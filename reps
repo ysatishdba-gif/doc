@@ -250,3 +250,179 @@ semantic information loss,
 not statistical density loss.
 
 That is the ontology-theoretic version of what your current method is approximating.
+
+if you want pure ontology reasoning with zero mathematical scoring, then you should stop using:
+
+IC,
+ΔIC,
+entropy,
+similarity scores,
+gradients,
+thresholds,
+statistical branching metrics.
+
+Instead, use a semantic constraint loss traversal.
+
+This becomes a purely symbolic ontology algorithm.
+
+Better Alternative: Constraint-Preservation Traversal
+
+The idea is:
+
+Traverse upward until the ontology removes an essential semantic qualifier from the original concept.
+
+No calculations are needed.
+
+Example
+
+Start with:
+
+Left knee joint pain
+
+Ancestors:
+
+Left knee pain
+Disorder of left knee
+Structure of left knee
+Knee structure
+
+At:
+
+Structure of left knee
+
+the ontology still preserves:
+
+laterality = left
+anatomy = knee
+
+At:
+
+Knee structure
+
+the ontology loses:
+
+laterality
+
+That is your boundary.
+
+No IC.
+No scores.
+No thresholds.
+
+Just ontology semantics.
+
+Core Principle
+
+Each concept carries semantic constraints from ontology relations such as:
+
+finding site
+laterality
+morphology
+anatomical structure
+associated procedure
+body region
+
+As you move upward:
+
+some constraints are preserved,
+eventually one disappears.
+
+The first ancestor where a defining constraint disappears is the semantic boundary.
+
+Simple Ontology-Only Rule
+
+Your traversal becomes:
+
+Start from target concept.
+Move upward one parent at a time.
+Compare semantic properties between child and parent.
+If the parent removes an essential property:
+stop traversal,
+return previous node.
+Why This Is Better
+
+This approach is:
+
+deterministic,
+explainable,
+ontology-native,
+independent of corpus statistics,
+independent of ontology size,
+portable across SNOMED-style ontologies.
+
+It also aligns better with how biomedical ontologies are actually designed.
+
+What Counts as a “Constraint”
+
+Depending on the ontology, you can track:
+
+laterality
+anatomical specificity
+body site
+role group
+clinical finding type
+morphology
+procedure target
+causative agent
+severity
+temporal qualifier
+
+Example:
+
+“Left knee joint pain”
+
+contains:
+
+left
+knee
+joint
+pain
+
+When one disappears in an ancestor:
+
+semantic scope widened,
+boundary crossed.
+Even Cleaner Version
+
+Instead of comparing all ancestors, define:
+
+“The semantic anchor is the highest ancestor that still preserves all defining qualifiers of the seed concept.”
+
+That becomes a purely logical ontology query.
+
+Recommended Practical Strategy
+
+For biomedical ontologies like:
+
+SNOMED CT
+UMLS
+
+use:
+
+IS-A hierarchy
+role groups
+defining relationships
+
+and stop traversal when:
+
+a defining relationship disappears,
+or becomes generalized.
+Your Current Method vs Ontology-Only Method
+
+Current:
+
+Detects statistical semantic collapse indirectly.
+
+Ontology-only:
+
+Detects explicit semantic qualifier loss directly.
+
+So instead of:
+
+“largest IC drop”
+
+you use:
+
+“first semantic constraint loss.”
+
+That is the cleanest non-mathematical ontology-native solution.
