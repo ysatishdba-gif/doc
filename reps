@@ -1,428 +1,205 @@
-The Core Metric FormulaTo visualize why the math works this way, look at how the data changes during traversal:\(\Delta IC=IC(\text{Current\ Node})-IC(\text{Parent\ Node})\)Climbing through low-level terms: Left knee joint pain \(\rightarrow \) Left knee pain. The change is minimal (\(\Delta IC \approx 0.02\)). The terms are equally specific.Hitting the Hub: Structure of Left Knee. It holds all the specific left knee clinical components [2].Crossing the Boundary: Structure of Left Knee \(\rightarrow \) Knee Structure. The parent concept drops the lateral modifier [2]. The descendant count skyrockets, causing a massive plunge in the parent's IC. The \(\Delta IC\) peaks right here. [2]Final Implementation ChecklistTo run this automatically in your pipeline, your script just needs to follow these three rules:Traverse upward from the target CUI, calculating the IC at each step [2].Track the difference (\(\Delta IC\)) between the current step and the next step [2].Pick the concept where that difference is the absolute highest, and exit the loop [2].
+If you're working directly with SNOMED CT RF2 files, then you can implement the ontology-only approach entirely from RF2 relationship semantics without any mathematical calculations.
 
+The key idea is:
 
-1. Lowest Common Semantic Region (Ontology Cut Method)
+Detect when an ancestor no longer preserves the defining RF2 relationships of the original concept.
 
-Instead of looking for the largest IC drop, define the boundary as:
-
-“The highest ancestor whose descendants still preserve all defining semantic constraints of the seed concept.”
-
-Example:
-
-Left knee joint pain
-Left knee pain
-Disorder of left knee
-Structure of left knee
-Knee structure ← laterality lost here
-
-The ontology itself already encodes:
-
-laterality,
-anatomical specificity,
-relation restrictions,
-role groups,
-body structure semantics.
-
-So instead of monitoring IC, you can detect:
-
-Boundary=arg
-a∈Ancestors(c)
-max
-	​
-
-ConstraintPreservation(a)
-
-The first ancestor where a defining restriction disappears becomes the semantic boundary.
-
-This is fully ontology-based.
-
-2. Description Logic (DL) Restriction Preservation — Best Pure Ontology Method
-
-This is probably the cleanest replacement.
-
-In ontologies like:
-
-SNOMED CT
-UMLS
-OWL ontologies
-
-concepts are defined by logical axioms.
-
-Example:
-
-Left Knee Joint Pain≡Pain⊓∃FindingSite.LeftKneeJoint
-
-As you traverse upward, compare logical restrictions.
-
-The semantic boundary occurs at:
-
-ΔR=R(child)−R(parent)
-
-where R is the set of DL restrictions.
-
-When:
-
-laterality disappears,
-anatomical specificity disappears,
-role groups collapse,
-existential restrictions are generalized,
-
-you have crossed the ontology boundary.
-
-No IC needed.
-
-3. Semantic Feature Retention Score
-
-Represent every concept as ontology features only:
-
-F(c)={laterality,anatomy,morphology,finding site,clinical course,associated morphology}
-
-Then compute:
-
-Retention(p,c)=
-∣F(c)∣
-∣F(p)∩F(c)∣
-	​
-
-
-Traversal stops when retention drops maximally.
-
-This is ontology-native because features come from:
-
-role groups,
-object properties,
-ontology relations,
-DL axioms.
-
-No thresholds required.
-
-4. Ontology Community Detection / Graph Partitioning
-
-This is a more advanced but elegant approach.
-
-Treat the ontology as a graph:
-
-nodes = concepts,
-edges = IS-A + semantic relations.
-
-Then run:
-
-Louvain modularity,
-spectral partitioning,
-ontology clustering,
-semantic flow partitioning.
-
-Your “boundary” is the point where traversal exits the local semantic community.
-
-This avoids:
-
-IC,
-thresholds,
-handcrafted gradients.
-
-The ontology topology itself determines the boundary.
-
-Very elegant for large biomedical ontologies.
-
-5. Relation Entropy Transition (Best Hybrid)
-
-Instead of IC over descendants, measure ontology relation diversity.
-
-For each ancestor:
-
-H(c)=−∑p(r)logp(r)
-
-where r are ontology relation types among descendants.
-
-Specific subtrees:
-
-low entropy,
-homogeneous semantics.
-
-Generalized ancestors:
-
-high entropy,
-mixed semantics.
-
-The boundary occurs at the maximal entropy acceleration.
-
-This remains ontology-derived rather than corpus-derived.
-
-Why Your Current IC-Drop Method Works
-
-Your current method is implicitly detecting:
-
-semantic phase transition
-
-At:
-
-Structure of Left Knee
-→ Knee Structure
-
-the ontology suddenly:
-
-merges lateralized branches,
-increases descendant branching factor,
-broadens semantic scope.
-
-IC drop is just a proxy for:
-
-ontology branching explosion,
-loss of defining constraints,
-semantic generalization.
-
-So the “real” phenomenon is structural, not statistical.
-
-Strong Recommendation
-
-If your goal is:
-
-zero thresholds,
-ontology purity,
-deterministic explainability,
-portability across ontologies,
-
-then the best replacement is:
-
-→ DL Restriction Preservation
-
-because it:
-
-uses only ontology axioms,
-is mathematically principled,
-explains exactly which semantic property was lost,
-avoids corpus dependence,
-works naturally with SNOMED CT.
-
-The stopping rule becomes:
-
-Stop at first ancestor whereR(parent)
-
-⊇R(seed)
-
-or equivalently:
-
-argmax∣ΔR∣
-
-where R is the restriction set.
-
-That gives you:
-
-interpretable boundaries,
-no arbitrary thresholds,
-ontology-native semantics,
-cleaner theoretical grounding than IC gradients.
-A More Principled Reformulation of Your Pipeline
+Best RF2-Based Alternative
 
 Instead of:
 
-argmaxΔIC
-
-use:
-
-argmax(∣R(c
-i
-	​
-
-)∖R(c
-i+1
-	​
-
-)∣)
-
-where:
-
-R(c) = logical restriction set,
-c
-i
-	​
-
- = current ancestor,
-c
-i+1
-	​
-
- = parent.
-
-This directly detects:
-
-semantic information loss,
-not statistical density loss.
-
-That is the ontology-theoretic version of what your current method is approximating.
-
-if you want pure ontology reasoning with zero mathematical scoring, then you should stop using:
-
 IC,
-ΔIC,
-entropy,
-similarity scores,
-gradients,
+descendant counts,
+graph density,
 thresholds,
-statistical branching metrics.
 
-Instead, use a semantic constraint loss traversal.
+use only:
 
-This becomes a purely symbolic ontology algorithm.
+Relationship
+StatedRelationship
+ISA
+attribute relationships
 
-Better Alternative: Constraint-Preservation Traversal
+from RF2.
 
-The idea is:
+What You Parse in RF2
 
-Traverse upward until the ontology removes an essential semantic qualifier from the original concept.
+The important RF2 tables are:
 
-No calculations are needed.
+1. Concept File
 
-Example
+Contains:
 
-Start with:
-
-Left knee joint pain
-
-Ancestors:
-
-Left knee pain
-Disorder of left knee
-Structure of left knee
-Knee structure
-
-At:
-
-Structure of left knee
-
-the ontology still preserves:
-
-laterality = left
-anatomy = knee
-
-At:
-
-Knee structure
-
-the ontology loses:
-
-laterality
-
-That is your boundary.
-
-No IC.
-No scores.
-No thresholds.
-
-Just ontology semantics.
-
-Core Principle
-
-Each concept carries semantic constraints from ontology relations such as:
-
-finding site
-laterality
-morphology
-anatomical structure
-associated procedure
-body region
-
-As you move upward:
-
-some constraints are preserved,
-eventually one disappears.
-
-The first ancestor where a defining constraint disappears is the semantic boundary.
-
-Simple Ontology-Only Rule
-
-Your traversal becomes:
-
-Start from target concept.
-Move upward one parent at a time.
-Compare semantic properties between child and parent.
-If the parent removes an essential property:
-stop traversal,
-return previous node.
-Why This Is Better
-
-This approach is:
-
-deterministic,
-explainable,
-ontology-native,
-independent of corpus statistics,
-independent of ontology size,
-portable across SNOMED-style ontologies.
-
-It also aligns better with how biomedical ontologies are actually designed.
-
-What Counts as a “Constraint”
-
-Depending on the ontology, you can track:
-
-laterality
-anatomical specificity
-body site
-role group
-clinical finding type
-morphology
-procedure target
-causative agent
-severity
-temporal qualifier
+active concepts
+IDs
+status
 
 Example:
 
-“Left knee joint pain”
+Left knee joint pain
+2. Relationship File
 
-contains:
+This is the important one.
 
-left
-knee
-joint
-pain
-
-When one disappears in an ancestor:
-
-semantic scope widened,
-boundary crossed.
-Even Cleaner Version
-
-Instead of comparing all ancestors, define:
-
-“The semantic anchor is the highest ancestor that still preserves all defining qualifiers of the seed concept.”
-
-That becomes a purely logical ontology query.
-
-Recommended Practical Strategy
-
-For biomedical ontologies like:
-
-SNOMED CT
-UMLS
-
-use:
+It contains:
 
 IS-A hierarchy
-role groups
+defining attributes
+
+Examples:
+
+finding site → left knee structure
+associated morphology
+laterality
+occurrence
+Pure Ontology Traversal Algorithm
+Step 1 — Get defining attributes of seed concept
+
+From RF2 relationships collect:
+
+finding site = left knee joint
+laterality = left
+clinical finding = pain
+
+These become the semantic signature.
+
+Step 2 — Traverse IS-A parents upward
+
+Using:
+
+typeId = 116680003 (IS-A)
+
+walk parent chain upward.
+
+Step 3 — At each ancestor, inspect relationships
+
+Check whether ancestor still preserves:
+
+same finding site,
+same laterality,
+same structure,
+same role groups.
+Stopping Rule
+
+Stop when a defining attribute disappears or generalizes.
+
+Example:
+
+Concept	Laterality	Knee	Joint
+Left knee joint pain	YES	YES	YES
+Left knee pain	YES	YES	NO
+Disorder of left knee	YES	YES	NO
+Structure of left knee	YES	YES	NO
+Knee structure	NO	YES	NO
+
+Traversal stops before:
+
+Knee structure
+
+because:
+
+laterality vanished.
+Why This Works Better Than IC
+
+IC only approximates:
+
+semantic broadening.
+
+RF2 relationships explicitly encode:
+
+semantic broadening.
+
+So you can directly observe ontology meaning changes instead of inferring them statistically.
+
+Important RF2 Fields
+
+You mainly need:
+
+RF2 Field	Purpose
+sourceId	child concept
+destinationId	target concept
+typeId	relationship type
+characteristicTypeId	stated/inferred
+relationshipGroup	semantic grouping
+Relationship Types to Monitor
+
+Especially important:
+
+Relationship	Meaning
+Finding site	anatomy
+Associated morphology	pathology
+Laterality	left/right
+Procedure site	procedures
+Due to	causation
+Severity	qualifiers
+Recommended Logic
+
+Instead of:
+
+“largest semantic drop”
+
+do:
+
+“highest ancestor preserving all defining RF2 relationships.”
+
+That is:
+
+cleaner,
+ontology-native,
+deterministic,
+explainable,
+fully RF2-driven.
+Even Better: Use Role Groups
+
+In SNOMED, meaning is often encoded via:
+
+relationshipGroup
+
+You should compare:
+
+grouped semantic patterns,
+not individual relationships alone.
+
+Example:
+
+Group:
+
+finding site = left knee
+morphology = inflammation
+
+If the parent breaks or removes the group:
+
+semantic boundary crossed.
+
+This is much more robust than IC.
+
+Practical RF2 Pipeline
+Parse:
+Concepts
+Relationships
+Descriptions (optional)
+Build:
+parent graph
+attribute map
+Traverse:
+upward via IS-A
+Compare:
+ancestor attributes vs seed attributes
+Stop:
+
+when defining attributes disappear/generalize.
+
+Strong Recommendation
+
+If your ontology is SNOMED RF2, then:
+
+Best non-mathematical solution:
+→ Relationship-preservation traversal
+
+using:
+
+IS-A hierarchy
 defining relationships
+role groups
 
-and stop traversal when:
-
-a defining relationship disappears,
-or becomes generalized.
-Your Current Method vs Ontology-Only Method
-
-Current:
-
-Detects statistical semantic collapse indirectly.
-
-Ontology-only:
-
-Detects explicit semantic qualifier loss directly.
-
-So instead of:
-
-“largest IC drop”
-
-you use:
-
-“first semantic constraint loss.”
-
-That is the cleanest non-mathematical ontology-native solution.
+This is the most ontology-faithful solution possible without introducing statistical heuristics.
