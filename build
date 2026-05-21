@@ -1,49 +1,45 @@
 """
 build_topics.py
 ---------------
-Build a CUI -> topics pickle from UMLS tables in BigQuery.
+Build a CUI -> topics pickle from UMLS data.
 
-Configuration is hardcoded in the CONFIG block below.
-Run with no arguments:
+On first run, fetches UMLS data from BigQuery into a local cache file
+(umls_cache.pkl). On subsequent runs, uses the cache and skips BigQuery
+entirely.
+
+To force re-fetch: delete umls_cache.pkl and run again.
+
+The cache is automatically invalidated and re-fetched if you change any
+of these config values:
+    PROJECT, DATASET, SAB, LANGUAGE
+
+To iterate on anchoring policy (STRICT_SLOTS, TRAVERSAL_RELS, etc.) just
+run again — the cache is reused.
+
+Usage:
     pip install google-cloud-bigquery
     gcloud auth application-default login
     python build_topics.py
-
-The algorithm:
-  For each SNOMED CUI:
-    1. Collect its attributes (has_finding_site, has_laterality, etc.)
-    2. Walk upward via every IS-A parent (multi-path DFS)
-    3. Along each path, walk as far as parents preserve the seed's attributes
-    4. Collect every node where a path "stops" — these are the anchors
-    5. Return all distinct anchors as the CUI's topic set
-
-A CUI can map to multiple anchors (SNOMED has multi-inheritance). All
-anchors are equally valid topics; no "primary" labeling.
-
-Match rule between seed and parent:
-  - For strict slots (has_finding_site, has_laterality):
-      parent must have the SAME value, else broken
-  - For other slots:
-      parent must have the attribute at all (any value), else broken
 """
 
 import datetime
+import os
 import pickle
 import time
 from collections import defaultdict
-from google.cloud import bigquery
 
 
 # ============================================================================
-# CONFIG — edit these for your environment
+# CONFIG — edit these
 # ============================================================================
 
-PROJECT = "YOUR_GCP_PROJECT"        # <-- REPLACE: e.g. "my-company-prod"
-DATASET = "YOUR_UMLS_DATASET"       # <-- REPLACE: e.g. "umls_2025aa"
-OUTPUT_PATH = "topics.pkl"          # where to write the pickle
+PROJECT = "YOUR_GCP_PROJECT"        # <-- REPLACE
+DATASET = "YOUR_UMLS_DATASET"       # <-- REPLACE
 
-# Table names within the dataset. The defaults match standard UMLS naming;
-# change only if your tables are named differently.
+CACHE_PATH = "umls_cache.pkl"
+OUTPUT_PATH = "topics.pkl"
+
+# Table names. Change only if your tables are named differently.
 TABLE_MRCONSO = "MRCONSO"
 TABLE_MRREL   = "MRREL"
 TABLE_MRSTY   = "MRSTY"
@@ -53,200 +49,177 @@ SAB      = "SNOMEDCT_US"
 LANGUAGE = "ENG"
 
 # Attribute types where ANY value change at the parent breaks the match.
-# Other attributes only break when missing entirely (any value is fine).
-#
-# These two are strict because:
-#   has_finding_site -> generalizing "Left knee" to "Knee" loses clinical
-#                       specificity. Search for "left knee" should not return
-#                       generic-knee or right-knee concepts.
-#   has_laterality   -> Left is not a kind of Right. There is no IS-A
-#                       relation between sides; treating it as generalizable
-#                       collapses lateralized concepts.
+# Other attributes only break when missing entirely.
 STRICT_SLOTS = {"has_finding_site", "has_laterality"}
 
 # Which UMLS relationship types to use for walking UP the hierarchy.
-# Each entry is (REL, RELA) — RELA can be None to match any RELA value
-# for that REL.
+# Each entry is (REL, RELA) — RELA can be None to match any RELA value.
 #
-# Available choices (UMLS Metathesaurus):
+# The cache fetches broadly; changing this list does NOT require a
+# re-fetch. Just rebuild from the existing cache.
 #
-#   ("CHD", "isa")     SNOMED's IS-A backbone. CUI2 IS-A CUI1
-#                      (CUI1 is the parent). The cleanest, most reliable
-#                      hierarchy edges. Always include.
+# Available choices:
+#   ("CHD", "isa")   SNOMED IS-A backbone
+#   ("RB",  None)    Related Broader (curator-asserted, non-IS-A)
+#   ("SY",  None)    Synonymous atoms (rarely useful at CUI level)
 #
-#   ("RB",  None)      Related Broader. Curator-asserted "broader than"
-#                      relationships that aren't strict IS-A. Cross-source
-#                      broadenings, MeSH-style organizing relationships,
-#                      etc. CUI2 is the narrower concept (current), CUI1
-#                      is the broader one. Generally safe and useful.
-#
-#   ("SY",  None)      Synonymous atoms. Rarely useful at CUI level
-#                      because UMLS already collapses synonyms into a
-#                      single CUI; only meaningful for cross-source
-#                      atom synonymy that didn't fully merge.
-#
-# NOT used (deliberately):
-#   PAR / inverse_isa  Just the inverse of CHD/isa; would double-count.
-#   RN                 Inverse of RB; would double-count.
-#   RQ                 "Possibly synonymous" — too fuzzy, adds noise.
-#   SIB                Sibling — non-directional, no "up" direction.
-#   RO + non-isa RELA  Domain-specific relationships (mapped_to, due_to,
-#                      occurs_in, etc.) — used for ATTRIBUTE comparison,
-#                      not traversal. Mixing them into traversal would
-#                      walk sideways and inflate topic groups.
-#
-# Each anchor entry in the output pickle gets tagged with the (REL, RELA)
-# that produced it, so you can audit how much each edge type contributes.
+# NOT useful for traversal:
+#   PAR/inverse_isa, RN, SIB, RQ, RO with non-isa RELA
 TRAVERSAL_RELS = [
     ("CHD", "isa"),
     ("RB",  None),
-    # ("SY", None),    # uncomment to also use atom synonyms
 ]
 
 # For testing: only anchor first N CUIs. Set to None for the full build.
-# A smoke build with 10000 takes ~30 seconds of anchoring after the BQ
-# queries complete; the full build runs every CUI in the dataset.
-MAX_CONCEPTS = None    # e.g. 10000 for smoke testing, None for full build
+MAX_CONCEPTS = None
 
-# Safety cap on multi-parent path explosion. If a CUI's upward traversal
-# touches more nodes than this, we stop. Real SNOMED concepts rarely
-# exceed a few hundred ancestors in their transitive closure; a runaway
-# usually indicates a cycle or unusually dense ontology region.
+# Safety cap on multi-parent path explosion.
 MAX_NODES_PER_TRAVERSAL = 5000
 
 
 # ============================================================================
-# Step 1: Load UMLS data from BigQuery into Python dicts
+# Step 1: Cache management — auto-detect or fetch from BigQuery
 # ============================================================================
 
-def load_concepts(client):
-    """Return the set of active SNOMED CUIs."""
+def get_or_fetch_cache():
+    """
+    Auto-detect: load existing cache if compatible with current config,
+    else fetch fresh from BigQuery.
+
+    Compatibility check ensures we don't silently use a cache that was
+    built for a different project/dataset/SAB/language.
+    """
+    current_config = {
+        "project":  PROJECT,
+        "dataset":  DATASET,
+        "sab":      SAB,
+        "language": LANGUAGE,
+    }
+
+    if os.path.exists(CACHE_PATH):
+        print(f"Found existing cache: {CACHE_PATH}")
+        t0 = time.time()
+        with open(CACHE_PATH, "rb") as f:
+            cache = pickle.load(f)
+        print(f"  loaded in {time.time()-t0:.1f}s")
+
+        cached_config = cache.get("config", {})
+        if cached_config != current_config:
+            print(f"\n  WARNING: cache config differs from current config:")
+            for key in current_config:
+                if cached_config.get(key) != current_config[key]:
+                    print(f"    {key}: cache={cached_config.get(key)!r}  "
+                          f"current={current_config[key]!r}")
+            print(f"  Re-fetching from BigQuery ...\n")
+        else:
+            print(f"  fetched_at  : {cache['fetched_at']}")
+            print(f"  cuis        : {len(cache['cuis']):,}")
+            print(f"  mrrel_rows  : {len(cache['mrrel_rows']):,}")
+            print(f"  config OK — using cached data")
+            return cache
+
+    print(f"\nFetching UMLS data from BigQuery ...")
+    cache = fetch_from_bigquery(current_config)
+    print(f"\nSaving cache to {CACHE_PATH} ...")
+    t0 = time.time()
+    with open(CACHE_PATH, "wb") as f:
+        pickle.dump(cache, f, protocol=pickle.HIGHEST_PROTOCOL)
+    size_mb = os.path.getsize(CACHE_PATH) / (1024 * 1024)
+    print(f"  wrote {size_mb:.1f} MB in {time.time()-t0:.1f}s")
+    return cache
+
+
+def fetch_from_bigquery(config):
+    """
+    Pull everything we need from BigQuery in one go, return as a dict.
+
+    We fetch broadly — every REL type that could plausibly be used for
+    traversal — so that future tweaks to TRAVERSAL_RELS don't require
+    re-fetching.
+    """
+    # Import here so the rest of the script doesn't require the BQ
+    # library installed when running off a cache.
+    from google.cloud import bigquery
+
+    if config["project"] == "YOUR_GCP_PROJECT" or config["dataset"] == "YOUR_UMLS_DATASET":
+        print("ERROR: edit PROJECT and DATASET in the CONFIG block")
+        raise SystemExit(1)
+
+    client = bigquery.Client(project=config["project"])
+    sab = config["sab"]
+    lat = config["language"]
+
+    # ---- 1. Active CUIs ----
+    print("  [1/4] Loading SNOMED CUIs from MRCONSO ...")
+    t0 = time.time()
     sql = f"""
     SELECT DISTINCT CUI
-    FROM `{PROJECT}.{DATASET}.{TABLE_MRCONSO}`
-    WHERE SAB = @sab
-      AND LAT = @lat
+    FROM `{config['project']}.{config['dataset']}.{TABLE_MRCONSO}`
+    WHERE SAB = @sab AND LAT = @lat
       AND SUPPRESS NOT IN ('O', 'Y')
     """
     job_config = bigquery.QueryJobConfig(query_parameters=[
-        bigquery.ScalarQueryParameter("sab", "STRING", SAB),
-        bigquery.ScalarQueryParameter("lat", "STRING", LANGUAGE),
+        bigquery.ScalarQueryParameter("sab", "STRING", sab),
+        bigquery.ScalarQueryParameter("lat", "STRING", lat),
     ])
-    return {row.CUI for row in client.query(sql, job_config=job_config).result()}
+    cuis = {row.CUI for row in client.query(sql, job_config=job_config).result()}
+    print(f"        {len(cuis):,} CUIs in {time.time()-t0:.1f}s")
 
-
-def load_parents_and_attrs(client, cuis):
-    """
-    One pass over MRREL. Returns:
-        parents[cui]   = dict { parent_cui : (REL, RELA) }
-                         The REL/RELA records HOW we reached that parent —
-                         CHD/isa or RB or SY. Same parent reached via two
-                         REL types: we keep the highest-priority one
-                         (TRAVERSAL_RELS list order).
-        attrs[cui]     = dict { rela_name : value_cui } of defining attrs
-        edge_counts    = dict { (REL, RELA): count } for diagnostics
-
-    Direction: in MRREL the relationship is "from CUI2 to CUI1". For
-    hierarchy-style RELs (CHD, RB), CUI1 is the broader/parent concept
-    and CUI2 is the narrower/child. So parent edges go: CUI2 -> CUI1.
-    """
-    # Build a SQL WHERE clause that matches any entry in TRAVERSAL_RELS,
-    # plus the RO/attribute rows we use for defining attributes.
-    traversal_conditions = []
-    for rel, rela in TRAVERSAL_RELS:
-        if rela is None:
-            traversal_conditions.append(f"(REL = '{rel}')")
-        else:
-            traversal_conditions.append(f"(REL = '{rel}' AND RELA = '{rela}')")
-    traversal_clause = " OR ".join(traversal_conditions) if traversal_conditions else "FALSE"
-
+    # ---- 2. MRREL rows (broad fetch) ----
+    print("  [2/4] Loading MRREL rows (broad — all REL types we might use) ...")
+    t0 = time.time()
     sql = f"""
     SELECT CUI1, CUI2, REL, RELA
-    FROM `{PROJECT}.{DATASET}.{TABLE_MRREL}`
+    FROM `{config['project']}.{config['dataset']}.{TABLE_MRREL}`
     WHERE SAB = @sab
       AND SUPPRESS NOT IN ('O', 'Y')
       AND CUI1 != CUI2
       AND (
-            {traversal_clause}
+            (REL = 'CHD' AND RELA = 'isa')
+         OR (REL = 'PAR' AND RELA = 'inverse_isa')
+         OR (REL = 'RB')
+         OR (REL = 'RN')
+         OR (REL = 'SY')
+         OR (REL = 'SIB')
          OR (REL = 'RO' AND RELA IS NOT NULL
-                        AND RELA != 'isa'
-                        AND NOT STARTS_WITH(RELA, 'inverse_'))
+                         AND RELA != 'isa'
+                         AND NOT STARTS_WITH(RELA, 'inverse_'))
       )
     """
     job_config = bigquery.QueryJobConfig(query_parameters=[
-        bigquery.ScalarQueryParameter("sab", "STRING", SAB),
+        bigquery.ScalarQueryParameter("sab", "STRING", sab),
     ])
-
-    # Build a fast lookup of (REL, RELA) -> priority index for ordering
-    # parent-edge sources when the same parent is reachable via multiple
-    # relationships. Lower index = higher priority.
-    rel_priority = {}
-    for i, (rel, rela) in enumerate(TRAVERSAL_RELS):
-        rel_priority[(rel, rela)] = i
-        if rela is None:
-            # Catch-all: this priority applies to any RELA under this REL
-            pass
-
-    def edge_priority(rel, rela):
-        # Exact match wins; fall back to (rel, None) catch-all.
-        if (rel, rela) in rel_priority:
-            return rel_priority[(rel, rela)]
-        if (rel, None) in rel_priority:
-            return rel_priority[(rel, None)]
-        return 999
-
-    def is_traversal_edge(rel, rela):
-        for tr_rel, tr_rela in TRAVERSAL_RELS:
-            if rel != tr_rel:
-                continue
-            if tr_rela is None or rela == tr_rela:
-                return True
-        return False
-
-    parents = defaultdict(dict)     # child_cui -> {parent_cui: (REL, RELA)}
-    attrs = defaultdict(dict)
-    edge_counts = defaultdict(int)
-
+    mrrel_rows = []
     for row in client.query(sql, job_config=job_config).result():
-        if row.CUI1 not in cuis or row.CUI2 not in cuis:
-            continue
+        if row.CUI1 in cuis and row.CUI2 in cuis:
+            mrrel_rows.append((row.CUI1, row.CUI2, row.REL, row.RELA))
+    print(f"        {len(mrrel_rows):,} rows in {time.time()-t0:.1f}s")
+    rel_counts = defaultdict(int)
+    for _, _, rel, rela in mrrel_rows:
+        rel_counts[(rel, rela)] += 1
+    print(f"        Row breakdown (top 10):")
+    for (rel, rela), n in sorted(rel_counts.items(), key=lambda kv: -kv[1])[:10]:
+        print(f"          {rel:6s} {str(rela)[:30]:30s}  {n:>10,d}")
 
-        if is_traversal_edge(row.REL, row.RELA):
-            # CUI1 is the broader concept (parent), CUI2 is the narrower (child).
-            child, parent = row.CUI2, row.CUI1
-            key = (row.REL, row.RELA)
-            edge_counts[key] += 1
-            existing = parents[child].get(parent)
-            # If already present via a higher-priority REL, keep that one.
-            if existing is None or edge_priority(*key) < edge_priority(*existing):
-                parents[child][parent] = key
-        else:
-            # RO row with a non-isa RELA — this is a defining attribute.
-            # CUI2 is the concept being defined, CUI1 is the attribute value.
-            attrs[row.CUI2].setdefault(row.RELA, row.CUI1)
-
-    return parents, attrs, edge_counts
-
-
-def load_semantic_tags(client, cuis):
+    # ---- 3. Semantic types ----
+    print("  [3/4] Loading semantic types from MRSTY ...")
+    t0 = time.time()
     sql = f"""
     SELECT CUI, STY
-    FROM `{PROJECT}.{DATASET}.{TABLE_MRSTY}`
+    FROM `{config['project']}.{config['dataset']}.{TABLE_MRSTY}`
     """
     tags = {}
     for row in client.query(sql).result():
         if row.CUI in cuis and row.CUI not in tags:
             tags[row.CUI] = row.STY
-    return tags
+    print(f"        {len(tags):,} tags in {time.time()-t0:.1f}s")
 
-
-def load_labels(client, cuis_of_interest):
-    """Pull preferred labels for a specific set of CUIs."""
-    if not cuis_of_interest:
-        return {}
-    labels = {}
-    cui_list = list(cuis_of_interest)
+    # ---- 4. Preferred labels ----
+    print("  [4/4] Loading preferred labels from MRCONSO ...")
+    t0 = time.time()
+    cui_list = sorted(cuis)
     BATCH = 50000
+    labels = {}
     for i in range(0, len(cui_list), BATCH):
         batch = cui_list[i:i + BATCH]
         sql = f"""
@@ -255,7 +228,7 @@ def load_labels(client, cuis_of_interest):
             CASE WHEN TS = 'P' AND ISPREF = 'Y' AND SUPPRESS = 'N' THEN 0
                  WHEN SUPPRESS = 'N' THEN 1
                  ELSE 2 END AS rank
-          FROM `{PROJECT}.{DATASET}.{TABLE_MRCONSO}`
+          FROM `{config['project']}.{config['dataset']}.{TABLE_MRCONSO}`
           WHERE SAB = @sab AND LAT = @lat
             AND SUPPRESS NOT IN ('O', 'Y')
             AND CUI IN UNNEST(@cuis)
@@ -264,17 +237,86 @@ def load_labels(client, cuis_of_interest):
         FROM ranked GROUP BY CUI
         """
         job_config = bigquery.QueryJobConfig(query_parameters=[
-            bigquery.ScalarQueryParameter("sab", "STRING", SAB),
-            bigquery.ScalarQueryParameter("lat", "STRING", LANGUAGE),
+            bigquery.ScalarQueryParameter("sab", "STRING", sab),
+            bigquery.ScalarQueryParameter("lat", "STRING", lat),
             bigquery.ArrayQueryParameter("cuis", "STRING", batch),
         ])
         for row in client.query(sql, job_config=job_config).result():
             labels[row.CUI] = row.label
-    return labels
+    print(f"        {len(labels):,} labels in {time.time()-t0:.1f}s")
+
+    return {
+        "fetched_at": datetime.datetime.now().isoformat(),
+        "config":     config,
+        "cuis":       cuis,
+        "mrrel_rows": mrrel_rows,
+        "tags":       tags,
+        "labels":     labels,
+    }
 
 
 # ============================================================================
-# Step 2: The anchoring algorithm — multi-path
+# Step 2: Parse MRREL into parents/attrs dicts
+# ============================================================================
+
+def parse_mrrel(cache):
+    """
+    Walk the cached MRREL rows once. Split into:
+        parents[child_cui]  = dict { parent_cui : (REL, RELA) }
+        attrs[cui]          = dict { rela_name : value_cui }
+        edge_counts         = dict { (REL, RELA) : count }
+
+    The parents dict only includes REL types listed in TRAVERSAL_RELS.
+    Every other "RO with a named RELA" row becomes a defining attribute.
+
+    Direction: in MRREL the relationship is "from CUI2 to CUI1". For
+    hierarchy-style RELs (CHD, RB), CUI1 is the broader/parent concept
+    and CUI2 is the narrower/child. So parent edges go: CUI2 -> CUI1.
+    """
+    traversal_set = set()
+    traversal_rel_only = set()
+    for rel, rela in TRAVERSAL_RELS:
+        if rela is None:
+            traversal_rel_only.add(rel)
+        else:
+            traversal_set.add((rel, rela))
+
+    rel_priority = {}
+    for i, (rel, rela) in enumerate(TRAVERSAL_RELS):
+        rel_priority[(rel, rela)] = i
+
+    def is_traversal(rel, rela):
+        if rel in traversal_rel_only:
+            return True
+        return (rel, rela) in traversal_set
+
+    def edge_priority(rel, rela):
+        if (rel, rela) in rel_priority:
+            return rel_priority[(rel, rela)]
+        if (rel, None) in rel_priority:
+            return rel_priority[(rel, None)]
+        return 999
+
+    parents = defaultdict(dict)
+    attrs = defaultdict(dict)
+    edge_counts = defaultdict(int)
+
+    for cui1, cui2, rel, rela in cache["mrrel_rows"]:
+        if is_traversal(rel, rela):
+            child, parent = cui2, cui1
+            key = (rel, rela)
+            edge_counts[key] += 1
+            existing = parents[child].get(parent)
+            if existing is None or edge_priority(*key) < edge_priority(*existing):
+                parents[child][parent] = key
+        elif rel == "RO" and rela and not rela.startswith("inverse_") and rela != "isa":
+            attrs[cui2].setdefault(rela, cui1)
+
+    return parents, attrs, edge_counts
+
+
+# ============================================================================
+# Step 3: The anchoring algorithm — multi-path
 # ============================================================================
 
 def check_break(seed_attrs, parent_attrs):
@@ -297,32 +339,21 @@ def check_break(seed_attrs, parent_attrs):
 
 def find_anchors(seed_cui, parents, attrs):
     """
-    Walk every preserving path upward from seed_cui (across any REL type
-    configured in TRAVERSAL_RELS). Collect all distinct anchors.
+    Walk every traversal path upward from seed_cui. Collect all distinct
+    anchors. Returns a list of dicts (alphabetical by anchor CUI):
 
-    Returns a list of dicts, alphabetical by anchor CUI:
-        [{"anchor":      cui,
-          "lost":        rela_or_None,
-          "path_length": int,
-          "rels_used":   sorted list of (REL, RELA) tuples seen on the path}, ...]
-
-    Always non-empty: if the seed has no preserving parents, returns
-    a single entry with anchor=seed_cui itself.
-
-    path_length and rels_used are diagnostic only. Anchors are NOT ranked.
-
-    `parents` here is dict[child] -> dict[parent] -> (REL, RELA).
+      [{"anchor":      cui,
+        "lost":        rela_or_None,
+        "path_length": int,
+        "rels_used":   sorted list of (REL, RELA) tuples seen on path}, ...]
     """
     seed_attrs = attrs.get(seed_cui, {})
     if not seed_attrs:
         return [{"anchor": seed_cui, "lost": None,
                  "path_length": 1, "rels_used": []}]
 
-    # anchor_cui -> {"lost", "path_length", "rels_used"}
     found_anchors = {}
     visited_total = set()
-    # Stack entries: (current_node, depth, visited_set_on_path,
-    #                 rels_used_so_far as frozenset of (REL, RELA))
     stack = [(seed_cui, 1, frozenset([seed_cui]), frozenset())]
 
     while stack:
@@ -332,9 +363,8 @@ def find_anchors(seed_cui, parents, attrs):
         current, depth, visited_on_path, rels_used = stack.pop()
         visited_total.add(current)
 
-        # parents[current] is a dict[parent_cui] -> (REL, RELA)
         ps = parents.get(current, {})
-        preserving_parents = []   # list of (parent_cui, (REL, RELA))
+        preserving_parents = []
         any_break_reason = None
 
         for parent_cui, rel_key in ps.items():
@@ -376,35 +406,27 @@ def find_anchors(seed_cui, parents, attrs):
 
 
 # ============================================================================
-# Step 3: Orchestration
+# Step 4: Orchestration
 # ============================================================================
 
 def main():
-    if PROJECT == "YOUR_GCP_PROJECT" or DATASET == "YOUR_UMLS_DATASET":
-        print("ERROR: edit the CONFIG block at the top of build_topics.py")
-        print("       set PROJECT and DATASET to your real values, then re-run.")
-        raise SystemExit(1)
-
     print("=" * 60)
     print("Build CUI -> topics pickle")
     print(f"  project       : {PROJECT}")
     print(f"  dataset       : {DATASET}")
+    print(f"  cache         : {CACHE_PATH}")
     print(f"  output        : {OUTPUT_PATH}")
     print(f"  strict slots  : {sorted(STRICT_SLOTS)}")
+    print(f"  traversal     : {TRAVERSAL_RELS}")
     print(f"  max_concepts  : {MAX_CONCEPTS if MAX_CONCEPTS else 'all'}")
     print("=" * 60)
 
-    client = bigquery.Client(project=PROJECT)
+    print("\n[1/4] Getting UMLS data (cache or BigQuery) ...")
+    cache = get_or_fetch_cache()
 
-    print("\n[1/5] Loading SNOMED CUIs from MRCONSO ...")
+    print("\n[2/4] Parsing MRREL into parents and attributes ...")
     t0 = time.time()
-    cuis = load_concepts(client)
-    print(f"      {len(cuis):,} CUIs in {time.time()-t0:.1f}s")
-
-    print("\n[2/5] Loading parents and attributes from MRREL ...")
-    print(f"      Traversal REL types: {TRAVERSAL_RELS}")
-    t0 = time.time()
-    parents, attrs, edge_counts = load_parents_and_attrs(client, cuis)
+    parents, attrs, edge_counts = parse_mrrel(cache)
     n_edges = sum(len(v) for v in parents.values())
     n_attrs = sum(len(v) for v in attrs.values())
     print(f"      {n_edges:,} traversal edges, {n_attrs:,} attributes in "
@@ -413,13 +435,9 @@ def main():
     for (rel, rela), n in sorted(edge_counts.items(), key=lambda kv: -kv[1]):
         print(f"        {rel:6s} {str(rela):20s}  {n:>10,d}")
 
-    print("\n[3/5] Loading semantic types from MRSTY ...")
+    print("\n[3/4] Finding anchors ...")
     t0 = time.time()
-    tags = load_semantic_tags(client, cuis)
-    print(f"      {len(tags):,} tags in {time.time()-t0:.1f}s")
-
-    print("\n[4/5] Finding anchors (multi-path) ...")
-    t0 = time.time()
+    cuis = cache["cuis"]
     all_cuis = list(cuis)
     if MAX_CONCEPTS:
         all_cuis = all_cuis[:MAX_CONCEPTS]
@@ -433,7 +451,9 @@ def main():
     for i, cui in enumerate(all_cuis):
         if i % 50000 == 0 and i > 0:
             rate = i / (time.time() - t0)
-            print(f"      {i:,} / {len(all_cuis):,}  ({rate:.0f}/sec)")
+            eta_min = (len(all_cuis) - i) / max(1, rate) / 60
+            print(f"      {i:,} / {len(all_cuis):,}  ({rate:.0f}/sec, "
+                  f"ETA {eta_min:.1f}min)")
         anchors = find_anchors(cui, parents, attrs)
         anchors_by_cui[cui] = anchors
         total_anchor_entries += len(anchors)
@@ -442,23 +462,26 @@ def main():
         if len(anchors) == 1 and anchors[0]["anchor"] == cui:
             self_only_count += 1
     print(f"      anchored {len(anchors_by_cui):,} CUIs in {time.time()-t0:.1f}s")
-    print(f"      {multi_anchor_count:,} CUIs have >1 topic; "
-          f"avg topics/CUI = {total_anchor_entries/max(1,len(anchors_by_cui)):.2f}")
 
-    print("\n[5/5] Pulling labels and saving pickle ...")
+    print("\n[4/4] Saving pickle ...")
     t0 = time.time()
-    needed = set(anchors_by_cui.keys())
-    for entries in anchors_by_cui.values():
-        for e in entries:
-            needed.add(e["anchor"])
-    labels = load_labels(client, needed)
     unique_anchors = {e["anchor"] for entries in anchors_by_cui.values() for e in entries}
+    labels = cache["labels"]
+    tags = cache["tags"]
+    needed = set(anchors_by_cui.keys()) | unique_anchors
+    out_labels = {c: labels[c] for c in needed if c in labels}
+    out_tags = {c: tags[c] for c in needed if c in tags}
 
     payload = {
         "built_at": datetime.datetime.now().isoformat(),
+        "cache_fetched_at": cache.get("fetched_at"),
+        "config": {
+            "strict_slots": sorted(STRICT_SLOTS),
+            "traversal_rels": TRAVERSAL_RELS,
+        },
         "anchors": anchors_by_cui,
-        "labels":  labels,
-        "tags":    {c: tags[c] for c in needed if c in tags},
+        "labels":  out_labels,
+        "tags":    out_tags,
         "stats": {
             "total_cuis": len(anchors_by_cui),
             "unique_anchors": len(unique_anchors),
@@ -468,9 +491,7 @@ def main():
         },
     }
     with open(OUTPUT_PATH, "wb") as f:
-        pickle.dump(payload, f)
-
-    import os
+        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
     size_mb = os.path.getsize(OUTPUT_PATH) / (1024 * 1024)
     print(f"      wrote {size_mb:.1f} MB in {time.time()-t0:.1f}s")
 
