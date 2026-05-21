@@ -337,6 +337,27 @@ def check_break(seed_attrs, parent_attrs):
     return None
 
 
+def is_transparent_parent(seed_attrs, parent_attrs):
+    """
+    A parent is "transparent" if it shares NO defining attributes with the
+    seed. There's nothing meaningful to compare, so we walk through it
+    instead of treating it as a boundary.
+
+    Why this matters:
+      - 'Wedge pressure technique' has technique_of; its parent 'Technique'
+        has no attributes at all. There's nothing to match on, but
+        'Technique' is the clear topic. Walk through.
+      - Cases where the seed has attributes the parent simply doesn't
+        carry (because UMLS chose to attach them only at the more specific
+        level) are not "boundaries" — the parent is just less detailed.
+    """
+    if not parent_attrs:
+        return True   # parent has nothing at all; nothing to break
+    # If parent's attribute types don't overlap with the seed's at all,
+    # there's no shared comparison surface.
+    return not (set(seed_attrs) & set(parent_attrs))
+
+
 def find_anchors(seed_cui, parents, attrs):
     """
     Walk every traversal path upward from seed_cui. Collect all distinct
@@ -346,11 +367,17 @@ def find_anchors(seed_cui, parents, attrs):
         "lost":        rela_or_None,
         "path_length": int,
         "rels_used":   sorted list of (REL, RELA) tuples seen on path}, ...]
+
+    Behavior:
+      - Walks through "transparent" parents (no attribute overlap with seed).
+        These don't anchor; we look past them for a real comparison point.
+      - Seeds with no defining attributes still walk — they vacuously
+        preserve everything, so they walk until they hit the root or until
+        a parent ALSO has no attributes (transparent), in which case we
+        continue past it. Effectively such seeds anchor at the ontology
+        root via whatever traversal path exists.
     """
     seed_attrs = attrs.get(seed_cui, {})
-    if not seed_attrs:
-        return [{"anchor": seed_cui, "lost": None,
-                 "path_length": 1, "rels_used": []}]
 
     found_anchors = {}
     visited_total = set()
@@ -364,17 +391,23 @@ def find_anchors(seed_cui, parents, attrs):
         visited_total.add(current)
 
         ps = parents.get(current, {})
-        preserving_parents = []
+        preserving_parents = []   # parents we'll continue exploring through
         any_break_reason = None
 
         for parent_cui, rel_key in ps.items():
             if parent_cui in visited_on_path:
                 continue
-            broken = check_break(seed_attrs, attrs.get(parent_cui, {}))
-            if broken is None:
+            parent_attrs = attrs.get(parent_cui, {})
+            if is_transparent_parent(seed_attrs, parent_attrs):
+                # Walk through transparent parents without anchoring at
+                # the current node — they don't constitute a boundary.
                 preserving_parents.append((parent_cui, rel_key))
-            elif any_break_reason is None:
-                any_break_reason = broken
+            else:
+                broken = check_break(seed_attrs, parent_attrs)
+                if broken is None:
+                    preserving_parents.append((parent_cui, rel_key))
+                elif any_break_reason is None:
+                    any_break_reason = broken
 
         if not preserving_parents:
             existing = found_anchors.get(current)
