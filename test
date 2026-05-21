@@ -1,29 +1,153 @@
----------------------------------------------------------------------------
-SystemExit                                Traceback (most recent call last)
-Cell In[49], line 942
-    938     print("=" * 60)
-    941 if __name__ == "__main__":
---> 942     main()
 
-Cell In[49], line 777, in main()
-    774 print("=" * 60)
-    776 print("\n[1/4] Getting UMLS data (cache or BigQuery) ...")
---> 777 cache = get_or_fetch_cache()
-    779 print("\n[2/4] Parsing MRREL into parents and attributes ...")
-    780 t0 = time.time()
+[1/4] Getting UMLS data (cache or BigQuery) ...
+Found existing cache: umls_cache.pkl
+  loaded in 2.0s
 
-Cell In[49], line 234, in get_or_fetch_cache()
-    231         return cache
-    233 print(f"\nFetching UMLS data from BigQuery ...")
---> 234 cache = fetch_from_bigquery(current_config)
-    235 print(f"\nSaving cache to {CACHE_PATH} ...")
-    236 t0 = time.time()
+  Cache schema version is 0, current code expects 2.
+  Re-fetching from BigQuery ...
 
-Cell In[49], line 258, in fetch_from_bigquery(config)
-    256 if config["project"] == PROJECT or config["dataset"] == DATASET:
-    257     print("ERROR: edit PROJECT and DATASET in the CONFIG block")
---> 258     raise SystemExit(1)
-    260 client = bigquery.Client(project=config["project"])
-    261 sab = config["sab"]
 
-SystemExit: 1
+Fetching UMLS data from BigQuery ...
+  [1/4] Loading SNOMED CUIs from MRCONSO ...
+        374,538 CUIs in 9.3s
+  [2/4] Loading MRREL rows (broad — all REL types we might use) ...
+        2,748,222 rows in 144.8s
+        Row breakdown (top 10):
+          CHD    isa                                615,978
+          PAR    inverse_isa                        615,942
+          RO     finding_site_of                    106,424
+          RO     has_finding_site                   106,423
+          RO     has_associated_morphology           79,784
+          RO     associated_morphology_of            78,747
+          RO     has_method                          68,889
+          RO     method_of                           68,889
+          RO     mapped_from                         46,130
+          RO     mapped_to                           46,130
+  [3/4] Loading semantic types from MRSTY ...
+        370,670 CUIs tagged (21,535 have multiple STYs) in 112.4s
+  [4/4] Loading preferred labels from MRCONSO ...
+        374,538 labels in 33.1s
+
+Saving cache to umls_cache.pkl ...
+  wrote 156.3 MB in 5.8s
+
+[2/4] Parsing MRREL into parents and attributes ...
+      611,398 traversal edges, 715,317 attribute types (1,397,304 total values) in 12.0s
+      Edge breakdown by (REL, RELA):
+        CHD    isa                      615,978
+
+[3/4] Finding anchors ...
+      50,000 / 374,538  (11095/sec, ETA 0.5min)
+      100,000 / 374,538  (10910/sec, ETA 0.4min)
+      150,000 / 374,538  (10200/sec, ETA 0.4min)
+      200,000 / 374,538  (10459/sec, ETA 0.3min)
+      250,000 / 374,538  (10101/sec, ETA 0.2min)
+      300,000 / 374,538  (10219/sec, ETA 0.1min)
+      350,000 / 374,538  (9947/sec, ETA 0.0min)
+      anchored 374,538 CUIs in 37.5s
+
+[3.5/4] Filtering over-abstract anchors (threshold = 3,000 members) ...
+      found 10 over-threshold anchors (will be dropped):
+        31,504  C0029235  Organism
+        21,092  C1827535  Structure of half of body lateral to midsagittal plane
+        12,600  C0439861  Substances
+        11,501  C0347997  Physical objects
+         6,461  C2316799  Measurement of substance
+         5,962  C0013227  Drug or medicament (substance)
+         5,762  C0037088  Clinical finding (finding)
+         3,556  C1274016  Clinical history/examination observable
+         3,478  C2586094  Product manufactured as oral dose form
+         3,278  C0184661  Procedure
+      done in 1.4s
+      self-only after filter:    205,455
+      multi-topic after filter:  122,725
+
+[4/4] Saving pickle ...
+      wrote 65.8 MB in 3.5s
+
+============================================================
+DONE
+  Total CUIs            : 374,538
+  Unique anchors        : 287,289
+  Self-only             : 205,455 (54.9%)
+  Multi-topic CUIs      : 122,725 (32.8%)
+  Avg topics per CUI    : 1.54
+  Compression           : 1.30x
+  Pickle                : topics.pkl (65.8 MB)
+============================================================
+
+
+result:
+======================================================================
+Pickle: topics.pkl
+  built_at         : 2026-05-21T21:52:38.804305
+  total CUIs       : 374,538
+  unique anchors   : 287,289
+  self-only        : 205,455
+  multi-topic CUIs : 122,725
+======================================================================
+
+Relationship-type contribution to non-self anchors (290,505 total):
+  CHD    isa                    290,505  (100.0%)
+
+  Anchors reached using ONLY CHD/isa : 290,505
+  Anchors that used RB at any point  : 0
+  Anchors reached using ONLY RB      : 0
+    (these would not exist without RB traversal)
+
+--- Sample CUIs with ONE topic (different from self) [46358 total in pickle] ---
+  C0454027  (Chews fine cut tobacco                  ) -> C1287520  (Finding of tobacco use and exposure)
+  C0417970  (Accident caused by falling object due to action of machinery) -> C0441471  (Events)
+  C1266133  (Genital rhabdomyoma                     ) -> C0332447  (Morphologically abnormal structure)
+  C4708187  (Irreducible right inguinal hernia       ) -> C0262617  (Right inguinal hernia)
+  C4040318  (Measurement of C-reactive protein using high sensitivity technique) -> C0201657  (C-reactive protein level)
+
+--- Sample CUIs with MULTIPLE topics [122725 total in pickle] ---
+  C1101838  (Pitavastatin)
+      -> C0360714  (HMG-CoA reductase inhibitor)
+      -> C1101838  (Pitavastatin)
+  C0565439  (Perivesical tissue exploration)
+      -> C0565439  (Perivesical tissue exploration)
+      -> C1285289  (Exploration of trunk)
+  C4749308  (Benzodiazepine therapy)
+      -> C0087111  (Therapy)
+      -> C3469597  (Medication administration)
+      -> C4749308  (Benzodiazepine therapy)
+  C1998362  (Urodynamic study using catheter)
+      -> C0430952  (Urological investigation)
+      -> C0455799  (Urogenital system investigation)
+      -> C1998362  (Urodynamic study using catheter)
+  C0582970  (Prophylactic knee stretching)
+      -> C0582970  (Prophylactic knee stretching)
+      -> C0600080  (Stretching exercises)
+
+--- Sample CUIs that anchor to themselves [205455 total in pickle] ---
+  C1080746  (Desulfobacter latus (organism))
+  C3881538  (Polychloroprene examination/treatment glove, powdered)
+  C1085773  (Malassezia sympodialis)
+  C3464349  (Azelastine- and fluticasone-containing product)
+  C0316124  (Salmonella Bahati)
+
+--- Top 10 largest topic groups ---
+  2590 members  C0441471  (Events)
+  2350 members  C0332447  (Morphologically abnormal structure)
+  2086 members  C0229966  (Structure of right half of body)
+  2070 members  C0229967  (Structure of left half of body)
+  2058 members  C0442972  (Imaging guidance)
+  1986 members  C2711400  (Anatomical or acquired body structure)
+  1964 members  C2584795  (Product manufactured as parenteral dose form)
+  1941 members  C1287400  (History finding)
+  1897 members  C0022885  (Laboratory procedures)
+  1841 members  C0520510  (Material)
+
+======================================================================
+Copy/paste any of these into CUIS_TO_LOOKUP in lookup_topics.py
+======================================================================
+
+CUIS_TO_LOOKUP = [
+    "C0454027",   # Chews fine cut tobacco
+    "C0417970",   # Accident caused by falling object due to action of machinery
+    "C1101838",   # Pitavastatin
+    "C0565439",   # Perivesical tissue exploration
+    "C1080746",   # Desulfobacter latus (organism)
+]
