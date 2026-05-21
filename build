@@ -59,6 +59,145 @@ LANGUAGE = "ENG"
 # carries that information.
 STRICT_SLOTS = {"has_finding_site"}
 
+# Allowlist of RELA names that should be treated as DEFINING attributes.
+# RO rows with other RELAs are ignored — they're typically administrative,
+# associative, or modeling-artifact relationships that don't constrain the
+# concept's semantic identity.
+#
+# Setting this to None disables the allowlist (all named RO RELAs are
+# treated as defining — the old behavior). With the allowlist, only the
+# RELAs below count.
+#
+# This is the single biggest correctness improvement for topic quality:
+# narrowing to truly-defining relationships prevents the algorithm from
+# being misled by historical, administrative, or weak-semantic links.
+#
+# The list below is conservative — clinically core attributes only. Add
+# more as evidence shows they're useful in your retrieval results.
+ATTRIBUTE_RELAS = {
+    # Findings / disorders
+    "has_finding_site",
+    "has_associated_morphology",
+    "has_causative_agent",
+    "has_pathological_process",
+    "occurs_in",
+    "due_to",
+    "interprets",
+    "has_interpretation",
+    # Procedures
+    "has_method",
+    "has_procedure_site",
+    "has_procedure_site_direct",
+    "has_direct_procedure_site",
+    "has_indirect_procedure_site",
+    "has_direct_morphology",
+    "has_indirect_morphology",
+    "has_focus",
+    "has_intent",
+    "has_priority",
+    "has_route_of_administration",
+    "has_access",
+    "has_approach",
+    # Specimens
+    "has_specimen_source_topography",
+    "has_specimen_source_morphology",
+    "has_specimen_substance",
+    "has_specimen_procedure",
+    # Substances / drugs
+    "has_active_ingredient",
+    "has_dose_form",
+    "has_ingredient",
+    # Laterality (kept non-strict but still defining for some axes)
+    "has_laterality",
+}
+
+# Semantic-type gating: a parent's STY must be in the seed's allowed set
+# to be considered traversable. Prevents the algorithm from making
+# nonsensical jumps across ontology branches via shared attributes.
+#
+# Keys are semantic types of the SEED (the concept being anchored).
+# Values are sets of semantic types that are valid for parents.
+#
+# Default fall-through: if a seed's STY isn't a key here, no gating is
+# applied for that seed (traversal proceeds unrestricted). This means the
+# gating only enforces constraints where we have clear policy.
+#
+# Setting this to None disables gating entirely.
+#
+# Like the RELA allowlist, this is conservative. Add entries as needed.
+VALID_PARENT_STY_BY_SEED_STY = {
+    "Disease or Syndrome": {
+        "Disease or Syndrome",
+        "Pathologic Function",
+        "Mental or Behavioral Dysfunction",
+        "Neoplastic Process",
+        "Congenital Abnormality",
+        "Acquired Abnormality",
+        "Anatomical Abnormality",
+        "Finding",
+        "Sign or Symptom",
+        "Cell or Molecular Dysfunction",
+    },
+    "Finding": {
+        "Finding",
+        "Sign or Symptom",
+        "Disease or Syndrome",
+        "Pathologic Function",
+        "Clinical Attribute",
+        "Laboratory or Test Result",
+    },
+    "Sign or Symptom": {
+        "Sign or Symptom",
+        "Finding",
+        "Disease or Syndrome",
+        "Pathologic Function",
+    },
+    "Therapeutic or Preventive Procedure": {
+        "Therapeutic or Preventive Procedure",
+        "Health Care Activity",
+    },
+    "Diagnostic Procedure": {
+        "Diagnostic Procedure",
+        "Laboratory Procedure",
+        "Health Care Activity",
+    },
+    "Laboratory Procedure": {
+        "Laboratory Procedure",
+        "Diagnostic Procedure",
+    },
+    "Pharmacologic Substance": {
+        "Pharmacologic Substance",
+        "Clinical Drug",
+        "Antibiotic",
+        "Biologically Active Substance",
+        "Organic Chemical",
+        "Inorganic Chemical",
+        "Chemical",
+    },
+    "Clinical Drug": {
+        "Clinical Drug",
+        "Pharmacologic Substance",
+    },
+    # Anatomy
+    "Body Part, Organ, or Organ Component": {
+        "Body Part, Organ, or Organ Component",
+        "Body System",
+        "Body Location or Region",
+        "Anatomical Structure",
+        "Tissue",
+    },
+    "Body Location or Region": {
+        "Body Location or Region",
+        "Body Part, Organ, or Organ Component",
+        "Body System",
+    },
+    # Specimens
+    "Body Substance": {
+        "Body Substance",
+        "Substance",
+    },
+}
+
 # Which UMLS relationship types to use for walking UP the hierarchy.
 # Each entry is (REL, RELA) — RELA can be None to match any RELA value.
 #
@@ -343,6 +482,11 @@ def parse_mrrel(cache):
             if existing is None or edge_priority(*key) < edge_priority(*existing):
                 parents[child][parent] = key
         elif rel == "RO" and rela and not rela.startswith("inverse_") and rela != "isa":
+            # RELA allowlist filter: only allowlisted attribute types become
+            # defining attributes. Other RO rows (administrative,
+            # associative, weak-semantic) are ignored entirely.
+            if ATTRIBUTE_RELAS is not None and rela not in ATTRIBUTE_RELAS:
+                continue
             # Multi-value attributes: accumulate all values into a set
             attrs[cui2][rela].add(cui1)
 
@@ -417,7 +561,31 @@ def is_transparent_parent(seed_attrs, parent_attrs):
     return not parent_attrs
 
 
-def find_anchors(seed_cui, parents, attrs):
+def is_sty_compatible(seed_sty, parent_sty):
+    """
+    Return True if a parent with `parent_sty` is acceptable to traverse to
+    from a seed with `seed_sty`.
+
+    Behavior:
+      - If gating is disabled (VALID_PARENT_STY_BY_SEED_STY is None), always
+        compatible.
+      - If the seed's STY isn't in the gating map, no gating applies — the
+        traversal proceeds unrestricted. This means gating only enforces
+        policy where we have one.
+      - If the parent has no STY at all, treat as compatible (don't block
+        on missing metadata).
+    """
+    if VALID_PARENT_STY_BY_SEED_STY is None:
+        return True
+    allowed = VALID_PARENT_STY_BY_SEED_STY.get(seed_sty)
+    if allowed is None:
+        return True
+    if not parent_sty:
+        return True
+    return parent_sty in allowed
+
+
+def find_anchors(seed_cui, parents, attrs, tags):
     """
     Per-attribute anchor finding (Fix B), with strict slots as a hard filter.
 
@@ -457,7 +625,7 @@ def find_anchors(seed_cui, parents, attrs):
     seed_attrs = attrs.get(seed_cui, {})
     if not seed_attrs:
         # No attributes at all — walk with empty signature
-        return _walk_for_signature(seed_cui, {}, parents, attrs, axis=None)
+        return _walk_for_signature(seed_cui, {}, parents, attrs, tags, axis=None)
 
     # Split into strict and non-strict
     strict_signature = {k: v for k, v in seed_attrs.items() if k in STRICT_SLOTS}
@@ -465,7 +633,7 @@ def find_anchors(seed_cui, parents, attrs):
 
     if not non_strict_axes:
         # Only strict attributes — walk with the strict signature alone
-        return _walk_for_signature(seed_cui, strict_signature, parents, attrs, axis=None)
+        return _walk_for_signature(seed_cui, strict_signature, parents, attrs, tags, axis=None)
 
     # Per-axis walk: each non-strict attribute walks independently, but
     # the strict slots are added as a mandatory part of every signature.
@@ -475,7 +643,7 @@ def find_anchors(seed_cui, parents, attrs):
         per_axis_signature = dict(strict_signature)
         per_axis_signature[axis] = seed_attrs[axis]
         per_axis_results = _walk_for_signature(
-            seed_cui, per_axis_signature, parents, attrs, axis=axis,
+            seed_cui, per_axis_signature, parents, attrs, tags, axis=axis,
         )
         for entry in per_axis_results:
             anchor = entry["anchor"]
@@ -506,7 +674,7 @@ def find_anchors(seed_cui, parents, attrs):
     return result
 
 
-def _walk_for_signature(seed_cui, signature_attrs, parents, attrs, axis=None):
+def _walk_for_signature(seed_cui, signature_attrs, parents, attrs, tags, axis=None):
     """
     Walk every traversal path upward from seed_cui using `signature_attrs`
     as the seed's attribute signature. This is the per-axis primitive
@@ -516,9 +684,15 @@ def _walk_for_signature(seed_cui, signature_attrs, parents, attrs, axis=None):
       - Walks through transparent parents (no defining attrs)
       - Never anchors at a transparent terminus — backs up to last
         meaningful ancestor on the path
-      - Strict-slot rules still apply (laterality, finding-site values
-        must match if those are the signature attributes)
+      - Strict-slot rules still apply
+
+    New behavior (this turn):
+      - Semantic-type gating: a parent is only traversable if its STY is
+        in the seed's allowed parent-STY set (per VALID_PARENT_STY_BY_SEED_STY).
+        STY-incompatible parents are rejected outright — not even considered
+        for transparency or attribute matching.
     """
+    seed_sty = tags.get(seed_cui)
     found_anchors = {}
     visited_total = set()
     signature_is_meaningful = bool(signature_attrs)
@@ -543,6 +717,14 @@ def _walk_for_signature(seed_cui, signature_attrs, parents, attrs, axis=None):
         for parent_cui, rel_key in ps.items():
             if parent_cui in visited_on_path:
                 continue
+
+            # STY gate: reject parents with incompatible semantic types
+            parent_sty = tags.get(parent_cui)
+            if not is_sty_compatible(seed_sty, parent_sty):
+                if any_break_reason is None:
+                    any_break_reason = "sty_incompatible"
+                continue
+
             parent_attrs = attrs.get(parent_cui, {})
             if is_transparent_parent(signature_attrs, parent_attrs):
                 preserving_parents.append((parent_cui, rel_key))
@@ -618,6 +800,8 @@ def main():
     print(f"  strict slots  : {sorted(STRICT_SLOTS)}")
     print(f"  traversal     : {TRAVERSAL_RELS}")
     print(f"  max members   : {MAX_MEMBERS_PER_ANCHOR if MAX_MEMBERS_PER_ANCHOR else 'no limit'}")
+    print(f"  RELA allowlist: {len(ATTRIBUTE_RELAS) if ATTRIBUTE_RELAS else 'disabled'} entries")
+    print(f"  STY gating    : {len(VALID_PARENT_STY_BY_SEED_STY) if VALID_PARENT_STY_BY_SEED_STY else 'disabled'} policies")
     print(f"  max_concepts  : {MAX_CONCEPTS if MAX_CONCEPTS else 'all'}")
     print("=" * 60)
 
@@ -661,7 +845,7 @@ def main():
             eta_min = (len(all_cuis) - i) / max(1, rate) / 60
             print(f"      {i:,} / {len(all_cuis):,}  ({rate:.0f}/sec, "
                   f"ETA {eta_min:.1f}min)")
-        anchors = find_anchors(cui, parents, attrs)
+        anchors = find_anchors(cui, parents, attrs, tags)
         anchors_by_cui[cui] = anchors
         total_anchor_entries += len(anchors)
         if len(anchors) > 1:
@@ -748,6 +932,11 @@ def main():
             "strict_slots": sorted(STRICT_SLOTS),
             "traversal_rels": TRAVERSAL_RELS,
             "max_members_per_anchor": MAX_MEMBERS_PER_ANCHOR,
+            "attribute_relas": sorted(ATTRIBUTE_RELAS) if ATTRIBUTE_RELAS else None,
+            "sty_gating": (
+                sorted(VALID_PARENT_STY_BY_SEED_STY.keys())
+                if VALID_PARENT_STY_BY_SEED_STY else None
+            ),
         },
         "anchors": anchors_by_cui,
         "labels":  out_labels,
