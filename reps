@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from google import genai
+from google.cloud import storage
 from google.genai import types
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -1531,41 +1532,211 @@ if __name__ == "__main__":
         project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION
     )
 
-    test_queries = [
-        # "CT scan that documents your hernia?",
-        # "PCP notes within the last year",
-        # "Most recent EKG with tracings",
-        "Which best describes your primary cancer?"
-        # ,"TNM staging summary","Most recent cross-sectional imaging"
-    ]
+    # =====================================================================
+    # MODE A — SINGLE-QUERY TEST (commented out; uncomment to run inline)
+    # =====================================================================
+    # test_queries = [
+    #     # "CT scan that documents your hernia?",
+    #     # "PCP notes within the last year",
+    #     # "Most recent EKG with tracings",
+    #     "Which best describes your primary cancer?"
+    #     # ,"TNM staging summary","Most recent cross-sectional imaging"
+    # ]
+    #
+    # results = []
+    # with ThreadPoolExecutor(max_workers=4) as executor:
+    #     futures = {
+    #         executor.submit(minimal_pipeline, pipeline, query): query
+    #         for query in test_queries
+    #     }
+    #     for idx, future in enumerate(as_completed(futures), 2):
+    #         res = future.result()
+    #         results.append(res)
+    #
+    #         valid, err = validate_schema(res, "minimal_pipeline")
+    #         filename = f"query{idx}_pipeline.json"
+    #         save_json(res, filename)
+    #
+    #         # Compact highlights — not the full payload.
+    #         print(f"Query     : {res.get('question', '')[:80]}")
+    #         print(f"Actions   : {', '.join(res.get('action_finder') or [])}")
+    #         if not res.get("is_processable"):
+    #             print("Status    : Not processable")
+    #         else:
+    #             rep = res.get("representative_terms") or []
+    #             print(
+    #                 f"Status    : Processable | "
+    #                 f"clinical: {res.get('is_clinical')} | "
+    #                 f"intents: {res.get('total_intents_detected')}"
+    #             )
+    #             print(f"Rep terms : {', '.join(rep) if rep else '—'}")
+    #         if not valid:
+    #             print(f"Schema    : FAILED — {err}")
+    #         print("-" * 60)
 
-    results = []
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {
-            executor.submit(minimal_pipeline, pipeline, query): query
-            for query in test_queries
+    # =====================================================================
+    # MODE B — BATCH FROM GCS (active)
+    # Reads queries from a GCS JSON/JSONL file, runs them in parallel,
+    # prints query / action_finder / is_processable / representative_terms /
+    # temporal_signals for each, and saves all results to rep-term.json.
+    #
+    # To switch back to single-query mode: comment this block out and
+    # uncomment Mode A above.
+    # =====================================================================
+
+    GCS_URI = "gs://your-bucket/path/to/queries.jsonl"  # <-- set this
+    QUERY_FIELD = "query"   # JSON field holding the text; falls back to question/text/q
+    BATCH_WORKERS = 4
+    OUTPUT_FILE = "rep-term.json"
+
+    def _parse_gcs_uri(uri: str):
+        if not uri.startswith("gs://"):
+            raise ValueError(f"Not a gs:// URI: {uri}")
+        rest = uri[len("gs://"):]
+        if "/" not in rest:
+            raise ValueError(f"GCS URI missing object path: {uri}")
+        bucket, _, blob = rest.partition("/")
+        return bucket, blob
+
+    def _download_gcs(uri: str) -> str:
+        bucket_name, blob_name = _parse_gcs_uri(uri)
+        client = storage.Client()
+        return client.bucket(bucket_name).blob(blob_name).download_as_text()
+
+    def _extract_query(item, field: str):
+        if isinstance(item, str):
+            q = item.strip()
+            return q or None
+        if isinstance(item, dict):
+            for key in (field, "query", "question", "text", "q"):
+                val = item.get(key)
+                if isinstance(val, str) and val.strip():
+                    return val.strip()
+        return None
+
+    def _load_queries(uri: str, field: str = "query") -> List[str]:
+        """Auto-detect JSONL, JSON array of objects, JSON array of strings,
+        or JSON object wrapping a list."""
+        raw = _download_gcs(uri).strip()
+        if not raw:
+            return []
+        out: List[str] = []
+        # Try JSONL first (only if it really looks line-oriented).
+        if "\n" in raw and not raw.lstrip().startswith("["):
+            line_items, ok = [], True
+            for line in raw.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    line_items.append(json.loads(line))
+                except json.JSONDecodeError:
+                    ok = False
+                    break
+            if ok and line_items:
+                for it in line_items:
+                    q = _extract_query(it, field)
+                    if q:
+                        out.append(q)
+                return out
+        # Fall back to single JSON document.
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            list_val = None
+            for key in (field, "queries", "questions", "items", "data"):
+                if isinstance(data.get(key), list):
+                    list_val = data[key]
+                    break
+            if list_val is None:
+                for v in data.values():
+                    if isinstance(v, list):
+                        list_val = v
+                        break
+            if list_val is None:
+                q = _extract_query(data, field)
+                return [q] if q else []
+            data = list_val
+        if isinstance(data, list):
+            for it in data:
+                q = _extract_query(it, field)
+                if q:
+                    out.append(q)
+        return out
+
+    def _collect_temporal_signals(pr: Dict[str, Any]) -> List[str]:
+        """Union of temporal_signal across all intents, deduped, order-preserving."""
+        signals, seen = [], set()
+        for intent in pr.get("intents") or []:
+            rsig = (intent.get("retrieval_signals") or {}).get("temporal_signal") or []
+            for s in rsig:
+                if isinstance(s, str):
+                    k = s.strip().lower()
+                    if k and k not in seen:
+                        seen.add(k)
+                        signals.append(s.strip())
+            # Belt-and-suspenders: also walk candidates.
+            for fc in intent.get("final_candidates") or []:
+                for s in (fc.get("retrieval_signals") or {}).get("temporal_signal") or []:
+                    if isinstance(s, str):
+                        k = s.strip().lower()
+                        if k and k not in seen:
+                            seen.add(k)
+                            signals.append(s.strip())
+        return signals
+
+    def _summarize(pr: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "query": pr.get("question", ""),
+            "action_finder": list(pr.get("action_finder") or []),
+            "is_processable": bool(pr.get("is_processable")),
+            "representative_terms": list(pr.get("representative_terms") or []),
+            "temporal_signals": _collect_temporal_signals(pr),
         }
-        for idx, future in enumerate(as_completed(futures), 2):
-            res = future.result()
-            results.append(res)
 
-            valid, err = validate_schema(res, "minimal_pipeline")
-            filename = f"query{idx}_pipeline.json"
-            save_json(res, filename)
+    def _fmt(items: List[str]) -> str:
+        return ", ".join(items) if items else "—"
 
-            # Compact highlights — not the full payload.
-            print(f"Query     : {res.get('question', '')[:80]}")
-            print(f"Actions   : {', '.join(res.get('action_finder') or [])}")
-            if not res.get("is_processable"):
-                print("Status    : Not processable")
-            else:
-                rep = res.get("representative_terms") or []
-                print(
-                    f"Status    : Processable | "
-                    f"clinical: {res.get('is_clinical')} | "
-                    f"intents: {res.get('total_intents_detected')}"
-                )
-                print(f"Rep terms : {', '.join(rep) if rep else '—'}")
-            if not valid:
-                print(f"Schema    : FAILED — {err}")
-            print("-" * 60)
+    print(f"Loading queries from: {GCS_URI}")
+    queries = _load_queries(GCS_URI, field=QUERY_FIELD)
+    if not queries:
+        print("No queries found in input file.")
+        raise SystemExit(1)
+    print(f"Loaded {len(queries)} queries\n")
+
+    # Run all queries in parallel, preserving input order in the output.
+    summaries: List[Optional[Dict[str, Any]]] = [None] * len(queries)
+    with ThreadPoolExecutor(max_workers=BATCH_WORKERS) as executor:
+        future_to_idx = {
+            executor.submit(minimal_pipeline, pipeline, q): i
+            for i, q in enumerate(queries)
+        }
+        for fut in as_completed(future_to_idx):
+            i = future_to_idx[fut]
+            try:
+                summaries[i] = _summarize(fut.result())
+            except Exception as e:
+                summaries[i] = {
+                    "query": queries[i],
+                    "action_finder": [],
+                    "is_processable": False,
+                    "representative_terms": [],
+                    "temporal_signals": [],
+                    "error": str(e),
+                }
+
+    summaries = [s for s in summaries if s is not None]
+
+    print("=" * 72)
+    print(f"RESULTS ({len(summaries)} queries)")
+    print("=" * 72)
+    for idx, s in enumerate(summaries, 1):
+        print(f"[{idx}/{len(summaries)}] Query              : {s['query']}")
+        print(f"        Action finder      : {_fmt(s['action_finder'])}")
+        print(f"        Is processable     : {s['is_processable']}")
+        print(f"        Representative     : {_fmt(s['representative_terms'])}")
+        print(f"        Temporal signals   : {_fmt(s['temporal_signals'])}")
+        print("-" * 72)
+
+    with open(OUTPUT_FILE, "w") as f:
+        json.dump(summaries, f, indent=2)
+    print(f"\nSaved {len(summaries)} summaries to {OUTPUT_FILE}")
