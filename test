@@ -1,0 +1,73 @@
+"""
+lookup_topics.py
+----------------
+Load the pickle from build_topics.py and print topics for hardcoded CUIs.
+
+Edit the CONFIG block below — set PICKLE_PATH and CUIS_TO_LOOKUP, then run:
+    python lookup_topics.py
+
+A CUI can have MULTIPLE topics (SNOMED multi-inheritance). All topics
+are printed for each CUI. None are labeled as primary; they're all
+equally valid.
+"""
+
+import pickle
+
+
+# ============================================================================
+# CONFIG — edit these
+# ============================================================================
+
+PICKLE_PATH = "topics.pkl"
+
+# CUIs to look up. Add or remove as needed.
+CUIS_TO_LOOKUP = [
+    "C0027051",     # Myocardial Infarction
+    "C0231749",     # Pain in knee
+    "C0011854",     # Diabetes Mellitus
+]
+
+
+# ============================================================================
+# Lookup
+# ============================================================================
+
+def main():
+    with open(PICKLE_PATH, "rb") as f:
+        data = pickle.load(f)
+
+    labels = data["labels"]
+    anchors = data["anchors"]
+
+    print("=" * 60)
+    print(f"Pickle: {PICKLE_PATH}")
+    print(f"  built_at        : {data['built_at']}")
+    print(f"  total_cuis      : {data['stats']['total_cuis']:,}")
+    print(f"  unique_anchors  : {data['stats']['unique_anchors']:,}")
+    print("=" * 60)
+
+    for cui in CUIS_TO_LOOKUP:
+        seed_label = labels.get(cui, "")
+        entries = anchors.get(cui)
+
+        print()
+        if entries is None:
+            print(f"{cui}  ({seed_label or 'not in pickle'})")
+            print("  -> Uncategorized")
+            continue
+
+        print(f"{cui}  ({seed_label})")
+        if len(entries) == 1:
+            anchor = entries[0]["anchor"]
+            anchor_label = labels.get(anchor, "")
+            print(f"  -> {anchor} - {anchor_label}")
+        else:
+            print(f"  -> ({len(entries)} topics)")
+            for e in entries:
+                anchor = e["anchor"]
+                anchor_label = labels.get(anchor, "")
+                print(f"     {anchor} - {anchor_label}")
+
+
+if __name__ == "__main__":
+    main()
