@@ -66,13 +66,12 @@ ROUTING DECISION (is_processable)
 
 Per-action processability:
 - information_retrieval     -> processable
-- knowledge_fact_search     -> processable
-- admin_response (symptom triage branch)   -> processable
-- admin_response (operational branch)      -> not processable
+- knowledge_fact_search     -> not processable
+- admin_response            -> not processable
 - conversational_response   -> not processable
 - out_of_scope              -> not processable
 
-Set is_processable=true if AT LEAST ONE selected action is processable; otherwise false. is_processable=true means downstream intent extraction will run. is_processable=false short-circuits the pipeline; the action labels tell the caller how to respond instead.
+Set is_processable=true ONLY if information_retrieval is among the selected actions; otherwise false. information_retrieval combined with any other action(s) is still processable — the IR portion gets the full pipeline, the other labels tell the caller what additional handling to do alongside. is_processable=false short-circuits the pipeline; the action labels tell the caller how to respond instead.
 
 ====================================================
 PRAGMATIC SIGNALS
@@ -229,14 +228,6 @@ For each intent:
 3. **nature** - What is the primary informational purpose? (Format: [Context] / [Purpose])
 4. **sub_natures[]** - What are the distinct dimensions of this information?
 5. **final_queries[]** - How would this appear in clinical documents?
-6. **representative_terms[]** - A short list (typically 1–3) of named clinical entities this intent is about. Read the intent's nature, sub_natures, and atomic_concepts together.Each term must name a thing that a typical
-   patient chart has its own section, list, or record for — diagnoses,medications, tests, procedures, devices, allergies, billing, insurance,visits, etc. If a candidate doesn't correspond to a chart section,drop it.
-
-   Ask: "what is this question ABOUT?" The answer is a named entity — a noun the chart has a section for — like "chemotherapy", "cancer", "medications". Pick the canonical name. NOT descriptive paraphrases or action phrases that wrap the entity in qualifiers (e.g. "prior systemic anti-cancer treatments", "review of pharmacotherapy"). The wrapping language describes what's being done WITH the entity; the entity is the subject — pick the subject.
-
-   A modifier narrows or scopes the question — it's a property of an entity, not the entity itself. Apply the deletion test: remove the candidate term from the question. If the question still makes coherent clinical sense without it, the term was a modifier — drop it. If removing it makes the question incoherent, the term is the subject — keep it. "Have you had a CT scan in the last 12 months" — remove "CT scan" and the question collapses (subject); remove "12 months" and the question still asks about CT scans (modifier). Pick "CT scan" only.
-
-   Do NOT enumerate atomic_concepts — those decompose; representative_terms summarize. Each term must name a DIFFERENT entity. Synonyms, abbreviations, and qualifier-wrapped forms of the same entity collapse to ONE — pick the canonical short name. Examples: "CT scan" and "computed tomography" name the same entity → pick one, not both. "billing", "billing statement", "billing process" all wrap the same entity → pick "billing", not all three.
 
 ====================================================
 SUB_NATURE DECOMPOSITION
@@ -495,8 +486,13 @@ Concepts to document:
 
 # LLM EXTRACTION SCHEMAS
 
-_PROCESSABLE_ACTIONS = {"information_retrieval", "knowledge_fact_search"}
-_NEVER_PROCESSABLE = {"conversational_response", "out_of_scope"}
+_PROCESSABLE_ACTIONS = {"information_retrieval"}
+_NEVER_PROCESSABLE = {
+    "conversational_response",
+    "knowledge_fact_search",
+    "admin_response",
+    "out_of_scope",
+}
 
 
 class RelevanceCheckOutput(BaseModel):
@@ -527,13 +523,23 @@ class RelevanceCheckOutput(BaseModel):
         self.actions = ordered or ["information_retrieval"]
 
         actions = set(self.actions)
-        # Hard rule: any clearly-processable action forces processable=True.
-        if actions & _PROCESSABLE_ACTIONS:
-            self.is_processable = True
-        # Hard rule: a set of ONLY never-processable actions forces False.
-        elif actions and actions <= _NEVER_PROCESSABLE:
+
+        # Hard rule 1: out_of_scope is EXCLUSIVE. If the LLM ever returns it
+        # alongside other actions, drop everything else and refuse processing.
+        # Enforced in code so the safety contract doesn't depend on prompt
+        # adherence.
+        if "out_of_scope" in actions:
+            self.actions = ["out_of_scope"]
             self.is_processable = False
-        # else: admin_response present (branch-ambiguous) — trust the LLM flag.
+            return self
+
+        # Hard rule 2: ONLY information_retrieval (alone or mixed with any
+        # combination of other actions) is processable. Everything else —
+        # admin_response, knowledge_fact_search, conversational_response,
+        # or any combination among them — is NOT processable.
+        # IR present in any mix forces processable=True regardless of what
+        # the LLM said. IR absent forces processable=False regardless.
+        self.is_processable = "information_retrieval" in actions
         return self
 
     @property
@@ -572,9 +578,6 @@ class Intent(BaseModel):
     nature: str = ""
     sub_natures: List[SubNature] = Field(default_factory=list)
     final_queries: List[str] = Field(default_factory=list)
-    # LLM-synthesized entity-level phrases (1–3) summarizing the intent.
-    # Not atomic_concepts copied verbatim — see INTENT STRUCTURE item 6.
-    representative_terms: list = Field(default_factory=list)
 
 
 class IntentExtractionResponse(BaseModel):
@@ -902,17 +905,11 @@ class ExtractionResult:
     # format methods
 
     def _representative_terms(self) -> List[str]:
-
-        source = self.representative_terms_list
-        if not source:
-            source = [
-                t
-                for intent in self.intents.intents
-                for t in (intent.representative_terms or [])
-            ]
+        """Dedupe and return the representative terms from the dedicated
+        REPRESENTATIVE_TERMS_PROMPT call. This is the single source of truth."""
         terms: List[str] = []
         seen: set = set()
-        for t in source:
+        for t in self.representative_terms_list:
             t_clean = str(t).strip()
             if not t_clean:
                 continue
