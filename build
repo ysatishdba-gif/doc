@@ -371,15 +371,23 @@ def check_break(seed_attrs, parent_attrs):
     Strict slots: parent's value-set must EQUAL the seed's value-set.
                   ({tibia, fibula} == {tibia, fibula}, not just overlap.)
                   Generalizing or losing any value breaks.
-    Other slots:  parent just needs to have the attribute (non-empty set).
-                  The specific values don't have to match.
+    Other slots:  parent must have at least one value in common with the
+                  seed's values (set intersection non-empty). Pure existence
+                  is NOT enough — if the seed's method=excision and the
+                  parent's method=drainage, those are semantically
+                  different and the boundary fires.
     """
     for rela, seed_value in seed_attrs.items():
+        parent_value = parent_attrs.get(rela)
         if rela in STRICT_SLOTS:
-            if parent_attrs.get(rela) != seed_value:
+            # Strict equality on the value sets
+            if parent_value != seed_value:
                 return rela
         else:
-            if rela not in parent_attrs:
+            # Non-strict: require value-set overlap, not just RELA presence
+            if not parent_value:
+                return rela
+            if seed_value.isdisjoint(parent_value):
                 return rela
     return None
 
@@ -620,8 +628,15 @@ def main():
     t0 = time.time()
     parents, attrs, edge_counts = parse_mrrel(cache)
     n_edges = sum(len(v) for v in parents.values())
-    n_attrs = sum(len(v) for v in attrs.values())
-    print(f"      {n_edges:,} traversal edges, {n_attrs:,} attributes in "
+    n_attr_types = sum(len(v) for v in attrs.values())
+    n_attr_values = sum(
+        len(values)
+        for rela_map in attrs.values()
+        for values in rela_map.values()
+    )
+    print(f"      {n_edges:,} traversal edges, "
+          f"{n_attr_types:,} attribute types "
+          f"({n_attr_values:,} total values) in "
           f"{time.time()-t0:.1f}s")
     print(f"      Edge breakdown by (REL, RELA):")
     for (rel, rela), n in sorted(edge_counts.items(), key=lambda kv: -kv[1]):
