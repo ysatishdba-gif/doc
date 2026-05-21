@@ -64,6 +64,45 @@ LANGUAGE = "ENG"
 #                       collapses lateralized concepts.
 STRICT_SLOTS = {"has_finding_site", "has_laterality"}
 
+# Which UMLS relationship types to use for walking UP the hierarchy.
+# Each entry is (REL, RELA) — RELA can be None to match any RELA value
+# for that REL.
+#
+# Available choices (UMLS Metathesaurus):
+#
+#   ("CHD", "isa")     SNOMED's IS-A backbone. CUI2 IS-A CUI1
+#                      (CUI1 is the parent). The cleanest, most reliable
+#                      hierarchy edges. Always include.
+#
+#   ("RB",  None)      Related Broader. Curator-asserted "broader than"
+#                      relationships that aren't strict IS-A. Cross-source
+#                      broadenings, MeSH-style organizing relationships,
+#                      etc. CUI2 is the narrower concept (current), CUI1
+#                      is the broader one. Generally safe and useful.
+#
+#   ("SY",  None)      Synonymous atoms. Rarely useful at CUI level
+#                      because UMLS already collapses synonyms into a
+#                      single CUI; only meaningful for cross-source
+#                      atom synonymy that didn't fully merge.
+#
+# NOT used (deliberately):
+#   PAR / inverse_isa  Just the inverse of CHD/isa; would double-count.
+#   RN                 Inverse of RB; would double-count.
+#   RQ                 "Possibly synonymous" — too fuzzy, adds noise.
+#   SIB                Sibling — non-directional, no "up" direction.
+#   RO + non-isa RELA  Domain-specific relationships (mapped_to, due_to,
+#                      occurs_in, etc.) — used for ATTRIBUTE comparison,
+#                      not traversal. Mixing them into traversal would
+#                      walk sideways and inflate topic groups.
+#
+# Each anchor entry in the output pickle gets tagged with the (REL, RELA)
+# that produced it, so you can audit how much each edge type contributes.
+TRAVERSAL_RELS = [
+    ("CHD", "isa"),
+    ("RB",  None),
+    # ("SY", None),    # uncomment to also use atom synonyms
+]
+
 # For testing: only anchor first N CUIs. Set to None for the full build.
 # A smoke build with 10000 takes ~30 seconds of anchoring after the BQ
 # queries complete; the full build runs every CUI in the dataset.
@@ -99,9 +138,28 @@ def load_concepts(client):
 def load_parents_and_attrs(client, cuis):
     """
     One pass over MRREL. Returns:
-        parents[cui]  = set of parent CUIs (IS-A)
-        attrs[cui]    = dict { rela_name : value_cui } of the concept's attributes
+        parents[cui]   = dict { parent_cui : (REL, RELA) }
+                         The REL/RELA records HOW we reached that parent —
+                         CHD/isa or RB or SY. Same parent reached via two
+                         REL types: we keep the highest-priority one
+                         (TRAVERSAL_RELS list order).
+        attrs[cui]     = dict { rela_name : value_cui } of defining attrs
+        edge_counts    = dict { (REL, RELA): count } for diagnostics
+
+    Direction: in MRREL the relationship is "from CUI2 to CUI1". For
+    hierarchy-style RELs (CHD, RB), CUI1 is the broader/parent concept
+    and CUI2 is the narrower/child. So parent edges go: CUI2 -> CUI1.
     """
+    # Build a SQL WHERE clause that matches any entry in TRAVERSAL_RELS,
+    # plus the RO/attribute rows we use for defining attributes.
+    traversal_conditions = []
+    for rel, rela in TRAVERSAL_RELS:
+        if rela is None:
+            traversal_conditions.append(f"(REL = '{rel}')")
+        else:
+            traversal_conditions.append(f"(REL = '{rel}' AND RELA = '{rela}')")
+    traversal_clause = " OR ".join(traversal_conditions) if traversal_conditions else "FALSE"
+
     sql = f"""
     SELECT CUI1, CUI2, REL, RELA
     FROM `{PROJECT}.{DATASET}.{TABLE_MRREL}`
@@ -109,7 +167,7 @@ def load_parents_and_attrs(client, cuis):
       AND SUPPRESS NOT IN ('O', 'Y')
       AND CUI1 != CUI2
       AND (
-            (REL = 'CHD' AND RELA = 'isa')
+            {traversal_clause}
          OR (REL = 'RO' AND RELA IS NOT NULL
                         AND RELA != 'isa'
                         AND NOT STARTS_WITH(RELA, 'inverse_'))
@@ -118,22 +176,56 @@ def load_parents_and_attrs(client, cuis):
     job_config = bigquery.QueryJobConfig(query_parameters=[
         bigquery.ScalarQueryParameter("sab", "STRING", SAB),
     ])
-    parents = defaultdict(set)
+
+    # Build a fast lookup of (REL, RELA) -> priority index for ordering
+    # parent-edge sources when the same parent is reachable via multiple
+    # relationships. Lower index = higher priority.
+    rel_priority = {}
+    for i, (rel, rela) in enumerate(TRAVERSAL_RELS):
+        rel_priority[(rel, rela)] = i
+        if rela is None:
+            # Catch-all: this priority applies to any RELA under this REL
+            pass
+
+    def edge_priority(rel, rela):
+        # Exact match wins; fall back to (rel, None) catch-all.
+        if (rel, rela) in rel_priority:
+            return rel_priority[(rel, rela)]
+        if (rel, None) in rel_priority:
+            return rel_priority[(rel, None)]
+        return 999
+
+    def is_traversal_edge(rel, rela):
+        for tr_rel, tr_rela in TRAVERSAL_RELS:
+            if rel != tr_rel:
+                continue
+            if tr_rela is None or rela == tr_rela:
+                return True
+        return False
+
+    parents = defaultdict(dict)     # child_cui -> {parent_cui: (REL, RELA)}
     attrs = defaultdict(dict)
+    edge_counts = defaultdict(int)
+
     for row in client.query(sql, job_config=job_config).result():
         if row.CUI1 not in cuis or row.CUI2 not in cuis:
             continue
-        if row.REL == "CHD" and row.RELA == "isa":
-            # In MRREL, "REL=CHD" with RELA=isa says: CUI2 is a child of CUI1.
-            # So CUI1 is the parent and CUI2 is the child.
-            # We record this as: CUI2's parent set includes CUI1.
-            parents[row.CUI2].add(row.CUI1)
+
+        if is_traversal_edge(row.REL, row.RELA):
+            # CUI1 is the broader concept (parent), CUI2 is the narrower (child).
+            child, parent = row.CUI2, row.CUI1
+            key = (row.REL, row.RELA)
+            edge_counts[key] += 1
+            existing = parents[child].get(parent)
+            # If already present via a higher-priority REL, keep that one.
+            if existing is None or edge_priority(*key) < edge_priority(*existing):
+                parents[child][parent] = key
         else:
-            # CUI2 is the concept being defined, CUI1 is the value,
-            # RELA is the attribute type. If a concept has multiple
-            # values for the same RELA (rare), we take the first seen.
+            # RO row with a non-isa RELA — this is a defining attribute.
+            # CUI2 is the concept being defined, CUI1 is the attribute value.
             attrs[row.CUI2].setdefault(row.RELA, row.CUI1)
-    return parents, attrs
+
+    return parents, attrs, edge_counts
 
 
 def load_semantic_tags(client, cuis):
@@ -205,66 +297,78 @@ def check_break(seed_attrs, parent_attrs):
 
 def find_anchors(seed_cui, parents, attrs):
     """
-    Walk every IS-A path upward from seed_cui. Collect all distinct anchors
-    (nodes where the path stops because every parent breaks the seed's
-    attributes, or because we hit the ontology root).
+    Walk every preserving path upward from seed_cui (across any REL type
+    configured in TRAVERSAL_RELS). Collect all distinct anchors.
 
     Returns a list of dicts, alphabetical by anchor CUI:
-        [{"anchor": cui, "lost": rela_or_None, "path_length": int}, ...]
+        [{"anchor":      cui,
+          "lost":        rela_or_None,
+          "path_length": int,
+          "rels_used":   sorted list of (REL, RELA) tuples seen on the path}, ...]
+
     Always non-empty: if the seed has no preserving parents, returns
     a single entry with anchor=seed_cui itself.
 
-    The path_length field is diagnostic only. Anchors are NOT ranked —
-    all of them are equally valid topics for the seed CUI.
+    path_length and rels_used are diagnostic only. Anchors are NOT ranked.
+
+    `parents` here is dict[child] -> dict[parent] -> (REL, RELA).
     """
     seed_attrs = attrs.get(seed_cui, {})
     if not seed_attrs:
-        return [{"anchor": seed_cui, "lost": None, "path_length": 1}]
+        return [{"anchor": seed_cui, "lost": None,
+                 "path_length": 1, "rels_used": []}]
 
-    found_anchors = {}    # anchor_cui -> {"lost": rela, "path_length": int}
+    # anchor_cui -> {"lost", "path_length", "rels_used"}
+    found_anchors = {}
     visited_total = set()
-    stack = [(seed_cui, 1, frozenset([seed_cui]))]
+    # Stack entries: (current_node, depth, visited_set_on_path,
+    #                 rels_used_so_far as frozenset of (REL, RELA))
+    stack = [(seed_cui, 1, frozenset([seed_cui]), frozenset())]
 
     while stack:
         if len(visited_total) > MAX_NODES_PER_TRAVERSAL:
             break
 
-        current, depth, visited_on_path = stack.pop()
+        current, depth, visited_on_path, rels_used = stack.pop()
         visited_total.add(current)
 
-        ps = parents.get(current, set())
-        preserving_parents = []
+        # parents[current] is a dict[parent_cui] -> (REL, RELA)
+        ps = parents.get(current, {})
+        preserving_parents = []   # list of (parent_cui, (REL, RELA))
         any_break_reason = None
 
-        for parent in ps:
-            if parent in visited_on_path:
+        for parent_cui, rel_key in ps.items():
+            if parent_cui in visited_on_path:
                 continue
-            broken = check_break(seed_attrs, attrs.get(parent, {}))
+            broken = check_break(seed_attrs, attrs.get(parent_cui, {}))
             if broken is None:
-                preserving_parents.append(parent)
+                preserving_parents.append((parent_cui, rel_key))
             elif any_break_reason is None:
                 any_break_reason = broken
 
         if not preserving_parents:
-            # current is an anchor: either no parents at all (root), or
-            # every parent broke at least one of the seed's attributes.
-            # If we've seen this anchor before via a different path, keep
-            # the longer path length (diagnostic only, no ranking).
             existing = found_anchors.get(current)
             if existing is None or depth > existing["path_length"]:
                 found_anchors[current] = {
                     "lost": any_break_reason,
                     "path_length": depth,
+                    "rels_used": rels_used,
                 }
         else:
             new_visited = visited_on_path | {current}
-            for parent in preserving_parents:
-                stack.append((parent, depth + 1, new_visited))
+            for parent_cui, rel_key in preserving_parents:
+                stack.append((
+                    parent_cui,
+                    depth + 1,
+                    new_visited,
+                    rels_used | {rel_key},
+                ))
 
-    # Sort alphabetically by anchor CUI for stable, reproducible output.
-    # The order carries no semantic meaning — all anchors are equal.
     result = [
-        {"anchor": cui, "lost": data["lost"], "path_length": data["path_length"]}
+        {"anchor": cui,
+         "lost": data["lost"],
+         "path_length": data["path_length"],
+         "rels_used": sorted(list(data["rels_used"]))}
         for cui, data in found_anchors.items()
     ]
     result.sort(key=lambda r: r["anchor"])
@@ -298,12 +402,16 @@ def main():
     print(f"      {len(cuis):,} CUIs in {time.time()-t0:.1f}s")
 
     print("\n[2/5] Loading parents and attributes from MRREL ...")
+    print(f"      Traversal REL types: {TRAVERSAL_RELS}")
     t0 = time.time()
-    parents, attrs = load_parents_and_attrs(client, cuis)
+    parents, attrs, edge_counts = load_parents_and_attrs(client, cuis)
     n_edges = sum(len(v) for v in parents.values())
     n_attrs = sum(len(v) for v in attrs.values())
-    print(f"      {n_edges:,} IS-A edges, {n_attrs:,} attributes in "
+    print(f"      {n_edges:,} traversal edges, {n_attrs:,} attributes in "
           f"{time.time()-t0:.1f}s")
+    print(f"      Edge breakdown by (REL, RELA):")
+    for (rel, rela), n in sorted(edge_counts.items(), key=lambda kv: -kv[1]):
+        print(f"        {rel:6s} {str(rela):20s}  {n:>10,d}")
 
     print("\n[3/5] Loading semantic types from MRSTY ...")
     t0 = time.time()
