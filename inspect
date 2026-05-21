@@ -40,6 +40,43 @@ def main():
     print(f"  multi-topic CUIs : {stats.get('multi_anchor', '?'):,}")
     print("=" * 70)
 
+    # --- REL breakdown: which relationship types are contributing anchors? ---
+    # An anchor's rels_used set tells us which REL types appeared on the
+    # path that reached it. We count how many anchor entries used each REL.
+    rel_anchor_counts = defaultdict(int)
+    anchors_with_only_isa = 0
+    anchors_with_any_rb = 0
+    anchors_with_only_rb = 0
+    total_non_self_anchors = 0
+    for cui, entries in anchors.items():
+        for e in entries:
+            if e["anchor"] == cui:
+                continue
+            total_non_self_anchors += 1
+            rels = set(tuple(r) for r in e.get("rels_used", []))
+            for r in rels:
+                rel_anchor_counts[r] += 1
+            isa_only = rels == {("CHD", "isa")}
+            has_rb = any(r[0] == "RB" for r in rels)
+            only_rb = rels and all(r[0] == "RB" for r in rels)
+            if isa_only:
+                anchors_with_only_isa += 1
+            if has_rb:
+                anchors_with_any_rb += 1
+            if only_rb:
+                anchors_with_only_rb += 1
+
+    if total_non_self_anchors > 0:
+        print(f"\nRelationship-type contribution to non-self anchors "
+              f"({total_non_self_anchors:,} total):")
+        for (rel, rela), n in sorted(rel_anchor_counts.items(), key=lambda kv: -kv[1]):
+            pct = 100 * n / total_non_self_anchors
+            print(f"  {rel:6s} {str(rela):20s}  {n:>8,d}  ({pct:5.1f}%)")
+        print(f"\n  Anchors reached using ONLY CHD/isa : {anchors_with_only_isa:,}")
+        print(f"  Anchors that used RB at any point  : {anchors_with_any_rb:,}")
+        print(f"  Anchors reached using ONLY RB      : {anchors_with_only_rb:,}")
+        print(f"    (these would not exist without RB traversal)")
+
     # --- Separate the CUIs into buckets ---
     single_topic = []
     multi_topic = []
