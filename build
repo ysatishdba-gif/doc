@@ -1,0 +1,386 @@
+"""
+build_topics.py
+---------------
+Build a CUI -> topics pickle from UMLS tables in BigQuery.
+
+Configuration is hardcoded in the CONFIG block below.
+Run with no arguments:
+    pip install google-cloud-bigquery
+    gcloud auth application-default login
+    python build_topics.py
+
+The algorithm:
+  For each SNOMED CUI:
+    1. Collect its attributes (has_finding_site, has_laterality, etc.)
+    2. Walk upward via every IS-A parent (multi-path DFS)
+    3. Along each path, walk as far as parents preserve the seed's attributes
+    4. Collect every node where a path "stops" — these are the anchors
+    5. Return all distinct anchors as the CUI's topic set
+
+A CUI can map to multiple anchors (SNOMED has multi-inheritance). All
+anchors are equally valid topics; no "primary" labeling.
+
+Match rule between seed and parent:
+  - For strict slots (has_finding_site, has_laterality):
+      parent must have the SAME value, else broken
+  - For other slots:
+      parent must have the attribute at all (any value), else broken
+"""
+
+import datetime
+import pickle
+import time
+from collections import defaultdict
+from google.cloud import bigquery
+
+
+# ============================================================================
+# CONFIG — edit these for your environment
+# ============================================================================
+
+PROJECT = "YOUR_GCP_PROJECT"        # <-- REPLACE: e.g. "my-company-prod"
+DATASET = "YOUR_UMLS_DATASET"       # <-- REPLACE: e.g. "umls_2025aa"
+OUTPUT_PATH = "topics.pkl"          # where to write the pickle
+
+# Table names within the dataset. The defaults match standard UMLS naming;
+# change only if your tables are named differently.
+TABLE_MRCONSO = "MRCONSO"
+TABLE_MRREL   = "MRREL"
+TABLE_MRSTY   = "MRSTY"
+
+# Source vocabulary and language filters.
+SAB      = "SNOMEDCT_US"
+LANGUAGE = "ENG"
+
+# Attribute types where ANY value change at the parent breaks the match.
+# Other attributes only break when missing entirely (any value is fine).
+#
+# These two are strict because:
+#   has_finding_site -> generalizing "Left knee" to "Knee" loses clinical
+#                       specificity. Search for "left knee" should not return
+#                       generic-knee or right-knee concepts.
+#   has_laterality   -> Left is not a kind of Right. There is no IS-A
+#                       relation between sides; treating it as generalizable
+#                       collapses lateralized concepts.
+STRICT_SLOTS = {"has_finding_site", "has_laterality"}
+
+# For testing: only anchor first N CUIs. Set to None for the full build.
+# A smoke build with 10000 takes ~30 seconds of anchoring after the BQ
+# queries complete; the full build runs every CUI in the dataset.
+MAX_CONCEPTS = None    # e.g. 10000 for smoke testing, None for full build
+
+# Safety cap on multi-parent path explosion. If a CUI's upward traversal
+# touches more nodes than this, we stop. Real SNOMED concepts rarely
+# exceed a few hundred ancestors in their transitive closure; a runaway
+# usually indicates a cycle or unusually dense ontology region.
+MAX_NODES_PER_TRAVERSAL = 5000
+
+
+# ============================================================================
+# Step 1: Load UMLS data from BigQuery into Python dicts
+# ============================================================================
+
+def load_concepts(client):
+    """Return the set of active SNOMED CUIs."""
+    sql = f"""
+    SELECT DISTINCT CUI
+    FROM `{PROJECT}.{DATASET}.{TABLE_MRCONSO}`
+    WHERE SAB = @sab
+      AND LAT = @lat
+      AND SUPPRESS NOT IN ('O', 'Y')
+    """
+    job_config = bigquery.QueryJobConfig(query_parameters=[
+        bigquery.ScalarQueryParameter("sab", "STRING", SAB),
+        bigquery.ScalarQueryParameter("lat", "STRING", LANGUAGE),
+    ])
+    return {row.CUI for row in client.query(sql, job_config=job_config).result()}
+
+
+def load_parents_and_attrs(client, cuis):
+    """
+    One pass over MRREL. Returns:
+        parents[cui]  = set of parent CUIs (IS-A)
+        attrs[cui]    = dict { rela_name : value_cui } of the concept's attributes
+    """
+    sql = f"""
+    SELECT CUI1, CUI2, REL, RELA
+    FROM `{PROJECT}.{DATASET}.{TABLE_MRREL}`
+    WHERE SAB = @sab
+      AND SUPPRESS NOT IN ('O', 'Y')
+      AND CUI1 != CUI2
+      AND (
+            (REL = 'CHD' AND RELA = 'isa')
+         OR (REL = 'RO' AND RELA IS NOT NULL
+                        AND RELA != 'isa'
+                        AND NOT STARTS_WITH(RELA, 'inverse_'))
+      )
+    """
+    job_config = bigquery.QueryJobConfig(query_parameters=[
+        bigquery.ScalarQueryParameter("sab", "STRING", SAB),
+    ])
+    parents = defaultdict(set)
+    attrs = defaultdict(dict)
+    for row in client.query(sql, job_config=job_config).result():
+        if row.CUI1 not in cuis or row.CUI2 not in cuis:
+            continue
+        if row.REL == "CHD" and row.RELA == "isa":
+            # In MRREL, "REL=CHD" with RELA=isa says: CUI2 is a child of CUI1.
+            # So CUI1 is the parent and CUI2 is the child.
+            # We record this as: CUI2's parent set includes CUI1.
+            parents[row.CUI2].add(row.CUI1)
+        else:
+            # CUI2 is the concept being defined, CUI1 is the value,
+            # RELA is the attribute type. If a concept has multiple
+            # values for the same RELA (rare), we take the first seen.
+            attrs[row.CUI2].setdefault(row.RELA, row.CUI1)
+    return parents, attrs
+
+
+def load_semantic_tags(client, cuis):
+    sql = f"""
+    SELECT CUI, STY
+    FROM `{PROJECT}.{DATASET}.{TABLE_MRSTY}`
+    """
+    tags = {}
+    for row in client.query(sql).result():
+        if row.CUI in cuis and row.CUI not in tags:
+            tags[row.CUI] = row.STY
+    return tags
+
+
+def load_labels(client, cuis_of_interest):
+    """Pull preferred labels for a specific set of CUIs."""
+    if not cuis_of_interest:
+        return {}
+    labels = {}
+    cui_list = list(cuis_of_interest)
+    BATCH = 50000
+    for i in range(0, len(cui_list), BATCH):
+        batch = cui_list[i:i + BATCH]
+        sql = f"""
+        WITH ranked AS (
+          SELECT CUI, STR,
+            CASE WHEN TS = 'P' AND ISPREF = 'Y' AND SUPPRESS = 'N' THEN 0
+                 WHEN SUPPRESS = 'N' THEN 1
+                 ELSE 2 END AS rank
+          FROM `{PROJECT}.{DATASET}.{TABLE_MRCONSO}`
+          WHERE SAB = @sab AND LAT = @lat
+            AND SUPPRESS NOT IN ('O', 'Y')
+            AND CUI IN UNNEST(@cuis)
+        )
+        SELECT CUI, ARRAY_AGG(STR ORDER BY rank LIMIT 1)[OFFSET(0)] AS label
+        FROM ranked GROUP BY CUI
+        """
+        job_config = bigquery.QueryJobConfig(query_parameters=[
+            bigquery.ScalarQueryParameter("sab", "STRING", SAB),
+            bigquery.ScalarQueryParameter("lat", "STRING", LANGUAGE),
+            bigquery.ArrayQueryParameter("cuis", "STRING", batch),
+        ])
+        for row in client.query(sql, job_config=job_config).result():
+            labels[row.CUI] = row.label
+    return labels
+
+
+# ============================================================================
+# Step 2: The anchoring algorithm — multi-path
+# ============================================================================
+
+def check_break(seed_attrs, parent_attrs):
+    """
+    Return the name of the first attribute the parent breaks, or None if
+    all of the seed's attributes are preserved.
+
+    Strict slots: parent must have the SAME value.
+    Other slots:  parent just needs to have the attribute (any value).
+    """
+    for rela, seed_value in seed_attrs.items():
+        if rela in STRICT_SLOTS:
+            if parent_attrs.get(rela) != seed_value:
+                return rela
+        else:
+            if rela not in parent_attrs:
+                return rela
+    return None
+
+
+def find_anchors(seed_cui, parents, attrs):
+    """
+    Walk every IS-A path upward from seed_cui. Collect all distinct anchors
+    (nodes where the path stops because every parent breaks the seed's
+    attributes, or because we hit the ontology root).
+
+    Returns a list of dicts, alphabetical by anchor CUI:
+        [{"anchor": cui, "lost": rela_or_None, "path_length": int}, ...]
+    Always non-empty: if the seed has no preserving parents, returns
+    a single entry with anchor=seed_cui itself.
+
+    The path_length field is diagnostic only. Anchors are NOT ranked —
+    all of them are equally valid topics for the seed CUI.
+    """
+    seed_attrs = attrs.get(seed_cui, {})
+    if not seed_attrs:
+        return [{"anchor": seed_cui, "lost": None, "path_length": 1}]
+
+    found_anchors = {}    # anchor_cui -> {"lost": rela, "path_length": int}
+    visited_total = set()
+    stack = [(seed_cui, 1, frozenset([seed_cui]))]
+
+    while stack:
+        if len(visited_total) > MAX_NODES_PER_TRAVERSAL:
+            break
+
+        current, depth, visited_on_path = stack.pop()
+        visited_total.add(current)
+
+        ps = parents.get(current, set())
+        preserving_parents = []
+        any_break_reason = None
+
+        for parent in ps:
+            if parent in visited_on_path:
+                continue
+            broken = check_break(seed_attrs, attrs.get(parent, {}))
+            if broken is None:
+                preserving_parents.append(parent)
+            elif any_break_reason is None:
+                any_break_reason = broken
+
+        if not preserving_parents:
+            # current is an anchor: either no parents at all (root), or
+            # every parent broke at least one of the seed's attributes.
+            # If we've seen this anchor before via a different path, keep
+            # the longer path length (diagnostic only, no ranking).
+            existing = found_anchors.get(current)
+            if existing is None or depth > existing["path_length"]:
+                found_anchors[current] = {
+                    "lost": any_break_reason,
+                    "path_length": depth,
+                }
+        else:
+            new_visited = visited_on_path | {current}
+            for parent in preserving_parents:
+                stack.append((parent, depth + 1, new_visited))
+
+    # Sort alphabetically by anchor CUI for stable, reproducible output.
+    # The order carries no semantic meaning — all anchors are equal.
+    result = [
+        {"anchor": cui, "lost": data["lost"], "path_length": data["path_length"]}
+        for cui, data in found_anchors.items()
+    ]
+    result.sort(key=lambda r: r["anchor"])
+    return result
+
+
+# ============================================================================
+# Step 3: Orchestration
+# ============================================================================
+
+def main():
+    if PROJECT == "YOUR_GCP_PROJECT" or DATASET == "YOUR_UMLS_DATASET":
+        print("ERROR: edit the CONFIG block at the top of build_topics.py")
+        print("       set PROJECT and DATASET to your real values, then re-run.")
+        raise SystemExit(1)
+
+    print("=" * 60)
+    print("Build CUI -> topics pickle")
+    print(f"  project       : {PROJECT}")
+    print(f"  dataset       : {DATASET}")
+    print(f"  output        : {OUTPUT_PATH}")
+    print(f"  strict slots  : {sorted(STRICT_SLOTS)}")
+    print(f"  max_concepts  : {MAX_CONCEPTS if MAX_CONCEPTS else 'all'}")
+    print("=" * 60)
+
+    client = bigquery.Client(project=PROJECT)
+
+    print("\n[1/5] Loading SNOMED CUIs from MRCONSO ...")
+    t0 = time.time()
+    cuis = load_concepts(client)
+    print(f"      {len(cuis):,} CUIs in {time.time()-t0:.1f}s")
+
+    print("\n[2/5] Loading parents and attributes from MRREL ...")
+    t0 = time.time()
+    parents, attrs = load_parents_and_attrs(client, cuis)
+    n_edges = sum(len(v) for v in parents.values())
+    n_attrs = sum(len(v) for v in attrs.values())
+    print(f"      {n_edges:,} IS-A edges, {n_attrs:,} attributes in "
+          f"{time.time()-t0:.1f}s")
+
+    print("\n[3/5] Loading semantic types from MRSTY ...")
+    t0 = time.time()
+    tags = load_semantic_tags(client, cuis)
+    print(f"      {len(tags):,} tags in {time.time()-t0:.1f}s")
+
+    print("\n[4/5] Finding anchors (multi-path) ...")
+    t0 = time.time()
+    all_cuis = list(cuis)
+    if MAX_CONCEPTS:
+        all_cuis = all_cuis[:MAX_CONCEPTS]
+        print(f"      LIMITED to first {len(all_cuis):,} CUIs")
+
+    anchors_by_cui = {}
+    multi_anchor_count = 0
+    self_only_count = 0
+    total_anchor_entries = 0
+
+    for i, cui in enumerate(all_cuis):
+        if i % 50000 == 0 and i > 0:
+            rate = i / (time.time() - t0)
+            print(f"      {i:,} / {len(all_cuis):,}  ({rate:.0f}/sec)")
+        anchors = find_anchors(cui, parents, attrs)
+        anchors_by_cui[cui] = anchors
+        total_anchor_entries += len(anchors)
+        if len(anchors) > 1:
+            multi_anchor_count += 1
+        if len(anchors) == 1 and anchors[0]["anchor"] == cui:
+            self_only_count += 1
+    print(f"      anchored {len(anchors_by_cui):,} CUIs in {time.time()-t0:.1f}s")
+    print(f"      {multi_anchor_count:,} CUIs have >1 topic; "
+          f"avg topics/CUI = {total_anchor_entries/max(1,len(anchors_by_cui)):.2f}")
+
+    print("\n[5/5] Pulling labels and saving pickle ...")
+    t0 = time.time()
+    needed = set(anchors_by_cui.keys())
+    for entries in anchors_by_cui.values():
+        for e in entries:
+            needed.add(e["anchor"])
+    labels = load_labels(client, needed)
+    unique_anchors = {e["anchor"] for entries in anchors_by_cui.values() for e in entries}
+
+    payload = {
+        "built_at": datetime.datetime.now().isoformat(),
+        "anchors": anchors_by_cui,
+        "labels":  labels,
+        "tags":    {c: tags[c] for c in needed if c in tags},
+        "stats": {
+            "total_cuis": len(anchors_by_cui),
+            "unique_anchors": len(unique_anchors),
+            "self_only": self_only_count,
+            "multi_anchor": multi_anchor_count,
+            "total_anchor_entries": total_anchor_entries,
+        },
+    }
+    with open(OUTPUT_PATH, "wb") as f:
+        pickle.dump(payload, f)
+
+    import os
+    size_mb = os.path.getsize(OUTPUT_PATH) / (1024 * 1024)
+    print(f"      wrote {size_mb:.1f} MB in {time.time()-t0:.1f}s")
+
+    print("\n" + "=" * 60)
+    print("DONE")
+    print(f"  Total CUIs            : {len(anchors_by_cui):,}")
+    print(f"  Unique anchors        : {len(unique_anchors):,}")
+    print(f"  Self-only             : {self_only_count:,} "
+          f"({100*self_only_count/max(1,len(anchors_by_cui)):.1f}%)")
+    print(f"  Multi-topic CUIs      : {multi_anchor_count:,} "
+          f"({100*multi_anchor_count/max(1,len(anchors_by_cui)):.1f}%)")
+    print(f"  Avg topics per CUI    : "
+          f"{total_anchor_entries/max(1,len(anchors_by_cui)):.2f}")
+    print(f"  Compression           : "
+          f"{len(anchors_by_cui)/max(1,len(unique_anchors)):.2f}x")
+    print(f"  Pickle                : {OUTPUT_PATH} ({size_mb:.1f} MB)")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()
