@@ -1,80 +1,63 @@
 ======================================================================
 Pickle: topics.pkl
-  built_at         : 2026-05-21T19:36:38.369401
+  built_at         : 2026-05-21T19:59:48.552805
   total CUIs       : 374,538
-  unique anchors   : 101,162
-  self-only        : 99,898
-  multi-topic CUIs : 77,379
+  unique anchors   : 124,181
+  self-only        : 122,798
+  multi-topic CUIs : 34,071
 ======================================================================
 
-Relationship-type contribution to non-self anchors (575,705 total):
-  CHD    isa                    575,355  ( 99.9%)
-  RB     inverse_was_a          295,893  ( 51.4%)
-  RB     referred_to_by          17,628  (  3.1%)
-  RB     alternative_of           1,269  (  0.2%)
+Relationship-type contribution to non-self anchors (302,692 total):
+  CHD    isa                    302,692  (100.0%)
 
-  Anchors reached using ONLY CHD/isa : 268,052
-  Anchors that used RB at any point  : 307,653
-  Anchors reached using ONLY RB      : 350
+  Anchors reached using ONLY CHD/isa : 302,692
+  Anchors that used RB at any point  : 0
+  Anchors reached using ONLY RB      : 0
     (these would not exist without RB traversal)
 
---- Sample CUIs with ONE topic (different from self) [197261 total in pickle] ---
+--- Sample CUIs with ONE topic (different from self) [217669 total in pickle] ---
   C3164461  (Atresia of systemic vein                ) -> C3165169  (Congenital abnormality of systemic vein)
-  C0524148  (Heptaminol measurement                  ) -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+  C0524148  (Heptaminol measurement                  ) -> C2316799  (Measurement of substance)
+  C5547446  (Serum testosterone above reference range) -> C2711908  (Measurement finding outside reference range)
   C1444384  (Skin care education                     ) -> C0557043  (Procedure education)
   C1290900  (Condition AND/OR status of human remains) -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
-  C0337354  (Quadrantectomy of breast                ) -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
 
---- Sample CUIs with MULTIPLE topics [77379 total in pickle] ---
+--- Sample CUIs with MULTIPLE topics [34071 total in pickle] ---
   C0751161  (Galactose epimerase deficiency)
-      -> C0034525  (Radiation effect on tissue)
-      -> C0597300  (Disorder of protein metabolism)
-      -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
-  C5547446  (Serum testosterone above reference range)
-      -> C0438258  (Blood chemistry outside reference range)
-      -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
-  C1275033  (PUVA therapy-associated squamous cell carcinoma)
-      -> C0034525  (Radiation effect on tissue)
-      -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+      -> C0016952  (Galactosaemia)
+      -> C0019247  (Hereditary disease)
+      -> C0520572  (Enzymopathy)
   C4076030  (Injection of normal human immunoglobulin)
       -> C0150150  (Blood products administration)
-      -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
       -> C3469597  (Medication administration)
-  C2960444  (Mixed serous and mucinous cystadenoma of borderline malignancy)
-      -> C0034525  (Radiation effect on tissue)
-      -> C0178360  (Suicide and selfinflicted injury)
-      -> C0261515  (Accidental cut, puncture, perforation or hemorrhage during injection or vaccination (navigational concept))
-      -> C0261517  (Accidental cut, puncture, perforation or haemorrhage during aspiration of fluid or tissue, puncture and catheterisation)
-      -> C0261971  (Suicide and selfinflicted injury by hanging, strangulation and suffocation)
-      -> C0261990  (Suicide and selfinflicted injury by jumping or lying before moving object)
-      -> C0346785  (Malignant melanoma of trunk (excluding scrotum) (navigational concept))
-      -> C0418257  (Suicide and selfinflicted poisoning by solid and liquid substances)
-      -> C0449224  (Respiratory tract and mouth)
-      -> C0449226  (Digestive tract and abdominal organs)
-      -> C0449233  (Endocrine, breast and special senses)
-      -> C0521829  (Arthropod-borne infectious disease)
-      -> C0700136  (Disorder of epiphysis)
+  C0230989  (Amniotic villi)
+      -> C0460005  (Torso)
+      -> C0700276  (Anatomical structure)
+  C1283689  (Region of ileum)
       -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
-      -> C2939422  (Accidental cut, puncture, perforation or haemorrhage during infusion or transfusion)
+      -> C4040653  (Digestive tract part)
+  C0268097  (Nutritional muscular degeneration)
+      -> C0268084  (Disorder of trace mineral metabolism)
+      -> C1285162  (Degenerative disorder)
 
---- Sample CUIs that anchor to themselves [99898 total in pickle] ---
+--- Sample CUIs that anchor to themselves [122798 total in pickle] ---
   C4517381  (Discharge specimen from penis)
+  C1275033  (PUVA therapy-associated squamous cell carcinoma)
   C0407992  (Revision to open reduction of fracture dislocation and functional bracing)
   C4074933  (Structure of muscle acting on ankle joint)
   C3474327  (Product containing precisely mirabegron 25 milligram/1 each prolonged-release oral tablet (clinical drug))
-  C4514409  (Entire epiphysis of pubic tubercle)
 
 --- Top 10 largest topic groups ---
-  196839 members  C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
-  29598 members  C0504082  (Body substance)
-  28059 members  C0729759  (Substance categorized by structure)
-  18502 members  C4706571  (Medicinal product categorised by structure)
-  17225 members  C4749806  (Organic acid and/or organic acid derivative-containing product)
-  16689 members  C0576788  (Organic acid and/or organic acid derivative)
-  16490 members  C0034525  (Radiation effect on tissue)
-  15039 members  C0029224  (Organic chemical)
-  8257 members  C0261971  (Suicide and selfinflicted injury by hanging, strangulation and suffocation)
-  8257 members  C0261990  (Suicide and selfinflicted injury by jumping or lying before moving object)
+  104410 members  C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+  4760 members  C4707809  (Substance categorized by disposition)
+  3697 members  C2316799  (Measurement of substance)
+  2315 members  C1290828  (Procedure related finding)
+  2299 members  C1292784  (Procedure by method)
+  2206 members  C0302955  (Nitrogen and/or nitrogen compound-containing product)
+  2119 members  C2317510  (Measurement of substance in specimen)
+  1951 members  C0700276  (Anatomical structure)
+  1705 members  C1287110  (Social and personal history finding)
+  1651 members  C0015385  (Limb)
 
 ======================================================================
 Copy/paste any of these into CUIS_TO_LOOKUP in lookup_topics.py
@@ -84,6 +67,6 @@ CUIS_TO_LOOKUP = [
     "C3164461",   # Atresia of systemic vein
     "C0524148",   # Heptaminol measurement
     "C0751161",   # Galactose epimerase deficiency
-    "C5547446",   # Serum testosterone above reference range
+    "C4076030",   # Injection of normal human immunoglobulin
     "C4517381",   # Discharge specimen from penis
 ]
