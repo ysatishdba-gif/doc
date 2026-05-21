@@ -1467,7 +1467,7 @@ def run_single_query(
     return {"query": query, "status": "completed", "files": files}
 
 
-def minimal_pipeline(pipeline, q) -> Dict[str, Any]:
+def minimal_pipeline(pipeline, q, skip_context: bool = False) -> Dict[str, Any]:
    
     t0 = datetime.utcnow()
 
@@ -1484,7 +1484,25 @@ def minimal_pipeline(pipeline, q) -> Dict[str, Any]:
             action_finder=relevance.actions,
         ).model_dump()
 
-    # intents + representative terms both depend only on the expanded query.
+    # FAST PATH: when skip_context=True, the only field beyond stage 1 that
+    # downstream cares about is representative_terms. extract_intents and
+    # build_context produce data that nothing in the minimal output uses,
+    # so we skip BOTH and run only the representative-terms call.
+    if skip_context:
+        rep_terms = pipeline.extract_representative_terms(expansion.expanded_query)
+        return Format_MinimalPipeline(
+            question=q,
+            is_processable=True,
+            action_finder=relevance.actions,
+            expanded_query=expansion.expanded_query,
+            is_clinical=None,
+            representative_terms=rep_terms.representative_terms,
+            total_intents_detected=None,
+            intents=None,
+        ).model_dump()
+
+    # FULL PATH: intents + representative terms both depend only on the
+    # expanded query, so run them in parallel.
     with ThreadPoolExecutor(max_workers=2) as ex:
         f_int = ex.submit(pipeline.extract_intents, q, expansion.expanded_query)
         f_rep = ex.submit(
@@ -1508,7 +1526,6 @@ def minimal_pipeline(pipeline, q) -> Dict[str, Any]:
     )
 
     fp = result.to_full_pipeline()
-    print(f"Total time: {processing_time:.1f}s")
 
     return Format_MinimalPipeline(
         question=q,
@@ -1590,6 +1607,7 @@ if __name__ == "__main__":
     FILE_PATH = ""
     BATCH_WORKERS = 4
     OUTPUT_FILE = "rep-term.json"
+    SKIP_CONTEXT = True  # True = no temporal/facets (faster); False = full pipeline
 
     def load_json_from_gcs(bucket_name, blob_name):
         client = storage.Client()
@@ -1638,7 +1656,7 @@ if __name__ == "__main__":
     summaries: List[Optional[Dict[str, Any]]] = [None] * len(questions)
     with ThreadPoolExecutor(max_workers=BATCH_WORKERS) as executor:
         future_to_idx = {
-            executor.submit(minimal_pipeline, pipeline, q): i
+            executor.submit(minimal_pipeline, pipeline, q, SKIP_CONTEXT): i
             for i, q in enumerate(questions)
         }
         for fut in as_completed(future_to_idx):
