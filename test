@@ -1,73 +1,73 @@
-"""
-lookup_topics.py
-----------------
-Load the pickle from build_topics.py and print topics for hardcoded CUIs.
+======================================================================
+Pickle: topics.pkl
+  built_at         : 2026-05-21T18:40:12.735475
+  total CUIs       : 374,538
+  unique anchors   : 227,456
+  self-only        : 227,182
+  multi-topic CUIs : 28,070
+======================================================================
 
-Edit the CONFIG block below — set PICKLE_PATH and CUIS_TO_LOOKUP, then run:
-    python lookup_topics.py
+Relationship-type contribution to non-self anchors (191,178 total):
+  CHD    isa                    190,904  ( 99.9%)
+  RB     referred_to_by           6,034  (  3.2%)
+  RB     inverse_was_a            4,118  (  2.2%)
+  RB     alternative_of             299  (  0.2%)
 
-A CUI can have MULTIPLE topics (SNOMED multi-inheritance). All topics
-are printed for each CUI. None are labeled as primary; they're all
-equally valid.
-"""
+  Anchors reached using ONLY CHD/isa : 180,810
+  Anchors that used RB at any point  : 10,368
+  Anchors reached using ONLY RB      : 274
+    (these would not exist without RB traversal)
 
-import pickle
+--- Sample CUIs with ONE topic (different from self) [119286 total in pickle] ---
+  C3164461  (Atresia of systemic vein                ) -> C3165169  (Congenital abnormality of systemic vein)
+  C0524148  (Heptaminol measurement                  ) -> C2316799  (Measurement of substance)
+  C5547446  (Serum testosterone above reference range) -> C0438258  (Blood chemistry outside reference range)
+  C1444384  (Skin care education                     ) -> C0557043  (Procedure education)
+  C1289507  (Entire nucleus solitarius               ) -> C1281202  (Entire cranial nerve nucleus)
 
+--- Sample CUIs with MULTIPLE topics [28070 total in pickle] ---
+  C0751161  (Galactose epimerase deficiency)
+      -> C0016952  (Galactosaemia)
+      -> C0019247  (Hereditary disease)
+  C4076030  (Injection of normal human immunoglobulin)
+      -> C0150150  (Blood products administration)
+      -> C3469597  (Medication administration)
+  C0337354  (Quadrantectomy of breast)
+      -> C0015250  (Complete excision)
+      -> C1293182  (Trunk excision)
+  C0230989  (Amniotic villi)
+      -> C0460005  (Torso)
+      -> C0700276  (Anatomical structure)
+  C5687821  (Structure of periosteum of shoulder)
+      -> C1720025  (Structure of shoulder and/or upper arm)
+      -> C2316804  (Structure of soft tissue of limb)
 
-# ============================================================================
-# CONFIG — edit these
-# ============================================================================
+--- Sample CUIs that anchor to themselves [227182 total in pickle] ---
+  C4517381  (Discharge specimen from penis)
+  C1275033  (PUVA therapy-associated squamous cell carcinoma)
+  C1290900  (Condition AND/OR status of human remains)
+  C2960444  (Mixed serous and mucinous cystadenoma of borderline malignancy)
+  C4302701  (Wedge pressure technique)
 
-PICKLE_PATH = "topics.pkl"
+--- Top 10 largest topic groups ---
+  4760 members  C4707809  (Substance categorized by disposition)
+  3698 members  C2316799  (Measurement of substance)
+  2299 members  C1292784  (Procedure by method)
+  2157 members  C2711906  (Evaluation finding (finding))
+  2119 members  C2317510  (Measurement of substance in specimen)
+  1914 members  C0700276  (Anatomical structure)
+  1705 members  C1287110  (Social and personal history finding)
+  1674 members  C0015385  (Limb)
+  1612 members  C0574125  (Functional finding)
+  1553 members  C0519671  (Immunology laboratory test (procedure))
 
-# CUIs to look up. Add or remove as needed.
+======================================================================
+Copy/paste any of these into CUIS_TO_LOOKUP in lookup_topics.py
+======================================================================
+
 CUIS_TO_LOOKUP = [
-    "C0027051",     # Myocardial Infarction
-    "C0231749",     # Pain in knee
-    "C0011854",     # Diabetes Mellitus
-]
-
-
-# ============================================================================
-# Lookup
-# ============================================================================
-
-def main():
-    with open(PICKLE_PATH, "rb") as f:
-        data = pickle.load(f)
-
-    labels = data["labels"]
-    anchors = data["anchors"]
-
-    print("=" * 60)
-    print(f"Pickle: {PICKLE_PATH}")
-    print(f"  built_at        : {data['built_at']}")
-    print(f"  total_cuis      : {data['stats']['total_cuis']:,}")
-    print(f"  unique_anchors  : {data['stats']['unique_anchors']:,}")
-    print("=" * 60)
-
-    for cui in CUIS_TO_LOOKUP:
-        seed_label = labels.get(cui, "")
-        entries = anchors.get(cui)
-
-        print()
-        if entries is None:
-            print(f"{cui}  ({seed_label or 'not in pickle'})")
-            print("  -> Uncategorized")
-            continue
-
-        print(f"{cui}  ({seed_label})")
-        if len(entries) == 1:
-            anchor = entries[0]["anchor"]
-            anchor_label = labels.get(anchor, "")
-            print(f"  -> {anchor} - {anchor_label}")
-        else:
-            print(f"  -> ({len(entries)} topics)")
-            for e in entries:
-                anchor = e["anchor"]
-                anchor_label = labels.get(anchor, "")
-                print(f"     {anchor} - {anchor_label}")
-
-
-if __name__ == "__main__":
-    main()
+    "C3164461",   # Atresia of systemic vein
+    "C0524148",   # Heptaminol measurement
+    "C0751161",   # Galactose epimerase deficiency
+    "C4076030",   # Injection of normal human immunoglobulin
+    "C4517381",   # Discharge specimen from penis
