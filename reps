@@ -33,8 +33,8 @@ ACTION CATEGORIES
 
 2. "information_retrieval"
    Instruction: Search clinical documents, records, guidelines, drug databases, protocols, or other clinical knowledge sources for the answer.
-   When applies: Any query whose answer is documented in patient charts, clinical guidelines, drug references, internal protocols, lab references, or research literature.
-   Examples: "What's the patient's last A1C?", "What's our chest-pain protocol?", "Patient has type 2 diabetes - what are the latest treatment options?", "Drug interactions between metformin and contrast dye"
+   When applies: Any query whose answer is documented in patient charts, clinical guidelines, drug references, internal protocols, lab references, or research literature. Includes intake-style questions addressed to the patient ("Do you have/take/use X?") when X is a chart-section entity — device, medication, allergy, diagnosis, implant, procedure, lab, imaging. The yes/no answer is something a chart records.
+   Examples: "What's the patient's last A1C?", "What's our chest-pain protocol?", "Patient has type 2 diabetes - what are the latest treatment options?", "Drug interactions between metformin and contrast dye", "Do you have a continuous infusion device?", "Do you take any blood thinners?", "Are you allergic to penicillin?"
 
 3. "knowledge_fact_search"
    Instruction: Generate clinician-facing guidance — treatment overviews, standards-of-care summaries, symptom management, prevention recommendations.
@@ -84,6 +84,7 @@ Read the ORIGINAL query as written, before any expansion:
 - Imperatives to the reader ("select", "click", "navigate", "confirm") are behaviors, not retrievals.
 - Patient-voice phrasing ("my", "I have", "should I") + simple explanation request -> conversational_response, not information_retrieval.
 - Clinician-voice phrasing + patient context ("the patient's...", "my patient with...") -> information_retrieval.
+- Intake-style second-person yes/no questions ("Do you have X?", "Do you take X?", "Are you on X?", "Have you ever had X?") -> include information_retrieval WHEN X is a chart-section entity: device, medication, allergy, diagnosis, implant, procedure, lab, imaging, vaccination. The chart has a section to record the answer. May also include conversational_response when the question is being asked TO a patient (both apply — the patient answers, the chart records). EXCLUDE information_retrieval when X is a vague subjective state with no chart section: "do you have pain", "do you have concerns", "do you have questions", "are you feeling okay" -> conversational_response only.
 
 DEFAULTS when uncertain:
 - Between information_retrieval and knowledge_fact_search -> include information_retrieval (or both if both genuinely apply).
@@ -1643,13 +1644,18 @@ if __name__ == "__main__":
         return signals
 
     def _summarize(pr: Dict[str, Any]) -> Dict[str, Any]:
-        return {
+        out = {
             "query": pr.get("question", ""),
             "action_finder": list(pr.get("action_finder") or []),
             "is_processable": bool(pr.get("is_processable")),
             "representative_terms": list(pr.get("representative_terms") or []),
-            "temporal_signals": _collect_temporal_signals(pr),
         }
+        # Only include temporal_signals when the full pipeline actually ran
+        # (i.e. intents were extracted). On the fast path / non-processable
+        # paths there is no temporal data, so omit the field entirely.
+        if pr.get("intents"):
+            out["temporal_signals"] = _collect_temporal_signals(pr)
+        return out
 
     data = load_json_from_gcs(BUCKET_NAME, FILE_PATH)
     questions = list(data.keys())
@@ -1674,7 +1680,6 @@ if __name__ == "__main__":
                     "action_finder": [],
                     "is_processable": False,
                     "representative_terms": [],
-                    "temporal_signals": [],
                     "error": str(e),
                 }
 
@@ -1685,7 +1690,8 @@ if __name__ == "__main__":
         print(f"  actions    : {s['action_finder']}")
         print(f"  processable: {s['is_processable']}")
         print(f"  rep terms  : {s['representative_terms']}")
-        print(f"  temporal   : {s['temporal_signals']}")
+        if "temporal_signals" in s:
+            print(f"  temporal   : {s['temporal_signals']}")
 
     with open(OUTPUT_FILE, "w") as f:
         json.dump(summaries, f, indent=2)
