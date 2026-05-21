@@ -1,72 +1,112 @@
 """
-lookup_topics.py
-----------------
-Load the pickle from build_topics.py and print topics for hardcoded CUIs.
+inspect_pickle.py
+-----------------
+Look at the pickle and print interesting CUIs to test the lookup with.
 
-Edit the CONFIG block below — set PICKLE_PATH and CUIS_TO_LOOKUP, then run:
-    python lookup_topics.py
+Use this when your pickle is a smoke build (e.g. MAX_CONCEPTS=1000) and
+you don't know which specific CUIs are in it. This script samples the
+pickle and shows you:
+  - A few CUIs with a SINGLE topic
+  - A few CUIs with MULTIPLE topics
+  - The 10 largest topic groups
 
-A CUI can have MULTIPLE topics (SNOMED multi-inheritance). All topics
-are printed for each CUI. None are labeled as primary; they're all
-equally valid.
+Then you can copy any of those CUIs into lookup_topics.py to test.
+
+Just edit PICKLE_PATH below and run:
+    python inspect_pickle.py
 """
 
 import pickle
+from collections import defaultdict
 
-
-# ============================================================================
-# CONFIG — edit these
-# ============================================================================
 
 PICKLE_PATH = "topics.pkl"
 
-# CUIs to look up. Add or remove as needed.
-CUIS_TO_LOOKUP = [
-    "C0027051",     # Myocardial Infarction
-    "C0231749",     # Pain in knee
-    "C0011854",     # Diabetes Mellitus
-]
-
-
-# ============================================================================
-# Lookup
-# ============================================================================
 
 def main():
     with open(PICKLE_PATH, "rb") as f:
         data = pickle.load(f)
 
-    labels = data["labels"]
     anchors = data["anchors"]
+    labels = data["labels"]
+    stats = data["stats"]
 
-    print("=" * 60)
+    print("=" * 70)
     print(f"Pickle: {PICKLE_PATH}")
-    print(f"  built_at        : {data['built_at']}")
-    print(f"  total_cuis      : {data['stats']['total_cuis']:,}")
-    print(f"  unique_anchors  : {data['stats']['unique_anchors']:,}")
-    print("=" * 60)
+    print(f"  built_at         : {data['built_at']}")
+    print(f"  total CUIs       : {stats['total_cuis']:,}")
+    print(f"  unique anchors   : {stats['unique_anchors']:,}")
+    print(f"  self-only        : {stats.get('self_only', '?'):,}")
+    print(f"  multi-topic CUIs : {stats.get('multi_anchor', '?'):,}")
+    print("=" * 70)
 
-    for cui in CUIS_TO_LOOKUP:
-        seed_label = labels.get(cui, "")
-        entries = anchors.get(cui)
-
-        print()
-        if entries is None:
-            print(f"{cui}  ({seed_label or 'not in pickle'})")
-            print("  -> Uncategorized")
-            continue
-
-        print(f"{cui}  ({seed_label})")
+    # --- Separate the CUIs into buckets ---
+    single_topic = []
+    multi_topic = []
+    self_only = []
+    for cui, entries in anchors.items():
         if len(entries) == 1:
-            anchor = entries[0]["anchor"]
-            anchor_label = labels.get(anchor, "")
-            print(f"  -> {anchor} - {anchor_label}")
+            if entries[0]["anchor"] == cui:
+                self_only.append(cui)
+            else:
+                single_topic.append(cui)
         else:
-            print(f"  -> ({len(entries)} topics)")
-            for e in entries:
-                anchor = e["anchor"]
-                anchor_label = labels.get(anchor, "")
-                print(f"     {anchor} - {anchor_label}")
+            multi_topic.append(cui)
+
+    # --- Show 5 single-topic samples (where the topic differs from the CUI) ---
+    print(f"\n--- Sample CUIs with ONE topic (different from self) "
+          f"[{len(single_topic)} total in pickle] ---")
+    if not single_topic:
+        print("  (none — every non-multi CUI is its own topic; expected if smoke build is small)")
+    else:
+        for cui in single_topic[:5]:
+            anchor = anchors[cui][0]["anchor"]
+            print(f"  {cui}  ({labels.get(cui, '?'):40s}) -> {anchor}  ({labels.get(anchor, '?')})")
+
+    # --- Show 5 multi-topic samples ---
+    print(f"\n--- Sample CUIs with MULTIPLE topics [{len(multi_topic)} total in pickle] ---")
+    if not multi_topic:
+        print("  (none in this pickle)")
+    else:
+        for cui in multi_topic[:5]:
+            print(f"  {cui}  ({labels.get(cui, '?')})")
+            for e in anchors[cui]:
+                a = e["anchor"]
+                print(f"      -> {a}  ({labels.get(a, '?')})")
+
+    # --- Show 5 self-only samples (just so you can confirm the lookup works
+    #     for them too — they'll just return themselves as the topic) ---
+    print(f"\n--- Sample CUIs that anchor to themselves [{len(self_only)} total in pickle] ---")
+    for cui in self_only[:5]:
+        print(f"  {cui}  ({labels.get(cui, '?')})")
+
+    # --- Top 10 largest topic groups (which anchors gather the most members) ---
+    groups = defaultdict(list)
+    for cui, entries in anchors.items():
+        for e in entries:
+            groups[e["anchor"]].append(cui)
+
+    big_groups = sorted(groups.items(), key=lambda kv: -len(kv[1]))[:10]
+    print(f"\n--- Top 10 largest topic groups ---")
+    for anchor, members in big_groups:
+        print(f"  {len(members):>4d} members  {anchor}  ({labels.get(anchor, '?')})")
+
+    # --- Ready-to-paste list for lookup_topics.py ---
+    print("\n" + "=" * 70)
+    print("Copy/paste any of these into CUIS_TO_LOOKUP in lookup_topics.py")
+    print("=" * 70)
+    sample = []
+    if single_topic:
+        sample.extend(single_topic[:2])
+    if multi_topic:
+        sample.extend(multi_topic[:2])
+    if self_only:
+        sample.append(self_only[0])
+    print("\nCUIS_TO_LOOKUP = [")
+    for cui in sample:
+        comment = labels.get(cui, "")
+        print(f'    "{cui}",   # {comment}')
+    print("]")
 
 
 if __name__ == "__main__":
