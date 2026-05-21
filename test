@@ -1,136 +1,89 @@
-Loading umls_cache.pkl ...
-Loading topics.pkl ...
+======================================================================
+Pickle: topics.pkl
+  built_at         : 2026-05-21T19:36:38.369401
+  total CUIs       : 374,538
+  unique anchors   : 101,162
+  self-only        : 99,898
+  multi-topic CUIs : 77,379
+======================================================================
 
-========================================================================
-SEED: C4517381  (Discharge specimen from penis)
-========================================================================
+Relationship-type contribution to non-self anchors (575,705 total):
+  CHD    isa                    575,355  ( 99.9%)
+  RB     inverse_was_a          295,893  ( 51.4%)
+  RB     referred_to_by          17,628  (  3.1%)
+  RB     alternative_of           1,269  (  0.2%)
 
-Seed attributes (2):
-  has_specimen_source_topography      -> C0030851  (Penile structure (body structure))
-  has_specimen_substance              -> C0012621  (Discharge)
+  Anchors reached using ONLY CHD/isa : 268,052
+  Anchors that used RB at any point  : 307,653
+  Anchors reached using ONLY RB      : 350
+    (these would not exist without RB traversal)
 
-Anchors from topics.pkl (1):
-  C4517381  (Discharge specimen from penis)  lost=has_specimen_source_topography
+--- Sample CUIs with ONE topic (different from self) [197261 total in pickle] ---
+  C3164461  (Atresia of systemic vein                ) -> C3165169  (Congenital abnormality of systemic vein)
+  C0524148  (Heptaminol measurement                  ) -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+  C1444384  (Skin care education                     ) -> C0557043  (Procedure education)
+  C1290900  (Condition AND/OR status of human remains) -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+  C0337354  (Quadrantectomy of breast                ) -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
 
-All parents in MRREL (2):
+--- Sample CUIs with MULTIPLE topics [77379 total in pickle] ---
+  C0751161  (Galactose epimerase deficiency)
+      -> C0034525  (Radiation effect on tissue)
+      -> C0597300  (Disorder of protein metabolism)
+      -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+  C5547446  (Serum testosterone above reference range)
+      -> C0438258  (Blood chemistry outside reference range)
+      -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+  C1275033  (PUVA therapy-associated squamous cell carcinoma)
+      -> C0034525  (Radiation effect on tissue)
+      -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+  C4076030  (Injection of normal human immunoglobulin)
+      -> C0150150  (Blood products administration)
+      -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+      -> C3469597  (Medication administration)
+  C2960444  (Mixed serous and mucinous cystadenoma of borderline malignancy)
+      -> C0034525  (Radiation effect on tissue)
+      -> C0178360  (Suicide and selfinflicted injury)
+      -> C0261515  (Accidental cut, puncture, perforation or hemorrhage during injection or vaccination (navigational concept))
+      -> C0261517  (Accidental cut, puncture, perforation or haemorrhage during aspiration of fluid or tissue, puncture and catheterisation)
+      -> C0261971  (Suicide and selfinflicted injury by hanging, strangulation and suffocation)
+      -> C0261990  (Suicide and selfinflicted injury by jumping or lying before moving object)
+      -> C0346785  (Malignant melanoma of trunk (excluding scrotum) (navigational concept))
+      -> C0418257  (Suicide and selfinflicted poisoning by solid and liquid substances)
+      -> C0449224  (Respiratory tract and mouth)
+      -> C0449226  (Digestive tract and abdominal organs)
+      -> C0449233  (Endocrine, breast and special senses)
+      -> C0521829  (Arthropod-borne infectious disease)
+      -> C0700136  (Disorder of epiphysis)
+      -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+      -> C2939422  (Accidental cut, puncture, perforation or haemorrhage during infusion or transfusion)
 
-  Parent: C0600083  (Discharge specimen)
-    edge type      : REL=CHD RELA=isa
-    parent attrs   : 1 total
-    boundary fires : YES, because:
-      - MISSING has_specimen_source_topography: seed has it, parent doesn't
+--- Sample CUIs that anchor to themselves [99898 total in pickle] ---
+  C4517381  (Discharge specimen from penis)
+  C0407992  (Revision to open reduction of fracture dislocation and functional bracing)
+  C4074933  (Structure of muscle acting on ankle joint)
+  C3474327  (Product containing precisely mirabegron 25 milligram/1 each prolonged-release oral tablet (clinical drug))
+  C4514409  (Entire epiphysis of pubic tubercle)
 
-  Parent: C1292689  (Specimen from penis)
-    edge type      : REL=CHD RELA=isa
-    parent attrs   : 1 total
-    boundary fires : YES, because:
-      - MISSING has_specimen_substance: seed has it, parent doesn't
+--- Top 10 largest topic groups ---
+  196839 members  C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+  29598 members  C0504082  (Body substance)
+  28059 members  C0729759  (Substance categorized by structure)
+  18502 members  C4706571  (Medicinal product categorised by structure)
+  17225 members  C4749806  (Organic acid and/or organic acid derivative-containing product)
+  16689 members  C0576788  (Organic acid and/or organic acid derivative)
+  16490 members  C0034525  (Radiation effect on tissue)
+  15039 members  C0029224  (Organic chemical)
+  8257 members  C0261971  (Suicide and selfinflicted injury by hanging, strangulation and suffocation)
+  8257 members  C0261990  (Suicide and selfinflicted injury by jumping or lying before moving object)
 
-========================================================================
-SEED: C1275033  (PUVA therapy-associated squamous cell carcinoma)
-========================================================================
+======================================================================
+Copy/paste any of these into CUIS_TO_LOOKUP in lookup_topics.py
+======================================================================
 
-Seed attributes (6):
-  due_to                              -> C0853073  (PUVA therapy)
-  has_associated_morphology           -> C0007137  (SCC - squamous cell carcinoma)
-  has_causative_agent                 -> C0041625  (Ultraviolet radiation)
-  has_finding_site                    -> C1123023  (Skin structure (body structure))  [STRICT]
-  has_interpretation                  -> C0205161  (Abnormal (qualifier value))
-  occurs_after                        -> C0853073  (PUVA therapy)
-
-Anchors from topics.pkl (1):
-  C1275033  (PUVA therapy-associated squamous cell carcinoma)  lost=occurs_after
-
-All parents in MRREL (6):
-
-  Parent: C0007137  (SCC - squamous cell carcinoma)
-    edge type      : REL=CHD RELA=isa
-    parent attrs   : 5 total
-    boundary fires : YES, because:
-      - MISSING occurs_after: seed has it, parent doesn't
-      - MISSING due_to: seed has it, parent doesn't
-      - MISSING has_associated_morphology: seed has it, parent doesn't
-      - MISSING has_causative_agent: seed has it, parent doesn't
-      - STRICT has_finding_site: seed=C1123023(Skin structure (body structure)) vs parent=None(missing)
-      - MISSING has_interpretation: seed has it, parent doesn't
-
-  Parent: C0345977  (Malignant epithelial neoplasm of skin)
-    edge type      : REL=CHD RELA=isa
-    parent attrs   : 3 total
-    boundary fires : YES, because:
-      - MISSING occurs_after: seed has it, parent doesn't
-      - MISSING due_to: seed has it, parent doesn't
-      - MISSING has_causative_agent: seed has it, parent doesn't
-      - MISSING has_interpretation: seed has it, parent doesn't
-
-  Parent: C1274252  (Squamous neoplasm of surface epithelium)
-    edge type      : REL=CHD RELA=isa
-    parent attrs   : 2 total
-    boundary fires : YES, because:
-      - MISSING occurs_after: seed has it, parent doesn't
-      - MISSING due_to: seed has it, parent doesn't
-      - MISSING has_causative_agent: seed has it, parent doesn't
-      - STRICT has_finding_site: seed=C1123023(Skin structure (body structure)) vs parent=C1302881(Structure of skin and/or surface epithelium)
-      - MISSING has_interpretation: seed has it, parent doesn't
-
-  Parent: C1275030  (Adverse effect from PUVA photochemotherapy)
-    edge type      : REL=CHD RELA=isa
-    parent attrs   : 5 total
-    boundary fires : YES, because:
-      - MISSING has_associated_morphology: seed has it, parent doesn't
-
-  Parent: C1275046  (Malignant neoplasm of skin caused by radiation)
-    edge type      : REL=CHD RELA=isa
-    parent attrs   : 3 total
-    boundary fires : YES, because:
-      - MISSING occurs_after: seed has it, parent doesn't
-      - MISSING due_to: seed has it, parent doesn't
-      - MISSING has_interpretation: seed has it, parent doesn't
-
-  Parent: C1285376  (Neoplastic complication of procedure)
-    edge type      : REL=CHD RELA=isa
-    parent attrs   : 3 total
-    boundary fires : YES, because:
-      - MISSING has_causative_agent: seed has it, parent doesn't
-      - STRICT has_finding_site: seed=C1123023(Skin structure (body structure)) vs parent=None(missing)
-      - MISSING has_interpretation: seed has it, parent doesn't
-
-========================================================================
-SEED: C4302701  (Wedge pressure technique)
-========================================================================
-
-Seed attributes (1):
-  technique_of                        -> C0456174  (Wedge pressure - a wave)
-
-Anchors from topics.pkl (1):
-  C4302701  (Wedge pressure technique)  lost=technique_of
-
-All parents in MRREL (1):
-
-  Parent: C0449851  (Technique)
-    edge type      : REL=CHD RELA=isa
-    parent attrs   : 0 total
-    boundary fires : YES, because:
-      - MISSING technique_of: seed has it, parent doesn't
-
-========================================================================
-SEED: C2960444  (Mixed serous and mucinous cystadenoma of borderline malignancy)
-========================================================================
-
-Seed attributes (0):
-  (none — seed will anchor to itself automatically)
-
-Anchors from topics.pkl (1):
-  C2960444  (Mixed serous and mucinous cystadenoma of borderline malignancy)  lost=None
-
-All parents in MRREL (2):
-
-  Parent: C0431094  (Borderline cystadenoma)
-    edge type      : REL=CHD RELA=isa
-    parent attrs   : 0 total
-    boundary fires : NO — would walk up to this parent
-
-  Parent: C1302387  (Mixed epithelial tumor of borderline malignancy)
-    edge type      : REL=CHD RELA=isa
-    parent attrs   : 0 total
-    boundary fires : NO — would walk up to this parent
+CUIS_TO_LOOKUP = [
+    "C3164461",   # Atresia of systemic vein
+    "C0524148",   # Heptaminol measurement
+    "C0751161",   # Galactose epimerase deficiency
+    "C5547446",   # Serum testosterone above reference range
+    "C4517381",   # Discharge specimen from penis
+]
