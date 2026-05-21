@@ -1,73 +1,25 @@
-======================================================================
+============================================================
 Pickle: topics.pkl
-  built_at         : 2026-05-21T18:40:12.735475
-  total CUIs       : 374,538
-  unique anchors   : 227,456
-  self-only        : 227,182
-  multi-topic CUIs : 28,070
-======================================================================
+  built_at        : 2026-05-21T18:40:12.735475
+  total_cuis      : 374,538
+  unique_anchors  : 227,456
+============================================================
 
-Relationship-type contribution to non-self anchors (191,178 total):
-  CHD    isa                    190,904  ( 99.9%)
-  RB     referred_to_by           6,034  (  3.2%)
-  RB     inverse_was_a            4,118  (  2.2%)
-  RB     alternative_of             299  (  0.2%)
+C3164461  (Atresia of systemic vein)
+  -> C3165169 - Congenital abnormality of systemic vein
 
-  Anchors reached using ONLY CHD/isa : 180,810
-  Anchors that used RB at any point  : 10,368
-  Anchors reached using ONLY RB      : 274
-    (these would not exist without RB traversal)
+C0524148  (Heptaminol measurement)
+  -> C2316799 - Measurement of substance
 
---- Sample CUIs with ONE topic (different from self) [119286 total in pickle] ---
-  C3164461  (Atresia of systemic vein                ) -> C3165169  (Congenital abnormality of systemic vein)
-  C0524148  (Heptaminol measurement                  ) -> C2316799  (Measurement of substance)
-  C5547446  (Serum testosterone above reference range) -> C0438258  (Blood chemistry outside reference range)
-  C1444384  (Skin care education                     ) -> C0557043  (Procedure education)
-  C1289507  (Entire nucleus solitarius               ) -> C1281202  (Entire cranial nerve nucleus)
+C0751161  (Galactose epimerase deficiency)
+  -> (2 topics)
+     C0016952 - Galactosaemia
+     C0019247 - Hereditary disease
 
---- Sample CUIs with MULTIPLE topics [28070 total in pickle] ---
-  C0751161  (Galactose epimerase deficiency)
-      -> C0016952  (Galactosaemia)
-      -> C0019247  (Hereditary disease)
-  C4076030  (Injection of normal human immunoglobulin)
-      -> C0150150  (Blood products administration)
-      -> C3469597  (Medication administration)
-  C0337354  (Quadrantectomy of breast)
-      -> C0015250  (Complete excision)
-      -> C1293182  (Trunk excision)
-  C0230989  (Amniotic villi)
-      -> C0460005  (Torso)
-      -> C0700276  (Anatomical structure)
-  C5687821  (Structure of periosteum of shoulder)
-      -> C1720025  (Structure of shoulder and/or upper arm)
-      -> C2316804  (Structure of soft tissue of limb)
+C4076030  (Injection of normal human immunoglobulin)
+  -> (2 topics)
+     C0150150 - Blood products administration
+     C3469597 - Medication administration
 
---- Sample CUIs that anchor to themselves [227182 total in pickle] ---
-  C4517381  (Discharge specimen from penis)
-  C1275033  (PUVA therapy-associated squamous cell carcinoma)
-  C1290900  (Condition AND/OR status of human remains)
-  C2960444  (Mixed serous and mucinous cystadenoma of borderline malignancy)
-  C4302701  (Wedge pressure technique)
-
---- Top 10 largest topic groups ---
-  4760 members  C4707809  (Substance categorized by disposition)
-  3698 members  C2316799  (Measurement of substance)
-  2299 members  C1292784  (Procedure by method)
-  2157 members  C2711906  (Evaluation finding (finding))
-  2119 members  C2317510  (Measurement of substance in specimen)
-  1914 members  C0700276  (Anatomical structure)
-  1705 members  C1287110  (Social and personal history finding)
-  1674 members  C0015385  (Limb)
-  1612 members  C0574125  (Functional finding)
-  1553 members  C0519671  (Immunology laboratory test (procedure))
-
-======================================================================
-Copy/paste any of these into CUIS_TO_LOOKUP in lookup_topics.py
-======================================================================
-
-CUIS_TO_LOOKUP = [
-    "C3164461",   # Atresia of systemic vein
-    "C0524148",   # Heptaminol measurement
-    "C0751161",   # Galactose epimerase deficiency
-    "C4076030",   # Injection of normal human immunoglobulin
-    "C4517381",   # Discharge specimen from penis
+C4517381  (Discharge specimen from penis)
+  -> C4517381 - Discharge specimen from penis
