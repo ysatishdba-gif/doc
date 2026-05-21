@@ -379,29 +379,44 @@ def find_anchors(seed_cui, parents, attrs):
         "rels_used":   sorted list of (REL, RELA) tuples seen on path}, ...]
 
     Behavior:
-      - Walks through "transparent" parents (no attribute overlap with seed).
-        These don't anchor; we look past them for a real comparison point.
-      - Seeds with no defining attributes still walk — they vacuously
-        preserve everything, so they walk until they hit the root or until
-        a parent ALSO has no attributes (transparent), in which case we
-        continue past it. Effectively such seeds anchor at the ontology
-        root via whatever traversal path exists.
+      - Walks through "transparent" parents (zero defining attributes) — but
+        does NOT anchor on them. The current node is recorded as an anchor
+        only when both (a) it has a content boundary with its parents, and
+        (b) it itself has at least one defining attribute. Otherwise we
+        back up to the most recent non-transparent node on the path.
+
+        This rule prevents the algorithm from walking up to abstract
+        organizing concepts at the top of SNOMED's hierarchy (which have
+        no attributes and end up swallowing huge numbers of CUIs).
+      - A seed that has no defining attributes is allowed to anchor at
+        any non-transparent ancestor it can reach.
     """
     seed_attrs = attrs.get(seed_cui, {})
 
     found_anchors = {}
     visited_total = set()
-    stack = [(seed_cui, 1, frozenset([seed_cui]), frozenset())]
+    # Stack entry: (current_cui, depth, visited_on_path,
+    #               rels_used, last_meaningful_ancestor, last_meaningful_depth)
+    # last_meaningful_ancestor: the most recent node on this path with
+    # at least one defining attribute (used as the fallback anchor when
+    # the walk would otherwise terminate at a transparent node).
+    seed_is_meaningful = bool(seed_attrs)
+    stack = [(
+        seed_cui, 1, frozenset([seed_cui]), frozenset(),
+        seed_cui if seed_is_meaningful else None,
+        1 if seed_is_meaningful else 0,
+    )]
 
     while stack:
         if len(visited_total) > MAX_NODES_PER_TRAVERSAL:
             break
 
-        current, depth, visited_on_path, rels_used = stack.pop()
+        (current, depth, visited_on_path, rels_used,
+         last_meaningful, last_meaningful_depth) = stack.pop()
         visited_total.add(current)
 
         ps = parents.get(current, {})
-        preserving_parents = []   # parents we'll continue exploring through
+        preserving_parents = []   # list of (parent_cui, rel_key)
         any_break_reason = None
 
         for parent_cui, rel_key in ps.items():
@@ -409,8 +424,6 @@ def find_anchors(seed_cui, parents, attrs):
                 continue
             parent_attrs = attrs.get(parent_cui, {})
             if is_transparent_parent(seed_attrs, parent_attrs):
-                # Walk through transparent parents without anchoring at
-                # the current node — they don't constitute a boundary.
                 preserving_parents.append((parent_cui, rel_key))
             else:
                 broken = check_break(seed_attrs, parent_attrs)
@@ -420,21 +433,47 @@ def find_anchors(seed_cui, parents, attrs):
                     any_break_reason = broken
 
         if not preserving_parents:
-            existing = found_anchors.get(current)
-            if existing is None or depth > existing["path_length"]:
-                found_anchors[current] = {
+            # Terminus reached. The "real" anchor is `current`, but if
+            # `current` is itself transparent (no defining attributes),
+            # we don't want it as a topic — back up to the last
+            # meaningful ancestor we saw on the path.
+            current_attrs = attrs.get(current, {})
+            if current_attrs:
+                anchor_cui = current
+                anchor_depth = depth
+            elif last_meaningful is not None:
+                anchor_cui = last_meaningful
+                anchor_depth = last_meaningful_depth
+            else:
+                # Seed had no attrs and the whole path was transparent.
+                # No meaningful anchor exists. Fall back to seed itself.
+                anchor_cui = seed_cui
+                anchor_depth = 1
+
+            existing = found_anchors.get(anchor_cui)
+            if existing is None or anchor_depth > existing["path_length"]:
+                found_anchors[anchor_cui] = {
                     "lost": any_break_reason,
-                    "path_length": depth,
+                    "path_length": anchor_depth,
                     "rels_used": rels_used,
                 }
         else:
             new_visited = visited_on_path | {current}
             for parent_cui, rel_key in preserving_parents:
+                parent_attrs = attrs.get(parent_cui, {})
+                if parent_attrs:
+                    next_last_meaningful = parent_cui
+                    next_last_meaningful_depth = depth + 1
+                else:
+                    next_last_meaningful = last_meaningful
+                    next_last_meaningful_depth = last_meaningful_depth
                 stack.append((
                     parent_cui,
                     depth + 1,
                     new_visited,
                     rels_used | {rel_key},
+                    next_last_meaningful,
+                    next_last_meaningful_depth,
                 ))
 
     result = [
