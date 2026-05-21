@@ -1,25 +1,136 @@
-============================================================
-Pickle: topics.pkl
-  built_at        : 2026-05-21T18:40:12.735475
-  total_cuis      : 374,538
-  unique_anchors  : 227,456
-============================================================
+Loading umls_cache.pkl ...
+Loading topics.pkl ...
 
-C3164461  (Atresia of systemic vein)
-  -> C3165169 - Congenital abnormality of systemic vein
+========================================================================
+SEED: C4517381  (Discharge specimen from penis)
+========================================================================
 
-C0524148  (Heptaminol measurement)
-  -> C2316799 - Measurement of substance
+Seed attributes (2):
+  has_specimen_source_topography      -> C0030851  (Penile structure (body structure))
+  has_specimen_substance              -> C0012621  (Discharge)
 
-C0751161  (Galactose epimerase deficiency)
-  -> (2 topics)
-     C0016952 - Galactosaemia
-     C0019247 - Hereditary disease
+Anchors from topics.pkl (1):
+  C4517381  (Discharge specimen from penis)  lost=has_specimen_source_topography
 
-C4076030  (Injection of normal human immunoglobulin)
-  -> (2 topics)
-     C0150150 - Blood products administration
-     C3469597 - Medication administration
+All parents in MRREL (2):
 
-C4517381  (Discharge specimen from penis)
-  -> C4517381 - Discharge specimen from penis
+  Parent: C0600083  (Discharge specimen)
+    edge type      : REL=CHD RELA=isa
+    parent attrs   : 1 total
+    boundary fires : YES, because:
+      - MISSING has_specimen_source_topography: seed has it, parent doesn't
+
+  Parent: C1292689  (Specimen from penis)
+    edge type      : REL=CHD RELA=isa
+    parent attrs   : 1 total
+    boundary fires : YES, because:
+      - MISSING has_specimen_substance: seed has it, parent doesn't
+
+========================================================================
+SEED: C1275033  (PUVA therapy-associated squamous cell carcinoma)
+========================================================================
+
+Seed attributes (6):
+  due_to                              -> C0853073  (PUVA therapy)
+  has_associated_morphology           -> C0007137  (SCC - squamous cell carcinoma)
+  has_causative_agent                 -> C0041625  (Ultraviolet radiation)
+  has_finding_site                    -> C1123023  (Skin structure (body structure))  [STRICT]
+  has_interpretation                  -> C0205161  (Abnormal (qualifier value))
+  occurs_after                        -> C0853073  (PUVA therapy)
+
+Anchors from topics.pkl (1):
+  C1275033  (PUVA therapy-associated squamous cell carcinoma)  lost=occurs_after
+
+All parents in MRREL (6):
+
+  Parent: C0007137  (SCC - squamous cell carcinoma)
+    edge type      : REL=CHD RELA=isa
+    parent attrs   : 5 total
+    boundary fires : YES, because:
+      - MISSING occurs_after: seed has it, parent doesn't
+      - MISSING due_to: seed has it, parent doesn't
+      - MISSING has_associated_morphology: seed has it, parent doesn't
+      - MISSING has_causative_agent: seed has it, parent doesn't
+      - STRICT has_finding_site: seed=C1123023(Skin structure (body structure)) vs parent=None(missing)
+      - MISSING has_interpretation: seed has it, parent doesn't
+
+  Parent: C0345977  (Malignant epithelial neoplasm of skin)
+    edge type      : REL=CHD RELA=isa
+    parent attrs   : 3 total
+    boundary fires : YES, because:
+      - MISSING occurs_after: seed has it, parent doesn't
+      - MISSING due_to: seed has it, parent doesn't
+      - MISSING has_causative_agent: seed has it, parent doesn't
+      - MISSING has_interpretation: seed has it, parent doesn't
+
+  Parent: C1274252  (Squamous neoplasm of surface epithelium)
+    edge type      : REL=CHD RELA=isa
+    parent attrs   : 2 total
+    boundary fires : YES, because:
+      - MISSING occurs_after: seed has it, parent doesn't
+      - MISSING due_to: seed has it, parent doesn't
+      - MISSING has_causative_agent: seed has it, parent doesn't
+      - STRICT has_finding_site: seed=C1123023(Skin structure (body structure)) vs parent=C1302881(Structure of skin and/or surface epithelium)
+      - MISSING has_interpretation: seed has it, parent doesn't
+
+  Parent: C1275030  (Adverse effect from PUVA photochemotherapy)
+    edge type      : REL=CHD RELA=isa
+    parent attrs   : 5 total
+    boundary fires : YES, because:
+      - MISSING has_associated_morphology: seed has it, parent doesn't
+
+  Parent: C1275046  (Malignant neoplasm of skin caused by radiation)
+    edge type      : REL=CHD RELA=isa
+    parent attrs   : 3 total
+    boundary fires : YES, because:
+      - MISSING occurs_after: seed has it, parent doesn't
+      - MISSING due_to: seed has it, parent doesn't
+      - MISSING has_interpretation: seed has it, parent doesn't
+
+  Parent: C1285376  (Neoplastic complication of procedure)
+    edge type      : REL=CHD RELA=isa
+    parent attrs   : 3 total
+    boundary fires : YES, because:
+      - MISSING has_causative_agent: seed has it, parent doesn't
+      - STRICT has_finding_site: seed=C1123023(Skin structure (body structure)) vs parent=None(missing)
+      - MISSING has_interpretation: seed has it, parent doesn't
+
+========================================================================
+SEED: C4302701  (Wedge pressure technique)
+========================================================================
+
+Seed attributes (1):
+  technique_of                        -> C0456174  (Wedge pressure - a wave)
+
+Anchors from topics.pkl (1):
+  C4302701  (Wedge pressure technique)  lost=technique_of
+
+All parents in MRREL (1):
+
+  Parent: C0449851  (Technique)
+    edge type      : REL=CHD RELA=isa
+    parent attrs   : 0 total
+    boundary fires : YES, because:
+      - MISSING technique_of: seed has it, parent doesn't
+
+========================================================================
+SEED: C2960444  (Mixed serous and mucinous cystadenoma of borderline malignancy)
+========================================================================
+
+Seed attributes (0):
+  (none — seed will anchor to itself automatically)
+
+Anchors from topics.pkl (1):
+  C2960444  (Mixed serous and mucinous cystadenoma of borderline malignancy)  lost=None
+
+All parents in MRREL (2):
+
+  Parent: C0431094  (Borderline cystadenoma)
+    edge type      : REL=CHD RELA=isa
+    parent attrs   : 0 total
+    boundary fires : NO — would walk up to this parent
+
+  Parent: C1302387  (Mixed epithelial tumor of borderline malignancy)
+    edge type      : REL=CHD RELA=isa
+    parent attrs   : 0 total
+    boundary fires : NO — would walk up to this parent
