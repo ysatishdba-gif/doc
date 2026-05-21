@@ -67,7 +67,13 @@ STRICT_SLOTS = {"has_finding_site", "has_laterality"}
 #   PAR/inverse_isa, RN, SIB, RQ, RO with non-isa RELA
 TRAVERSAL_RELS = [
     ("CHD", "isa"),
-    ("RB",  None),
+    # NOTE: Earlier experiments with RB enabled showed that the RB rows
+    # in this dataset are dominated by inverse_was_a (historical concept
+    # retirements), referred_to_by (citation links), and alternative_of
+    # (administrative). These are noise, not clinical broader-than edges.
+    # Re-enabling RB caused massive over-grouping into metadata concepts.
+    # If you want to experiment with re-enabling, do it cautiously and
+    # be prepared to see anchors land on retirement/metadata concepts.
 ]
 
 # For testing: only anchor first N CUIs. Set to None for the full build.
@@ -339,23 +345,27 @@ def check_break(seed_attrs, parent_attrs):
 
 def is_transparent_parent(seed_attrs, parent_attrs):
     """
-    A parent is "transparent" if it shares NO defining attributes with the
-    seed. There's nothing meaningful to compare, so we walk through it
-    instead of treating it as a boundary.
+    A parent is "transparent" if it has ZERO defining attributes at all.
+    The walk should pass through it without anchoring, since there's nothing
+    to compare against and no clinical-content gradient at this node.
 
-    Why this matters:
-      - 'Wedge pressure technique' has technique_of; its parent 'Technique'
-        has no attributes at all. There's nothing to match on, but
-        'Technique' is the clear topic. Walk through.
-      - Cases where the seed has attributes the parent simply doesn't
-        carry (because UMLS chose to attach them only at the more specific
-        level) are not "boundaries" — the parent is just less detailed.
+    We deliberately do NOT treat "parent has some attributes but none
+    overlap with the seed" as transparent. That earlier rule was too
+    permissive and let walks wander into unrelated subtrees through nodes
+    that happened to share no attribute types with the seed. The current
+    rule is stricter: only empty parents pass through.
+
+    Why this matters in practice:
+      - 'Wedge pressure technique' (seed has technique_of) -> parent
+        'Technique' has zero attributes. Transparent → walk through to
+        find a real topic.
+      - 'Discharge specimen from penis' (seed has two attrs) -> parent
+        'Discharge specimen' has one attr (substance only). NOT
+        transparent — it has content, just not all of it. The boundary
+        fires here, which is correct: we're looking at a real
+        clinical-content gradient.
     """
-    if not parent_attrs:
-        return True   # parent has nothing at all; nothing to break
-    # If parent's attribute types don't overlap with the seed's at all,
-    # there's no shared comparison surface.
-    return not (set(seed_attrs) & set(parent_attrs))
+    return not parent_attrs
 
 
 def find_anchors(seed_cui, parents, attrs):
