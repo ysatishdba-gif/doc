@@ -1,70 +1,63 @@
 ======================================================================
 Pickle: topics.pkl
-  built_at         : 2026-05-21T17:24:53.245729
-  total CUIs       : 1,000
-  unique anchors   : 1,774
-  self-only        : 841
-  multi-topic CUIs : 91
+  built_at         : 2026-05-21T17:56:21.469468
+  total CUIs       : 374,538
+  unique anchors   : 227,416
+  self-only        : 227,369
+  multi-topic CUIs : 25,489
 ======================================================================
 
---- Sample CUIs with ONE topic (different from self) [68 total in pickle] ---
-  C4752451  (Chlorhexidine and nystatin only product ) -> C4755856  (Chlorhexidine and nystatin only product in cutaneous dose form)
-  C5550991  (Claw hand                               ) -> C0158470  (Acquired claw hand (disorder))
-  C3887256  (Pathological fracture of right humerus due to osteoporosis) -> C4047454  (Pathological fracture of right humerus due to secondary osteoporosis)
-  C2959971  (Endoscopic ligation of varix of small intestine) -> C2960375  (Endoscopy of upper gastrointestinal tract and ligation of varix of duodenum)
-  C3265879  (Axitinib-containing product in oral dose form) -> C4750831  (Axitinib only product in oral dose form)
+--- Sample CUIs with ONE topic (different from self) [121680 total in pickle] ---
+  C3164461  (Atresia of systemic vein                ) -> C3165169  (Congenital abnormality of systemic vein)
+  C0524148  (Heptaminol measurement                  ) -> C2316799  (Measurement of substance)
+  C5547446  (Serum testosterone above reference range) -> C2711908  (Measurement finding outside reference range)
+  C1444384  (Skin care education                     ) -> C0557043  (Teaching how to perform procedure)
+  C0337354  (Quadrantectomy of breast                ) -> C1293182  (Trunk excision)
 
---- Sample CUIs with MULTIPLE topics [91 total in pickle] ---
-  C0751161  (Galactosemia III)
-      -> C0574089  (Generalised uridine diphosphate galactose-4-epimerase deficiency)
-      -> C0574090  (Erythrocyte uridine diphosphate galactose-4-epimerase deficiency)
-  C1444384  (Skin care education)
-      -> C0584783  (Parastomal skin care education)
-      -> C1444386  (Skin breakdown control education)
-  C0553763  (Posterior interosseous nerve lesion)
-      -> C0393889  (Posterior interosseous nerve compression)
-      -> C0434265  (Closed injury, posterior interosseous nerve)
-      -> C0434266  (Open injury, posterior interosseous nerve)
-  C0408671  (Primary decompression of cervical spine)
-      -> C0408605  (Primary foraminotomy of cervical spine)
-      -> C0408672  (Primary anterior decompression of cervical spinal cord and fusion)
-      -> C0408675  (Primary posterior decompression cervical cord and fusion)
-      -> C1997819  (Primary foraminoplasty of cervical spine using laser)
-  C0586074  (Referral to audiologist)
-      -> C0584100  (Referral to audiological scientist)
-      -> C0584101  (Referral to community doctor in audiology)
-      -> C0584102  (Referral to medical technical officer in audiology)
-      -> C0584103  (Referral to hearing therapist)
-      -> C0584104  (Referral to registered hearing aid dispenser)
-      -> C0584105  (Referral to paediatric audiologist)
+--- Sample CUIs with MULTIPLE topics [25489 total in pickle] ---
+  C0751161  (UDP (uridine diphosphate) galactose-4-epimerase deficiency)
+      -> C0016952  (Galactosaemia)
+      -> C0019247  (Hereditary disease)
+  C4076030  (Injection of normal human immunoglobulin)
+      -> C0150150  (Administration of blood product)
+      -> C3469597  (Medication administration)
+  C0230989  (Structure of amniotic villi)
+      -> C0460005  (Torso)
+      -> C0700276  (Anatomical structure)
+  C5687821  (Structure of periosteum of shoulder)
+      -> C1720025  (Structure of shoulder and/or upper arm)
+      -> C2316804  (Structure of soft tissue of limb)
+  C0203958  (Chiropractic adjustment of coccyx subluxation)
+      -> C0185482  (Musculoskeletal system manipulation)
+      -> C1293202  (Trunk manipulation)
 
---- Sample CUIs that anchor to themselves [841 total in pickle] ---
-  C3164461  (Atresia of systemic vein)
-  C0524148  (Heptaminol measurement)
+--- Sample CUIs that anchor to themselves [227369 total in pickle] ---
   C4517381  (Discharge specimen from penis)
-  C5547446  (Serum testosterone above reference range)
   C1275033  (PUVA therapy-associated squamous cell carcinoma)
+  C1290900  (Condition AND/OR status of human remains)
+  C2960444  (Mixed serous and mucinous cystadenoma of borderline malignancy)
+  C4302701  (Wedge pressure technique)
 
 --- Top 10 largest topic groups ---
-     2 members  C4755856  (Chlorhexidine and nystatin only product in cutaneous dose form)
-     2 members  C0194383  (Fine needle aspiration biopsy of urinary bladder)
-     2 members  C0187856  (Excisional biopsy of femur (procedure))
-     2 members  C0189214  (Incisional biopsy of larynx)
-     2 members  C0193257  (Transposition of tissue of rectum)
-     2 members  C0226371  (Structure of superior gluteal artery (body structure))
-     2 members  C5761319  (Structure of superficial circumflex iliac artery)
-     2 members  C0224374  (Structure of pyramidalis muscle (body structure))
-     1 members  C3164461  (Atresia of systemic vein)
-     1 members  C0524148  (Heptaminol measurement)
+  4760 members  C4707809  (Substance categorized by disposition)
+  3697 members  C2316799  (Measurement of substance)
+  2299 members  C1292784  (Procedure by method)
+  2157 members  C2711906  (Evaluation finding)
+  2119 members  C2317510  (Measurement of substance in specimen)
+  1914 members  C0700276  (Anatomical structure)
+  1705 members  C1287110  (Social and personal history finding)
+  1651 members  C0015385  (Limb structure (body structure))
+  1611 members  C0574125  (Functional finding)
+  1553 members  C0519671  (Immunology laboratory test (procedure))
 
 ======================================================================
 Copy/paste any of these into CUIS_TO_LOOKUP in lookup_topics.py
 ======================================================================
 
 CUIS_TO_LOOKUP = [
-    "C4752451",   # Chlorhexidine and nystatin only product
-    "C5550991",   # Claw hand
-    "C0751161",   # Galactosemia III
-    "C1444384",   # Skin care education
     "C3164461",   # Atresia of systemic vein
+    "C0524148",   # Heptaminol measurement
+    "C0751161",   # UDP (uridine diphosphate) galactose-4-epimerase deficiency
+    "C4076030",   # Injection of normal human immunoglobulin
+    "C4517381",   # Discharge specimen from penis
 ]
