@@ -57,8 +57,10 @@ from collections import defaultdict
 # CONFIG — edit these
 # ============================================================================
 
-PROJECT = "YOUR_GCP_PROJECT"        # <-- REPLACE
-DATASET = "YOUR_UMLS_DATASET"       # <-- REPLACE
+# PROJECT and DATASET must be defined in a cell above this one (or in the
+# enclosing module). They are referenced directly — no defaults here.
+# This avoids the recurring problem of placeholder values overwriting your
+# real ones when the cell is re-pasted.
 
 CACHE_PATH = "umls_cache.pkl"
 OUTPUT_PATH = "topics.pkl"
@@ -252,10 +254,6 @@ def fetch_from_bigquery(config):
     # Import here so the rest of the script doesn't require the BQ
     # library installed when running off a cache.
     from google.cloud import bigquery
-
-    if config["project"] == "YOUR_GCP_PROJECT" or config["dataset"] == "YOUR_UMLS_DATASET":
-        print("ERROR: edit PROJECT and DATASET in the CONFIG block")
-        raise SystemExit(1)
 
     client = bigquery.Client(project=config["project"])
     sab = config["sab"]
