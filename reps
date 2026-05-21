@@ -1,130 +1,72 @@
 """
 lookup_topics.py
 ----------------
-Load the pickle from build_topics.py and resolve CUIs to topics.
+Load the pickle from build_topics.py and print topics for hardcoded CUIs.
 
-A CUI can have MULTIPLE topics (SNOMED multi-inheritance). All anchors
-are returned as equally valid topics for that CUI. None is labeled as
-"primary" — different parent paths legitimately lead to different
-clinically meaningful anchors, and there's no objective basis for ranking
-them.
+Edit the CONFIG block below — set PICKLE_PATH and CUIS_TO_LOOKUP, then run:
+    python lookup_topics.py
 
-Usage:
-    # Show all topics for a CUI
-    python lookup_topics.py --pickle topics.pkl --cui C0231749
-
-    # Multiple CUIs
-    python lookup_topics.py --pickle topics.pkl --cui C0231749 --cui C0027051
-
-    # Group CUIs (a CUI with N topics appears in N buckets)
-    python lookup_topics.py --pickle topics.pkl --cui C0231749 --cui C0027051 --bag
-
-    # Pipe from file
-    cat my_cuis.txt | python lookup_topics.py --pickle topics.pkl --stdin
-
-    # Pickle stats
-    python lookup_topics.py --pickle topics.pkl
-
-As a library:
-    from lookup_topics import load_pickle, topics_for, topic_bag
-
-    data = load_pickle("topics.pkl")
-    print(topics_for(data, "C0231749"))   # list of topic strings
+A CUI can have MULTIPLE topics (SNOMED multi-inheritance). All topics
+are printed for each CUI. None are labeled as primary; they're all
+equally valid.
 """
 
-import argparse
 import pickle
-import sys
-from collections import defaultdict
 
 
-def load_pickle(path):
-    with open(path, "rb") as f:
-        return pickle.load(f)
+# ============================================================================
+# CONFIG — edit these
+# ============================================================================
+
+PICKLE_PATH = "topics.pkl"
+
+# CUIs to look up. Add or remove as needed.
+CUIS_TO_LOOKUP = [
+    "C0027051",     # Myocardial Infarction
+    "C0231749",     # Pain in knee
+    "C0011854",     # Diabetes Mellitus
+]
 
 
-def format_topic(data, anchor_cui):
-    """Render '<anchor_cui> - <label>'."""
-    label = data["labels"].get(anchor_cui, "")
-    return f"{anchor_cui} - {label}" if label else anchor_cui
-
-
-def topics_for(data, cui):
-    """
-    Return all topics for a CUI as a list of strings.
-    Returns ["Uncategorized"] if the CUI is not in the pickle.
-    Anchors are returned in the order they appear in the pickle (sort-stable);
-    the order has no semantic meaning.
-    """
-    entries = data["anchors"].get(cui)
-    if entries is None:
-        return ["Uncategorized"]
-    return [format_topic(data, e["anchor"]) for e in entries]
-
-
-def topic_bag(data, cuis):
-    """
-    Group CUIs by topic. Returns {topic: [cuis]}.
-
-    A CUI with multiple topics appears under EACH of its topics. This is
-    the honest behavior — every topic is equally valid for that CUI, so
-    bucketing it in only one would lose information. Callers that want
-    a single bucket per CUI should deduplicate explicitly.
-    """
-    bag = defaultdict(list)
-    for cui in cuis:
-        for topic in topics_for(data, cui):
-            bag[topic].append(cui)
-    return dict(bag)
-
+# ============================================================================
+# Lookup
+# ============================================================================
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--pickle", required=True)
-    p.add_argument("--cui", action="append", default=[])
-    p.add_argument("--stdin", action="store_true")
-    p.add_argument("--bag", action="store_true",
-                   help="Group CUIs by topic (a CUI with N topics counts in N buckets)")
-    args = p.parse_args()
+    with open(PICKLE_PATH, "rb") as f:
+        data = pickle.load(f)
 
-    data = load_pickle(args.pickle)
+    labels = data["labels"]
+    anchors = data["anchors"]
 
-    cuis = list(args.cui)
-    if args.stdin:
-        cuis.extend(line.strip() for line in sys.stdin if line.strip())
+    print("=" * 60)
+    print(f"Pickle: {PICKLE_PATH}")
+    print(f"  built_at        : {data['built_at']}")
+    print(f"  total_cuis      : {data['stats']['total_cuis']:,}")
+    print(f"  unique_anchors  : {data['stats']['unique_anchors']:,}")
+    print("=" * 60)
 
-    # No CUIs: show stats
-    if not cuis:
-        s = data["stats"]
-        print(f"Pickle: {args.pickle}")
-        print(f"  built_at         : {data['built_at']}")
-        print(f"  total_cuis       : {s['total_cuis']:,}")
-        print(f"  unique_anchors   : {s['unique_anchors']:,}")
-        compr = s['total_cuis'] / max(1, s['unique_anchors'])
-        print(f"  compression      : {compr:.2f}x")
-        print(f"  self-only        : {s.get('self_only', '?'):,}")
-        print(f"  multi-topic CUIs : {s.get('multi_anchor', '?'):,}")
-        avg = s.get('total_anchor_entries', 0) / max(1, s['total_cuis'])
-        print(f"  avg topics/CUI   : {avg:.2f}")
-        return
+    for cui in CUIS_TO_LOOKUP:
+        seed_label = labels.get(cui, "")
+        entries = anchors.get(cui)
 
-    if args.bag:
-        bag = topic_bag(data, cuis)
-        for topic, members in sorted(bag.items(), key=lambda kv: -len(kv[1])):
-            print(f"{topic}  [{len(members)}]")
-            for c in members:
-                print(f"    {c}  {data['labels'].get(c, '')}")
-        return
+        print()
+        if entries is None:
+            print(f"{cui}  ({seed_label or 'not in pickle'})")
+            print("  -> Uncategorized")
+            continue
 
-    # One block per CUI: list every topic, no primary marker
-    for c in cuis:
-        ts = topics_for(data, c)
-        if len(ts) == 1:
-            print(f"{c}  ->  {ts[0]}")
+        print(f"{cui}  ({seed_label})")
+        if len(entries) == 1:
+            anchor = entries[0]["anchor"]
+            anchor_label = labels.get(anchor, "")
+            print(f"  -> {anchor} - {anchor_label}")
         else:
-            print(f"{c}  ->  ({len(ts)} topics)")
-            for t in ts:
-                print(f"           {t}")
+            print(f"  -> ({len(entries)} topics)")
+            for e in entries:
+                anchor = e["anchor"]
+                anchor_label = labels.get(anchor, "")
+                print(f"     {anchor} - {anchor_label}")
 
 
 if __name__ == "__main__":
