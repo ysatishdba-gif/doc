@@ -1,28 +1,28 @@
 ======================================================================
 Pickle: topics.pkl
-  built_at         : 2026-05-21T19:59:48.552805
+  built_at         : 2026-05-21T20:37:33.034007
   total CUIs       : 374,538
-  unique anchors   : 124,181
-  self-only        : 122,798
-  multi-topic CUIs : 34,071
+  unique anchors   : 148,590
+  self-only        : 144,220
+  multi-topic CUIs : 46,857
 ======================================================================
 
-Relationship-type contribution to non-self anchors (302,692 total):
-  CHD    isa                    302,692  (100.0%)
+Relationship-type contribution to non-self anchors (291,375 total):
+  CHD    isa                    291,375  (100.0%)
 
-  Anchors reached using ONLY CHD/isa : 302,692
+  Anchors reached using ONLY CHD/isa : 291,375
   Anchors that used RB at any point  : 0
   Anchors reached using ONLY RB      : 0
     (these would not exist without RB traversal)
 
---- Sample CUIs with ONE topic (different from self) [217669 total in pickle] ---
+--- Sample CUIs with ONE topic (different from self) [183461 total in pickle] ---
   C3164461  (Atresia of systemic vein                ) -> C3165169  (Congenital abnormality of systemic vein)
   C0524148  (Heptaminol measurement                  ) -> C2316799  (Measurement of substance)
   C5547446  (Serum testosterone above reference range) -> C2711908  (Measurement finding outside reference range)
   C1444384  (Skin care education                     ) -> C0557043  (Procedure education)
-  C1290900  (Condition AND/OR status of human remains) -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+  C1290900  (Condition AND/OR status of human remains) -> C0457936  (General clinical state)
 
---- Sample CUIs with MULTIPLE topics [34071 total in pickle] ---
+--- Sample CUIs with MULTIPLE topics [46857 total in pickle] ---
   C0751161  (Galactose epimerase deficiency)
       -> C0016952  (Galactosaemia)
       -> C0019247  (Hereditary disease)
@@ -30,34 +30,34 @@ Relationship-type contribution to non-self anchors (302,692 total):
   C4076030  (Injection of normal human immunoglobulin)
       -> C0150150  (Blood products administration)
       -> C3469597  (Medication administration)
+  C2960444  (Mixed serous and mucinous cystadenoma of borderline malignancy)
+      -> C0037088  (Clinical finding (finding))
+      -> C0332447  (Morphologically abnormal structure)
   C0230989  (Amniotic villi)
       -> C0460005  (Torso)
       -> C0700276  (Anatomical structure)
   C1283689  (Region of ileum)
-      -> C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+      -> C2711400  (Anatomical or acquired body structure)
       -> C4040653  (Digestive tract part)
-  C0268097  (Nutritional muscular degeneration)
-      -> C0268084  (Disorder of trace mineral metabolism)
-      -> C1285162  (Degenerative disorder)
 
---- Sample CUIs that anchor to themselves [122798 total in pickle] ---
+--- Sample CUIs that anchor to themselves [144220 total in pickle] ---
   C4517381  (Discharge specimen from penis)
   C1275033  (PUVA therapy-associated squamous cell carcinoma)
+  C4302701  (Wedge pressure technique)
   C0407992  (Revision to open reduction of fracture dislocation and functional bracing)
-  C4074933  (Structure of muscle acting on ankle joint)
-  C3474327  (Product containing precisely mirabegron 25 milligram/1 each prolonged-release oral tablet (clinical drug))
+  C0886765  (Tocainide hydrochloride (substance))
 
 --- Top 10 largest topic groups ---
-  104410 members  C2720507  (SNOMED CT has been created by combining SNOMED RT and a computer-based nomenclature and classification known as Read Codes Version 3, which was created on behalf of the U.K. Department of Health.)
+  32041 members  C0029235  (Organism)
+  13333 members  C0439861  (Substances)
+  11533 members  C0347997  (Physical objects)
+  6220 members  C0013227  (Drug or medicament (substance))
+  5828 members  C0037088  (Clinical finding (finding))
+  5006 members  C1274016  (Clinical history/examination observable)
   4760 members  C4707809  (Substance categorized by disposition)
+  3725 members  C0332447  (Morphologically abnormal structure)
   3697 members  C2316799  (Measurement of substance)
-  2315 members  C1290828  (Procedure related finding)
-  2299 members  C1292784  (Procedure by method)
-  2206 members  C0302955  (Nitrogen and/or nitrogen compound-containing product)
-  2119 members  C2317510  (Measurement of substance in specimen)
-  1951 members  C0700276  (Anatomical structure)
-  1705 members  C1287110  (Social and personal history finding)
-  1651 members  C0015385  (Limb)
+  3417 members  C0184661  (Procedure)
 
 ======================================================================
 Copy/paste any of these into CUIS_TO_LOOKUP in lookup_topics.py
