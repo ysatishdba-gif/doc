@@ -50,7 +50,14 @@ LANGUAGE = "ENG"
 
 # Attribute types where ANY value change at the parent breaks the match.
 # Other attributes only break when missing entirely.
-STRICT_SLOTS = {"has_finding_site", "has_laterality"}
+#
+# Laterality was previously here but has been relaxed for the document-
+# retrieval use case. With laterality non-strict, 'Pain in left knee' and
+# 'Pain in right knee' can share topics via shared morphology, which
+# trades cross-side specificity for recall. Downstream consumers MUST
+# verify side from the retrieved chunk text — the topic layer no longer
+# carries that information.
+STRICT_SLOTS = {"has_finding_site"}
 
 # Which UMLS relationship types to use for walking UP the hierarchy.
 # Each entry is (REL, RELA) — RELA can be None to match any RELA value.
@@ -81,6 +88,22 @@ MAX_CONCEPTS = None
 
 # Safety cap on multi-parent path explosion.
 MAX_NODES_PER_TRAVERSAL = 5000
+
+# Anchor quality floor. After all anchors are computed, count how many
+# CUIs anchored to each anchor. Any anchor with > this many members is
+# considered too abstract to be a useful topic for document matching.
+# CUIs that anchored to such an over-abstract anchor have THAT anchor
+# dropped from their topic list. If all of a CUI's anchors are dropped,
+# the CUI becomes self-only.
+#
+# Setting this to None disables the filter.
+#
+# Why 3000: empirically, anchors with >3000 members in SNOMED-only
+# data tend to be high-level organizing concepts ("Organism", "Substance",
+# "Procedure") rather than clinical topics. These produce false-positive
+# matches in document retrieval (a query about one organism would match
+# documents about any organism).
+MAX_MEMBERS_PER_ANCHOR = 3000
 
 
 # ============================================================================
@@ -304,7 +327,11 @@ def parse_mrrel(cache):
         return 999
 
     parents = defaultdict(dict)
-    attrs = defaultdict(dict)
+    # attrs[cui][rela] = set of value CUIs (multi-value preservation).
+    # SNOMED concepts can have multiple values for the same attribute
+    # (e.g., 'Fracture of tibia and fibula' has two finding_sites).
+    # Storing as a set preserves these values.
+    attrs = defaultdict(lambda: defaultdict(set))
     edge_counts = defaultdict(int)
 
     for cui1, cui2, rel, rela in cache["mrrel_rows"]:
@@ -316,9 +343,16 @@ def parse_mrrel(cache):
             if existing is None or edge_priority(*key) < edge_priority(*existing):
                 parents[child][parent] = key
         elif rel == "RO" and rela and not rela.startswith("inverse_") and rela != "isa":
-            attrs[cui2].setdefault(rela, cui1)
+            # Multi-value attributes: accumulate all values into a set
+            attrs[cui2][rela].add(cui1)
 
-    return parents, attrs, edge_counts
+    # Convert nested defaultdicts to regular dicts with frozensets for
+    # hashable, predictable downstream consumption
+    attrs_final = {}
+    for cui, rela_map in attrs.items():
+        attrs_final[cui] = {rela: frozenset(values) for rela, values in rela_map.items()}
+
+    return parents, attrs_final, edge_counts
 
 
 # ============================================================================
@@ -330,8 +364,15 @@ def check_break(seed_attrs, parent_attrs):
     Return the name of the first attribute the parent breaks, or None if
     all of the seed's attributes are preserved.
 
-    Strict slots: parent must have the SAME value.
-    Other slots:  parent just needs to have the attribute (any value).
+    Attribute values are frozensets (multi-value attributes are supported —
+    SNOMED concepts can have multiple values for the same attribute, e.g.,
+    'Fracture of tibia and fibula' has two finding_sites).
+
+    Strict slots: parent's value-set must EQUAL the seed's value-set.
+                  ({tibia, fibula} == {tibia, fibula}, not just overlap.)
+                  Generalizing or losing any value breaks.
+    Other slots:  parent just needs to have the attribute (non-empty set).
+                  The specific values don't have to match.
     """
     for rela, seed_value in seed_attrs.items():
         if rela in STRICT_SLOTS:
@@ -370,41 +411,113 @@ def is_transparent_parent(seed_attrs, parent_attrs):
 
 def find_anchors(seed_cui, parents, attrs):
     """
-    Walk every traversal path upward from seed_cui. Collect all distinct
-    anchors. Returns a list of dicts (alphabetical by anchor CUI):
+    Per-attribute anchor finding (Fix B), with strict slots as a hard filter.
 
+    Design:
+      - For each NON-STRICT attribute, walk that single axis up the tree.
+        Each axis can find a different anchor.
+      - For an anchor candidate to be valid, it must ALSO preserve all of
+        the seed's STRICT slots (laterality, finding_site).
+      - This means strict slots can't be relaxed via per-axis decomposition.
+        Per-axis walks happen WITHIN the cone of "ancestors that preserve
+        strict slots." If no such cone exists, the seed is self-only.
+
+    Why this design:
+      Naive per-axis decomposition breaks strict-slot guarantees. Example:
+        Pain in left knee → has_finding_site=L_knee, has_laterality=LEFT,
+                            has_morphology=Pain
+        Pain in right knee → has_finding_site=R_knee, has_laterality=RIGHT,
+                             has_morphology=Pain
+        Generic knee pain → has_morphology=Pain (no laterality, no site)
+      Pure per-axis decomposition would let both Pain-left-knee and
+      Pain-right-knee anchor to Generic-knee-pain via the morphology axis.
+      In a retrieval pipeline this would cross-match left and right knee
+      documents — clinically wrong.
+
+      With strict-slot filtering: Generic knee pain is NOT a valid anchor
+      candidate because it's missing has_laterality and has_finding_site
+      (the seeds' strict slots). So the morphology-axis walk goes no
+      higher than concepts that preserve the seed's specific laterality.
+
+    Returns a list of dicts (alphabetical by anchor CUI):
       [{"anchor":      cui,
         "lost":        rela_or_None,
         "path_length": int,
-        "rels_used":   sorted list of (REL, RELA) tuples seen on path}, ...]
-
-    Behavior:
-      - Walks through "transparent" parents (zero defining attributes) — but
-        does NOT anchor on them. The current node is recorded as an anchor
-        only when both (a) it has a content boundary with its parents, and
-        (b) it itself has at least one defining attribute. Otherwise we
-        back up to the most recent non-transparent node on the path.
-
-        This rule prevents the algorithm from walking up to abstract
-        organizing concepts at the top of SNOMED's hierarchy (which have
-        no attributes and end up swallowing huge numbers of CUIs).
-      - A seed that has no defining attributes is allowed to anchor at
-        any non-transparent ancestor it can reach.
+        "rels_used":   sorted list of (REL, RELA) tuples,
+        "axes":        sorted list of attribute types that drove this anchor}]
     """
     seed_attrs = attrs.get(seed_cui, {})
+    if not seed_attrs:
+        # No attributes at all — walk with empty signature
+        return _walk_for_signature(seed_cui, {}, parents, attrs, axis=None)
 
+    # Split into strict and non-strict
+    strict_signature = {k: v for k, v in seed_attrs.items() if k in STRICT_SLOTS}
+    non_strict_axes = [k for k in seed_attrs if k not in STRICT_SLOTS]
+
+    if not non_strict_axes:
+        # Only strict attributes — walk with the strict signature alone
+        return _walk_for_signature(seed_cui, strict_signature, parents, attrs, axis=None)
+
+    # Per-axis walk: each non-strict attribute walks independently, but
+    # the strict slots are added as a mandatory part of every signature.
+    # An anchor must preserve the strict slots AND the per-axis attribute.
+    all_anchors = {}
+    for axis in non_strict_axes:
+        per_axis_signature = dict(strict_signature)
+        per_axis_signature[axis] = seed_attrs[axis]
+        per_axis_results = _walk_for_signature(
+            seed_cui, per_axis_signature, parents, attrs, axis=axis,
+        )
+        for entry in per_axis_results:
+            anchor = entry["anchor"]
+            existing = all_anchors.get(anchor)
+            if existing is None:
+                all_anchors[anchor] = {
+                    "anchor": anchor,
+                    "lost": entry["lost"],
+                    "path_length": entry["path_length"],
+                    "rels_used": set(tuple(r) for r in entry["rels_used"]),
+                    "axes": {axis},
+                }
+            else:
+                if entry["path_length"] > existing["path_length"]:
+                    existing["path_length"] = entry["path_length"]
+                existing["rels_used"].update(tuple(r) for r in entry["rels_used"])
+                existing["axes"].add(axis)
+
+    result = [
+        {"anchor":      e["anchor"],
+         "lost":        e["lost"],
+         "path_length": e["path_length"],
+         "rels_used":   sorted(list(e["rels_used"])),
+         "axes":        sorted(list(e["axes"]))}
+        for e in all_anchors.values()
+    ]
+    result.sort(key=lambda r: r["anchor"])
+    return result
+
+
+def _walk_for_signature(seed_cui, signature_attrs, parents, attrs, axis=None):
+    """
+    Walk every traversal path upward from seed_cui using `signature_attrs`
+    as the seed's attribute signature. This is the per-axis primitive
+    that the new find_anchors() calls once per attribute.
+
+    Behaviors preserved from the previous algorithm:
+      - Walks through transparent parents (no defining attrs)
+      - Never anchors at a transparent terminus — backs up to last
+        meaningful ancestor on the path
+      - Strict-slot rules still apply (laterality, finding-site values
+        must match if those are the signature attributes)
+    """
     found_anchors = {}
     visited_total = set()
-    # Stack entry: (current_cui, depth, visited_on_path,
-    #               rels_used, last_meaningful_ancestor, last_meaningful_depth)
-    # last_meaningful_ancestor: the most recent node on this path with
-    # at least one defining attribute (used as the fallback anchor when
-    # the walk would otherwise terminate at a transparent node).
-    seed_is_meaningful = bool(seed_attrs)
+    signature_is_meaningful = bool(signature_attrs)
     stack = [(
         seed_cui, 1, frozenset([seed_cui]), frozenset(),
-        seed_cui if seed_is_meaningful else None,
-        1 if seed_is_meaningful else 0,
+        seed_cui if signature_is_meaningful else None,
+        1 if signature_is_meaningful else 0,
     )]
 
     while stack:
@@ -416,27 +529,25 @@ def find_anchors(seed_cui, parents, attrs):
         visited_total.add(current)
 
         ps = parents.get(current, {})
-        preserving_parents = []   # list of (parent_cui, rel_key)
+        preserving_parents = []
         any_break_reason = None
 
         for parent_cui, rel_key in ps.items():
             if parent_cui in visited_on_path:
                 continue
             parent_attrs = attrs.get(parent_cui, {})
-            if is_transparent_parent(seed_attrs, parent_attrs):
+            if is_transparent_parent(signature_attrs, parent_attrs):
                 preserving_parents.append((parent_cui, rel_key))
             else:
-                broken = check_break(seed_attrs, parent_attrs)
+                broken = check_break(signature_attrs, parent_attrs)
                 if broken is None:
                     preserving_parents.append((parent_cui, rel_key))
                 elif any_break_reason is None:
                     any_break_reason = broken
 
         if not preserving_parents:
-            # Terminus reached. The "real" anchor is `current`, but if
-            # `current` is itself transparent (no defining attributes),
-            # we don't want it as a topic — back up to the last
-            # meaningful ancestor we saw on the path.
+            # Terminus reached. Back up to last meaningful if current is
+            # transparent (refuses anchoring at abstract organizing nodes).
             current_attrs = attrs.get(current, {})
             if current_attrs:
                 anchor_cui = current
@@ -445,8 +556,6 @@ def find_anchors(seed_cui, parents, attrs):
                 anchor_cui = last_meaningful
                 anchor_depth = last_meaningful_depth
             else:
-                # Seed had no attrs and the whole path was transparent.
-                # No meaningful anchor exists. Fall back to seed itself.
                 anchor_cui = seed_cui
                 anchor_depth = 1
 
@@ -500,6 +609,7 @@ def main():
     print(f"  output        : {OUTPUT_PATH}")
     print(f"  strict slots  : {sorted(STRICT_SLOTS)}")
     print(f"  traversal     : {TRAVERSAL_RELS}")
+    print(f"  max members   : {MAX_MEMBERS_PER_ANCHOR if MAX_MEMBERS_PER_ANCHOR else 'no limit'}")
     print(f"  max_concepts  : {MAX_CONCEPTS if MAX_CONCEPTS else 'all'}")
     print("=" * 60)
 
@@ -545,6 +655,68 @@ def main():
             self_only_count += 1
     print(f"      anchored {len(anchors_by_cui):,} CUIs in {time.time()-t0:.1f}s")
 
+    # ---- Anchor quality post-pass ----
+    if MAX_MEMBERS_PER_ANCHOR is not None:
+        print(f"\n[3.5/4] Filtering over-abstract anchors "
+              f"(threshold = {MAX_MEMBERS_PER_ANCHOR:,} members) ...")
+        t0 = time.time()
+
+        # Count members per anchor across all CUIs
+        member_counts = defaultdict(int)
+        for entries in anchors_by_cui.values():
+            for e in entries:
+                member_counts[e["anchor"]] += 1
+
+        # Identify over-threshold anchors
+        bad_anchors = {a for a, n in member_counts.items()
+                       if n > MAX_MEMBERS_PER_ANCHOR}
+
+        if not bad_anchors:
+            print(f"      no anchors exceed threshold; no changes")
+        else:
+            print(f"      found {len(bad_anchors):,} over-threshold anchors "
+                  f"(will be dropped):")
+            sorted_bad = sorted(((a, member_counts[a]) for a in bad_anchors),
+                                key=lambda kv: -kv[1])
+            for anchor, n in sorted_bad[:15]:
+                label = cache["labels"].get(anchor, "?")
+                # Truncate long labels
+                label_short = label[:60] + ("..." if len(label) > 60 else "")
+                print(f"        {n:>6,d}  {anchor}  {label_short}")
+            if len(sorted_bad) > 15:
+                print(f"        ... and {len(sorted_bad) - 15} more")
+
+            # Apply: drop bad anchors from each CUI's list
+            new_self_only = 0
+            new_multi = 0
+            new_total_entries = 0
+            for cui in list(anchors_by_cui.keys()):
+                entries = anchors_by_cui[cui]
+                # Keep only entries whose anchor is not over-threshold
+                kept = [e for e in entries if e["anchor"] not in bad_anchors]
+                if kept:
+                    anchors_by_cui[cui] = kept
+                else:
+                    # All anchors were over-threshold → self-only
+                    anchors_by_cui[cui] = [{
+                        "anchor": cui, "lost": "abstract_anchors_filtered",
+                        "path_length": 1, "rels_used": [],
+                    }]
+
+            # Recount stats
+            self_only_count = 0
+            multi_anchor_count = 0
+            total_anchor_entries = 0
+            for cui, entries in anchors_by_cui.items():
+                total_anchor_entries += len(entries)
+                if len(entries) > 1:
+                    multi_anchor_count += 1
+                if len(entries) == 1 and entries[0]["anchor"] == cui:
+                    self_only_count += 1
+            print(f"      done in {time.time()-t0:.1f}s")
+            print(f"      self-only after filter:    {self_only_count:,}")
+            print(f"      multi-topic after filter:  {multi_anchor_count:,}")
+
     print("\n[4/4] Saving pickle ...")
     t0 = time.time()
     unique_anchors = {e["anchor"] for entries in anchors_by_cui.values() for e in entries}
@@ -560,6 +732,7 @@ def main():
         "config": {
             "strict_slots": sorted(STRICT_SLOTS),
             "traversal_rels": TRAVERSAL_RELS,
+            "max_members_per_anchor": MAX_MEMBERS_PER_ANCHOR,
         },
         "anchors": anchors_by_cui,
         "labels":  out_labels,
