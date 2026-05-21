@@ -3,6 +3,30 @@ build_topics.py
 ---------------
 Build a CUI -> topics pickle from UMLS data.
 
+Conceptual model
+================
+This algorithm is a constrained factorization of a concept's attribute
+signature under hard-preserved dimensions ("strict slots"). It's
+effectively faceted semantic clustering over the SNOMED IS-A graph.
+
+For each concept:
+  1. Decompose its attributes into "strict" (must match exactly at any
+     anchor) and "non-strict" (per-axis, value-overlap required) groups.
+  2. For each non-strict attribute axis, walk independently up the IS-A
+     hierarchy looking for an anchor that:
+       - preserves the seed's strict slots EXACTLY
+       - has value-set overlap with the seed for the per-axis attribute
+  3. Each axis can produce its own anchor. A concept thus gets one topic
+     per attribute axis (de-duplicated where multiple axes converge on
+     the same ancestor).
+  4. Anchors that turn out to gather too many member CUIs (post-pass
+     filter, MAX_MEMBERS_PER_ANCHOR) are removed — they're acting as
+     organizing nodes rather than clinical topics. This is a
+     corpus-derived information-content prior, not an arbitrary
+     threshold.
+
+Cache behavior
+==============
 On first run, fetches UMLS data from BigQuery into a local cache file
 (umls_cache.pkl). On subsequent runs, uses the cache and skips BigQuery
 entirely.
@@ -59,144 +83,36 @@ LANGUAGE = "ENG"
 # carries that information.
 STRICT_SLOTS = {"has_finding_site"}
 
-# Allowlist of RELA names that should be treated as DEFINING attributes.
-# RO rows with other RELAs are ignored — they're typically administrative,
-# associative, or modeling-artifact relationships that don't constrain the
-# concept's semantic identity.
+# Optional allowlist of RELAs that count as defining attributes.
+# When None (default), every named RO RELA is treated as defining.
 #
-# Setting this to None disables the allowlist (all named RO RELAs are
-# treated as defining — the old behavior). With the allowlist, only the
-# RELAs below count.
+# If you observe in the build output that specific RELAs are producing
+# bad anchors (e.g., administrative or historical relationships), add
+# this set to filter them out. Example:
+#     ATTRIBUTE_RELAS = {"has_finding_site", "has_associated_morphology",
+#                        "has_method", "has_procedure_site",
+#                        "has_causative_agent", "has_active_ingredient"}
 #
-# This is the single biggest correctness improvement for topic quality:
-# narrowing to truly-defining relationships prevents the algorithm from
-# being misled by historical, administrative, or weak-semantic links.
-#
-# The list below is conservative — clinically core attributes only. Add
-# more as evidence shows they're useful in your retrieval results.
-ATTRIBUTE_RELAS = {
-    # Findings / disorders
-    "has_finding_site",
-    "has_associated_morphology",
-    "has_causative_agent",
-    "has_pathological_process",
-    "occurs_in",
-    "due_to",
-    "interprets",
-    "has_interpretation",
-    # Procedures
-    "has_method",
-    "has_procedure_site",
-    "has_procedure_site_direct",
-    "has_direct_procedure_site",
-    "has_indirect_procedure_site",
-    "has_direct_morphology",
-    "has_indirect_morphology",
-    "has_focus",
-    "has_intent",
-    "has_priority",
-    "has_route_of_administration",
-    "has_access",
-    "has_approach",
-    # Specimens
-    "has_specimen_source_topography",
-    "has_specimen_source_morphology",
-    "has_specimen_substance",
-    "has_specimen_procedure",
-    # Substances / drugs
-    "has_active_ingredient",
-    "has_dose_form",
-    "has_ingredient",
-    # Laterality (kept non-strict but still defining for some axes)
-    "has_laterality",
-}
+# Don't add this preemptively. Build first, see what RELAs are doing the
+# work via the build log's edge breakdown, and only restrict if specific
+# RELAs are demonstrably causing problems.
+ATTRIBUTE_RELAS = None
 
-# Semantic-type gating: a parent's STY must be in the seed's allowed set
-# to be considered traversable. Prevents the algorithm from making
-# nonsensical jumps across ontology branches via shared attributes.
+# Optional semantic-type gating for traversal. When None (default), no
+# gating is applied — parents are considered regardless of their STY.
 #
-# Keys are semantic types of the SEED (the concept being anchored).
-# Values are sets of semantic types that are valid for parents.
+# If you observe specific cross-domain anchor jumps in the inspection
+# output (e.g., a Disease anchoring at an Organism), add a policy here.
+# Format: {seed_sty: {allowed_parent_sty, ...}}
 #
-# Default fall-through: if a seed's STY isn't a key here, no gating is
-# applied for that seed (traversal proceeds unrestricted). This means the
-# gating only enforces constraints where we have clear policy.
+# Example:
+#     VALID_PARENT_STY_BY_SEED_STY = {
+#         "Disease or Syndrome": {"Disease or Syndrome", "Finding"},
+#     }
 #
-# Setting this to None disables gating entirely.
-#
-# Like the RELA allowlist, this is conservative. Add entries as needed.
-VALID_PARENT_STY_BY_SEED_STY = {
-    "Disease or Syndrome": {
-        "Disease or Syndrome",
-        "Pathologic Function",
-        "Mental or Behavioral Dysfunction",
-        "Neoplastic Process",
-        "Congenital Abnormality",
-        "Acquired Abnormality",
-        "Anatomical Abnormality",
-        "Finding",
-        "Sign or Symptom",
-        "Cell or Molecular Dysfunction",
-    },
-    "Finding": {
-        "Finding",
-        "Sign or Symptom",
-        "Disease or Syndrome",
-        "Pathologic Function",
-        "Clinical Attribute",
-        "Laboratory or Test Result",
-    },
-    "Sign or Symptom": {
-        "Sign or Symptom",
-        "Finding",
-        "Disease or Syndrome",
-        "Pathologic Function",
-    },
-    "Therapeutic or Preventive Procedure": {
-        "Therapeutic or Preventive Procedure",
-        "Health Care Activity",
-    },
-    "Diagnostic Procedure": {
-        "Diagnostic Procedure",
-        "Laboratory Procedure",
-        "Health Care Activity",
-    },
-    "Laboratory Procedure": {
-        "Laboratory Procedure",
-        "Diagnostic Procedure",
-    },
-    "Pharmacologic Substance": {
-        "Pharmacologic Substance",
-        "Clinical Drug",
-        "Antibiotic",
-        "Biologically Active Substance",
-        "Organic Chemical",
-        "Inorganic Chemical",
-        "Chemical",
-    },
-    "Clinical Drug": {
-        "Clinical Drug",
-        "Pharmacologic Substance",
-    },
-    # Anatomy
-    "Body Part, Organ, or Organ Component": {
-        "Body Part, Organ, or Organ Component",
-        "Body System",
-        "Body Location or Region",
-        "Anatomical Structure",
-        "Tissue",
-    },
-    "Body Location or Region": {
-        "Body Location or Region",
-        "Body Part, Organ, or Organ Component",
-        "Body System",
-    },
-    # Specimens
-    "Body Substance": {
-        "Body Substance",
-        "Substance",
-    },
-}
+# Same principle as ATTRIBUTE_RELAS: don't add preemptively. Add only
+# where you can point to a specific bad anchor caused by an STY jump.
+VALID_PARENT_STY_BY_SEED_STY = None
 
 # Which UMLS relationship types to use for walking UP the hierarchy.
 # Each entry is (REL, RELA) — RELA can be None to match any RELA value.
@@ -244,6 +160,29 @@ MAX_NODES_PER_TRAVERSAL = 5000
 # documents about any organism).
 MAX_MEMBERS_PER_ANCHOR = 3000
 
+# Overlap ratio threshold for non-strict slots. When comparing seed and
+# parent value-sets for a non-strict attribute, the parent must contain
+# at least this fraction of the seed's values. Set to 0.5 by default —
+# parent must cover at least half of the seed's values to count as
+# preserving the axis.
+#
+# Why this matters: pure "any-overlap" matching (the previous behavior)
+# allows semantic-bridge effects like seed={tibia,fibula} matching parent
+# {fibula,skull} just because of the shared fibula. A higher threshold
+# tightens to require substantive coverage.
+#
+# Tuning: 0.0 = any overlap (loose), 1.0 = all seed values must be in
+# parent (strictest). Values in between mean "parent covers at least X%
+# of the seed's values."
+NON_STRICT_OVERLAP_RATIO = 0.5
+
+# Cache schema version. Bump when the cache structure changes in a
+# backwards-incompatible way so old caches get auto-invalidated.
+# Version history:
+#   2  tags stored as frozenset[str] per CUI (multiple STYs supported)
+#   1  initial single-STY format (deprecated)
+CACHE_SCHEMA_VERSION = 2
+
 
 # ============================================================================
 # Step 1: Cache management — auto-detect or fetch from BigQuery
@@ -272,7 +211,12 @@ def get_or_fetch_cache():
         print(f"  loaded in {time.time()-t0:.1f}s")
 
         cached_config = cache.get("config", {})
-        if cached_config != current_config:
+        cache_schema = cache.get("schema_version", 0)
+        if cache_schema != CACHE_SCHEMA_VERSION:
+            print(f"\n  Cache schema version is {cache_schema}, "
+                  f"current code expects {CACHE_SCHEMA_VERSION}.")
+            print(f"  Re-fetching from BigQuery ...\n")
+        elif cached_config != current_config:
             print(f"\n  WARNING: cache config differs from current config:")
             for key in current_config:
                 if cached_config.get(key) != current_config[key]:
@@ -376,11 +320,15 @@ def fetch_from_bigquery(config):
     SELECT CUI, STY
     FROM `{config['project']}.{config['dataset']}.{TABLE_MRSTY}`
     """
-    tags = {}
+    # A CUI can have multiple semantic types. Collect all of them.
+    tags_accum = defaultdict(set)
     for row in client.query(sql).result():
-        if row.CUI in cuis and row.CUI not in tags:
-            tags[row.CUI] = row.STY
-    print(f"        {len(tags):,} tags in {time.time()-t0:.1f}s")
+        if row.CUI in cuis:
+            tags_accum[row.CUI].add(row.STY)
+    tags = {cui: frozenset(stys) for cui, stys in tags_accum.items()}
+    n_multi = sum(1 for stys in tags.values() if len(stys) > 1)
+    print(f"        {len(tags):,} CUIs tagged "
+          f"({n_multi:,} have multiple STYs) in {time.time()-t0:.1f}s")
 
     # ---- 4. Preferred labels ----
     print("  [4/4] Loading preferred labels from MRCONSO ...")
@@ -414,6 +362,7 @@ def fetch_from_bigquery(config):
     print(f"        {len(labels):,} labels in {time.time()-t0:.1f}s")
 
     return {
+        "schema_version": CACHE_SCHEMA_VERSION,
         "fetched_at": datetime.datetime.now().isoformat(),
         "config":     config,
         "cuis":       cuis,
@@ -515,11 +464,15 @@ def check_break(seed_attrs, parent_attrs):
     Strict slots: parent's value-set must EQUAL the seed's value-set.
                   ({tibia, fibula} == {tibia, fibula}, not just overlap.)
                   Generalizing or losing any value breaks.
-    Other slots:  parent must have at least one value in common with the
-                  seed's values (set intersection non-empty). Pure existence
-                  is NOT enough — if the seed's method=excision and the
-                  parent's method=drainage, those are semantically
-                  different and the boundary fires.
+
+    Other slots: parent's value-set must contain at least
+                 NON_STRICT_OVERLAP_RATIO of the seed's values. This is
+                 stronger than "any overlap" — prevents semantic bridges
+                 like seed={tibia,fibula} matching parent={fibula,skull}
+                 just because of the shared fibula.
+                 Default 0.5 means 'parent must cover at least half of the
+                 seed's values'. Set lower for more recall, higher for
+                 more precision.
     """
     for rela, seed_value in seed_attrs.items():
         parent_value = parent_attrs.get(rela)
@@ -528,10 +481,12 @@ def check_break(seed_attrs, parent_attrs):
             if parent_value != seed_value:
                 return rela
         else:
-            # Non-strict: require value-set overlap, not just RELA presence
+            # Non-strict: require value-set overlap above threshold
             if not parent_value:
                 return rela
-            if seed_value.isdisjoint(parent_value):
+            intersection_size = len(seed_value & parent_value)
+            seed_size = len(seed_value)
+            if intersection_size / seed_size < NON_STRICT_OVERLAP_RATIO:
                 return rela
     return None
 
@@ -561,28 +516,41 @@ def is_transparent_parent(seed_attrs, parent_attrs):
     return not parent_attrs
 
 
-def is_sty_compatible(seed_sty, parent_sty):
+def is_sty_compatible(seed_stys, parent_stys):
     """
-    Return True if a parent with `parent_sty` is acceptable to traverse to
-    from a seed with `seed_sty`.
+    Return True if a parent is acceptable to traverse to from a seed.
+    Both arguments are frozensets of STY strings (CUIs may have multiple
+    semantic types in UMLS — e.g., a CUI that's both "Finding" and "Sign
+    or Symptom").
 
     Behavior:
       - If gating is disabled (VALID_PARENT_STY_BY_SEED_STY is None), always
         compatible.
-      - If the seed's STY isn't in the gating map, no gating applies — the
-        traversal proceeds unrestricted. This means gating only enforces
-        policy where we have one.
-      - If the parent has no STY at all, treat as compatible (don't block
-        on missing metadata).
+      - The seed is "compatible" with a parent if ANY of the seed's STYs
+        has a policy AND that policy admits AT LEAST ONE of the parent's
+        STYs. (Union semantics: any-of-seed × any-of-parent must match.)
+      - If none of the seed's STYs have a policy entry, no gating applies.
+      - If the parent has no STYs, treat as compatible (don't block on
+        missing metadata).
     """
     if VALID_PARENT_STY_BY_SEED_STY is None:
         return True
-    allowed = VALID_PARENT_STY_BY_SEED_STY.get(seed_sty)
-    if allowed is None:
+    if not parent_stys:
         return True
-    if not parent_sty:
+    seed_stys = seed_stys or frozenset()
+    # Collect the union of allowed parent-STYs across all seed STYs that
+    # have policies. If no seed STY has a policy, we get an empty allowed
+    # set and fall through to "no gating applies".
+    allowed_union = set()
+    any_policy = False
+    for s in seed_stys:
+        allowed = VALID_PARENT_STY_BY_SEED_STY.get(s)
+        if allowed is not None:
+            any_policy = True
+            allowed_union.update(allowed)
+    if not any_policy:
         return True
-    return parent_sty in allowed
+    return not allowed_union.isdisjoint(parent_stys)
 
 
 def find_anchors(seed_cui, parents, attrs, tags):
@@ -692,7 +660,7 @@ def _walk_for_signature(seed_cui, signature_attrs, parents, attrs, tags, axis=No
         STY-incompatible parents are rejected outright — not even considered
         for transparency or attribute matching.
     """
-    seed_sty = tags.get(seed_cui)
+    seed_stys = tags.get(seed_cui)
     found_anchors = {}
     visited_total = set()
     signature_is_meaningful = bool(signature_attrs)
@@ -719,8 +687,8 @@ def _walk_for_signature(seed_cui, signature_attrs, parents, attrs, tags, axis=No
                 continue
 
             # STY gate: reject parents with incompatible semantic types
-            parent_sty = tags.get(parent_cui)
-            if not is_sty_compatible(seed_sty, parent_sty):
+            parent_stys = tags.get(parent_cui)
+            if not is_sty_compatible(seed_stys, parent_stys):
                 if any_break_reason is None:
                     any_break_reason = "sty_incompatible"
                 continue
@@ -829,6 +797,7 @@ def main():
     print("\n[3/4] Finding anchors ...")
     t0 = time.time()
     cuis = cache["cuis"]
+    tags = cache["tags"]
     all_cuis = list(cuis)
     if MAX_CONCEPTS:
         all_cuis = all_cuis[:MAX_CONCEPTS]
@@ -920,7 +889,6 @@ def main():
     t0 = time.time()
     unique_anchors = {e["anchor"] for entries in anchors_by_cui.values() for e in entries}
     labels = cache["labels"]
-    tags = cache["tags"]
     needed = set(anchors_by_cui.keys()) | unique_anchors
     out_labels = {c: labels[c] for c in needed if c in labels}
     out_tags = {c: tags[c] for c in needed if c in tags}
