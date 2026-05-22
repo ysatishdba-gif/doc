@@ -4,8 +4,10 @@ diagnose_compression.py
 Run BEFORE committing to a full build. Measures how much actual
 compression the facet+canonical-normalization scheme produces.
 
-Loads the cache, extracts raw facets, computes canonical sets,
-normalizes, builds signatures, and counts distinct signatures.
+USAGE (in a GCP notebook cell):
+  Paste the contents of build_facet_index.py into one cell and run it.
+  Then paste the contents of THIS file into the next cell and run it.
+  This script directly uses the functions defined by build_facet_index.
 
 Outputs:
   - Total distinct topic IDs across the corpus
@@ -13,30 +15,18 @@ Outputs:
   - Top 20 topics by member count (which signatures absorb the most CUIs)
   - Size distribution (how many topics have 1 member, 2-5, 6-20, etc.)
   - Facet sparseness (how often each facet is present per CUI)
-
-Use this to decide:
-  - "Include all RELAs as facets" vs "use a smaller fixed set"
-  - Whether normalization bounds need tuning
-  - Whether the design will scale to your document corpus
-
-Run AFTER editing the policy you want to test in build_facet_index.py.
 """
 
 import hashlib
 import pickle
 import time
 from collections import Counter, defaultdict
-from itertools import islice
 
 
-CACHE_PATH = "umls_cache.pkl"
-
-# Pull the same logic from build_facet_index so this matches what the
-# real build would produce.
-import build_facet_index as bfi
+CACHE_PATH_DIAG = "umls_cache.pkl"
 
 
-def build_signature(facets):
+def _diag_build_signature(facets):
     parts = []
     for facet in sorted(facets):
         values = sorted(facets[facet])
@@ -46,40 +36,44 @@ def build_signature(facets):
     return "|".join(parts)
 
 
-def hash_signature(sig):
+def _diag_hash_signature(sig):
     if not sig:
         return None
     return "tp_" + hashlib.sha1(sig.encode()).hexdigest()[:12]
 
 
-def main():
+def diagnose_compression():
+    """Measure compression without building the full pickle.
+
+    Uses the functions defined by build_facet_index.py — paste THAT
+    file's contents into a cell first, then run this in the next cell.
+    """
     print("=" * 60)
     print("Compression diagnostic")
     print("=" * 60)
-    print(f"  cache         : {CACHE_PATH}")
-    print(f"  blocklist     : {bfi.RELA_BLOCKLIST}")
+    print(f"  cache         : {CACHE_PATH_DIAG}")
+    print(f"  blocklist     : {RELA_BLOCKLIST}")
     print(f"  bounds        : descendants in "
-          f"[{bfi.MIN_DESCENDANTS}, {bfi.MAX_DESCENDANTS}]")
+          f"[{MIN_DESCENDANTS}, {MAX_DESCENDANTS}]")
 
     print("\n[1/4] Loading cache ...")
     t0 = time.time()
-    with open(CACHE_PATH, "rb") as f:
+    with open(CACHE_PATH_DIAG, "rb") as f:
         cache = pickle.load(f)
     print(f"      {len(cache['cuis']):,} CUIs in {time.time()-t0:.1f}s")
 
     print("\n[2/4] Building IS-A graph + extracting raw facets ...")
     t0 = time.time()
-    parents = bfi.build_isa_parents(cache)
-    children = bfi.build_isa_children(parents)
-    cui_raw_facets = bfi.extract_raw_facets(cache)
+    parents = build_isa_parents(cache)
+    children = build_isa_children(parents)
+    cui_raw_facets = extract_raw_facets(cache)
     print(f"      {len(cui_raw_facets):,} CUIs have raw facets")
 
-    # Facet sparseness — how common is each facet across CUIs?
     facet_presence = Counter()
     for cui, facets in cui_raw_facets.items():
         for facet in facets:
             facet_presence[facet] += 1
-    print(f"      {len(facet_presence):,} distinct facet types")
+    print(f"      {len(facet_presence):,} distinct facet types (RELAs)")
     print(f"      Top 20 most common facets:")
     for facet, n in facet_presence.most_common(20):
         pct = 100 * n / len(cache["cuis"])
@@ -95,17 +89,16 @@ def main():
 
     canonical_sets = {}
     for facet in sorted(value_space):
-        min_d, max_d = bfi.PER_FACET_BOUNDS.get(facet,
-                                                (bfi.MIN_DESCENDANTS,
-                                                 bfi.MAX_DESCENDANTS))
-        canonical_sets[facet] = bfi.extract_canonical_set(
+        min_d, max_d = PER_FACET_BOUNDS.get(
+            facet, (MIN_DESCENDANTS, MAX_DESCENDANTS),
+        )
+        canonical_sets[facet] = extract_canonical_set(
             facet, value_space[facet], children, parents,
             cache["labels"], min_d, max_d,
         )
 
-    cui_normalized = bfi.normalize_facets(cui_raw_facets, canonical_sets, parents)
+    cui_normalized = normalize_facets(cui_raw_facets, canonical_sets, parents)
 
-    # Add disorder facet
     DISORDER_STYS = {
         "Disease or Syndrome", "Pathologic Function", "Neoplastic Process",
         "Mental or Behavioral Dysfunction", "Anatomical Abnormality",
@@ -115,12 +108,12 @@ def main():
     }
     disorder_cuis = {cui for cui, stys in cache["tags"].items()
                      if stys & DISORDER_STYS}
-    canonical_sets["disorder"] = bfi.extract_canonical_set(
+    canonical_sets["disorder"] = extract_canonical_set(
         "disorder", disorder_cuis, children, parents,
-        cache["labels"], bfi.MIN_DESCENDANTS, bfi.MAX_DESCENDANTS,
+        cache["labels"], MIN_DESCENDANTS, MAX_DESCENDANTS,
     )
-    bfi.add_disorder_facet(cui_normalized, cache["cuis"], cache["tags"],
-                           canonical_sets["disorder"], parents)
+    add_disorder_facet(cui_normalized, cache["cuis"], cache["tags"],
+                       canonical_sets["disorder"], parents)
     print(f"      {len(cui_normalized):,} CUIs have normalized facets")
     print(f"      in {time.time()-t0:.1f}s")
 
@@ -128,14 +121,13 @@ def main():
     t0 = time.time()
     topic_members = defaultdict(list)
     for cui, facets in cui_normalized.items():
-        sig = build_signature(facets)
+        sig = _diag_build_signature(facets)
         if not sig:
             continue
-        tid = hash_signature(sig)
+        tid = _diag_hash_signature(sig)
         topic_members[tid].append(cui)
     print(f"      done in {time.time()-t0:.1f}s")
 
-    # ---- Results ----
     n_cuis_with_topic = sum(len(m) for m in topic_members.values())
     n_topics = len(topic_members)
     compression = n_cuis_with_topic / n_topics if n_topics else 0
@@ -147,9 +139,7 @@ def main():
     print(f"  CUIs with topic ID         : {n_cuis_with_topic:,}")
     print(f"  Distinct topic IDs         : {n_topics:,}")
     print(f"  Compression ratio          : {compression:.2f}x")
-    print(f"    (CUIs that map to ONE topic on average)")
 
-    # Size distribution
     print(f"\n  Topic size distribution:")
     size_buckets = [(1, 1), (2, 5), (6, 20), (21, 100), (101, 1000), (1001, 10**9)]
     for lo, hi in size_buckets:
@@ -158,25 +148,19 @@ def main():
         pct = 100 * n / n_topics if n_topics else 0
         print(f"    {label:>10s} members: {n:>7,d} topics  ({pct:5.1f}%)")
 
-    # Topic-1-member rate is the key metric: if 90% of topics have 1 member,
-    # we're not compressing
     n_solo = sum(1 for m in topic_members.values() if len(m) == 1)
     print(f"\n  Topics with exactly 1 CUI  : {n_solo:,} "
           f"({100*n_solo/n_topics:.1f}% of topics)")
     print(f"  CUIs in solo topics        : {n_solo:,} "
           f"({100*n_solo/n_cuis_with_topic:.1f}% of CUIs)")
 
-    # Top 20 most-populated topics
     print(f"\n  Top 20 most-populated topics:")
     sorted_topics = sorted(topic_members.items(), key=lambda kv: -len(kv[1]))
     for tid, members in sorted_topics[:20]:
         sample = members[0]
-        sig_short = "(can re-derive from build)"
-        # Re-derive the signature for display
-        facets = cui_normalized.get(sample)
-        if facets:
-            sig = build_signature(facets)
-            sig_short = sig[:80] + ("..." if len(sig) > 80 else "")
+        facets = cui_normalized.get(sample, {})
+        sig = _diag_build_signature(facets)
+        sig_short = sig[:80] + ("..." if len(sig) > 80 else "")
         sample_label = cache["labels"].get(sample, "?")
         print(f"    {len(members):>6,d} members  {tid}")
         print(f"             sig: {sig_short}")
@@ -187,22 +171,18 @@ def main():
     print("=" * 60)
     if compression < 1.5:
         print("  Compression is LOW (< 1.5x).")
-        print("  → Most CUIs end up with unique signatures.")
-        print("  → The facet approach isn't grouping concepts together.")
-        print("  → Likely cause: too many facets, or normalization too narrow.")
-        print("  → Try: reduce facet set or expand canonical anchor bounds.")
+        print("  → Most CUIs have unique signatures; facets aren't grouping.")
+        print("  → Try: smaller facet set, or expand canonical bounds.")
     elif compression < 5:
         print("  Compression is MODERATE (1.5x - 5x).")
-        print("  → Some grouping but most CUIs still mostly unique.")
-        print("  → Might be acceptable depending on use case.")
+        print("  → Some grouping but limited; may need tuning.")
     elif compression < 50:
         print("  Compression is GOOD (5x - 50x).")
-        print("  → Topic layer is meaningfully grouping CUIs.")
-        print("  → Document storage and query lookup will scale.")
+        print("  → Topic layer is meaningfully reducing the index size.")
     else:
         print("  Compression is VERY HIGH (50x+).")
-        print("  → Risk of over-grouping — verify top topics look right.")
+        print("  → Risk of over-grouping; verify top topics look right.")
 
 
-if __name__ == "__main__":
-    main()
+# Call it
+diagnose_compression()
