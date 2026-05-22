@@ -1,79 +1,213 @@
-======================================================================
-Pickle: topics.pkl
-  built_at         : 2026-05-22T16:14:41.450473
-  total CUIs       : 374,538
-  unique anchors   : 297,325
-  self-only        : 221,414
-  multi-topic CUIs : 113,574
-======================================================================
+"""
+inspect_pickle.py
+-----------------
+Look at the pickle and print interesting CUIs to test the lookup with.
 
-Relationship-type contribution to non-self anchors (264,768 total):
-  CHD    isa                    264,768  (100.0%)
+Use this when your pickle is a smoke build (e.g. MAX_CONCEPTS=1000) and
+you don't know which specific CUIs are in it. This script samples the
+pickle and shows you:
+  - A few CUIs with a SINGLE topic
+  - A few CUIs with MULTIPLE topics
+  - The 10 largest topic groups
 
-  Anchors reached using ONLY CHD/isa : 264,768
-  Anchors that used RB at any point  : 0
-  Anchors reached using ONLY RB      : 0
-    (these would not exist without RB traversal)
+Then you can copy any of those CUIs into lookup_topics.py to test.
 
---- Sample CUIs with ONE topic (different from self) [39550 total in pickle] ---
-  C0340679  (Inverse steal syndrome                  ) -> C0425674  (Finding of artery)
-  C0201756  (Gas liquid chromatography, alkali flame ionisation type) -> C0201749  (Chromatography measurement)
-  C0067047  (myo-Inositol 2-dehydrogenase            ) -> C0030016  (Dehydrogenase)
-  C1298821  (Annular abscess of aortic root          ) -> C1320843  (Abscess of aortic root)
-  C0475418  (Intestinal ameba                        ) -> C1285556  (Navigational concept)
+Just edit PICKLE_PATH below and run:
+    python inspect_pickle.py
+"""
 
---- Sample CUIs with MULTIPLE topics [113574 total in pickle] ---
-  C4551771  (Kleefstra syndrome (disorder))
-      -> C0266617  (Congenital deformity of face (disorder))
-      -> C4551771  (Kleefstra syndrome (disorder))
-  C0434773  (Closed traumatic subluxation, proximal interphalangeal joint)
-      -> C0434643  (Closed traumatic dislocation, proximal interphalangeal joint)
-      -> C0434773  (Closed traumatic subluxation, proximal interphalangeal joint)
-  C4750090  (Repair of incisional hernia using surgical mesh)
-      -> C0019328  (Hernia repair)
-      -> C0342971  (Incisional herniorrhaphy)
-      -> C5551405  (Hernioplasty)
-  C4756452  (Fomepizole only product in parenteral dose form)
-      -> C3219910  (Product containing fomepizole in parenteral dose form (medicinal product form))
-      -> C4753300  (Fomepizole only product)
-  C1828187  (Maintenance of percutaneous endoscopic gastrostomy tube)
-      -> C0399716  (Attention to gastrostomy tube)
-      -> C1297900  (Maintenance of device)
-      -> C1828187  (Maintenance of percutaneous endoscopic gastrostomy tube)
+import pickle
+from collections import defaultdict
 
---- Sample CUIs that anchor to themselves [221414 total in pickle] ---
-  C5885059  (Community legal services)
-  C3442181  (Vagococcus entomophilus (organism))
-  C0333704  (Chromosome break)
-  C5880212  (Traumatic blister of skin of male genitalia)
-  C5818314  (Extended spectrum beta-lactamase producing Enterobacter)
 
---- Self-only CUI diagnostic ---
-  Loading umls_cache.pkl to check parent structure of self-only CUIs ...
-  Self-only CUIs that are TRUE ORPHANS (no IS-A parent): 6,723 (3.0%)
-  Self-only CUIs that HAVE parents but algorithm rejected them: 214,691 (97.0%)
-  --> The majority have parents — Fix B (per-attribute anchoring) would likely help reduce self-only count
+PICKLE_PATH = "topics.pkl"
 
---- Top 10 largest topic groups ---
-  1500 members  C0581658  (Fluoroscopy of systems)
-  1470 members  C0202640  (Fluoroscopy of regions)
-  1359 members  C0009450  (Communicable disease)
-  1329 members  C3539909  (Allergic disposition)
-  1223 members  C0014406  (Environments)
-  1187 members  C0034927  (Referral)
-  1170 members  C1519795  (Unit of measure)
-  1139 members  C0039401  (Education procedure)
-  1113 members  C2317559  (History of clinical finding in subject)
-  1105 members  C0274456  (Accidental poisoning)
 
-======================================================================
-Copy/paste any of these into CUIS_TO_LOOKUP in lookup_topics.py
-======================================================================
+def main():
+    with open(PICKLE_PATH, "rb") as f:
+        data = pickle.load(f)
 
-CUIS_TO_LOOKUP = [
-    "C0340679",   # Inverse steal syndrome
-    "C0201756",   # Gas liquid chromatography, alkali flame ionisation type
-    "C4551771",   # Kleefstra syndrome (disorder)
-    "C0434773",   # Closed traumatic subluxation, proximal interphalangeal joint
-    "C5885059",   # Community legal services
-]
+    anchors = data["anchors"]
+    labels = data["labels"]
+    stats = data["stats"]
+
+    print("=" * 70)
+    print(f"Pickle: {PICKLE_PATH}")
+    print(f"  built_at         : {data['built_at']}")
+    print(f"  total CUIs       : {stats['total_cuis']:,}")
+    print(f"  unique anchors   : {stats['unique_anchors']:,}")
+    print(f"  self-only        : {stats.get('self_only', '?'):,}")
+    print(f"  multi-topic CUIs : {stats.get('multi_anchor', '?'):,}")
+    print("=" * 70)
+
+    # --- REL breakdown: which relationship types are contributing anchors? ---
+    # An anchor's rels_used set tells us which REL types appeared on the
+    # path that reached it. We count how many anchor entries used each REL.
+    rel_anchor_counts = defaultdict(int)
+    anchors_with_only_isa = 0
+    anchors_with_any_rb = 0
+    anchors_with_only_rb = 0
+    total_non_self_anchors = 0
+    for cui, entries in anchors.items():
+        for e in entries:
+            if e["anchor"] == cui:
+                continue
+            total_non_self_anchors += 1
+            rels = set(tuple(r) for r in e.get("rels_used", []))
+            for r in rels:
+                rel_anchor_counts[r] += 1
+            isa_only = rels == {("CHD", "isa")}
+            has_rb = any(r[0] == "RB" for r in rels)
+            only_rb = rels and all(r[0] == "RB" for r in rels)
+            if isa_only:
+                anchors_with_only_isa += 1
+            if has_rb:
+                anchors_with_any_rb += 1
+            if only_rb:
+                anchors_with_only_rb += 1
+
+    if total_non_self_anchors > 0:
+        print(f"\nRelationship-type contribution to non-self anchors "
+              f"({total_non_self_anchors:,} total):")
+        for (rel, rela), n in sorted(rel_anchor_counts.items(), key=lambda kv: -kv[1]):
+            pct = 100 * n / total_non_self_anchors
+            print(f"  {rel:6s} {str(rela):20s}  {n:>8,d}  ({pct:5.1f}%)")
+        print(f"\n  Anchors reached using ONLY CHD/isa : {anchors_with_only_isa:,}")
+        print(f"  Anchors that used RB at any point  : {anchors_with_any_rb:,}")
+        print(f"  Anchors reached using ONLY RB      : {anchors_with_only_rb:,}")
+        print(f"    (these would not exist without RB traversal)")
+
+    # --- Separate the CUIs into buckets ---
+    single_topic = []
+    multi_topic = []
+    self_only = []
+    for cui, entries in anchors.items():
+        if len(entries) == 1:
+            if entries[0]["anchor"] == cui:
+                self_only.append(cui)
+            else:
+                single_topic.append(cui)
+        else:
+            multi_topic.append(cui)
+
+    # --- Show 5 single-topic samples (where the topic differs from the CUI) ---
+    print(f"\n--- Sample CUIs with ONE topic (different from self) "
+          f"[{len(single_topic)} total in pickle] ---")
+    if not single_topic:
+        print("  (none — every non-multi CUI is its own topic; expected if smoke build is small)")
+    else:
+        for cui in single_topic[:5]:
+            anchor = anchors[cui][0]["anchor"]
+            print(f"  {cui}  ({labels.get(cui, '?'):40s}) -> {anchor}  ({labels.get(anchor, '?')})")
+
+    # --- Show 5 multi-topic samples ---
+    print(f"\n--- Sample CUIs with MULTIPLE topics [{len(multi_topic)} total in pickle] ---")
+    if not multi_topic:
+        print("  (none in this pickle)")
+    else:
+        for cui in multi_topic[:5]:
+            print(f"  {cui}  ({labels.get(cui, '?')})")
+            for e in anchors[cui]:
+                a = e["anchor"]
+                print(f"      -> {a}  ({labels.get(a, '?')})")
+
+    # --- Show 5 self-only samples (just so you can confirm the lookup works
+    #     for them too — they'll just return themselves as the topic) ---
+    print(f"\n--- Sample CUIs that anchor to themselves [{len(self_only)} total in pickle] ---")
+    for cui in self_only[:5]:
+        print(f"  {cui}  ({labels.get(cui, '?')})")
+
+    # --- Diagnostic: are self-only CUIs orphans, or do they have parents
+    #     that the algorithm rejected? This is the question that decides
+    #     whether further algorithm improvements would help.
+    print(f"\n--- Self-only CUI diagnostic ---")
+    print(f"  Loading umls_cache.pkl to check parent structure of self-only CUIs ...")
+    try:
+        with open("umls_cache.pkl", "rb") as f:
+            cache = pickle.load(f)
+        # Build parents map from cache (CHD/isa only, matching the algorithm)
+        parents_map = defaultdict(set)
+        for cui1, cui2, rel, rela in cache["mrrel_rows"]:
+            if rel == "CHD" and rela == "isa":
+                parents_map[cui2].add(cui1)
+
+        orphans = 0
+        with_parents = 0
+        for cui in self_only:
+            if parents_map.get(cui):
+                with_parents += 1
+            else:
+                orphans += 1
+        total = orphans + with_parents
+        if total > 0:
+            print(f"  Self-only CUIs that are TRUE ORPHANS (no IS-A parent): "
+                  f"{orphans:,} ({100*orphans/total:.1f}%)")
+            print(f"  Self-only CUIs that HAVE parents but algorithm rejected them: "
+                  f"{with_parents:,} ({100*with_parents/total:.1f}%)")
+
+        # --- Breakdown: WHY were anchors rejected? Each self-only entry
+        # carries a `lost` reason that tells us which rule fired. This
+        # tells us which lever to pull if we want to reduce self-only.
+        from collections import Counter
+        reason_counts = Counter()
+        for cui in self_only:
+            entries = anchors.get(cui, [])
+            for e in entries:
+                # In self-only entries the anchor IS the CUI itself.
+                # The `lost` field tells us why no upward anchor was found.
+                if e["anchor"] == cui:
+                    reason = e.get("lost") or "no_parent_or_other"
+                    reason_counts[reason] += 1
+        print(f"\n  Reason self-only CUIs failed to anchor upward:")
+        for reason, n in reason_counts.most_common():
+            pct = 100 * n / len(self_only) if self_only else 0
+            print(f"    {n:>7,}  ({pct:5.1f}%)  {reason}")
+
+        # --- Sample 3 CUIs per top reason so we can see what's going on
+        examples_per_reason = defaultdict(list)
+        for cui in self_only:
+            entries = anchors.get(cui, [])
+            for e in entries:
+                if e["anchor"] == cui:
+                    reason = e.get("lost") or "no_parent_or_other"
+                    if len(examples_per_reason[reason]) < 3:
+                        examples_per_reason[reason].append(cui)
+        print(f"\n  Sample CUIs by rejection reason:")
+        for reason, _ in reason_counts.most_common():
+            print(f"    [{reason}]")
+            for cui in examples_per_reason[reason]:
+                print(f"      {cui}  ({labels.get(cui, '?')})")
+    except FileNotFoundError:
+        print(f"  (umls_cache.pkl not found; skipping diagnostic)")
+
+    # --- Top 10 largest topic groups (which anchors gather the most members) ---
+    groups = defaultdict(list)
+    for cui, entries in anchors.items():
+        for e in entries:
+            groups[e["anchor"]].append(cui)
+
+    big_groups = sorted(groups.items(), key=lambda kv: -len(kv[1]))[:10]
+    print(f"\n--- Top 10 largest topic groups ---")
+    for anchor, members in big_groups:
+        print(f"  {len(members):>4d} members  {anchor}  ({labels.get(anchor, '?')})")
+
+    # --- Ready-to-paste list for lookup_topics.py ---
+    print("\n" + "=" * 70)
+    print("Copy/paste any of these into CUIS_TO_LOOKUP in lookup_topics.py")
+    print("=" * 70)
+    sample = []
+    if single_topic:
+        sample.extend(single_topic[:2])
+    if multi_topic:
+        sample.extend(multi_topic[:2])
+    if self_only:
+        sample.append(self_only[0])
+    print("\nCUIS_TO_LOOKUP = [")
+    for cui in sample:
+        comment = labels.get(cui, "")
+        print(f'    "{cui}",   # {comment}')
+    print("]")
+
+
+if __name__ == "__main__":
+    main()
