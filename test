@@ -1,153 +1,210 @@
+"""
+diagnose_compression.py
+-----------------------
+Run BEFORE committing to a full build. Measures how much actual
+compression the facet+canonical-normalization scheme produces.
 
-[1/4] Getting UMLS data (cache or BigQuery) ...
-Found existing cache: umls_cache.pkl
-  loaded in 2.0s
+Loads the cache, extracts raw facets, computes canonical sets,
+normalizes, builds signatures, and counts distinct signatures.
 
-  Cache schema version is 0, current code expects 2.
-  Re-fetching from BigQuery ...
+Outputs:
+  - Total distinct topic IDs across the corpus
+  - Compression ratio (CUIs / topic_IDs)
+  - Top 20 topics by member count (which signatures absorb the most CUIs)
+  - Size distribution (how many topics have 1 member, 2-5, 6-20, etc.)
+  - Facet sparseness (how often each facet is present per CUI)
 
+Use this to decide:
+  - "Include all RELAs as facets" vs "use a smaller fixed set"
+  - Whether normalization bounds need tuning
+  - Whether the design will scale to your document corpus
 
-Fetching UMLS data from BigQuery ...
-  [1/4] Loading SNOMED CUIs from MRCONSO ...
-        374,538 CUIs in 9.3s
-  [2/4] Loading MRREL rows (broad — all REL types we might use) ...
-        2,748,222 rows in 144.8s
-        Row breakdown (top 10):
-          CHD    isa                                615,978
-          PAR    inverse_isa                        615,942
-          RO     finding_site_of                    106,424
-          RO     has_finding_site                   106,423
-          RO     has_associated_morphology           79,784
-          RO     associated_morphology_of            78,747
-          RO     has_method                          68,889
-          RO     method_of                           68,889
-          RO     mapped_from                         46,130
-          RO     mapped_to                           46,130
-  [3/4] Loading semantic types from MRSTY ...
-        370,670 CUIs tagged (21,535 have multiple STYs) in 112.4s
-  [4/4] Loading preferred labels from MRCONSO ...
-        374,538 labels in 33.1s
+Run AFTER editing the policy you want to test in build_facet_index.py.
+"""
 
-Saving cache to umls_cache.pkl ...
-  wrote 156.3 MB in 5.8s
-
-[2/4] Parsing MRREL into parents and attributes ...
-      611,398 traversal edges, 715,317 attribute types (1,397,304 total values) in 12.0s
-      Edge breakdown by (REL, RELA):
-        CHD    isa                      615,978
-
-[3/4] Finding anchors ...
-      50,000 / 374,538  (11095/sec, ETA 0.5min)
-      100,000 / 374,538  (10910/sec, ETA 0.4min)
-      150,000 / 374,538  (10200/sec, ETA 0.4min)
-      200,000 / 374,538  (10459/sec, ETA 0.3min)
-      250,000 / 374,538  (10101/sec, ETA 0.2min)
-      300,000 / 374,538  (10219/sec, ETA 0.1min)
-      350,000 / 374,538  (9947/sec, ETA 0.0min)
-      anchored 374,538 CUIs in 37.5s
-
-[3.5/4] Filtering over-abstract anchors (threshold = 3,000 members) ...
-      found 10 over-threshold anchors (will be dropped):
-        31,504  C0029235  Organism
-        21,092  C1827535  Structure of half of body lateral to midsagittal plane
-        12,600  C0439861  Substances
-        11,501  C0347997  Physical objects
-         6,461  C2316799  Measurement of substance
-         5,962  C0013227  Drug or medicament (substance)
-         5,762  C0037088  Clinical finding (finding)
-         3,556  C1274016  Clinical history/examination observable
-         3,478  C2586094  Product manufactured as oral dose form
-         3,278  C0184661  Procedure
-      done in 1.4s
-      self-only after filter:    205,455
-      multi-topic after filter:  122,725
-
-[4/4] Saving pickle ...
-      wrote 65.8 MB in 3.5s
-
-============================================================
-DONE
-  Total CUIs            : 374,538
-  Unique anchors        : 287,289
-  Self-only             : 205,455 (54.9%)
-  Multi-topic CUIs      : 122,725 (32.8%)
-  Avg topics per CUI    : 1.54
-  Compression           : 1.30x
-  Pickle                : topics.pkl (65.8 MB)
-============================================================
+import hashlib
+import pickle
+import time
+from collections import Counter, defaultdict
+from itertools import islice
 
 
-result:
-======================================================================
-Pickle: topics.pkl
-  built_at         : 2026-05-21T21:52:38.804305
-  total CUIs       : 374,538
-  unique anchors   : 287,289
-  self-only        : 205,455
-  multi-topic CUIs : 122,725
-======================================================================
+CACHE_PATH = "umls_cache.pkl"
 
-Relationship-type contribution to non-self anchors (290,505 total):
-  CHD    isa                    290,505  (100.0%)
+# Pull the same logic from build_facet_index so this matches what the
+# real build would produce.
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import build_facet_index as bfi
 
-  Anchors reached using ONLY CHD/isa : 290,505
-  Anchors that used RB at any point  : 0
-  Anchors reached using ONLY RB      : 0
-    (these would not exist without RB traversal)
 
---- Sample CUIs with ONE topic (different from self) [46358 total in pickle] ---
-  C0454027  (Chews fine cut tobacco                  ) -> C1287520  (Finding of tobacco use and exposure)
-  C0417970  (Accident caused by falling object due to action of machinery) -> C0441471  (Events)
-  C1266133  (Genital rhabdomyoma                     ) -> C0332447  (Morphologically abnormal structure)
-  C4708187  (Irreducible right inguinal hernia       ) -> C0262617  (Right inguinal hernia)
-  C4040318  (Measurement of C-reactive protein using high sensitivity technique) -> C0201657  (C-reactive protein level)
+def build_signature(facets):
+    parts = []
+    for facet in sorted(facets):
+        values = sorted(facets[facet])
+        if not values:
+            continue
+        parts.append(f"{facet}:{','.join(values)}")
+    return "|".join(parts)
 
---- Sample CUIs with MULTIPLE topics [122725 total in pickle] ---
-  C1101838  (Pitavastatin)
-      -> C0360714  (HMG-CoA reductase inhibitor)
-      -> C1101838  (Pitavastatin)
-  C0565439  (Perivesical tissue exploration)
-      -> C0565439  (Perivesical tissue exploration)
-      -> C1285289  (Exploration of trunk)
-  C4749308  (Benzodiazepine therapy)
-      -> C0087111  (Therapy)
-      -> C3469597  (Medication administration)
-      -> C4749308  (Benzodiazepine therapy)
-  C1998362  (Urodynamic study using catheter)
-      -> C0430952  (Urological investigation)
-      -> C0455799  (Urogenital system investigation)
-      -> C1998362  (Urodynamic study using catheter)
-  C0582970  (Prophylactic knee stretching)
-      -> C0582970  (Prophylactic knee stretching)
-      -> C0600080  (Stretching exercises)
 
---- Sample CUIs that anchor to themselves [205455 total in pickle] ---
-  C1080746  (Desulfobacter latus (organism))
-  C3881538  (Polychloroprene examination/treatment glove, powdered)
-  C1085773  (Malassezia sympodialis)
-  C3464349  (Azelastine- and fluticasone-containing product)
-  C0316124  (Salmonella Bahati)
+def hash_signature(sig):
+    if not sig:
+        return None
+    return "tp_" + hashlib.sha1(sig.encode()).hexdigest()[:12]
 
---- Top 10 largest topic groups ---
-  2590 members  C0441471  (Events)
-  2350 members  C0332447  (Morphologically abnormal structure)
-  2086 members  C0229966  (Structure of right half of body)
-  2070 members  C0229967  (Structure of left half of body)
-  2058 members  C0442972  (Imaging guidance)
-  1986 members  C2711400  (Anatomical or acquired body structure)
-  1964 members  C2584795  (Product manufactured as parenteral dose form)
-  1941 members  C1287400  (History finding)
-  1897 members  C0022885  (Laboratory procedures)
-  1841 members  C0520510  (Material)
 
-======================================================================
-Copy/paste any of these into CUIS_TO_LOOKUP in lookup_topics.py
-======================================================================
+def main():
+    print("=" * 60)
+    print("Compression diagnostic")
+    print("=" * 60)
+    print(f"  cache         : {CACHE_PATH}")
+    print(f"  blocklist     : {bfi.RELA_BLOCKLIST}")
+    print(f"  bounds        : descendants in "
+          f"[{bfi.MIN_DESCENDANTS}, {bfi.MAX_DESCENDANTS}]")
 
-CUIS_TO_LOOKUP = [
-    "C0454027",   # Chews fine cut tobacco
-    "C0417970",   # Accident caused by falling object due to action of machinery
-    "C1101838",   # Pitavastatin
-    "C0565439",   # Perivesical tissue exploration
-    "C1080746",   # Desulfobacter latus (organism)
-]
+    print("\n[1/4] Loading cache ...")
+    t0 = time.time()
+    with open(CACHE_PATH, "rb") as f:
+        cache = pickle.load(f)
+    print(f"      {len(cache['cuis']):,} CUIs in {time.time()-t0:.1f}s")
+
+    print("\n[2/4] Building IS-A graph + extracting raw facets ...")
+    t0 = time.time()
+    parents = bfi.build_isa_parents(cache)
+    children = bfi.build_isa_children(parents)
+    cui_raw_facets = bfi.extract_raw_facets(cache)
+    print(f"      {len(cui_raw_facets):,} CUIs have raw facets")
+
+    # Facet sparseness — how common is each facet across CUIs?
+    facet_presence = Counter()
+    for cui, facets in cui_raw_facets.items():
+        for facet in facets:
+            facet_presence[facet] += 1
+    print(f"      {len(facet_presence):,} distinct facet types")
+    print(f"      Top 20 most common facets:")
+    for facet, n in facet_presence.most_common(20):
+        pct = 100 * n / len(cache["cuis"])
+        print(f"        {n:>7,d}  ({pct:5.1f}%)  {facet}")
+    print(f"      ... in {time.time()-t0:.1f}s")
+
+    print("\n[3/4] Extracting canonical sets and normalizing ...")
+    t0 = time.time()
+    value_space = defaultdict(set)
+    for cui, facets in cui_raw_facets.items():
+        for facet, values in facets.items():
+            value_space[facet].update(values)
+
+    canonical_sets = {}
+    for facet in sorted(value_space):
+        min_d, max_d = bfi.PER_FACET_BOUNDS.get(facet,
+                                                (bfi.MIN_DESCENDANTS,
+                                                 bfi.MAX_DESCENDANTS))
+        canonical_sets[facet] = bfi.extract_canonical_set(
+            facet, value_space[facet], children, parents,
+            cache["labels"], min_d, max_d,
+        )
+
+    cui_normalized = bfi.normalize_facets(cui_raw_facets, canonical_sets, parents)
+
+    # Add disorder facet
+    DISORDER_STYS = {
+        "Disease or Syndrome", "Pathologic Function", "Neoplastic Process",
+        "Mental or Behavioral Dysfunction", "Anatomical Abnormality",
+        "Cell or Molecular Dysfunction", "Congenital Abnormality",
+        "Acquired Abnormality", "Finding", "Sign or Symptom",
+        "Injury or Poisoning",
+    }
+    disorder_cuis = {cui for cui, stys in cache["tags"].items()
+                     if stys & DISORDER_STYS}
+    canonical_sets["disorder"] = bfi.extract_canonical_set(
+        "disorder", disorder_cuis, children, parents,
+        cache["labels"], bfi.MIN_DESCENDANTS, bfi.MAX_DESCENDANTS,
+    )
+    bfi.add_disorder_facet(cui_normalized, cache["cuis"], cache["tags"],
+                           canonical_sets["disorder"], parents)
+    print(f"      {len(cui_normalized):,} CUIs have normalized facets")
+    print(f"      in {time.time()-t0:.1f}s")
+
+    print("\n[4/4] Computing signatures and counting distinct topics ...")
+    t0 = time.time()
+    topic_members = defaultdict(list)
+    for cui, facets in cui_normalized.items():
+        sig = build_signature(facets)
+        if not sig:
+            continue
+        tid = hash_signature(sig)
+        topic_members[tid].append(cui)
+    print(f"      done in {time.time()-t0:.1f}s")
+
+    # ---- Results ----
+    n_cuis_with_topic = sum(len(m) for m in topic_members.values())
+    n_topics = len(topic_members)
+    compression = n_cuis_with_topic / n_topics if n_topics else 0
+
+    print("\n" + "=" * 60)
+    print("RESULTS")
+    print("=" * 60)
+    print(f"  Total CUIs in corpus       : {len(cache['cuis']):,}")
+    print(f"  CUIs with topic ID         : {n_cuis_with_topic:,}")
+    print(f"  Distinct topic IDs         : {n_topics:,}")
+    print(f"  Compression ratio          : {compression:.2f}x")
+    print(f"    (CUIs that map to ONE topic on average)")
+
+    # Size distribution
+    print(f"\n  Topic size distribution:")
+    size_buckets = [(1, 1), (2, 5), (6, 20), (21, 100), (101, 1000), (1001, 10**9)]
+    for lo, hi in size_buckets:
+        n = sum(1 for m in topic_members.values() if lo <= len(m) <= hi)
+        label = f"{lo}" if lo == hi else f"{lo}-{hi}"
+        pct = 100 * n / n_topics if n_topics else 0
+        print(f"    {label:>10s} members: {n:>7,d} topics  ({pct:5.1f}%)")
+
+    # Topic-1-member rate is the key metric: if 90% of topics have 1 member,
+    # we're not compressing
+    n_solo = sum(1 for m in topic_members.values() if len(m) == 1)
+    print(f"\n  Topics with exactly 1 CUI  : {n_solo:,} "
+          f"({100*n_solo/n_topics:.1f}% of topics)")
+    print(f"  CUIs in solo topics        : {n_solo:,} "
+          f"({100*n_solo/n_cuis_with_topic:.1f}% of CUIs)")
+
+    # Top 20 most-populated topics
+    print(f"\n  Top 20 most-populated topics:")
+    sorted_topics = sorted(topic_members.items(), key=lambda kv: -len(kv[1]))
+    for tid, members in sorted_topics[:20]:
+        sample = members[0]
+        sig_short = "(can re-derive from build)"
+        # Re-derive the signature for display
+        facets = cui_normalized.get(sample)
+        if facets:
+            sig = build_signature(facets)
+            sig_short = sig[:80] + ("..." if len(sig) > 80 else "")
+        sample_label = cache["labels"].get(sample, "?")
+        print(f"    {len(members):>6,d} members  {tid}")
+        print(f"             sig: {sig_short}")
+        print(f"             sample: {sample}  ({sample_label[:50]})")
+
+    print("\n" + "=" * 60)
+    print("INTERPRETATION")
+    print("=" * 60)
+    if compression < 1.5:
+        print("  Compression is LOW (< 1.5x).")
+        print("  → Most CUIs end up with unique signatures.")
+        print("  → The facet approach isn't grouping concepts together.")
+        print("  → Likely cause: too many facets, or normalization too narrow.")
+        print("  → Try: reduce facet set or expand canonical anchor bounds.")
+    elif compression < 5:
+        print("  Compression is MODERATE (1.5x - 5x).")
+        print("  → Some grouping but most CUIs still mostly unique.")
+        print("  → Might be acceptable depending on use case.")
+    elif compression < 50:
+        print("  Compression is GOOD (5x - 50x).")
+        print("  → Topic layer is meaningfully grouping CUIs.")
+        print("  → Document storage and query lookup will scale.")
+    else:
+        print("  Compression is VERY HIGH (50x+).")
+        print("  → Risk of over-grouping — verify top topics look right.")
+
+
+if __name__ == "__main__":
+    main()
