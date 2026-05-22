@@ -1,798 +1,534 @@
 ======================================================================
 Pickle: topics.pkl
-  built_at         : 2026-05-22T16:14:41.450473
+  built_at         : 2026-05-22T16:44:06.913917
   total CUIs       : 374,538
-  unique anchors   : 297,325
-  self-only        : 221,414
-  multi-topic CUIs : 113,574
+  unique anchors   : 276,100
+  self-only        : 240,251
+  multi-topic CUIs : 58,441
 ======================================================================
 
-Relationship-type contribution to non-self anchors (264,768 total):
-  CHD    isa                    264,768  (100.0%)
+Relationship-type contribution to non-self anchors (181,562 total):
+  CHD    isa                    181,562  (100.0%)
 
-  Anchors reached using ONLY CHD/isa : 264,768
+  Anchors reached using ONLY CHD/isa : 181,562
   Anchors that used RB at any point  : 0
   Anchors reached using ONLY RB      : 0
     (these would not exist without RB traversal)
 
---- Sample CUIs with ONE topic (different from self) [39550 total in pickle] ---
+--- Sample CUIs with ONE topic (different from self) [75846 total in pickle] ---
+  C4551771  (Kleefstra syndrome (disorder)           ) -> C0578002  (Finding of face)
+  C5778645  (Assistance with application for continuation of health coverage program) -> C0557034  (Assisting (procedure))
+  C5880212  (Traumatic blister of skin of male genitalia) -> C3839277  (Skin disorder of male genitalia)
   C0340679  (Inverse steal syndrome                  ) -> C0425674  (Finding of artery)
-  C0201756  (Gas liquid chromatography, alkali flame ionisation type) -> C0201749  (Chromatography measurement)
-  C0067047  (myo-Inositol 2-dehydrogenase            ) -> C0030016  (Dehydrogenase)
-  C1298821  (Annular abscess of aortic root          ) -> C1320843  (Abscess of aortic root)
-  C0475418  (Intestinal ameba                        ) -> C1285556  (Navigational concept)
+  C0396236  (Transantral neurectomy of vidian nerve using sublabial approach) -> C0196671  (Vidianectomy)
 
---- Sample CUIs with MULTIPLE topics [113574 total in pickle] ---
-  C4551771  (Kleefstra syndrome (disorder))
-      -> C0266617  (Congenital deformity of face (disorder))
-      -> C4551771  (Kleefstra syndrome (disorder))
+--- Sample CUIs with MULTIPLE topics [58441 total in pickle] ---
   C0434773  (Closed traumatic subluxation, proximal interphalangeal joint)
       -> C0434643  (Closed traumatic dislocation, proximal interphalangeal joint)
       -> C0434773  (Closed traumatic subluxation, proximal interphalangeal joint)
-  C4750090  (Repair of incisional hernia using surgical mesh)
-      -> C0019328  (Hernia repair)
-      -> C0342971  (Incisional herniorrhaphy)
-      -> C5551405  (Hernioplasty)
-  C4756452  (Fomepizole only product in parenteral dose form)
-      -> C3219910  (Product containing fomepizole in parenteral dose form (medicinal product form))
-      -> C4753300  (Fomepizole only product)
   C1828187  (Maintenance of percutaneous endoscopic gastrostomy tube)
-      -> C0399716  (Attention to gastrostomy tube)
+      -> C1285152  (Procedure by site)
       -> C1297900  (Maintenance of device)
-      -> C1828187  (Maintenance of percutaneous endoscopic gastrostomy tube)
+  C5547157  (Chest resonance to percussion impaired)
+      -> C0425528  (Chest percussion finding)
+      -> C1287661  (Finding of chest resonance to percussion)
+  C0581838  (Deafness suspected)
+      -> C0581838  (Deafness suspected)
+      -> C2732483  (Suspected clinical finding)
+      -> C2732635  (Possible clinical finding)
+  C0276158  (Acute adenoviral encephalitis)
+      -> C0014038  (Encephalitis)
+      -> C0243010  (Viral encephalitis)
+      -> C0276157  (Adenoviral encephalitis)
+      -> C0546994  (Acute viral encephalitis)
 
---- Sample CUIs that anchor to themselves [221414 total in pickle] ---
+--- Sample CUIs that anchor to themselves [240251 total in pickle] ---
   C5885059  (Community legal services)
+  C4750090  (Repair of incisional hernia using surgical mesh)
+  C4756452  (Fomepizole only product in parenteral dose form)
   C3442181  (Vagococcus entomophilus (organism))
-  C0333704  (Chromosome break)
-  C5880212  (Traumatic blister of skin of male genitalia)
-  C5818314  (Extended spectrum beta-lactamase producing Enterobacter)
+  C0225403  (Inferior nasal meatus)
 
 --- Self-only CUI diagnostic ---
   Loading umls_cache.pkl to check parent structure of self-only CUIs ...
-  Self-only CUIs that are TRUE ORPHANS (no IS-A parent): 6,723 (3.0%)
-  Self-only CUIs that HAVE parents but algorithm rejected them: 214,691 (97.0%)
+  Self-only CUIs that are TRUE ORPHANS (no IS-A parent): 6,723 (2.8%)
+  Self-only CUIs that HAVE parents but algorithm rejected them: 233,528 (97.2%)
 
   Reason self-only CUIs failed to anchor upward:
-     71,808  ( 32.4%)  abstract_anchors_filtered
-     35,603  ( 16.1%)  has_finding_site
-     22,329  ( 10.1%)  no_parent_or_other
-     13,990  (  6.3%)  entire_anatomy_structure_of
-     10,052  (  4.5%)  has_entire_anatomy_structure
-      6,687  (  3.0%)  has_active_ingredient
-      5,225  (  2.4%)  has_associated_morphology
-      4,818  (  2.2%)  finding_site_of
-      3,504  (  1.6%)  has_causative_agent
-      3,042  (  1.4%)  causative_agent_of
-      2,931  (  1.3%)  mapped_to
-      2,699  (  1.2%)  is_interpreted_by
-      2,612  (  1.2%)  has_component
-      2,529  (  1.1%)  interprets
-      2,481  (  1.1%)  component_of
-      1,775  (  0.8%)  has_basis_of_strength_substance
-      1,568  (  0.7%)  associated_morphology_of
-      1,545  (  0.7%)  possibly_equivalent_to
-      1,473  (  0.7%)  has_precise_active_ingredient
-      1,414  (  0.6%)  direct_procedure_site_of
-      1,352  (  0.6%)  active_ingredient_of
-      1,288  (  0.6%)  has_dose_form
-      1,274  (  0.6%)  due_to
-      1,197  (  0.5%)  has_presentation_strength_denominator_unit
-      1,094  (  0.5%)  has_direct_procedure_site
-      1,038  (  0.5%)  has_method
-        815  (  0.4%)  has_unit_of_presentation
-        638  (  0.3%)  mapped_from
-        637  (  0.3%)  direct_device_of
-        634  (  0.3%)  is_modification_of
-        544  (  0.2%)  indirect_procedure_site_of
-        501  (  0.2%)  has_presentation_strength_numerator_unit
-        500  (  0.2%)  has_interpretation
-        439  (  0.2%)  device_used_by
-        436  (  0.2%)  cause_of
-        419  (  0.2%)  has_concentration_strength_numerator_unit
-        404  (  0.2%)  direct_substance_of
-        391  (  0.2%)  has_focus
-        386  (  0.2%)  focus_of
-        380  (  0.2%)  disposition_of
-        358  (  0.2%)  has_concentration_strength_denominator_unit
-        327  (  0.1%)  substance_used_by
-        321  (  0.1%)  associated_with
-        318  (  0.1%)  has_procedure_site
-        313  (  0.1%)  occurs_after
-        307  (  0.1%)  has_disposition
-        297  (  0.1%)  basis_of_strength_substance_of
-        284  (  0.1%)  method_of
-        271  (  0.1%)  has_modification
-        269  (  0.1%)  occurs_in
-        246  (  0.1%)  associated_finding_of
-        246  (  0.1%)  precise_active_ingredient_of
-        238  (  0.1%)  has_pathological_process
-        220  (  0.1%)  uses_substance
-        209  (  0.1%)  has_indirect_procedure_site
-        187  (  0.1%)  part_anatomy_structure_of
-        185  (  0.1%)  has_clinical_course
-        182  (  0.1%)  replaces
-        179  (  0.1%)  has_specimen_source_topography
-        177  (  0.1%)  is_sterile
-        170  (  0.1%)  direct_morphology_of
-        164  (  0.1%)  has_device_intended_site
-        142  (  0.1%)  replaced_by
-        138  (  0.1%)  specimen_substance_of
-        138  (  0.1%)  has_direct_device
-        130  (  0.1%)  moved_to
-        129  (  0.1%)  has_compositional_material
-        128  (  0.1%)  associated_procedure_of
-        126  (  0.1%)  procedure_site_of
-        105  (  0.0%)  has_direct_morphology
-        103  (  0.0%)  occurs_before
-         89  (  0.0%)  has_laterality
-         81  (  0.0%)  specimen_source_topography_of
-         80  (  0.0%)  has_specimen
-         78  (  0.0%)  has_specimen_substance
-         72  (  0.0%)  has_direct_substance
-         68  (  0.0%)  has_technique
-         63  (  0.0%)  has_absorbability
-         61  (  0.0%)  specimen_of
-         58  (  0.0%)  acted_on_by_process
-         57  (  0.0%)  uses_device
-         53  (  0.0%)  has_inherent_attribute
-         51  (  0.0%)  has_finding_method
-         51  (  0.0%)  has_subject_relationship_context
-         50  (  0.0%)  has_property
-         47  (  0.0%)  has_temporal_context
-         45  (  0.0%)  route_of_administration_of
-         41  (  0.0%)  interpretation_of
-         41  (  0.0%)  has_specimen_procedure
-         40  (  0.0%)  specimen_procedure_of
+    136,591  ( 56.9%)  abstract_anchors_filtered
+     27,617  ( 11.5%)  has_finding_site
+     22,332  (  9.3%)  no_parent_or_other
+      7,889  (  3.3%)  has_entire_anatomy_structure
+      7,693  (  3.2%)  has_dose_form
+      3,784  (  1.6%)  has_causative_agent
+      3,440  (  1.4%)  has_component
+      2,943  (  1.2%)  finding_site_of
+      2,791  (  1.2%)  interprets
+      2,712  (  1.1%)  is_interpreted_by
+      2,678  (  1.1%)  causative_agent_of
+      2,320  (  1.0%)  has_associated_morphology
+      2,031  (  0.8%)  has_direct_procedure_site
+      1,899  (  0.8%)  component_of
+      1,858  (  0.8%)  has_associated_procedure
+      1,358  (  0.6%)  associated_morphology_of
+        763  (  0.3%)  possibly_equivalent_to
+        573  (  0.2%)  direct_device_of
+        530  (  0.2%)  mapped_to
+        526  (  0.2%)  has_method
+        521  (  0.2%)  has_active_ingredient
+        501  (  0.2%)  has_procedure_site
+        393  (  0.2%)  due_to
+        377  (  0.2%)  disposition_of
+        364  (  0.2%)  direct_procedure_site_of
+        342  (  0.1%)  has_focus
+        320  (  0.1%)  active_ingredient_of
+        294  (  0.1%)  device_used_by
+        293  (  0.1%)  direct_substance_of
+        265  (  0.1%)  focus_of
+        264  (  0.1%)  cause_of
+        257  (  0.1%)  has_direct_device
+        248  (  0.1%)  method_of
+        191  (  0.1%)  associated_with
+        167  (  0.1%)  occurs_after
+        167  (  0.1%)  has_direct_morphology
+        166  (  0.1%)  associated_procedure_of
+        153  (  0.1%)  has_disposition
+        149  (  0.1%)  has_direct_substance
+        149  (  0.1%)  uses_substance
+        147  (  0.1%)  has_indirect_procedure_site
+        128  (  0.1%)  has_specimen_source_topography
+        127  (  0.1%)  has_realization
+        122  (  0.1%)  process_acts_on
+        119  (  0.0%)  associated_finding_of
+        118  (  0.0%)  mapped_from
+         94  (  0.0%)  specimen_substance_of
+         92  (  0.0%)  substance_used_by
+         85  (  0.0%)  direct_morphology_of
+         65  (  0.0%)  indirect_procedure_site_of
+         61  (  0.0%)  occurs_before
+         59  (  0.0%)  occurs_in
+         58  (  0.0%)  uses_device
+         50  (  0.0%)  has_temporal_context
+         50  (  0.0%)  has_specimen_substance
+         47  (  0.0%)  has_finding_context
+         45  (  0.0%)  has_device_intended_site
+         44  (  0.0%)  route_of_administration_of
          40  (  0.0%)  procedure_context_of
-         39  (  0.0%)  energy_used_by
-         38  (  0.0%)  has_part_anatomy_structure
-         38  (  0.0%)  realization_of
-         37  (  0.0%)  inherent_location_of
-         36  (  0.0%)  access_device_used_by
-         34  (  0.0%)  process_acts_on
-         34  (  0.0%)  has_finding_context
-         34  (  0.0%)  subject_relationship_context_of
-         33  (  0.0%)  has_occurrence
-         30  (  0.0%)  characterizes
-         30  (  0.0%)  inheres_in
-         29  (  0.0%)  compositional_material_of
-         29  (  0.0%)  has_associated_procedure
+         37  (  0.0%)  specimen_procedure_of
+         36  (  0.0%)  characterizes
+         35  (  0.0%)  has_specimen
+         34  (  0.0%)  has_inherent_attribute
+         30  (  0.0%)  subject_relationship_context_of
          28  (  0.0%)  surgical_approach_of
-         28  (  0.0%)  device_intended_site_of
-         26  (  0.0%)  clinical_course_of
-         25  (  0.0%)  property_of
-         25  (  0.0%)  has_specimen_source_morphology
-         24  (  0.0%)  temporally_related_to
-         23  (  0.0%)  partially_equivalent_to
-         22  (  0.0%)  has_procedure_device
-         20  (  0.0%)  has_procedure_context
-         18  (  0.0%)  dose_form_of
-         17  (  0.0%)  has_scale_type
-         16  (  0.0%)  has_indirect_morphology
-         16  (  0.0%)  technique_of
-         16  (  0.0%)  recipient_category_of
-         15  (  0.0%)  extended_to_by_process
-         15  (  0.0%)  has_surgical_approach
-         14  (  0.0%)  specimen_source_identity_of
-         14  (  0.0%)  has_specimen_source_identity
-         13  (  0.0%)  has_time_aspect
-         13  (  0.0%)  characterized_by
-         13  (  0.0%)  procedure_device_of
-         13  (  0.0%)  has_direct_site
-         12  (  0.0%)  has_recipient_category
-         12  (  0.0%)  has_process_duration
-         12  (  0.0%)  uses_access_device
-         12  (  0.0%)  during
-         11  (  0.0%)  presentation_strength_denominator_unit_of
-         11  (  0.0%)  pathological_process_of
-         11  (  0.0%)  dose_form_intended_site_of
-         10  (  0.0%)  has_dose_form_intended_site
-         10  (  0.0%)  has_access
-         10  (  0.0%)  has_procedure_morphology
-         10  (  0.0%)  intent_of
-         10  (  0.0%)  has_intent
+         27  (  0.0%)  acted_on_by_process
+         27  (  0.0%)  energy_used_by
+         26  (  0.0%)  access_device_used_by
+         25  (  0.0%)  has_occurrence
+         24  (  0.0%)  inheres_in
+         22  (  0.0%)  property_of
+         22  (  0.0%)  interpretation_of
+         22  (  0.0%)  replaces
+         19  (  0.0%)  has_specimen_source_morphology
+         18  (  0.0%)  has_interpretation
+         17  (  0.0%)  has_indirect_morphology
+         16  (  0.0%)  specimen_of
+         16  (  0.0%)  procedure_site_of
+         16  (  0.0%)  realization_of
+         14  (  0.0%)  technique_of
+         14  (  0.0%)  has_specimen_procedure
+         14  (  0.0%)  clinical_course_of
+         11  (  0.0%)  has_pathological_process
+         10  (  0.0%)  compositional_material_of
          10  (  0.0%)  temporal_context_of
          10  (  0.0%)  finding_context_of
-         10  (  0.0%)  unit_of_presentation_of
-          9  (  0.0%)  specimen_source_morphology_of
-          9  (  0.0%)  uses_energy
-          8  (  0.0%)  has_associated_finding
-          8  (  0.0%)  direct_site_of
-          8  (  0.0%)  indirect_morphology_of
-          7  (  0.0%)  has_priority
-          7  (  0.0%)  has_inherent_location
-          7  (  0.0%)  has_coating_material
-          7  (  0.0%)  has_severity
-          6  (  0.0%)  process_output_of
-          6  (  0.0%)  finding_method_of
-          5  (  0.0%)  measurement_method_of
-          5  (  0.0%)  has_finding_informer
-          5  (  0.0%)  concentration_strength_numerator_unit_of
-          5  (  0.0%)  presentation_strength_numerator_unit_of
+         10  (  0.0%)  pathological_process_of
+          9  (  0.0%)  has_procedure_device
+          9  (  0.0%)  temporally_related_to
+          9  (  0.0%)  characterized_by
+          9  (  0.0%)  has_specimen_source_identity
+          9  (  0.0%)  dose_form_intended_site_of
+          9  (  0.0%)  entire_anatomy_structure_of
+          8  (  0.0%)  intent_of
+          7  (  0.0%)  specimen_source_topography_of
+          7  (  0.0%)  uses_access_device
+          6  (  0.0%)  has_dose_form_intended_site
+          6  (  0.0%)  has_clinical_course
+          6  (  0.0%)  has_intent
+          6  (  0.0%)  has_procedure_context
+          6  (  0.0%)  specimen_source_morphology_of
+          6  (  0.0%)  has_surgical_approach
+          6  (  0.0%)  basis_of_strength_substance_of
+          5  (  0.0%)  replaced_by
+          5  (  0.0%)  has_property
           5  (  0.0%)  dose_form_release_characteristic_of
-          5  (  0.0%)  units_of
-          5  (  0.0%)  has_dose_form_administration_method
-          5  (  0.0%)  indirect_device_of
-          4  (  0.0%)  has_state_of_matter
-          4  (  0.0%)  has_indirect_device
-          4  (  0.0%)  coating_material_of
+          5  (  0.0%)  precise_active_ingredient_of
+          5  (  0.0%)  recipient_category_of
+          5  (  0.0%)  procedure_device_of
+          5  (  0.0%)  specimen_source_identity_of
+          4  (  0.0%)  has_recipient_category
+          4  (  0.0%)  has_finding_method
           4  (  0.0%)  revision_status_of
-          3  (  0.0%)  has_precondition
-          3  (  0.0%)  concentration_strength_denominator_unit_of
-          3  (  0.0%)  has_dose_form_release_characteristic
+          3  (  0.0%)  partially_equivalent_to
+          3  (  0.0%)  has_procedure_morphology
+          2  (  0.0%)  has_finding_informer
+          2  (  0.0%)  indirect_morphology_of
           2  (  0.0%)  dose_form_transformation_of
-          2  (  0.0%)  has_route_of_administration
-          2  (  0.0%)  relative_to
-          2  (  0.0%)  possibly_replaces
-          2  (  0.0%)  procedure_morphology_of
-          2  (  0.0%)  has_dose_form_transformation
-          2  (  0.0%)  finding_informer_of
-          2  (  0.0%)  has_process_output
-          1  (  0.0%)  filling_of
+          2  (  0.0%)  has_indirect_device
+          2  (  0.0%)  has_modification
+          2  (  0.0%)  has_part_anatomy_structure
+          2  (  0.0%)  during
+          2  (  0.0%)  uses_energy
+          2  (  0.0%)  has_subject_relationship_context
+          1  (  0.0%)  has_compositional_material
+          1  (  0.0%)  extended_to_by_process
           1  (  0.0%)  scale_type_of
-          1  (  0.0%)  has_realization
-          1  (  0.0%)  has_measurement_method
-          1  (  0.0%)  precondition_of
-          1  (  0.0%)  part_referred_to_by
-          1  (  0.0%)  before
-          1  (  0.0%)  has_revision_status
-          1  (  0.0%)  plays_role
-          1  (  0.0%)  has_basic_dose_form
+          1  (  0.0%)  process_output_of
+          1  (  0.0%)  has_process_output
+          1  (  0.0%)  is_modification_of
+          1  (  0.0%)  finding_informer_of
+          1  (  0.0%)  has_technique
+          1  (  0.0%)  part_anatomy_structure_of
+          1  (  0.0%)  direct_site_of
+          1  (  0.0%)  procedure_morphology_of
+          1  (  0.0%)  dose_form_of
 
   Sample CUIs by rejection reason:
     [abstract_anchors_filtered]
+      C4750090  (Repair of incisional hernia using surgical mesh)
+      C4756452  (Fomepizole only product in parenteral dose form)
       C3442181  (Vagococcus entomophilus (organism))
-      C0333704  (Chromosome break)
-      C5818314  (Extended spectrum beta-lactamase producing Enterobacter)
     [has_finding_site]
-      C5880212  (Traumatic blister of skin of male genitalia)
       C0339396  (Disseminated posterior pole chorioretinitis)
       C0271699  (Nodular type diabetic glomerulosclerosis)
+      C0566797  (Finding of position of vertex presentation)
     [no_parent_or_other]
       C5885059  (Community legal services)
       C6007491  (Osteolysis of distal phalanx of second toe)
       C6009620  (Thoracoscopic excision of chest wall using video assistance)
-    [entire_anatomy_structure_of]
-      C1279463  (Entire diaphragmatic pleura)
-      C1288774  (Entire subcutaneous tissue of palmar area of wrist region (body structure))
-      C1284236  (Entire costotransverse ligament)
     [has_entire_anatomy_structure]
       C4076597  (Structure of bone marrow of fibula)
       C0227718  (Structure of uvula of urinary bladder)
-      C1282326  (Ulnar nerve sensory branch)
-    [has_active_ingredient]
-      C4754064  (Mirtazapine only product)
-      C3211812  (Product containing etidronic acid in oral dose form (medicinal product form))
-      C5687299  (Animal material diagnostic allergen extract)
-    [has_associated_morphology]
-      C2064545  (Posterior dislocation of lens of right eye)
-      C0858751  (Blister of lip)
-      C4076163  (Atypical pigmented lesion)
-    [finding_site_of]
-      C4545833  (Structure of supracondylar part of right humerus)
-      C0581520  (Flexor of hip joint)
-      C1268195  (Limb part)
+      C0459583  (Submuscular areolar tissue of eyelid)
+    [has_dose_form]
+      C0689614  (Metyrosine 250 mg oral capsule)
+      C5567615  (Voglibose 300 microgram oral tablet)
+      C0976445  (Product containing precisely diphenidol hydrochloride 25 milligram/1 each conventional release oral tablet (clinical drug))
     [has_causative_agent]
       C4707909  (Adverse reaction to hypothalamic hormone)
       C0275203  (Brassica napus poisoning)
-      C0236742  (Phencyclidine-related disorder)
-    [causative_agent_of]
-      C0206592  (Orbivirus group)
-      C0001180  (Acremonium (organism))
-      C0331453  (Family Juncaginaceae - arrowgrass)
-    [mapped_to]
-      C0476379  (Ureter filling defect (finding))
-      C0520541  (Hypotensive episode)
-      C0234510  (Ideational agnosia)
+      C0684344  (Contact dermatitis caused by chromium)
+    [has_component]
+      C0202392  (Germanium measurement)
+      C1275522  (Ri204 specific IgE antibody measurement)
+      C0202349  (Cannabinoids measurement)
+    [finding_site_of]
+      C0225403  (Inferior nasal meatus)
+      C4545833  (Structure of supracondylar part of right humerus)
+      C1268195  (Limb part)
+    [interprets]
+      C1443998  (Anti-dengue immunoglobulin M antibody not detected)
+      C1286713  (Finding related to ability to find words)
+      C1287433  (Semantic memory performance - finding)
     [is_interpreted_by]
       C0234675  (Trigeminal reflex)
       C0575618  (Passive range of shoulder circumduction)
       C0429661  (Adequacy of peritoneal dialysis)
-    [has_component]
-      C0202392  (Germanium measurement)
-      C0202349  (Cannabinoids measurement)
-      C0201979  (Cyclic AMP measurement)
-    [interprets]
-      C1286713  (Finding related to ability to find words)
-      C1287433  (Semantic memory performance - finding)
-      C1287533  (Finding related to ability to talk about problems)
+    [causative_agent_of]
+      C0206592  (Orbivirus group)
+      C0001180  (Acremonium (organism))
+      C0331453  (Family Juncaginaceae - arrowgrass)
+    [has_associated_morphology]
+      C0858751  (Blister of lip)
+      C5969633  (Hemangioblastoma of intestine)
+      C1998451  (Closed Salter-Harris type IV fracture of distal femur)
+    [has_direct_procedure_site]
+      C0202827  (MRI of chest and myocardium)
+      C2025233  (Angiography of right external carotid artery)
+      C0394325  (Excision of lesion of accessory nerve (XI))
     [component_of]
       C0312635  (Hepatitis delta virus antibody)
-      C0369697  (Mycobacterium avium complex rRNA)
       C0020852  (Immunoglobulin G (substance))
-    [has_basis_of_strength_substance]
-      C0689614  (Metyrosine 250 mg oral capsule)
-      C5567615  (Voglibose 300 microgram oral tablet)
-      C1995702  (Lisdexamfetamine dimesylate 40 mg oral capsule)
+      C0042093  (Uroporphyrin)
+    [has_associated_procedure]
+      C4543543  (History of eyelid surgery)
+      C4316624  (History of amputation of left thumb)
+      C3839443  (Counseling for infertility done)
     [associated_morphology_of]
       C1282453  (High grade T-cell lymphoma morphology)
       C5396853  (Open mallet fracture)
       C0334044  (Dysplasia)
     [possibly_equivalent_to]
-      C0729347  (Milk protein antibody (substance))
       C0326923  (Plectrophenax nivalis)
-      C0424465  (Degree of personal cleanliness)
-    [has_precise_active_ingredient]
-      C1572367  (Product containing precisely mycophenolic acid (as mycophenolate sodium) 360 milligram/1 each gastro-resistant oral tablet (clinical drug))
-      C1145601  (Ceftizoxime (as ceftizoxime sodium) 500 mg powder for solution for injection vial)
-      C0994392  (Product containing precisely levothyroxine sodium 88 microgram/1 each conventional release oral tablet (clinical drug))
-    [direct_procedure_site_of]
-      C0230299  (Structure of uterine ligament (body structure))
-      C0226448  (Structure of left femoral artery (body structure))
-      C0040186  (Structure of tibial nerve (body structure))
-    [active_ingredient_of]
-      C0009629  (Conalbumin (substance))
-      C5230723  (Antigen of Streptococcus pneumoniae Danish serotype 7F capsular polysaccharide conjugated)
-      C0016452  (Food (substance))
-    [has_dose_form]
-      C5547539  (Iron (as ferric carboxymaltose) 50 mg/mL solution for injection)
-      C0783158  (Product containing precisely amylase 20000 unit and endopeptidase 20000 unit and triacylglycerol lipase 5000 unit/1 each conventional release oral capsule (clinical drug))
-      C1361671  (Product containing precisely cinacalcet (as cinacalcet hydrochloride) 60 milligram/1 each conventional release oral tablet (clinical drug))
-    [due_to]
-      C0435922  (Open fracture of intermediate cuneiform bone of foot)
-      C1960465  (Non-allergic drug hypersensitivity disorder)
-      C1095928  (Secondary hyperthyroidism)
-    [has_presentation_strength_denominator_unit]
-      C4073599  (Selexipag 1 mg oral tablet)
-      C1319722  (Risperidone 50 mg powder for suspension for injection vial)
-      C0981645  (Product containing precisely olanzapine 5 milligram/1 each conventional release orodispersible tablet (clinical drug))
-    [has_direct_procedure_site]
-      C1317915  (Uterine fundectomy)
-      C0730063  (Removal of internal limiting membrane)
-      C0473251  (Marsupialization of Bartholin gland)
-    [has_method]
-      C5968332  (Assessment of triggering factor)
-      C4039641  (Assessment of social support)
-      C0184903  (Discission)
-    [has_unit_of_presentation]
-      C5686265  (Artenimol 40 mg and piperaquine phosphate 320 mg oral tablet)
-      C0991749  (Temozolomide 100 mg oral capsule)
-      C0689726  (Naproxen (as naproxen sodium) 375 mg oral tablet)
-    [mapped_from]
-      C0231311  (Jet lag syndrome)
-      C0155242  (Stenosis and insufficiency of lacrimal passages)
-      C0034139  (Disorder of purine and pyrimidine metabolism)
+      C1210772  (Caloenas nicobarica)
+      C1046451  (Tetrao urogallus)
     [direct_device_of]
       C1283055  (Special footwear)
       C1283111  (Internal electromagnetic bone stimulator)
       C0181275  (Immobiliser)
-    [is_modification_of]
-      C0205658  (Alcuronium chloride)
-      C3818757  (Florbetaben (18-F))
-      C0039845  (Thiamine monophosphate)
-    [indirect_procedure_site_of]
-      C5968709  (Structure of eyeball segment of right eye)
-      C0226907  (Structure of palatine mucous membrane)
-      C0038291  (Sternoclavicular joint structure)
-    [has_presentation_strength_numerator_unit]
-      C0976445  (Product containing precisely diphenidol hydrochloride 25 milligram/1 each conventional release oral tablet (clinical drug))
-      C0977060  (Gabapentin 600 mg oral tablet)
-      C1318650  (Product containing precisely dolasetron mesilate 200 milligram/1 each conventional release oral tablet (clinical drug))
-    [has_interpretation]
-      C0234568  (Abnormal exchange of solutes of cerebrospinal fluid)
-      C0522225  (Normal reflex)
-      C0476421  (Abnormal pancreatic function)
-    [device_used_by]
-      C1281651  (Interphalangeal finger joint prosthesis)
-      C5921916  (Echoendoscope)
-      C0181342  (Injector)
-    [cause_of]
-      C1744706  (Intolerance to substance)
-      C0344107  (Poisoning caused by biological substance)
-      C0337252  (Struck by explosion)
-    [has_concentration_strength_numerator_unit]
-      C4084202  (Acetylcysteine 200 mg/mL solution for infusion and/or injection)
-      C4301785  (Crisaborole 20 mg/g cutaneous ointment)
-      C1168689  (Salbutamol (as salbutamol sulfate) 210 microgram/mL solution for inhalation)
-    [direct_substance_of]
-      C0348047  (Tissue graft)
-      C0564467  (Autograft kidney)
-      C0729268  (Mucosal flap (substance))
-    [has_focus]
-      C0150242  (Guilt work facilitation)
-      C1443529  (Dispensing medication assessment)
-      C4545808  (Parents and Children Together phonological intervention)
-    [focus_of]
-      C0184647  (Mental health treatment)
-      C0748657  (Congenital deformity of shoulder)
-      C0001314  (Acute disease)
+    [mapped_to]
+      C1276065  (Xerosis due to atopic dermatitis)
+      C0342911  (Moderate protein-calorie malnutrition (weight for age 60-74 percent of standard))
+      C0268160  (Fructokinase deficiency)
+    [has_method]
+      C0184903  (Discission)
+      C2732442  (Quantitative measurement of haemoglobin F relative to total haemoglobin in serum or plasma by HPLC)
+      C0186581  (Insertion of bone growth stimulator into radius AND ulna)
+    [has_active_ingredient]
+      C5191443  (Oxygen and/or oxygen compound-containing product)
+      C1445542  (White faced hornet venom diagnostic allergen extract)
+      C1445500  (Anisakis diagnostic allergen extract)
+    [has_procedure_site]
+      C0395278  (Rectus eye muscle operations)
+      C5788350  (Procedure on root canal of tooth)
+      C0176866  (Hemorrhoid operation)
+    [due_to]
+      C0433031  (Insect bite, nonvenomous, of forearm)
+      C2028178  (Gunshot wound of neck)
+      C5569016  (Dystonia due to Leigh syndrome)
     [disposition_of]
       C4722137  (Purine antagonist (disposition))
       C4522019  (Topoisomerase inhibitor (disposition))
       C5703059  (Growth hormone receptor agonist (disposition))
-    [has_concentration_strength_denominator_unit]
-      C5879558  (Taurolidine 20 mg/mL solution for intraperitoneal instillation)
-      C4084401  (Product containing precisely digoxin 100 microgram/1 milliliter conventional release solution for injection (clinical drug))
-      C0872507  (Phospholipid (as beractant) 25 mg/mL suspension for endotracheopulmonary instillation)
-    [substance_used_by]
-      C0440763  (Vein graft material)
-      C0014824  (Product containing erythrosin B stain (medicinal product))
-      C0002406  (Azorubin S stain (substance))
-    [associated_with]
-      C3532543  (Complication associated with nervous system implant)
-      C5787579  (Exposure to European tick-borne encephalitis virus)
-      C1283151  (Cardiac pacemaker lead)
-    [has_procedure_site]
-      C5922817  (Mechanical circulatory support using left ventricular assist device)
-      C5788350  (Procedure on root canal of tooth)
-      C0341079  (Bile duct prosthesis procedure)
-    [occurs_after]
-      C5688813  (Glaucoma following ocular onchocerciasis)
-      C4542948  (Dysphagia due to and following non-traumatic subarachnoid haemorrhage)
-      C4302448  (Sequela of infection caused by Corynebacterium)
-    [has_disposition]
-      C0036764  (Serpin protein)
-      C0001640  (Product containing alpha adrenergic receptor agonist (product))
-      C5551427  (P2Y12 G-protein-coupled platelet receptor antagonist)
-    [basis_of_strength_substance_of]
-      C0000378  (Droxidopa (substance))
-      C0873118  (Levobupivacaine (substance))
-      C0000956  (Nicoumalone)
+    [direct_procedure_site_of]
+      C0730267  (Venous structure of limb)
+      C4303483  (Structure of artery of left lower limb)
+      C0446657  (Anterior fossa meninges)
+    [has_focus]
+      C2584898  (Referral for medical termination of pregnancy)
+      C0730588  (Astigmatic keratotomy)
+      C0700230  (Leishmaniasis screening)
+    [active_ingredient_of]
+      C5230723  (Antigen of Streptococcus pneumoniae Danish serotype 7F capsular polysaccharide conjugated)
+      C4708532  (Equine antithymocyte immunoglobulin)
+      C5397526  (Antigen of Neisseria meningitidis serogroup A capsular oligosaccharide conjugated)
+    [device_used_by]
+      C5921916  (Echoendoscope)
+      C0441172  (Barton forceps)
+      C0564683  (Cystostomy tube)
+    [direct_substance_of]
+      C0564467  (Autograft kidney)
+      C0729268  (Mucosal flap (substance))
+      C0229665  (Arterial blood)
+    [focus_of]
+      C0020683  (Hypovolemic shock)
+      C0003467  (Feeling anxious)
+      C0001314  (Acute disease)
+    [cause_of]
+      C0231311  (Jet lag syndrome)
+      C1744706  (Intolerance to substance)
+      C0344107  (Poisoning caused by biological substance)
+    [has_direct_device]
+      C0184936  (Removal of suture)
+      C2586253  (Adjustment of arm sling)
+      C0408400  (Cemented prosthetic total arthroplasty of knee joint)
     [method_of]
       C0565484  (Application of caustics)
       C2585645  (Mechanical repair - action)
       C1288294  (Contouring - action)
-    [has_modification]
-      C0063455  (Indecainide)
-      C0361302  (Rhenium-186 (substance))
-      C0102840  (Aluminum chloride)
-    [occurs_in]
-      C4758001  (Acquired valgus deformity of bilateral ankles)
-      C3839930  (Acquired anomaly of mouth)
-      C0036346  (VEOS - very early-onset schizophrenia)
-    [associated_finding_of]
-      C0011065  (Death)
-      C0400839  (Ulcer of rectum (disorder))
-      C1609538  (Inactive tuberculosis)
-    [precise_active_ingredient_of]
-      C0700567  (Fluphenazine hydrochloride)
-      C0041536  (Ubidecarenone)
-      C0873119  (Levobupivacaine hydrochloride)
-    [has_pathological_process]
-      C0555973  (Infection of foot)
-      C0343026  (Infection of nail)
-      C1299539  (Infection of scrotum (disorder))
+    [associated_with]
+      C3532543  (Complication associated with nervous system implant)
+      C0275531  (Immunosuppression-related infectious disease)
+      C5395313  (Carbon monoxide detector)
+    [occurs_after]
+      C4542948  (Dysphagia due to and following non-traumatic subarachnoid haemorrhage)
+      C4302448  (Sequela of infection caused by Corynebacterium)
+      C1285433  (Sequelae of neurological disorders)
+    [has_direct_morphology]
+      C4039738  (Open excision of stricture of ureter)
+      C0192729  (Closure of fecal fistula)
+      C5688946  (Excision of leucoplakia of vocal cord)
+    [associated_procedure_of]
+      C3839410  (Supervision of high risk pregnancy for multigravida)
+      C0152055  (Family counselling)
+      C5687705  (Bioprosthetic transcatheter aortic valve implantation)
+    [has_disposition]
+      C0001640  (Product containing alpha adrenergic receptor agonist (product))
+      C5551427  (P2Y12 G-protein-coupled platelet receptor antagonist)
+      C4041516  (Substance with non-specific protein-tyrosine kinase inhibitor mechanism of action)
+    [has_direct_substance]
+      C3697478  (Full thickness autograft of skin to skin)
+      C3696903  (Split thickness autograft of skin to skin of neck)
+      C3697990  (Injection of iodine 131)
     [uses_substance]
-      C5767892  (Waxing up of teeth on study model)
-      C1301968  (Malachite green stain)
-      C1293950  (Silver stain method (procedure))
+      C1318916  (Alkali blue 6B stain method)
+      C4707704  (Radionuclide imaging of parathyroid using technetium (99m-Tc) and thallium-201)
+      C1318915  (Alkali blue 5B (4B) stain method (procedure))
     [has_indirect_procedure_site]
-      C5768525  (Cerebellar function test)
-      C5687965  (Insertion of nasal stent)
-      C0406005  (Transcatheter instillation of substance into pleural cavity)
-    [part_anatomy_structure_of]
-      C0559540  (Skin of part of palmar surface of hand)
-      C1268139  (Testicular part)
-      C1299180  (Part of cervical vertebra)
-    [has_clinical_course]
-      C0270383  (Acute exacerbation of chronic schizophrenia)
-      C4751174  (Chronic pain of bilateral feet)
-      C0154378  (Acute exacerbation of chronic schizoaffective schizophrenia (disorder))
-    [replaces]
-      C1533160  (Hornets, paper wasps, potter wasps, and yellow jackets)
-      C0558382  (Cellulitis of foot)
-      C0421009  (Postnatal care status)
+      C1320858  (Embolectomy of posterior tibial artery)
+      C5787806  (Scaling of teeth with root planing in quadrant of dental arch)
+      C5852700  (Removal of prosthesis of joint of left hip)
     [has_specimen_source_topography]
       C1292681  (Specimen from trachea)
       C1292664  (Specimen from left fallopian tube)
       C0444280  (Lower respiratory tract specimen)
-    [is_sterile]
-      C3881206  (Cable/lead/sensor/probe cover, non-sterile)
-      C3875938  (Ethylene vinyl acetate examination/treatment glove, non-powdered, non-sterile)
-      C3881706  (Foot-switch cover, sterile)
-    [direct_morphology_of]
-      C0001511  (Adhesion (morphologic abnormality))
-      C1288350  (Subretinal membrane)
-      C0013592  (Eyelashes turned out)
-    [has_device_intended_site]
-      C0183289  (Pleuroperitoneal shunt)
-      C5767715  (Bone screw fixation sleeve)
-      C5818501  (Neonatal brain temperature monitoring sensor)
-    [replaced_by]
-      C0559071  (Delivery booking place)
-      C0979543  (Product containing precisely pilocarpine hydrochloride 10 milligram/1 milliliter conventional release eye drops (clinical drug))
-      C0419464  (Infant feeding method at 9 months)
+    [has_realization]
+      C3697373  (At increased risk of dementia)
+      C3662281  (At increased risk for heart failure)
+      C5395241  (At increased risk for allergic response)
+    [process_acts_on]
+      C5566697  (Estimated required quantity of intake of fluoride in 24 hours)
+      C4263169  (Tyrosine intake)
+      C0556197  (Butter intake)
+    [associated_finding_of]
+      C0011065  (Death)
+      C1609538  (Inactive tuberculosis)
+      C0231303  (Distress (finding))
+    [mapped_from]
+      C0034139  (Disorder of purine and pyrimidine metabolism)
+      C0392322  (Undifferentiated schizophrenia)
+      C1850534  (Generalised oedema)
     [specimen_substance_of]
       C0694689  (Menstrual blood)
       C0015349  (Extracellular fluid)
-      C0441125  (Cotton wool ball)
-    [has_direct_device]
-      C5767875  (Wax-up of teeth on trial maxillofacial prosthesis)
-      C0394220  (Irrigation of subcutaneous cerebrospinal fluid reservoir)
-      C0472572  (Changing of tracheo-oesophageal valve)
-    [moved_to]
-      C0261891  (Adverse reaction to emetic)
-      C0476515  (Abnormal histological finding in specimen from respiratory organ and thorax)
-      C0036769  (Sertoli cell tumor)
-    [has_compositional_material]
-      C3881118  (Polyethylene elbow ulna prosthesis)
-      C3876289  (Pliable-polymer dental regeneration membrane, ligated)
-      C1531643  (Collagen punctal plug)
-    [associated_procedure_of]
-      C0420529  (Day hospital care)
-      C1827270  (Peripheral pulse taking)
-      C0033573  (Prostatectomy)
-    [procedure_site_of]
-      C0225912  (Outflow tract of left ventricle)
-      C0524453  (Structure of Bartholin's gland duct)
-      C0017422  (Male genital organs)
-    [has_direct_morphology]
-      C0521211  (Resection of diverticulum)
-      C0730126  (Debridement of ulcer)
-      C0413353  (Excision of ovotestis)
+      C0225379  (Upper respiratory fluid)
+    [substance_used_by]
+      C0440762  (Autologous artery)
+      C0559189  (Autograft (substance))
+      C0878260  (Auramine O stain (substance))
+    [direct_morphology_of]
+      C1288350  (Subretinal membrane)
+      C3698418  (Surgical wound hemorrhage)
+      C0162869  (Ruptured aneurysm)
+    [indirect_procedure_site_of]
+      C5968709  (Structure of eyeball segment of right eye)
+      C0226907  (Structure of palatine mucous membrane)
+      C0459409  (Cervical extradural space)
     [occurs_before]
-      C0021107  (Implantation procedure)
-      C0024881  (Excision of breast (procedure))
-      C0151526  (Premature delivery (finding))
-    [has_laterality]
-      C0450464  (Lung acupuncture points)
-      C1279593  (Entire arterial network of patella)
-      C0587131  (Lateral anterior abdominal surface region)
-    [specimen_source_topography_of]
-      C0225425  (Internal nose structure)
-      C0278427  (Structure of transplanted lung (body structure))
-      C0729857  (Perivesical tissue)
-    [has_specimen]
-      C1318661  (Fowl serum antibody level)
-      C1303253  (Ear, nose and throat microscopy, culture and sensitivities)
-      C1300161  (Daphnia, fish feed specific IgE antibody measurement)
+      C5968428  (Aspiration of food into pharynx)
+      C0185098  (Bypass graft)
+      C5922351  (Internal fixation of left tibia)
+    [occurs_in]
+      C5879387  (Injection of dexamethasone during maternal intrapartum period)
+      C5816895  (Fetal disorder due to uterine dystocia)
+      C5816922  (Early neonatal disorder due to abnormality of maternal soft tissue)
+    [uses_device]
+      C3164700  (Closure of defect of septum of heart using prosthetic patch)
+      C0441555  (Internal fixation using Kirschner wire)
+      C3873467  (Pulsed dye laser therapy to skin)
+    [has_temporal_context]
+      C4755248  (Alleged being subjected to abuse)
+      C1276142  (Emergency asthma patient visit since last encounter)
+      C3651054  (Caregiver able to perform caring activities)
     [has_specimen_substance]
       C0444112  (Pancreatic stone specimen)
       C5441075  (Salsa specimen)
       C3839051  (Venous plasma specimen)
-    [has_direct_substance]
-      C0430010  (Diagnostic dye introduction)
-      C0394937  (Lumbar chemical sympathectomy)
-      C0161971  (Infusion of steroid)
-    [has_technique]
-      C5787419  (IDDSI (International Dysphagia Diet Standardisation Initiative) Framework drinks level)
-      C5191339  (Self reported nutrition adherence score)
-      C5230589  (Insulin dose calculated by insulin sensitivity factor)
-    [has_absorbability]
-      C3876951  (Nerve guide, bioabsorbable, synthetic)
-      C4274055  (Femoral stem end cap, bioabsorbable)
-      C3874721  (Embolisation particle, bioabsorbable)
-    [specimen_of]
-      C3662750  (Specimen from periureteral tissue)
-      C1550100  (Serum sample)
-      C0586565  (Musculoskeletal specimen)
-    [acted_on_by_process]
-      C0002521  (Branched-chain amino acid)
-      C1260603  (Plant fibre)
-      C0032615  (Polyunsaturated fatty acid)
-    [uses_device]
-      C0430459  (Cardiovascular stress test using bicycle ergometer)
-      C0438671  (Laser dental therapy)
-      C0397388  (Patch enlargement of conduit)
-    [has_inherent_attribute]
-      C5880019  (Structure of left eye proper)
-      C5566206  (Ectocervical surgical margin)
-      C0227616  (Structure of fibrous capsule of kidney (body structure))
-    [has_finding_method]
-      C0577153  (Finding of auscultation of abdomen)
-      C0575447  (Tenderness of region of lumbar spine)
-      C0576316  (Subtalar joint crepitus palpable)
-    [has_subject_relationship_context]
-      C4076402  (Assessment of caregiver abilities)
-      C4759293  (Suicide safety plan given to caregiver)
-      C4510187  (History of fibromatosis)
-    [has_property]
-      C5203677  (Healthy Eating Index 2015 score (observable entity))
-      C5968384  (Measurement of concentration of nelfinavir in serum specimen)
-      C5547955  (Proton density fat fraction of liver)
-    [has_temporal_context]
-      C0419950  (ENT treatment changed)
-      C3651054  (Caregiver able to perform caring activities)
-      C4511956  (Long-term current use of medicinal gold)
+    [has_finding_context]
+      C4759346  (No history of attempted suicide)
+      C4699915  (Presumptive recent Zika negative)
+      C1268760  (Ready for enhanced community coping (finding))
+    [has_device_intended_site]
+      C5968638  (Central nervous system neurostimulator)
+      C3879881  (Iliofemoral vein stent)
+      C5880697  (Femoral neck fixation sleeve)
     [route_of_administration_of]
       C0694637  (NG - Nasogastric use)
       C1298996  (Gingival use)
       C1522199  (Extra-amniotic route (qualifier value))
-    [interpretation_of]
-      C0678579  (Brown colour)
-      C2711767  (Decreased relative to previous)
-      C0442722  (Present one plus out of three plus)
-    [has_specimen_procedure]
-      C0370199  (Aspirate)
-      C4039264  (Specimen from right lower lobe of lung obtained by endobronchial biopsy)
-      C5686186  (Specimen obtained by puncture procedure)
-    [specimen_procedure_of]
-      C1293356  (Wedge biopsy of lung)
-      C3522173  (Partial lobectomy of liver)
-      C0404194  (Right salpingectomy)
     [procedure_context_of]
       C4510313  (Declined by caregiver of subject)
       C1444649  (Not wanted)
       C1272694  (Abandoned)
-    [energy_used_by]
-      C1289901  (Laser beam, near infrared region)
-      C0563533  (Magnetic field)
-      C0729621  (Heavy ion radiation (physical force))
-    [has_part_anatomy_structure]
-      C0149538  (Skin of breast)
-      C1268087  (Upper body structure)
-      C0222682  (Phalanx)
-    [realization_of]
-      C0577601  (Nutritional finding)
-      C0018799  (Heart disease)
-      C0025115  (Medication error)
-    [inherent_location_of]
-      C0700038  (Female genital tract structure (body structure))
-      C0041967  (Urethral structure)
-      C0458485  (Female urethral structure)
-    [access_device_used_by]
-      C0179435  (Rigid bronchoscope)
-      C3879589  (Flexible ultrasonic bronchoscope)
-      C1272744  (Amnihook)
-    [process_acts_on]
-      C5566697  (Estimated required quantity of intake of fluoride in 24 hours)
-      C5438784  (Estimated required quantity of vitamin E and/or vitamin E derivative in 24 hours)
-      C0556068  (Soluble fiber requirement)
-    [has_finding_context]
-      C4759346  (No history of attempted suicide)
-      C4302771  (History of fetal growth retardation)
-      C3266262  (Multiple chronic diseases (situation))
+    [specimen_procedure_of]
+      C3522173  (Partial lobectomy of liver)
+      C0585098  (Resection of terminal ileum)
+      C0278259  (Local excision)
+    [characterizes]
+      C5230455  (Estimated quantity of intake of carbohydrate via intravenous route in 24 hours)
+      C5396316  (Estimated quantity of intake of fat and oil via parenteral nutrition in 24 hours)
+      C0456174  (Wedge pressure - a wave)
+    [has_specimen]
+      C0430352  (Amniotic fluid examination)
+      C1446144  (24 hour urine screening for urinary stone formation measurement)
+      C4305247  (Evaluation of kidney biopsy specimen)
+    [has_inherent_attribute]
+      C5566206  (Ectocervical surgical margin)
+      C5566198  (Uncinate surgical margin)
+      C0684063  (Eukaryote)
     [subject_relationship_context_of]
       C1274041  (Guardian)
       C0337527  (Brother)
       C1273525  (Maternal grandmother)
-    [has_occurrence]
-      C5566160  (Maternal intrapartum period)
-      C5685971  (Fetal prelabour period)
-      C0700597  (Adulthood - period)
-    [characterizes]
-      C4275128  (Percentage median body mass index for age and sex)
-      C5687832  (Enteral nutrition feeding regime followed)
-      C5922003  (Presence of macroscopic perforation of colorectum by primary malignant neoplasm of colorectum)
-    [inheres_in]
-      C1328319  (Ankle brachial pressure index)
-      C5879188  (Presence of neoplasm in mesentery)
-      C0683212  (Central nervous system function)
-    [compositional_material_of]
-      C5397311  (Porcine xenograft)
-      C0443154  (Biological surgical material)
-      C5438991  (Silicone foam)
-    [has_associated_procedure]
-      C3839258  (Laboratory specimen submitted)
-      C1960814  (Hepatitis B immunisation recommended)
-      C1273394  (Discussed with caregiver)
     [surgical_approach_of]
       C0522521  (Transvenous approach)
       C0521132  (Transfrontal approach)
       C0587264  (Via middle meatus)
-    [device_intended_site_of]
-      C0489868  (Peripheral artery)
-      C0222084  (Skin structure of face)
-      C0206417  (Peripheral nervous system)
-    [clinical_course_of]
-      C2945760  (Recurrent (qualifier value))
-      C0439657  (Brittle)
-      C0205365  (Subacute)
+    [acted_on_by_process]
+      C0002521  (Branched-chain amino acid)
+      C0242209  (Sugar)
+      C5231041  (Donor breast milk)
+    [energy_used_by]
+      C1289901  (Laser beam, near infrared region)
+      C0729621  (Heavy ion radiation (physical force))
+      C0021431  (Infrared rays)
+    [access_device_used_by]
+      C0179435  (Rigid bronchoscope)
+      C3879589  (Flexible ultrasonic bronchoscope)
+      C0581447  (Arterial catheter (physical object))
+    [has_occurrence]
+      C5566160  (Maternal intrapartum period)
+      C5685971  (Fetal prelabour period)
+      C0700597  (Adulthood - period)
+    [inheres_in]
+      C5924934  (Body height of biological mother)
+      C0428641  (Jugular bulb pressure)
+      C0456166  (Right ventricular pressure)
     [property_of]
       C1264665  (SFR)
       C1264674  (Number rate)
       C1264682  (Substance ratio (property) (qualifier value))
+    [interpretation_of]
+      C0442722  (Present one plus out of three plus)
+      C0205250  (High)
+      C0442725  (Present ++++ out of ++++ (qualifier value))
+    [replaces]
+      C5702994  (American Joint Committee on Cancer pNX (qualifier value))
+      C5761427  (pTis(DCIS) (AJCC))
+      C1287183  (Job details - finding)
     [has_specimen_source_morphology]
       C4542940  (Specimen from epidermoid cyst)
       C4542941  (Specimen from scar)
       C3853071  (Specimen from bite wound)
-    [temporally_related_to]
-      C5547189  (Perioperative positioning)
-      C0544693  (Victim in single vehicle accident)
-      C4759329  (Suicide attempt by psychostimulant overdose)
-    [partially_equivalent_to]
-      C2733600  (Finding related to evaluation of ascitic fluid)
-      C5686997  (Poisoning caused by detergent)
-      C0032343  (Poisoning by)
-    [has_procedure_device]
-      C0455802  (Stoma bag procedures)
-      C0455175  (Washing cervical cap)
-      C1960586  (Cardioverter defibrillator procedure)
-    [has_procedure_context]
-      C3839443  (Counseling for infertility done)
-      C1273391  (Cancer diagnosis discussed)
-      C0420607  (Examination categorized by action status)
-    [dose_form_of]
-      C4545635  (Oromucosal dose form)
-      C1272926  (Otic dose form (dose form))
-      C2711975  (Intrauterine dose form)
-    [has_scale_type]
-      C2733356  (Calculation of quantitative volume rate of glomerular filtration based on concentration of analyte in serum or plasma specimen)
-      C5818217  (Presence of invasive ductal carcinoma with extensive intraductal carcinoma in excised breast specimen)
-      C5230900  (Weight change intent)
+    [has_interpretation]
+      C1096403  (Left ventricular ejection fraction decreased)
+      C0349482  (High birth weight (disorder))
+      C4750301  (Moderate risk of harm to others)
     [has_indirect_morphology]
-      C0193385  (Evacuation of cyst of liver)
-      C0398497  (Aspiration of cystic hygroma)
-      C0562025  (Incision and drainage of abscess)
+      C0585428  (Transgastric drainage of pancreatic necrosis)
+      C0189666  (Repair of graft-enteric fistula)
+      C0193598  (Drainage of cyst of pancreas)
+    [specimen_of]
+      C3662750  (Specimen from periureteral tissue)
+      C1550100  (Serum sample)
+      C0444254  (Capillary blood specimen (specimen))
+    [procedure_site_of]
+      C0504089  (Serous sac structure (body structure))
+      C0687028  (Duct)
+      C0242695  (Skeletal muscular system)
+    [realization_of]
+      C5817981  (Bleeding due to vitamin K epoxide reductase complex 1 rapid metaboliser)
+      C3714432  (Excessive oral intake)
+      C1626923  (Allergic reaction to chemical)
     [technique_of]
       C5547937  (Gleason scoring system for prostatic cancer by largest nodule)
       C2700446  (Self reported)
       C5817485  (Microchip real time polymerase chain reaction technique)
-    [recipient_category_of]
-      C4076358  (Cadaver donor for kidney transplant)
-      C0302512  (Donor for liver transplant (person))
-      C4274271  (Multi-organ donor)
-    [extended_to_by_process]
-      C0737203  (Structure of surface of right ovary)
-      C5548423  (Structure of lymphatic vessel and/or small blood vessel)
-      C0227672  (Renal sinus structure (body structure))
-    [has_surgical_approach]
-      C3164792  (Lateral closing wedge osteotomy of distal humerus)
-      C0185748  (Reduction of masseter muscle by intraoral approach)
-      C5688920  (Aortic root enlargement using anterior approach)
-    [specimen_source_identity_of]
-      C0179336  (Blood bag, device)
-      C0694691  (Plasma bag, device)
-      C2315378  (Autologous blood bag, device)
-    [has_specimen_source_identity]
-      C1292465  (Specimen from blood bag)
-      C1292468  (Specimen from plasma bag)
-      C2584675  (Specimen from environment)
-    [has_time_aspect]
-      C0455829  (Waist circumference)
-      C5566390  (Triceps skinfold percentile)
-      C5566394  (Mid arm muscle circumference percentile)
-    [characterized_by]
-      C5548604  (Direct local invasion)
-      C1534674  (Primary malignant neoplastic proliferation)
-      C5548424  (Discontinuous metastatic spread)
-    [procedure_device_of]
-      C0006086  (Brace)
-      C0457169  (Respiratory equipment)
-      C1283154  (Chronic ambulatory peritoneal dialysis catheter)
-    [has_direct_site]
-      C5885087  (Vertical sacral axis motion)
-      C5699734  (Oblique sacral axis motion)
-      C5574387  (Superior transverse sacral axis motion)
-    [has_recipient_category]
-      C0152055  (Family counselling)
-      C1300323  (Family health promotion)
-      C1300301  (Community health procedure)
-    [has_process_duration]
-      C5230561  (Breastmilk feeding attempts in 24 hours)
-      C5438796  (Estimated required quantity of energy per kilogram body weight in 24 hours)
-      C5566713  (Estimated required quantity of intake of cobalt in 24 hours)
-    [uses_access_device]
-      C5879664  (Transcatheter replacement of mitral valve bioprosthesis)
-      C5192243  (Endoscopic snare resection)
-      C0565483  (Endoscopic injection of caustic)
-    [during]
-      C0403570  (Bloodstained peritoneal dialysis effluent)
-      C4517363  (Arrhythmia during surgery)
-      C3649856  (Cardiac arrest during cardiac surgery)
-    [presentation_strength_denominator_unit_of]
-      C4319814  (Pessary)
-      C4319658  (Patch)
-      C4319669  (Suppository (unit of presentation))
-    [pathological_process_of]
-      C4708789  (Contact hypersensitivity process)
-      C4708793  (Non-immunoglobulin E-mediated allergic process)
-      C4708794  (Allergic contact hypersensitivity process)
-    [dose_form_intended_site_of]
-      C4760449  (Intraperitoneal (intended site))
-      C5241184  (Intraarticular)
-      C5923032  (Intracameral)
-    [has_dose_form_intended_site]
-      C4750543  (Endotracheopulmonary dose form)
-      C1272931  (Endocervical dose form)
-      C4750544  (Buccal dose form)
-    [has_access]
-      C1997043  (Percutaneous transluminal ablation)
-      C0411807  (Percutaneous evacuation of wound seroma)
-      C0400265  (Laying open perianal abscess)
-    [has_procedure_morphology]
-      C1444803  (Procedure on ganglion cyst)
-      C0405597  (Abdominal wall hernia procedure)
-      C2711120  (Procedure on wound)
-    [intent_of]
-      C1298676  (Neoadjuvant intent)
-      C0302350  (Therapeutic intent)
-      C2960804  (Forensic intent)
-    [has_intent]
-      C0200798  (Forensic autopsy)
-      C1285155  (Procedure by intent)
-      C0436195  (Magnetic field for diagnosis)
+    [has_specimen_procedure]
+      C4038957  (Specimen from left lung obtained by blind bronchioloalveolar lavage procedure)
+      C0444209  (Low vaginal swab)
+      C5686195  (Specimen obtained by transthoracic needle biopsy)
+    [clinical_course_of]
+      C0332213  (Chronic aggressive)
+      C0205311  (Paroxysmal)
+      C0332212  (Chronic active)
+    [has_pathological_process]
+      C0015406  (Parasitic eye infection)
+      C0024118  (Parasitic infection of lung (disorder))
+      C5769575  (Autoimmune sensorimotor neuropathy)
+    [compositional_material_of]
+      C5397311  (Porcine xenograft)
+      C0599034  (Silicone gel)
+      C0730384  (Cadaver allograft)
     [temporal_context_of]
       C1444635  (Current or past)
       C1444699  (Past - specified)
@@ -801,179 +537,194 @@ Relationship-type contribution to non-self anchors (264,768 total):
       C1444704  (Probably present)
       C1997218  (Not suspected)
       C1444705  (Probably not present)
-    [unit_of_presentation_of]
-      C4321298  (Chewing gum (unit of presentation))
-      C4319584  (Pouch (unit of presentation))
-      C4319659  (Pen)
+    [pathological_process_of]
+      C4708789  (Contact hypersensitivity process)
+      C4708793  (Non-immunoglobulin E-mediated allergic process)
+      C4708794  (Allergic contact hypersensitivity process)
+    [has_procedure_device]
+      C0455802  (Stoma bag procedures)
+      C0455175  (Washing cervical cap)
+      C0405801  (Peritoneal drain procedure)
+    [temporally_related_to]
+      C0544693  (Victim in single vehicle accident)
+      C4759329  (Suicide attempt by psychostimulant overdose)
+      C2063678  (Suicide attempt by barbiturate overdose)
+    [characterized_by]
+      C5548604  (Direct local invasion)
+      C1534674  (Primary malignant neoplastic proliferation)
+      C5548424  (Discontinuous metastatic spread)
+    [has_specimen_source_identity]
+      C1292465  (Specimen from blood bag)
+      C1292468  (Specimen from plasma bag)
+      C1292466  (Specimen from blood bag from patient)
+    [dose_form_intended_site_of]
+      C4760449  (Intraperitoneal (intended site))
+      C5241184  (Intraarticular)
+      C5923032  (Intracameral)
+    [entire_anatomy_structure_of]
+      C1284838  (Entire anatomical space)
+      C1305733  (Entire endocrine gland)
+      C1280542  (Entire beard (body structure))
+    [intent_of]
+      C1298676  (Neoadjuvant intent)
+      C0302350  (Therapeutic intent)
+      C2960804  (Forensic intent)
+    [specimen_source_topography_of]
+      C0004454  (Structure of axillary fossa (body structure))
+      C0027426  (Structure of nasal fossae)
+      C0282335  (Respiratory tract)
+    [uses_access_device]
+      C0587766  (Nasojejunal feeding)
+      C0559219  (Nasoduodenal feeding)
+      C1301936  (Bronchial suction via endobronchial tube)
+    [has_dose_form_intended_site]
+      C4750543  (Endotracheopulmonary dose form)
+      C4750544  (Buccal dose form)
+      C4707893  (Oropharyngeal dose form)
+    [has_clinical_course]
+      C4041466  (Chronic obstructive asthma co-occurrent with acute exacerbation of asthma)
+      C0264491  (Acute on chronic respiratory failure)
+      C3850141  (Acute on chronic liver failure)
+    [has_intent]
+      C1285158  (Palliative procedure)
+      C5789088  (Neoadjuvant antineoplastic therapy)
+      C0436195  (Magnetic field for diagnosis)
+    [has_procedure_context]
+      C0580740  (Patient requested procedure)
+      C4316378  (Medication obtained)
+      C1271995  (Osteoporosis risk assessment defaulted)
     [specimen_source_morphology_of]
       C0441253  (Structure of ileal conduit)
       C3661807  (Peritoneal dialysis catheter insertion site)
       C0028259  (Nodule (morphologic abnormality))
-    [uses_energy]
-      C0206373  (Extracorporeal photopheresis)
-      C5779529  (Surgical diathermy (procedure))
-      C0185072  (Carbon dioxide laser photocoagulation)
-    [has_associated_finding]
-      C2712254  (Caregiver able to cope)
-      C1268760  (Ready for enhanced community coping (finding))
-      C4699916  (Presumptive recent Zika positive)
-    [direct_site_of]
-      C0086835  (Posterior tibial artery)
-      C1298665  (Surgical excision specimen)
-      C1608383  (Whole blood specimen)
-    [indirect_morphology_of]
-      C0332886  (Coarctation)
-      C1442858  (Surgical fistula)
-      C0333229  (Accumulation of fluid)
-    [has_priority]
-      C1298805  (Routine procedure)
-      C0581193  (Delayed discharge - social services (procedure))
-      C0191608  (Intermediate delay of small flap at scalp)
-    [has_inherent_location]
-      C5817463  (Histologic architectural pattern in primary malignant neoplasm of kidney)
-      C5547115  (Volume of primary malignant neoplasm of prostate in resected prostate specimen)
-      C5787596  (Histologic architectural pattern in ductal carcinoma in situ of breast)
-    [has_coating_material]
-      C3878154  (Metal-backed patella prosthesis)
-      C1301953  (Antibiotic-coated catheter)
-      C3880938  (Metal-on-polyethene total hip prosthesis)
-    [has_severity]
-      C5549823  (Severe food insecurity on United States household food security survey module)
-      C4707134  (Mild bodily distress disorder)
-      C5549822  (Moderate food insecurity on United States household food security survey module)
-    [process_output_of]
-      C4302123  (Entire cardiac cycle process)
-      C4302288  (Entire ventilation cycle process)
-      C0226893  (Intestinal contents)
-    [finding_method_of]
-      C0030248  (Palpation of abdomen)
-      C0199182  (History taking, health)
-      C0004339  (Auscultation - action)
-    [measurement_method_of]
-      C1318793  (Immunofluorescent stain method)
-      C0017231  (ID measurement)
-      C0523404  (Immunoassay, quantitative)
-    [has_finding_informer]
-      C0586406  (Eye symptom)
-      C0231918  (Nasal symptom)
-      C5788022  (Mechanical knee joint symptom)
-    [concentration_strength_numerator_unit_of]
-      C1306898  (MU)
-      C0439212  (nanogram (qualifier value))
-      C1688582  (GBq)
-    [presentation_strength_numerator_unit_of]
-      C0439453  (international units)
-      C0556640  (MBq)
-      C0439211  (microgram (qualifier value))
+    [has_surgical_approach]
+      C0405508  (Transsphenoidal hypophysectomy)
+      C5924113  (Posterolateral fusion lumbar spine)
+      C0396225  (Middle meatal antrostomy)
+    [basis_of_strength_substance_of]
+      C4708508  (Dimeticone 1000)
+      C1533373  (Morphine sulphate liposome)
+      C0982221  (Insulin lispro protamine (substance))
+    [replaced_by]
+      C0559071  (Delivery booking place)
+      C0334531  (Mesonephric neoplasm (morphologic abnormality))
+      C0419464  (Infant feeding method at 9 months)
+    [has_property]
+      C5438866  (Estimated required quantity of protein and/or protein derivative per kilogram in 24 hours)
+      C5438863  (Estimated required quantity of fat and oil per kilogram body weight in 24 hours)
+      C2733156  (Hypertonic cryohemolysis test)
     [dose_form_release_characteristic_of]
       C4545264  (Dual delayed-release)
       C4544674  (Delayed-release)
       C4545262  (Delayed-release and prolonged-release)
-    [units_of]
-      C2348028  (Cycles per minute)
-      C0560724  (g/meal)
-      C0556978  (g/week)
-    [has_dose_form_administration_method]
-      C5395462  (Conventional release intraarticular implant)
-      C5761414  (Impregnated material for tissue adhesive)
-      C5761415  (Powder for tissue adhesive)
-    [indirect_device_of]
-      C2607832  (Surgical drain)
-      C0441124  (Gauze bolster)
-      C0582124  (Neurostimulation device)
-    [has_state_of_matter]
-      C1697794  (Liquid dose form)
-      C1720668  (Gaseous dose form)
-      C1378566  (Solid dose form)
-    [has_indirect_device]
-      C0455194  (Releasing urethral catheter clamp)
-      C0455032  (Attaching urinary catheter to bag)
-      C0455105  (Milking chest drain)
-    [coating_material_of]
-      C0007742  (Ceramic)
-      C0074523  (Silicon carbide)
-      C0007009  (Carbon-containing product)
+    [precise_active_ingredient_of]
+      C0141982  (Sennoside B)
+      C1273084  (Methylcellulose-450)
+      C0060179  (Fenofibric acid)
+    [recipient_category_of]
+      C4076358  (Cadaver donor for kidney transplant)
+      C4076351  (Cadaver donor for lung transplant)
+      C5546515  (Live donor for lung transplant)
+    [procedure_device_of]
+      C0457169  (Respiratory equipment)
+      C1283154  (Chronic ambulatory peritoneal dialysis catheter)
+      C0040519  (Tourniquet)
+    [specimen_source_identity_of]
+      C2315378  (Autologous blood bag, device)
+      C0005795  (Blood donor (person))
+      C3877334  (Donor-organ preservation solution)
+    [has_recipient_category]
+      C0401187  (Live donor nephrectomy (procedure))
+      C4076383  (Removal of lung from cadaver donor)
+      C0397140  (Removal of heart-lung block from donor)
+    [has_finding_method]
+      C1290912  (Finding by palpation)
+      C1290913  (Finding by inspection (simple observation))
+      C1290914  (Finding by percussion)
     [revision_status_of]
       C0439625  (Second stage of multistaged procedure)
       C0439621  (Second revision)
       C0439624  (First stage of multistage procedure)
-    [has_precondition]
-      C5817978  (Neoadjuvant antineoplastic therapy procedure prior to surgery)
-      C5818616  (Presence of metastasis in sentinel lymph node using touch imprint cytology during surgical procedure)
-      C4082350  (Resting metabolic rate)
-    [concentration_strength_denominator_unit_of]
-      C0439208  (gram)
-      C0439227  (hour)
-      C0439242  (Milliliter)
-    [has_dose_form_release_characteristic]
-      C4529084  (Gas for insufflation)
-      C5767965  (Concentrate for solution for peritoneal dialysis)
-      C5688660  (Periodontal insert)
+    [partially_equivalent_to]
+      C5686997  (Poisoning caused by detergent)
+      C0161315  (Burns of multiple sites)
+      C0274908  (Toxic effect of soap)
+    [has_procedure_morphology]
+      C0405597  (Abdominal wall hernia procedure)
+      C4032440  (Care of open wound)
+      C4032474  (Care of closed wound)
+    [has_finding_informer]
+      C2712370  (Apparent life-threatening event in infant)
+      C4303743  (Brief resolved unexplained event)
+    [indirect_morphology_of]
+      C0476127  (Cystic, mucinous AND/OR serous neoplasm)
+      C1265833  (Deep abscess)
     [dose_form_transformation_of]
       C4545472  (Disperse)
       C4521688  (Dissolve)
-    [has_route_of_administration]
-      C5878995  (Administration via specific route)
-      C0456584  (Instillation of nose drops)
-    [relative_to]
-      C5397101  (Proportion of energy requirement from protein and/or protein derivative in 24 hours)
-      C5396836  (Proportion of energy requirement from carbohydrate in 24 hours)
-    [possibly_replaces]
-      C0334163  (Fibrous bands)
-      C5787515  (Myelodysplastic neoplasm with biallelic TP53 inactivation)
-    [procedure_morphology_of]
-      C0334418  (Extra-adrenal paraganglioma, malignant)
-      C0010957  (Damage)
-    [has_dose_form_transformation]
-      C5688948  (Solution for peritoneal dialysis)
-      C5761733  (Solution for solution for tissue adhesive)
-    [finding_informer_of]
-      C1637832  (Provider of history other than subject)
-      C1637797  (Subject of record or other provider of history)
-    [has_process_output]
-      C5566455  (Volume of drainage of gastric contents)
-      C5567686  (Method of parenteral nutrition feeding administration)
-    [filling_of]
-      C0599034  (Silicone gel)
+    [has_indirect_device]
+      C1563066  (Adjustment of suture within Molteno tube)
+      C0455118  (Emptying colostomy bag (procedure))
+    [has_modification]
+      C0055617  (Chromium trichloride (substance))
+      C0529572  (Capromab pendetide)
+    [has_part_anatomy_structure]
+      C1720496  (Structure of bone (organ))
+      C0018534  (Big toe)
+    [during]
+      C3649856  (Cardiac arrest during cardiac surgery)
+      C0418664  (Accidental puncture during medical care)
+    [uses_energy]
+      C1299561  (Argon laser iridotomy)
+      C0197892  (Reattachment of choroid and retina by xenon arc photocoagulation)
+    [has_subject_relationship_context]
+      C0565603  (Maternal surgical operation)
+      C4048009  (Primary care physician notified of test result)
+    [has_compositional_material]
+      C1271566  (Silicone gel dressing)
+    [extended_to_by_process]
+      C5548423  (Structure of lymphatic vessel and/or small blood vessel)
     [scale_type_of]
       C1264625  (Nominal value)
-    [has_realization]
-      C3662271  (Non-allergic hypersensitivity disposition)
-    [has_measurement_method]
-      C0579113  (Measurement of double stranded deoxyribonucleic acid antibody using enzyme-linked immunosorbent assay)
-    [precondition_of]
-      C5789088  (Neoadjuvant antineoplastic therapy)
-    [part_referred_to_by]
-      C0006087  (Structure of brachial artery (body structure))
-    [before]
-      C0456361  (Pre-existing disease in renal transplant)
-    [has_revision_status]
-      C0558347  (Surgical revision)
-    [plays_role]
-      C5395157  (Carrier oil-containing product)
-    [has_basic_dose_form]
-      C5879557  (Solution for intraperitoneal instillation)
+    [process_output_of]
+      C4302287  (Entire spontaneous ventilation cycle process)
+    [has_process_output]
+      C0425486  (Rate of spontaneous respiration)
+    [is_modification_of]
+      C4545613  (Radiolabelled octreotide)
+    [finding_informer_of]
+      C1637832  (Provider of history other than subject)
+    [has_technique]
+      C2919560  (Brighton paediatric early warning score)
+    [part_anatomy_structure_of]
+      C1283625  (Part of pectoralis major)
+    [direct_site_of]
+      C0444253  (Arterial blood specimen)
+    [procedure_morphology_of]
+      C0010957  (Damage)
+    [dose_form_of]
+      C4545642  (Gingival dose form)
 
 --- Top 10 largest topic groups ---
-  1500 members  C0581658  (Fluoroscopy of systems)
-  1470 members  C0202640  (Fluoroscopy of regions)
-  1359 members  C0009450  (Communicable disease)
-  1329 members  C3539909  (Allergic disposition)
-  1223 members  C0014406  (Environments)
-  1187 members  C0034927  (Referral)
-  1170 members  C1519795  (Unit of measure)
+  1495 members  C0370003  (Specimen)
+  1442 members  C0441655  (Activity)
+  1294 members  C0199219  (Inspection)
+  1234 members  C0014406  (Environments)
+  1222 members  C0441513  (Construction - action)
+  1218 members  C1519795  (Unit of measure)
+  1175 members  C1274075  (Neoplasm observable)
   1139 members  C0039401  (Education procedure)
   1113 members  C2317559  (History of clinical finding in subject)
-  1105 members  C0274456  (Accidental poisoning)
+  1110 members  C0041755  (Adverse drug reaction)
 
 ======================================================================
 Copy/paste any of these into CUIS_TO_LOOKUP in lookup_topics.py
 ======================================================================
 
 CUIS_TO_LOOKUP = [
-    "C0340679",   # Inverse steal syndrome
-    "C0201756",   # Gas liquid chromatography, alkali flame ionisation type
     "C4551771",   # Kleefstra syndrome (disorder)
+    "C5778645",   # Assistance with application for continuation of health coverage program
     "C0434773",   # Closed traumatic subluxation, proximal interphalangeal joint
+    "C1828187",   # Maintenance of percutaneous endoscopic gastrostomy tube
     "C5885059",   # Community legal services
 ]
