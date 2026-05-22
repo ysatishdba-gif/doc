@@ -155,12 +155,15 @@ MAX_NODES_PER_TRAVERSAL = 5000
 #
 # Setting this to None disables the filter.
 #
-# Why 3000: empirically, anchors with >3000 members in SNOMED-only
-# data tend to be high-level organizing concepts ("Organism", "Substance",
-# "Procedure") rather than clinical topics. These produce false-positive
-# matches in document retrieval (a query about one organism would match
-# documents about any organism).
-MAX_MEMBERS_PER_ANCHOR = 3000
+# Threshold history:
+#   3000 — first cut. Dropped "Organism" (32K), "Substance" (13K), etc.
+#          but left "Events" (2,590) and "Morphologically abnormal
+#          structure" (2,350) — too generic for retrieval.
+#   1500 — tighter. Drops the borderline-generic organizing concepts
+#          above. Trade-off: more CUIs become self-only (~10% more).
+#          Acceptable for retrieval because self-only CUIs still match
+#          themselves; bad anchors actively cause wrong matches.
+MAX_MEMBERS_PER_ANCHOR = 1500
 
 # Overlap ratio threshold for non-strict slots. When comparing seed and
 # parent value-sets for a non-strict attribute, the parent must contain
