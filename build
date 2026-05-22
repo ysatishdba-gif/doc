@@ -1,93 +1,118 @@
 """
-build_facets.py
----------------
-Build a CUI -> facet-signature pickle from UMLS data.
+build_facet_index.py
+--------------------
+Build a CUI -> normalized-facet-signature pickle from UMLS data.
 
-Each CUI becomes a structured signature: a dict mapping UMLS RELA names
-to sets of value CUIs. This preserves the full attribute structure that
-SNOMED encodes about each concept — not just the IS-A hierarchy, but
-ALL of the defining relationships:
+Per-facet canonical normalization (the spec's design):
+  For each defined facet (site, morphology, agent, procedure, drug,
+  disorder), there is a CANONICAL SET of CUIs that represent the
+  "right level" of generalization for retrieval. Every raw facet value
+  is rolled up via IS-A to its nearest canonical ancestor.
 
-    'C0032285' (Pneumonia) -> {
-        'has_finding_site':          {'C0024109'},  # Lung
-        'has_associated_morphology': {'C0009450'},  # Inflammation
-        'has_causative_agent':       {'C0004611'},  # Bacterium (if present)
-        ...
-    }
+  - Left lower lobe of lung → Lung (when "Lung" is canonical)
+  - Streptococcus pneumoniae → Bacteria (when "Bacteria" is canonical)
+  - Acute bacterial pneumonia → Pneumonia (disorder facet from the CUI itself)
 
-This is "Multi-Facet Topics": instead of compressing a concept into a
-single ancestor anchor, we keep the multi-dimensional structure.
+If a value has NO canonical ancestor, the original CUI is kept as-is
+(no normalization for that facet).
 
-At query time, two CUI signatures are compared facet-by-facet:
-- Exact equality counts as a match
-- Hierarchical (one value IS-A descends from the other) counts as a match
-  for that facet (Lung matches Right upper lobe)
-
-This is closer to how SNOMED CT actually models clinical concepts.
-
-The build also precomputes IS-A ancestor sets for every CUI that appears
-as a facet value. Stored in the pickle so match-time hierarchical
-comparison is O(1) per pair.
+The canonical sets themselves are AUTO-EXTRACTED from SNOMED's
+structure: for each facet's value space, we find IS-A ancestors that
+have a target number of descendants (organizing concepts), and use
+those as the canonical anchors.
 
 Usage:
-    Define PROJECT and DATASET in a cell above this one.
+    Define PROJECT and DATASET in a cell above.
     Then run:
-        python build_facets.py
-    On first run, fetches UMLS data from BigQuery into umls_cache.pkl.
-    On subsequent runs, uses the cache.
+        python build_facet_index.py
 """
 
 import datetime
+import hashlib
 import os
 import pickle
 import time
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 
 # ============================================================================
 # CONFIG
 # ============================================================================
 
-# PROJECT and DATASET must be defined in a cell above this one (or in the
-# enclosing module). They are referenced directly — no defaults here.
+# PROJECT and DATASET must be defined in a cell above this one.
 
 CACHE_PATH  = "umls_cache.pkl"
-OUTPUT_PATH = "facets.pkl"
+OUTPUT_PATH = "facet_index.pkl"
 
-# Table names
 TABLE_MRCONSO = "MRCONSO"
 TABLE_MRREL   = "MRREL"
 TABLE_MRSTY   = "MRSTY"
-
-# Source filters
-SAB      = "SNOMEDCT_US"
-LANGUAGE = "ENG"
-
-# Cache schema version. Reusing the v2 cache from build_topics.py.
+SAB           = "SNOMEDCT_US"
+LANGUAGE      = "ENG"
 CACHE_SCHEMA_VERSION = 2
 
-# How many IS-A ancestor levels to precompute. None = full transitive closure.
-# Setting to a small number (say 5) caps memory at the cost of recall on
-# very deep IS-A chains. None is recommended for clinical use.
-MAX_ANCESTOR_DEPTH = None
+# Mapping from SNOMED RELAs to logical facet names. Each facet may pull
+# from one or more RELAs (e.g., procedure_site_of and direct_procedure_site
+# both feed the "procedure_site" facet).
+#
+# The disorder facet is special: it comes from the seed CUI's own value
+# (normalized), not from a RELA. Handled separately below.
+RELA_TO_FACET = {
+    "has_finding_site":            "site",
+    "finding_site_of":             "site",
+    "has_associated_morphology":   "morphology",
+    "associated_morphology_of":    "morphology",
+    "has_causative_agent":         "agent",
+    "causative_agent_of":          "agent",
+    "has_method":                  "procedure",
+    "method_of":                   "procedure",
+    "has_procedure_site":          "procedure_site",
+    "has_direct_procedure_site":   "procedure_site",
+    "has_indirect_procedure_site": "procedure_site",
+    "has_active_ingredient":       "drug",
+    "active_ingredient_of":        "drug",
+    "has_ingredient":              "drug",
+}
+
+# Facets where we also derive the value from the seed CUI itself
+# (not from a RELA). For these, the CUI's own canonical ancestor is
+# the facet value.
+SEED_DERIVED_FACETS = {"disorder"}
+
+# Auto-extraction: for each facet's value space, an IS-A ancestor is
+# considered "canonical" if it has between MIN_DESCENDANTS and
+# MAX_DESCENDANTS descendants within the value space.
+#
+# These bounds determine how many canonical anchors get picked:
+#   - too low MIN: too many tiny canonical anchors → low compression
+#   - too high MIN: only very abstract anchors → over-collapse
+#   - too low MAX: misses major organizing concepts
+#   - too high MAX: lets in over-abstract anchors (e.g., "Body structure")
+#
+# Defaults below should pick around 50-200 anchors per facet based on
+# the spec's recommendation.
+MIN_DESCENDANTS = 20
+MAX_DESCENDANTS = 2000
+
+# Per-facet MIN/MAX overrides. Use this to tune individual facets after
+# seeing initial extraction results. Leave entries empty to use defaults.
+PER_FACET_BOUNDS = {
+    # "site": (30, 500),
+    # "agent": (5, 200),
+}
 
 
 # ============================================================================
-# Step 1: Cache management
+# Step 1: Cache loading (reuse from build_topics.py)
 # ============================================================================
 
 def get_or_fetch_cache():
-    """
-    Load existing umls_cache.pkl if it's compatible, else fetch from BQ.
-    Reuses the same cache as build_topics.py.
-    """
     current_config = {
         "project":  PROJECT,
         "dataset":  DATASET,
         "sab":      SAB,
         "language": LANGUAGE,
     }
-
     if os.path.exists(CACHE_PATH):
         print(f"Found existing cache: {CACHE_PATH}")
         t0 = time.time()
@@ -98,21 +123,15 @@ def get_or_fetch_cache():
         cached_config = cache.get("config", {})
         cache_schema = cache.get("schema_version", 0)
         if cache_schema != CACHE_SCHEMA_VERSION:
-            print(f"\n  Cache schema version is {cache_schema}, "
-                  f"current code expects {CACHE_SCHEMA_VERSION}.")
-            print(f"  Re-fetching from BigQuery ...\n")
+            print(f"\n  Cache schema mismatch (have {cache_schema}, "
+                  f"need {CACHE_SCHEMA_VERSION}). Re-fetching ...\n")
         elif cached_config != current_config:
-            print(f"\n  WARNING: cache config differs from current config:")
-            for key in current_config:
-                if cached_config.get(key) != current_config[key]:
-                    print(f"    {key}: cache={cached_config.get(key)!r}  "
-                          f"current={current_config[key]!r}")
-            print(f"  Re-fetching from BigQuery ...\n")
+            print(f"\n  Cache config mismatch. Re-fetching ...\n")
         else:
             print(f"  fetched_at  : {cache['fetched_at']}")
             print(f"  cuis        : {len(cache['cuis']):,}")
             print(f"  mrrel_rows  : {len(cache['mrrel_rows']):,}")
-            print(f"  config OK — using cached data")
+            print(f"  config OK")
             return cache
 
     print(f"\nFetching UMLS data from BigQuery ...")
@@ -127,44 +146,29 @@ def get_or_fetch_cache():
 
 
 def fetch_from_bigquery(config):
-    """Fetch the four data sources needed: CUIs, MRREL, MRSTY, labels."""
     from google.cloud import bigquery
-
     client = bigquery.Client(project=config["project"])
     sab = config["sab"]
     lat = config["language"]
 
-    # ---- 1. Active CUIs ----
-    print("  [1/4] Loading SNOMED CUIs from MRCONSO ...")
+    print("  [1/4] Loading SNOMED CUIs ...")
     t0 = time.time()
-    sql = f"""
-    SELECT DISTINCT CUI
-    FROM `{config['project']}.{config['dataset']}.{TABLE_MRCONSO}`
-    WHERE SAB = @sab AND LAT = @lat AND SUPPRESS = 'N'
-    """
+    sql = f"""SELECT DISTINCT CUI FROM `{config['project']}.{config['dataset']}.{TABLE_MRCONSO}`
+              WHERE SAB = @sab AND LAT = @lat AND SUPPRESS = 'N'"""
     job_config = bigquery.QueryJobConfig(query_parameters=[
         bigquery.ScalarQueryParameter("sab", "STRING", sab),
         bigquery.ScalarQueryParameter("lat", "STRING", lat),
     ])
-    cuis = set()
-    for row in client.query(sql, job_config=job_config).result():
-        cuis.add(row.CUI)
+    cuis = {row.CUI for row in client.query(sql, job_config=job_config).result()}
     print(f"        {len(cuis):,} CUIs in {time.time()-t0:.1f}s")
 
-    # ---- 2. MRREL rows ----
     print("  [2/4] Loading MRREL rows ...")
     t0 = time.time()
-    sql = f"""
-    SELECT CUI1, CUI2, REL, RELA
-    FROM `{config['project']}.{config['dataset']}.{TABLE_MRREL}`
-    WHERE SAB = @sab AND SUPPRESS = 'N'
-      AND (
-            (REL = 'CHD' AND RELA = 'isa')
-         OR (REL = 'RO' AND RELA IS NOT NULL
-                         AND RELA != 'isa'
-                         AND NOT STARTS_WITH(RELA, 'inverse_'))
-      )
-    """
+    sql = f"""SELECT CUI1, CUI2, REL, RELA FROM `{config['project']}.{config['dataset']}.{TABLE_MRREL}`
+              WHERE SAB = @sab AND SUPPRESS = 'N'
+              AND ((REL = 'CHD' AND RELA = 'isa')
+                OR (REL = 'RO' AND RELA IS NOT NULL AND RELA != 'isa'
+                                AND NOT STARTS_WITH(RELA, 'inverse_')))"""
     job_config = bigquery.QueryJobConfig(query_parameters=[
         bigquery.ScalarQueryParameter("sab", "STRING", sab),
     ])
@@ -174,13 +178,9 @@ def fetch_from_bigquery(config):
             mrrel_rows.append((row.CUI1, row.CUI2, row.REL, row.RELA))
     print(f"        {len(mrrel_rows):,} rows in {time.time()-t0:.1f}s")
 
-    # ---- 3. Semantic types ----
-    print("  [3/4] Loading semantic types from MRSTY ...")
+    print("  [3/4] Loading semantic types ...")
     t0 = time.time()
-    sql = f"""
-    SELECT CUI, STY
-    FROM `{config['project']}.{config['dataset']}.{TABLE_MRSTY}`
-    """
+    sql = f"SELECT CUI, STY FROM `{config['project']}.{config['dataset']}.{TABLE_MRSTY}`"
     tags_accum = defaultdict(set)
     for row in client.query(sql).result():
         if row.CUI in cuis:
@@ -188,21 +188,17 @@ def fetch_from_bigquery(config):
     tags = {cui: frozenset(stys) for cui, stys in tags_accum.items()}
     print(f"        {len(tags):,} CUIs tagged in {time.time()-t0:.1f}s")
 
-    # ---- 4. Preferred labels ----
-    print("  [4/4] Loading preferred labels from MRCONSO ...")
+    print("  [4/4] Loading preferred labels ...")
     t0 = time.time()
     cui_list = sorted(cuis)
     BATCH = 50000
     labels = {}
     for i in range(0, len(cui_list), BATCH):
         batch = cui_list[i:i+BATCH]
-        sql = f"""
-        SELECT CUI, STR
-        FROM `{config['project']}.{config['dataset']}.{TABLE_MRCONSO}`
-        WHERE SAB = @sab AND LAT = @lat AND TS = 'P' AND ISPREF = 'Y'
-              AND STT = 'PF' AND SUPPRESS = 'N'
-              AND CUI IN UNNEST(@cuis)
-        """
+        sql = f"""SELECT CUI, STR FROM `{config['project']}.{config['dataset']}.{TABLE_MRCONSO}`
+                  WHERE SAB = @sab AND LAT = @lat AND TS = 'P' AND ISPREF = 'Y'
+                        AND STT = 'PF' AND SUPPRESS = 'N'
+                        AND CUI IN UNNEST(@cuis)"""
         job_config = bigquery.QueryJobConfig(query_parameters=[
             bigquery.ScalarQueryParameter("sab", "STRING", sab),
             bigquery.ScalarQueryParameter("lat", "STRING", lat),
@@ -225,48 +221,11 @@ def fetch_from_bigquery(config):
 
 
 # ============================================================================
-# Step 2: Extract facet signatures from MRREL
-# ============================================================================
-
-def extract_facets(cache):
-    """
-    For each CUI, collect all of its non-IS-A attribute relationships
-    into a facet signature.
-
-    Returns:
-        cui_facets: dict[cui] -> dict[rela] -> frozenset of value CUIs
-
-    Multi-value RELAs are preserved as sets (a single CUI may have
-    multiple values for the same RELA, e.g., Fracture of tibia and fibula).
-
-    Only RELAs that point to other CUIs in our universe are kept.
-    """
-    cui_facets = defaultdict(lambda: defaultdict(set))
-    for cui1, cui2, rel, rela in cache["mrrel_rows"]:
-        # IS-A rows are handled separately (used for ancestor closure).
-        # We only collect RO (Related Other) rows as facets.
-        if rel == "RO" and rela and rela != "isa":
-            # cui1 is the value, cui2 is the concept being described
-            cui_facets[cui2][rela].add(cui1)
-
-    # Convert to frozensets for hashability/predictability
-    return {
-        cui: {rela: frozenset(vals) for rela, vals in rela_map.items()}
-        for cui, rela_map in cui_facets.items()
-    }
-
-
-# ============================================================================
-# Step 3: Build IS-A ancestor closure
+# Step 2: Build IS-A graph + raw facet data
 # ============================================================================
 
 def build_isa_parents(cache):
-    """
-    Return parents[cui] = set of direct IS-A parent CUIs.
-
-    UMLS encoding: REL='CHD' RELA='isa' means CUI2 is a child of CUI1.
-    So CUI1 is a parent of CUI2.
-    """
+    """parents[child] = set of direct IS-A parents"""
     parents = defaultdict(set)
     for cui1, cui2, rel, rela in cache["mrrel_rows"]:
         if rel == "CHD" and rela == "isa":
@@ -274,136 +233,413 @@ def build_isa_parents(cache):
     return parents
 
 
-def compute_ancestors(parents, target_cuis, max_depth=None):
+def build_isa_children(parents):
+    """Invert parents to get children[parent] = set of children"""
+    children = defaultdict(set)
+    for child, ps in parents.items():
+        for p in ps:
+            children[p].add(child)
+    return children
+
+
+def extract_raw_facets(cache):
     """
-    For each CUI in target_cuis, compute the set of ALL ancestors via IS-A
-    (including itself). This is the transitive closure of parent links.
+    Pull RELAs from MRREL and bucket them by logical facet name.
+    Returns cui_raw_facets[cui][facet_name] = set of value CUIs.
 
-    Used at query time for hierarchical facet matching: when comparing
-    facet values, we want to know if one is an ancestor of the other.
-
-    max_depth=None means full closure (recommended for clinical use).
-    max_depth=N caps walking at N levels above (saves memory).
-
-    Returns: dict[cui] -> frozenset(ancestor_cuis_including_self)
+    Multi-value: a single CUI may have multiple values per RELA AND
+    multiple RELAs feeding the same facet — we union all into one set.
     """
-    ancestors_cache = {}
-
-    def get_ancestors(cui):
-        if cui in ancestors_cache:
-            return ancestors_cache[cui]
-        result = {cui}
-        # BFS up the parent tree
-        frontier = {cui}
-        depth = 0
-        while frontier:
-            if max_depth is not None and depth >= max_depth:
-                break
-            next_frontier = set()
-            for c in frontier:
-                for p in parents.get(c, ()):
-                    if p not in result:
-                        next_frontier.add(p)
-                        result.add(p)
-            frontier = next_frontier
-            depth += 1
-        ancestors_cache[cui] = frozenset(result)
-        return ancestors_cache[cui]
-
-    ancestors = {}
-    for i, cui in enumerate(target_cuis):
-        ancestors[cui] = get_ancestors(cui)
-        if (i + 1) % 50000 == 0:
-            print(f"      {i+1:,} / {len(target_cuis):,} ancestor sets computed")
-    return ancestors
+    cui_raw_facets = defaultdict(lambda: defaultdict(set))
+    for cui1, cui2, rel, rela in cache["mrrel_rows"]:
+        if rel != "RO" or not rela or rela == "isa":
+            continue
+        facet = RELA_TO_FACET.get(rela)
+        if facet is None:
+            continue
+        cui_raw_facets[cui2][facet].add(cui1)
+    return cui_raw_facets
 
 
 # ============================================================================
-# Step 4: Main
+# Step 3: Auto-extract canonical sets per facet
+# ============================================================================
+
+def compute_descendant_counts(value_cuis, children, parents):
+    """
+    For each value CUI in the facet's value space, compute its descendant
+    count WITHIN the value space. A canonical anchor must be in the value
+    space itself OR be an ancestor of value-space members.
+
+    Strategy: walk up from each value CUI, marking ancestors. The "count"
+    for an ancestor is the number of distinct value CUIs that traced
+    through it.
+    """
+    ancestor_to_values = defaultdict(set)
+    for v in value_cuis:
+        # BFS up from v
+        visited = {v}
+        frontier = {v}
+        while frontier:
+            next_frontier = set()
+            for c in frontier:
+                ancestor_to_values[c].add(v)
+                for p in parents.get(c, ()):
+                    if p not in visited:
+                        visited.add(p)
+                        next_frontier.add(p)
+            frontier = next_frontier
+    return {anc: len(vals) for anc, vals in ancestor_to_values.items()}
+
+
+def extract_canonical_set(facet_name, value_cuis, children, parents,
+                          labels, min_desc, max_desc):
+    """
+    Auto-extract a canonical anchor set for one facet.
+
+    Returns a set of canonical CUIs. The rule: an ancestor is canonical
+    if it has between min_desc and max_desc descendants WITHIN the value
+    space.
+
+    We also exclude any CUI that's an ancestor of another canonical CUI
+    (we want the *deepest* concepts that qualify, not all the
+    grandparents).
+    """
+    print(f"\n  Extracting canonical set for '{facet_name}'")
+    print(f"    value space: {len(value_cuis):,} distinct values")
+    print(f"    bounds: descendant count in [{min_desc}, {max_desc}]")
+
+    desc_counts = compute_descendant_counts(value_cuis, children, parents)
+    candidates = {cui: n for cui, n in desc_counts.items()
+                  if min_desc <= n <= max_desc}
+    print(f"    candidate anchors (within bounds): {len(candidates):,}")
+
+    # Deduplicate: remove anchors whose descendants include another anchor.
+    # Walk each candidate's ancestor set; if an ancestor is also a candidate,
+    # the ancestor wins ONLY if it's substantially broader; otherwise we
+    # prefer the deeper one.
+    #
+    # Simpler rule: keep candidates that are NOT ancestors of any other
+    # candidate. The "deepest" canonical wins.
+    candidate_set = set(candidates)
+    canonical = set()
+    for cui in sorted(candidate_set):
+        # Walk up; if any ancestor is also a candidate AND has descendant
+        # count <= 2x ours, that ancestor wins.
+        is_dominated = False
+        visited = {cui}
+        frontier = set(parents.get(cui, ()))
+        while frontier:
+            next_frontier = set()
+            for p in frontier:
+                if p in visited:
+                    continue
+                visited.add(p)
+                if p in candidate_set and candidates[p] <= candidates[cui] * 2:
+                    # This deeper candidate is dominated by p
+                    # WAIT - if p has fewer descendants than cui, we have it
+                    # backwards. Let me re-think.
+                    # Actually: if p is an ancestor of cui, p has MORE
+                    # descendants than cui (its descendants include cui's).
+                    # So candidates[p] >= candidates[cui] always.
+                    # We want to keep cui if it's deep enough (not too close
+                    # to its ancestor canonicals).
+                    is_dominated = True
+                    break
+                next_frontier.update(parents.get(p, ()))
+            if is_dominated:
+                break
+            frontier = next_frontier
+        if not is_dominated:
+            canonical.add(cui)
+
+    print(f"    after deduplication: {len(canonical):,} canonical anchors")
+    if canonical:
+        # Show a sample
+        sample = sorted(canonical, key=lambda c: -candidates[c])[:10]
+        print(f"    top 10 by descendant count:")
+        for cui in sample:
+            label = labels.get(cui, "?")
+            print(f"      {candidates[cui]:>6,d}  {cui}  {label[:60]}")
+    return canonical
+
+
+# ============================================================================
+# Step 4: Normalize per-CUI facets
+# ============================================================================
+
+def normalize_value(value_cui, canonical_set, parents, cache_dict):
+    """
+    Walk up IS-A from value_cui until we hit a canonical CUI. Return the
+    canonical, or None if no canonical ancestor exists.
+
+    Uses cache_dict to memoize per-value lookups (a value may appear in
+    many seeds; normalize it once).
+
+    "Closest canonical wins" semantics: when multiple canonicals are
+    reachable, we take the first (BFS-closest).
+    """
+    if value_cui in cache_dict:
+        return cache_dict[value_cui]
+
+    if value_cui in canonical_set:
+        cache_dict[value_cui] = value_cui
+        return value_cui
+
+    visited = {value_cui}
+    frontier = set(parents.get(value_cui, ()))
+    while frontier:
+        # Take the first canonical we find in this BFS level
+        canonicals_at_level = frontier & canonical_set
+        if canonicals_at_level:
+            # Deterministic tiebreaker if multiple
+            chosen = sorted(canonicals_at_level)[0]
+            cache_dict[value_cui] = chosen
+            return chosen
+        next_frontier = set()
+        for c in frontier:
+            if c in visited:
+                continue
+            visited.add(c)
+            next_frontier.update(parents.get(c, ()))
+        frontier = next_frontier
+
+    cache_dict[value_cui] = None
+    return None
+
+
+def normalize_facets(cui_raw_facets, canonical_sets, parents):
+    """
+    For each CUI, normalize every facet value to its nearest canonical
+    ancestor. If no canonical ancestor: keep the original value as-is
+    (user's chosen fallback).
+
+    Returns cui_normalized[cui][facet] = frozenset of (canonical CUIs or
+    original CUIs that couldn't be normalized).
+    """
+    cui_normalized = {}
+    # Per-facet memoization caches
+    norm_caches = {f: {} for f in canonical_sets}
+
+    for cui, facets in cui_raw_facets.items():
+        out = {}
+        for facet, values in facets.items():
+            cset = canonical_sets.get(facet)
+            if not cset:
+                # No canonical set for this facet → keep all originals
+                out[facet] = frozenset(values)
+                continue
+            normalized_values = set()
+            for v in values:
+                norm = normalize_value(v, cset, parents, norm_caches[facet])
+                if norm is None:
+                    # No canonical ancestor → keep original (fallback choice)
+                    normalized_values.add(v)
+                else:
+                    normalized_values.add(norm)
+            out[facet] = frozenset(normalized_values)
+        cui_normalized[cui] = out
+    return cui_normalized
+
+
+# ============================================================================
+# Step 5: Disorder facet — normalize the seed CUI itself
+# ============================================================================
+
+def add_disorder_facet(cui_normalized, all_cuis, tags, disorder_canonical, parents):
+    """
+    The disorder facet is special: it comes from the seed CUI itself
+    (normalized), not from a RELA. This is what represents "the concept
+    is a kind of X" at the canonical level.
+
+    Only CUIs with a disorder-like semantic type get a disorder facet.
+    """
+    DISORDER_STYS = {
+        "Disease or Syndrome",
+        "Pathologic Function",
+        "Neoplastic Process",
+        "Mental or Behavioral Dysfunction",
+        "Anatomical Abnormality",
+        "Cell or Molecular Dysfunction",
+        "Congenital Abnormality",
+        "Acquired Abnormality",
+        "Finding",
+        "Sign or Symptom",
+        "Injury or Poisoning",
+    }
+    cache = {}
+    for cui in all_cuis:
+        stys = tags.get(cui, frozenset())
+        if not (stys & DISORDER_STYS):
+            continue
+        norm = normalize_value(cui, disorder_canonical, parents, cache)
+        if norm is None:
+            norm = cui  # Fallback: keep original CUI
+        cui_normalized.setdefault(cui, {})["disorder"] = frozenset({norm})
+
+
+# ============================================================================
+# Step 6: Topic signatures (deterministic + hashed)
+# ============================================================================
+
+def build_signature(facets, labels):
+    """
+    Build a canonical signature string from a normalized facet dict.
+
+    Format: 'facet1:CUI1,CUI2|facet2:CUI3|...'  (sorted facets, sorted values)
+    Uses CUIs (not labels) for stability — labels can change with vocab
+    updates, CUIs don't.
+    """
+    parts = []
+    for facet in sorted(facets):
+        values = sorted(facets[facet])
+        if not values:
+            continue
+        parts.append(f"{facet}:{','.join(values)}")
+    return "|".join(parts)
+
+
+def hash_signature(sig):
+    """Hash a signature string to a short topic ID."""
+    if not sig:
+        return None
+    return "tp_" + hashlib.sha1(sig.encode()).hexdigest()[:12]
+
+
+# ============================================================================
+# Step 7: Main
 # ============================================================================
 
 def main():
     print("=" * 60)
-    print("UMLS facet-signature builder")
+    print("UMLS facet-index builder")
     print("=" * 60)
-    print(f"  project       : {PROJECT}")
-    print(f"  dataset       : {DATASET}")
     print(f"  cache         : {CACHE_PATH}")
     print(f"  output        : {OUTPUT_PATH}")
-    print(f"  max_depth     : {MAX_ANCESTOR_DEPTH if MAX_ANCESTOR_DEPTH else 'full closure'}")
+    print(f"  facets        : {sorted(set(RELA_TO_FACET.values()) | SEED_DERIVED_FACETS)}")
+    print(f"  bounds        : descendants in [{MIN_DESCENDANTS}, {MAX_DESCENDANTS}]")
 
-    print("\n[1/4] Getting UMLS data (cache or BigQuery) ...")
+    print("\n[1/5] Getting UMLS data ...")
     cache = get_or_fetch_cache()
 
-    print("\n[2/4] Extracting facet signatures from MRREL ...")
-    t0 = time.time()
-    cui_facets = extract_facets(cache)
-    n_cuis_with_facets = len(cui_facets)
-    n_total_facets = sum(len(f) for f in cui_facets.values())
-    n_total_values = sum(
-        len(vals)
-        for f in cui_facets.values()
-        for vals in f.values()
-    )
-    facet_counts = defaultdict(int)
-    for f in cui_facets.values():
-        for rela in f:
-            facet_counts[rela] += 1
-    print(f"      {n_cuis_with_facets:,} CUIs have facets")
-    print(f"      {n_total_facets:,} facet entries ({n_total_values:,} total values)")
-    print(f"      in {time.time()-t0:.1f}s")
-    print(f"      Top 10 most common facet types:")
-    for rela, n in sorted(facet_counts.items(), key=lambda kv: -kv[1])[:10]:
-        print(f"        {n:>7,d}  {rela}")
-
-    print("\n[3/4] Computing IS-A ancestor closure ...")
+    print("\n[2/5] Building IS-A graph ...")
     t0 = time.time()
     parents = build_isa_parents(cache)
-    # We only need ancestor sets for CUIs that appear as facet values,
-    # PLUS all CUIs in our universe (for query matching).
-    target_cuis = set(cache["cuis"])
-    for f in cui_facets.values():
-        for vals in f.values():
-            target_cuis.update(vals)
-    print(f"      Computing ancestors for {len(target_cuis):,} CUIs ...")
-    ancestors = compute_ancestors(parents, target_cuis, MAX_ANCESTOR_DEPTH)
-    avg_anc = sum(len(a) for a in ancestors.values()) / max(len(ancestors), 1)
-    print(f"      {len(ancestors):,} ancestor sets, avg {avg_anc:.1f} ancestors each")
-    print(f"      in {time.time()-t0:.1f}s")
+    children = build_isa_children(parents)
+    print(f"      {sum(len(ps) for ps in parents.values()):,} IS-A edges in "
+          f"{time.time()-t0:.1f}s")
 
-    print("\n[4/4] Saving pickle ...")
+    print("\n[3/5] Extracting raw facets from MRREL ...")
+    t0 = time.time()
+    cui_raw_facets = extract_raw_facets(cache)
+    print(f"      {len(cui_raw_facets):,} CUIs have raw facets in "
+          f"{time.time()-t0:.1f}s")
+
+    # Collect value-space per facet
+    value_space_per_facet = defaultdict(set)
+    for cui, facets in cui_raw_facets.items():
+        for facet, values in facets.items():
+            value_space_per_facet[facet].update(values)
+
+    print(f"\n[4/5] Auto-extracting canonical sets ...")
+    t0 = time.time()
+    canonical_sets = {}
+    for facet in sorted(value_space_per_facet):
+        min_d, max_d = PER_FACET_BOUNDS.get(facet,
+                                            (MIN_DESCENDANTS, MAX_DESCENDANTS))
+        canonical_sets[facet] = extract_canonical_set(
+            facet, value_space_per_facet[facet], children, parents,
+            cache["labels"], min_d, max_d,
+        )
+
+    # Disorder facet: extract canonical from disorder CUIs themselves
+    DISORDER_STYS = {
+        "Disease or Syndrome", "Pathologic Function", "Neoplastic Process",
+        "Mental or Behavioral Dysfunction", "Anatomical Abnormality",
+        "Cell or Molecular Dysfunction", "Congenital Abnormality",
+        "Acquired Abnormality", "Finding", "Sign or Symptom",
+        "Injury or Poisoning",
+    }
+    disorder_cuis = {cui for cui, stys in cache["tags"].items()
+                     if stys & DISORDER_STYS}
+    canonical_sets["disorder"] = extract_canonical_set(
+        "disorder", disorder_cuis, children, parents,
+        cache["labels"], MIN_DESCENDANTS, MAX_DESCENDANTS,
+    )
+    print(f"      done in {time.time()-t0:.1f}s")
+
+    print(f"\n[5/5] Normalizing facets + building signatures ...")
+    t0 = time.time()
+    cui_normalized = normalize_facets(cui_raw_facets, canonical_sets, parents)
+    add_disorder_facet(cui_normalized, cache["cuis"], cache["tags"],
+                       canonical_sets["disorder"], parents)
+    print(f"      normalized {len(cui_normalized):,} CUIs in "
+          f"{time.time()-t0:.1f}s")
+
+    # Build signatures + topic IDs
+    t0 = time.time()
+    cui_signature = {}
+    cui_topic_id = {}
+    topic_metadata = {}    # topic_id -> {signature, facets, members}
+    topic_members = defaultdict(list)  # topic_id -> [cui, ...]
+    for cui, facets in cui_normalized.items():
+        sig = build_signature(facets, cache["labels"])
+        if not sig:
+            continue
+        tid = hash_signature(sig)
+        cui_signature[cui] = sig
+        cui_topic_id[cui] = tid
+        if tid not in topic_metadata:
+            topic_metadata[tid] = {
+                "signature": sig,
+                "facets": {f: sorted(vs) for f, vs in facets.items()},
+            }
+        topic_members[tid].append(cui)
+    print(f"      {len(cui_topic_id):,} CUIs assigned topic IDs in "
+          f"{time.time()-t0:.1f}s")
+    print(f"      {len(topic_metadata):,} distinct topic IDs")
+
+    # Save
+    print("\nSaving ...")
     t0 = time.time()
     payload = {
         "built_at": datetime.datetime.now().isoformat(),
         "cache_fetched_at": cache.get("fetched_at"),
         "config": {
-            "max_ancestor_depth": MAX_ANCESTOR_DEPTH,
+            "facets":            sorted(set(RELA_TO_FACET.values()) | SEED_DERIVED_FACETS),
+            "min_descendants":   MIN_DESCENDANTS,
+            "max_descendants":   MAX_DESCENDANTS,
+            "per_facet_bounds":  PER_FACET_BOUNDS,
         },
-        "cui_facets":    cui_facets,
-        "isa_ancestors": ancestors,
-        "labels":        cache["labels"],
-        "tags":          cache["tags"],
-        "stats": {
-            "total_cuis":             len(cache["cuis"]),
-            "cuis_with_facets":       n_cuis_with_facets,
-            "total_facet_entries":    n_total_facets,
-            "total_facet_values":     n_total_values,
-            "facet_type_counts":      dict(facet_counts),
-        },
+        "canonical_sets":    {f: sorted(s) for f, s in canonical_sets.items()},
+        "cui_normalized":    cui_normalized,    # cui -> {facet: frozenset(values)}
+        "cui_signature":     cui_signature,     # cui -> 'site:X|morph:Y'
+        "cui_topic_id":      cui_topic_id,      # cui -> 'tp_abc123'
+        "topic_metadata":    topic_metadata,    # tid -> {signature, facets}
+        "topic_members":     dict(topic_members),  # tid -> [cui, ...]
+        "labels":            cache["labels"],
+        "tags":              cache["tags"],
     }
     with open(OUTPUT_PATH, "wb") as f:
         pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
     size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
-    print(f"      wrote {size_mb:.1f} MB in {time.time()-t0:.1f}s")
+    print(f"  wrote {size_mb:.1f} MB in {time.time()-t0:.1f}s")
 
+    # Summary
     print("\n" + "=" * 60)
     print("DONE")
     print(f"  Total CUIs              : {len(cache['cuis']):,}")
-    print(f"  CUIs with facets        : {n_cuis_with_facets:,} "
-          f"({100*n_cuis_with_facets/max(len(cache['cuis']),1):.1f}%)")
-    print(f"  Distinct facet types    : {len(facet_counts):,}")
-    print(f"  Avg facets per CUI      : {n_total_facets/max(n_cuis_with_facets,1):.2f}")
-    print(f"  IS-A ancestor sets      : {len(ancestors):,}")
+    print(f"  CUIs with topic IDs     : {len(cui_topic_id):,}")
+    print(f"  Distinct topic IDs      : {len(topic_metadata):,}")
+    n_per_topic = Counter(len(v) for v in topic_members.values())
+    print(f"  Topic size distribution:")
+    for size, n in sorted(n_per_topic.items())[:5]:
+        print(f"    size {size:>5d}: {n:,} topics")
+    if len(n_per_topic) > 5:
+        print(f"    ... plus larger topics")
+    print(f"  Canonical anchors per facet:")
+    for f, s in sorted(canonical_sets.items()):
+        print(f"    {f:<20s}  {len(s):,} anchors")
     print(f"  Pickle                  : {OUTPUT_PATH} ({size_mb:.1f} MB)")
     print("=" * 60)
 
