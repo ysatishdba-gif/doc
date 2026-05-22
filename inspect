@@ -1,49 +1,66 @@
 """
-lookup_facets.py
-----------------
-Given a CUI, print its facet signature with human-readable labels.
+cuis_to_topics.py
+-----------------
+Look up the topic for one or more CUIs and show the details.
+
+Use this to inspect what's in facet_index.pkl after the build:
+  - which topic ID a CUI maps to
+  - the normalized facets that produced that topic
+  - the human-readable labels for each facet value
 
 Edit CUIS_TO_LOOKUP below and run:
-    python lookup_facets.py
+    python cuis_to_topics.py
 """
 
 import pickle
 
-PICKLE_PATH = "facets.pkl"
+
+PICKLE_PATH = "facet_index.pkl"
 
 CUIS_TO_LOOKUP = [
     "C0032285",   # Pneumonia (example — replace with your CUIs)
 ]
 
 
-def show_facets(cui, payload):
-    cui_facets    = payload["cui_facets"]
-    labels        = payload["labels"]
-    tags          = payload["tags"]
+def lookup(cui, payload):
+    labels = payload["labels"]
+    tags   = payload["tags"]
 
-    label = labels.get(cui, "?")
-    sty   = sorted(tags.get(cui, frozenset()))
-    print(f"\n{cui}  {label}")
-    if sty:
-        print(f"  semantic type(s): {', '.join(sty)}")
+    cui_label = labels.get(cui, "?")
+    cui_stys  = sorted(tags.get(cui, frozenset()))
 
-    facets = cui_facets.get(cui)
-    if not facets:
-        print(f"  (no facets — CUI has no defining RELA attributes in this build)")
+    print(f"\n{'='*60}")
+    print(f"{cui}  {cui_label}")
+    print(f"{'='*60}")
+    if cui_stys:
+        print(f"  semantic type(s): {', '.join(cui_stys)}")
+
+    topic_id   = payload["cui_topic_id"].get(cui)
+    signature  = payload["cui_signature"].get(cui)
+    normalized = payload["cui_normalized"].get(cui)
+
+    if topic_id is None:
+        print(f"\n  No topic ID — this CUI has no facets in the index.")
         return
 
-    print(f"  facets:")
-    # Sort by facet name for stable output
-    for rela in sorted(facets):
-        values = facets[rela]
-        # Render each value with its label
-        rendered = []
-        for v in sorted(values):
+    print(f"\n  topic ID  : {topic_id}")
+    print(f"  signature : {signature}")
+    print(f"\n  Normalized facets:")
+    for facet in sorted(normalized):
+        values = sorted(normalized[facet])
+        print(f"    {facet}:")
+        for v in values:
             v_label = labels.get(v, "?")
-            rendered.append(f"{v} ({v_label})")
-        print(f"    {rela}:")
-        for r in rendered:
-            print(f"      {r}")
+            print(f"      {v}  ({v_label})")
+
+    # Also show other CUIs that map to this same topic ID
+    members = payload["topic_members"].get(topic_id, [])
+    if len(members) > 1:
+        others = [m for m in members if m != cui][:10]
+        print(f"\n  Other CUIs with this same topic ID ({len(members)-1} total"
+              f"{', showing 10' if len(members) > 11 else ''}):")
+        for m in others:
+            print(f"    {m}  ({labels.get(m, '?')})")
 
 
 def main():
@@ -51,10 +68,11 @@ def main():
         payload = pickle.load(f)
     print(f"Loaded {PICKLE_PATH}")
     print(f"  built_at        : {payload['built_at']}")
-    print(f"  cuis with facets: {payload['stats']['cuis_with_facets']:,}")
+    print(f"  total CUIs      : {len(payload['cui_topic_id']):,}")
+    print(f"  distinct topics : {len(payload['topic_metadata']):,}")
 
     for cui in CUIS_TO_LOOKUP:
-        show_facets(cui, payload)
+        lookup(cui, payload)
 
 
 if __name__ == "__main__":
