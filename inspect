@@ -126,7 +126,6 @@ def main():
         with open("umls_cache.pkl", "rb") as f:
             cache = pickle.load(f)
         # Build parents map from cache (CHD/isa only, matching the algorithm)
-        from collections import defaultdict
         parents_map = defaultdict(set)
         for cui1, cui2, rel, rela in cache["mrrel_rows"]:
             if rel == "CHD" and rela == "isa":
