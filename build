@@ -1,49 +1,40 @@
 """
-build_topics.py
+build_facets.py
 ---------------
-Build a CUI -> topics pickle from UMLS data.
+Build a CUI -> facet-signature pickle from UMLS data.
 
-Conceptual model
-================
-This algorithm is a constrained factorization of a concept's attribute
-signature under hard-preserved dimensions ("strict slots"). It's
-effectively faceted semantic clustering over the SNOMED IS-A graph.
+Each CUI becomes a structured signature: a dict mapping UMLS RELA names
+to sets of value CUIs. This preserves the full attribute structure that
+SNOMED encodes about each concept — not just the IS-A hierarchy, but
+ALL of the defining relationships:
 
-For each concept:
-  1. Decompose its attributes into "strict" (must match exactly at any
-     anchor) and "non-strict" (per-axis, value-overlap required) groups.
-  2. For each non-strict attribute axis, walk independently up the IS-A
-     hierarchy looking for an anchor that:
-       - preserves the seed's strict slots EXACTLY
-       - has value-set overlap with the seed for the per-axis attribute
-  3. Each axis can produce its own anchor. A concept thus gets one topic
-     per attribute axis (de-duplicated where multiple axes converge on
-     the same ancestor).
-  4. Anchors that turn out to gather too many member CUIs (post-pass
-     filter, MAX_MEMBERS_PER_ANCHOR) are removed — they're acting as
-     organizing nodes rather than clinical topics. This is a
-     corpus-derived information-content prior, not an arbitrary
-     threshold.
+    'C0032285' (Pneumonia) -> {
+        'has_finding_site':          {'C0024109'},  # Lung
+        'has_associated_morphology': {'C0009450'},  # Inflammation
+        'has_causative_agent':       {'C0004611'},  # Bacterium (if present)
+        ...
+    }
 
-Cache behavior
-==============
-On first run, fetches UMLS data from BigQuery into a local cache file
-(umls_cache.pkl). On subsequent runs, uses the cache and skips BigQuery
-entirely.
+This is "Multi-Facet Topics": instead of compressing a concept into a
+single ancestor anchor, we keep the multi-dimensional structure.
 
-To force re-fetch: delete umls_cache.pkl and run again.
+At query time, two CUI signatures are compared facet-by-facet:
+- Exact equality counts as a match
+- Hierarchical (one value IS-A descends from the other) counts as a match
+  for that facet (Lung matches Right upper lobe)
 
-The cache is automatically invalidated and re-fetched if you change any
-of these config values:
-    PROJECT, DATASET, SAB, LANGUAGE
+This is closer to how SNOMED CT actually models clinical concepts.
 
-To iterate on anchoring policy (STRICT_SLOTS, TRAVERSAL_RELS, etc.) just
-run again — the cache is reused.
+The build also precomputes IS-A ancestor sets for every CUI that appears
+as a facet value. Stored in the pickle so match-time hierarchical
+comparison is O(1) per pair.
 
 Usage:
-    pip install google-cloud-bigquery
-    gcloud auth application-default login
-    python build_topics.py
+    Define PROJECT and DATASET in a cell above this one.
+    Then run:
+        python build_facets.py
+    On first run, fetches UMLS data from BigQuery into umls_cache.pkl.
+    On subsequent runs, uses the cache.
 """
 
 import datetime
@@ -54,152 +45,41 @@ from collections import defaultdict
 
 
 # ============================================================================
-# CONFIG — edit these
+# CONFIG
 # ============================================================================
 
 # PROJECT and DATASET must be defined in a cell above this one (or in the
 # enclosing module). They are referenced directly — no defaults here.
-# This avoids the recurring problem of placeholder values overwriting your
-# real ones when the cell is re-pasted.
 
-CACHE_PATH = "umls_cache.pkl"
-OUTPUT_PATH = "topics.pkl"
+CACHE_PATH  = "umls_cache.pkl"
+OUTPUT_PATH = "facets.pkl"
 
-# Table names. Change only if your tables are named differently.
+# Table names
 TABLE_MRCONSO = "MRCONSO"
 TABLE_MRREL   = "MRREL"
 TABLE_MRSTY   = "MRSTY"
 
-# Source vocabulary and language filters.
+# Source filters
 SAB      = "SNOMEDCT_US"
 LANGUAGE = "ENG"
 
-# Attribute types where ANY value change at the parent breaks the match.
-# Other attributes only break when missing entirely.
-#
-# Laterality was previously here but has been relaxed for the document-
-# retrieval use case. With laterality non-strict, 'Pain in left knee' and
-# 'Pain in right knee' can share topics via shared morphology, which
-# trades cross-side specificity for recall. Downstream consumers MUST
-# verify side from the retrieved chunk text — the topic layer no longer
-# carries that information.
-STRICT_SLOTS = {"has_finding_site"}
-
-# Optional allowlist of RELAs that count as defining attributes.
-# When None (default), every named RO RELA is treated as defining.
-#
-# If you observe in the build output that specific RELAs are producing
-# bad anchors (e.g., administrative or historical relationships), add
-# this set to filter them out. Example:
-#     ATTRIBUTE_RELAS = {"has_finding_site", "has_associated_morphology",
-#                        "has_method", "has_procedure_site",
-#                        "has_causative_agent", "has_active_ingredient"}
-#
-# Don't add this preemptively. Build first, see what RELAs are doing the
-# work via the build log's edge breakdown, and only restrict if specific
-# RELAs are demonstrably causing problems.
-ATTRIBUTE_RELAS = None
-
-# Optional semantic-type gating for traversal. When None (default), no
-# gating is applied — parents are considered regardless of their STY.
-#
-# If you observe specific cross-domain anchor jumps in the inspection
-# output (e.g., a Disease anchoring at an Organism), add a policy here.
-# Format: {seed_sty: {allowed_parent_sty, ...}}
-#
-# Example:
-#     VALID_PARENT_STY_BY_SEED_STY = {
-#         "Disease or Syndrome": {"Disease or Syndrome", "Finding"},
-#     }
-#
-# Same principle as ATTRIBUTE_RELAS: don't add preemptively. Add only
-# where you can point to a specific bad anchor caused by an STY jump.
-VALID_PARENT_STY_BY_SEED_STY = None
-
-# Which UMLS relationship types to use for walking UP the hierarchy.
-# Each entry is (REL, RELA) — RELA can be None to match any RELA value.
-#
-# The cache fetches broadly; changing this list does NOT require a
-# re-fetch. Just rebuild from the existing cache.
-#
-# Available choices:
-#   ("CHD", "isa")   SNOMED IS-A backbone
-#   ("RB",  None)    Related Broader (curator-asserted, non-IS-A)
-#   ("SY",  None)    Synonymous atoms (rarely useful at CUI level)
-#
-# NOT useful for traversal:
-#   PAR/inverse_isa, RN, SIB, RQ, RO with non-isa RELA
-TRAVERSAL_RELS = [
-    ("CHD", "isa"),
-    # NOTE: Earlier experiments with RB enabled showed that the RB rows
-    # in this dataset are dominated by inverse_was_a (historical concept
-    # retirements), referred_to_by (citation links), and alternative_of
-    # (administrative). These are noise, not clinical broader-than edges.
-    # Re-enabling RB caused massive over-grouping into metadata concepts.
-    # If you want to experiment with re-enabling, do it cautiously and
-    # be prepared to see anchors land on retirement/metadata concepts.
-]
-
-# For testing: only anchor first N CUIs. Set to None for the full build.
-MAX_CONCEPTS = None
-
-# Safety cap on multi-parent path explosion.
-MAX_NODES_PER_TRAVERSAL = 5000
-
-# Anchor quality floor. After all anchors are computed, count how many
-# CUIs anchored to each anchor. Any anchor with > this many members is
-# considered too abstract to be a useful topic for document matching.
-# CUIs that anchored to such an over-abstract anchor have THAT anchor
-# dropped from their topic list. If all of a CUI's anchors are dropped,
-# the CUI becomes self-only.
-#
-# Setting this to None disables the filter.
-#
-# Threshold history:
-#   3000 — first cut. Dropped "Organism" (32K), "Substance" (13K), etc.
-#          but left "Events" (2,590) and "Morphologically abnormal
-#          structure" (2,350) — too generic for retrieval.
-#   1500 — tighter. Drops the borderline-generic organizing concepts
-#          above. Trade-off: more CUIs become self-only (~10% more).
-#          Acceptable for retrieval because self-only CUIs still match
-#          themselves; bad anchors actively cause wrong matches.
-MAX_MEMBERS_PER_ANCHOR = 1500
-
-# Overlap ratio threshold for non-strict slots. When comparing seed and
-# parent value-sets for a non-strict attribute, the parent must contain
-# at least this fraction of the seed's values. Set to 0.5 by default —
-# parent must cover at least half of the seed's values to count as
-# preserving the axis.
-#
-# Why this matters: pure "any-overlap" matching (the previous behavior)
-# allows semantic-bridge effects like seed={tibia,fibula} matching parent
-# {fibula,skull} just because of the shared fibula. A higher threshold
-# tightens to require substantive coverage.
-#
-# Tuning: 0.0 = any overlap (loose), 1.0 = all seed values must be in
-# parent (strictest). Values in between mean "parent covers at least X%
-# of the seed's values."
-NON_STRICT_OVERLAP_RATIO = 0.5
-
-# Cache schema version. Bump when the cache structure changes in a
-# backwards-incompatible way so old caches get auto-invalidated.
-# Version history:
-#   2  tags stored as frozenset[str] per CUI (multiple STYs supported)
-#   1  initial single-STY format (deprecated)
+# Cache schema version. Reusing the v2 cache from build_topics.py.
 CACHE_SCHEMA_VERSION = 2
+
+# How many IS-A ancestor levels to precompute. None = full transitive closure.
+# Setting to a small number (say 5) caps memory at the cost of recall on
+# very deep IS-A chains. None is recommended for clinical use.
+MAX_ANCESTOR_DEPTH = None
 
 
 # ============================================================================
-# Step 1: Cache management — auto-detect or fetch from BigQuery
+# Step 1: Cache management
 # ============================================================================
 
 def get_or_fetch_cache():
     """
-    Auto-detect: load existing cache if compatible with current config,
-    else fetch fresh from BigQuery.
-
-    Compatibility check ensures we don't silently use a cache that was
-    built for a different project/dataset/SAB/language.
+    Load existing umls_cache.pkl if it's compatible, else fetch from BQ.
+    Reuses the same cache as build_topics.py.
     """
     current_config = {
         "project":  PROJECT,
@@ -241,21 +121,13 @@ def get_or_fetch_cache():
     t0 = time.time()
     with open(CACHE_PATH, "wb") as f:
         pickle.dump(cache, f, protocol=pickle.HIGHEST_PROTOCOL)
-    size_mb = os.path.getsize(CACHE_PATH) / (1024 * 1024)
+    size_mb = os.path.getsize(CACHE_PATH) / 1024 / 1024
     print(f"  wrote {size_mb:.1f} MB in {time.time()-t0:.1f}s")
     return cache
 
 
 def fetch_from_bigquery(config):
-    """
-    Pull everything we need from BigQuery in one go, return as a dict.
-
-    We fetch broadly — every REL type that could plausibly be used for
-    traversal — so that future tweaks to TRAVERSAL_RELS don't require
-    re-fetching.
-    """
-    # Import here so the rest of the script doesn't require the BQ
-    # library installed when running off a cache.
+    """Fetch the four data sources needed: CUIs, MRREL, MRSTY, labels."""
     from google.cloud import bigquery
 
     client = bigquery.Client(project=config["project"])
@@ -268,32 +140,26 @@ def fetch_from_bigquery(config):
     sql = f"""
     SELECT DISTINCT CUI
     FROM `{config['project']}.{config['dataset']}.{TABLE_MRCONSO}`
-    WHERE SAB = @sab AND LAT = @lat
-      AND SUPPRESS NOT IN ('O', 'Y')
+    WHERE SAB = @sab AND LAT = @lat AND SUPPRESS = 'N'
     """
     job_config = bigquery.QueryJobConfig(query_parameters=[
         bigquery.ScalarQueryParameter("sab", "STRING", sab),
         bigquery.ScalarQueryParameter("lat", "STRING", lat),
     ])
-    cuis = {row.CUI for row in client.query(sql, job_config=job_config).result()}
+    cuis = set()
+    for row in client.query(sql, job_config=job_config).result():
+        cuis.add(row.CUI)
     print(f"        {len(cuis):,} CUIs in {time.time()-t0:.1f}s")
 
-    # ---- 2. MRREL rows (broad fetch) ----
-    print("  [2/4] Loading MRREL rows (broad — all REL types we might use) ...")
+    # ---- 2. MRREL rows ----
+    print("  [2/4] Loading MRREL rows ...")
     t0 = time.time()
     sql = f"""
     SELECT CUI1, CUI2, REL, RELA
     FROM `{config['project']}.{config['dataset']}.{TABLE_MRREL}`
-    WHERE SAB = @sab
-      AND SUPPRESS NOT IN ('O', 'Y')
-      AND CUI1 != CUI2
+    WHERE SAB = @sab AND SUPPRESS = 'N'
       AND (
             (REL = 'CHD' AND RELA = 'isa')
-         OR (REL = 'PAR' AND RELA = 'inverse_isa')
-         OR (REL = 'RB')
-         OR (REL = 'RN')
-         OR (REL = 'SY')
-         OR (REL = 'SIB')
          OR (REL = 'RO' AND RELA IS NOT NULL
                          AND RELA != 'isa'
                          AND NOT STARTS_WITH(RELA, 'inverse_'))
@@ -307,12 +173,6 @@ def fetch_from_bigquery(config):
         if row.CUI1 in cuis and row.CUI2 in cuis:
             mrrel_rows.append((row.CUI1, row.CUI2, row.REL, row.RELA))
     print(f"        {len(mrrel_rows):,} rows in {time.time()-t0:.1f}s")
-    rel_counts = defaultdict(int)
-    for _, _, rel, rela in mrrel_rows:
-        rel_counts[(rel, rela)] += 1
-    print(f"        Row breakdown (top 10):")
-    for (rel, rela), n in sorted(rel_counts.items(), key=lambda kv: -kv[1])[:10]:
-        print(f"          {rel:6s} {str(rela)[:30]:30s}  {n:>10,d}")
 
     # ---- 3. Semantic types ----
     print("  [3/4] Loading semantic types from MRSTY ...")
@@ -321,15 +181,12 @@ def fetch_from_bigquery(config):
     SELECT CUI, STY
     FROM `{config['project']}.{config['dataset']}.{TABLE_MRSTY}`
     """
-    # A CUI can have multiple semantic types. Collect all of them.
     tags_accum = defaultdict(set)
     for row in client.query(sql).result():
         if row.CUI in cuis:
             tags_accum[row.CUI].add(row.STY)
     tags = {cui: frozenset(stys) for cui, stys in tags_accum.items()}
-    n_multi = sum(1 for stys in tags.values() if len(stys) > 1)
-    print(f"        {len(tags):,} CUIs tagged "
-          f"({n_multi:,} have multiple STYs) in {time.time()-t0:.1f}s")
+    print(f"        {len(tags):,} CUIs tagged in {time.time()-t0:.1f}s")
 
     # ---- 4. Preferred labels ----
     print("  [4/4] Loading preferred labels from MRCONSO ...")
@@ -338,20 +195,13 @@ def fetch_from_bigquery(config):
     BATCH = 50000
     labels = {}
     for i in range(0, len(cui_list), BATCH):
-        batch = cui_list[i:i + BATCH]
+        batch = cui_list[i:i+BATCH]
         sql = f"""
-        WITH ranked AS (
-          SELECT CUI, STR,
-            CASE WHEN TS = 'P' AND ISPREF = 'Y' AND SUPPRESS = 'N' THEN 0
-                 WHEN SUPPRESS = 'N' THEN 1
-                 ELSE 2 END AS rank
-          FROM `{config['project']}.{config['dataset']}.{TABLE_MRCONSO}`
-          WHERE SAB = @sab AND LAT = @lat
-            AND SUPPRESS NOT IN ('O', 'Y')
-            AND CUI IN UNNEST(@cuis)
-        )
-        SELECT CUI, ARRAY_AGG(STR ORDER BY rank LIMIT 1)[OFFSET(0)] AS label
-        FROM ranked GROUP BY CUI
+        SELECT CUI, STR
+        FROM `{config['project']}.{config['dataset']}.{TABLE_MRCONSO}`
+        WHERE SAB = @sab AND LAT = @lat AND TS = 'P' AND ISPREF = 'Y'
+              AND STT = 'PF' AND SUPPRESS = 'N'
+              AND CUI IN UNNEST(@cuis)
         """
         job_config = bigquery.QueryJobConfig(query_parameters=[
             bigquery.ScalarQueryParameter("sab", "STRING", sab),
@@ -359,7 +209,8 @@ def fetch_from_bigquery(config):
             bigquery.ArrayQueryParameter("cuis", "STRING", batch),
         ])
         for row in client.query(sql, job_config=job_config).result():
-            labels[row.CUI] = row.label
+            if row.CUI not in labels:
+                labels[row.CUI] = row.STR
     print(f"        {len(labels):,} labels in {time.time()-t0:.1f}s")
 
     return {
@@ -374,583 +225,186 @@ def fetch_from_bigquery(config):
 
 
 # ============================================================================
-# Step 2: Parse MRREL into parents/attrs dicts
+# Step 2: Extract facet signatures from MRREL
 # ============================================================================
 
-def parse_mrrel(cache):
+def extract_facets(cache):
     """
-    Walk the cached MRREL rows once. Split into:
-        parents[child_cui]  = dict { parent_cui : (REL, RELA) }
-        attrs[cui]          = dict { rela_name : value_cui }
-        edge_counts         = dict { (REL, RELA) : count }
+    For each CUI, collect all of its non-IS-A attribute relationships
+    into a facet signature.
 
-    The parents dict only includes REL types listed in TRAVERSAL_RELS.
-    Every other "RO with a named RELA" row becomes a defining attribute.
+    Returns:
+        cui_facets: dict[cui] -> dict[rela] -> frozenset of value CUIs
 
-    Direction: in MRREL the relationship is "from CUI2 to CUI1". For
-    hierarchy-style RELs (CHD, RB), CUI1 is the broader/parent concept
-    and CUI2 is the narrower/child. So parent edges go: CUI2 -> CUI1.
+    Multi-value RELAs are preserved as sets (a single CUI may have
+    multiple values for the same RELA, e.g., Fracture of tibia and fibula).
+
+    Only RELAs that point to other CUIs in our universe are kept.
     """
-    traversal_set = set()
-    traversal_rel_only = set()
-    for rel, rela in TRAVERSAL_RELS:
-        if rela is None:
-            traversal_rel_only.add(rel)
-        else:
-            traversal_set.add((rel, rela))
-
-    rel_priority = {}
-    for i, (rel, rela) in enumerate(TRAVERSAL_RELS):
-        rel_priority[(rel, rela)] = i
-
-    def is_traversal(rel, rela):
-        if rel in traversal_rel_only:
-            return True
-        return (rel, rela) in traversal_set
-
-    def edge_priority(rel, rela):
-        if (rel, rela) in rel_priority:
-            return rel_priority[(rel, rela)]
-        if (rel, None) in rel_priority:
-            return rel_priority[(rel, None)]
-        return 999
-
-    parents = defaultdict(dict)
-    # attrs[cui][rela] = set of value CUIs (multi-value preservation).
-    # SNOMED concepts can have multiple values for the same attribute
-    # (e.g., 'Fracture of tibia and fibula' has two finding_sites).
-    # Storing as a set preserves these values.
-    attrs = defaultdict(lambda: defaultdict(set))
-    edge_counts = defaultdict(int)
-
+    cui_facets = defaultdict(lambda: defaultdict(set))
     for cui1, cui2, rel, rela in cache["mrrel_rows"]:
-        if is_traversal(rel, rela):
-            child, parent = cui2, cui1
-            key = (rel, rela)
-            edge_counts[key] += 1
-            existing = parents[child].get(parent)
-            if existing is None or edge_priority(*key) < edge_priority(*existing):
-                parents[child][parent] = key
-        elif rel == "RO" and rela and not rela.startswith("inverse_") and rela != "isa":
-            # RELA allowlist filter: only allowlisted attribute types become
-            # defining attributes. Other RO rows (administrative,
-            # associative, weak-semantic) are ignored entirely.
-            if ATTRIBUTE_RELAS is not None and rela not in ATTRIBUTE_RELAS:
-                continue
-            # Multi-value attributes: accumulate all values into a set
-            attrs[cui2][rela].add(cui1)
+        # IS-A rows are handled separately (used for ancestor closure).
+        # We only collect RO (Related Other) rows as facets.
+        if rel == "RO" and rela and rela != "isa":
+            # cui1 is the value, cui2 is the concept being described
+            cui_facets[cui2][rela].add(cui1)
 
-    # Convert nested defaultdicts to regular dicts with frozensets for
-    # hashable, predictable downstream consumption
-    attrs_final = {}
-    for cui, rela_map in attrs.items():
-        attrs_final[cui] = {rela: frozenset(values) for rela, values in rela_map.items()}
-
-    return parents, attrs_final, edge_counts
+    # Convert to frozensets for hashability/predictability
+    return {
+        cui: {rela: frozenset(vals) for rela, vals in rela_map.items()}
+        for cui, rela_map in cui_facets.items()
+    }
 
 
 # ============================================================================
-# Step 3: The anchoring algorithm — multi-path
+# Step 3: Build IS-A ancestor closure
 # ============================================================================
 
-def check_break(seed_attrs, parent_attrs):
+def build_isa_parents(cache):
     """
-    Return the name of the first attribute the parent breaks, or None if
-    all of the seed's attributes are preserved.
+    Return parents[cui] = set of direct IS-A parent CUIs.
 
-    Attribute values are frozensets (multi-value attributes are supported —
-    SNOMED concepts can have multiple values for the same attribute, e.g.,
-    'Fracture of tibia and fibula' has two finding_sites).
-
-    Strict slots: parent's value-set must EQUAL the seed's value-set.
-                  ({tibia, fibula} == {tibia, fibula}, not just overlap.)
-                  Generalizing or losing any value breaks.
-                  MISSING at parent is treated as different → BREAKS.
-
-    Non-strict slots: two cases
-        - Parent HAS the RELA: value-sets must overlap by at least
-          NON_STRICT_OVERLAP_RATIO of the seed's values. Different
-          enough values break (prevents semantic-bridge effects like
-          seed={tibia,fibula} matching parent={fibula,skull}).
-        - Parent does NOT have the RELA: treated as PRESERVED, not
-          broken. The parent simply doesn't model that aspect of the
-          concept — which is common in SNOMED where many anatomical,
-          structural, and modeling-artifact RELAs only appear on
-          specific concepts but not on their ancestors.
-
-    Why "missing-as-preserved": diagnostic on 374K CUIs showed ~24K
-    self-only rejections caused by structural RELAs (entire_anatomy
-    structure_of, has_entire_anatomy_structure, etc.) being present on
-    the seed but absent on the parent. These aren't clinical differences;
-    they're SNOMED modeling artifacts. Treating missing-as-preserved
-    lets the walk continue past them.
-
-    Trade-off: ancestors that simply omit a non-strict attribute the
-    seed cares about will look compatible. The MAX_MEMBERS_PER_ANCHOR
-    filter compensates by dropping anchors that become over-broad.
+    UMLS encoding: REL='CHD' RELA='isa' means CUI2 is a child of CUI1.
+    So CUI1 is a parent of CUI2.
     """
-    for rela, seed_value in seed_attrs.items():
-        parent_value = parent_attrs.get(rela)
-        if rela in STRICT_SLOTS:
-            # Strict equality on the value sets (missing breaks)
-            if parent_value != seed_value:
-                return rela
-        else:
-            # Non-strict: missing-at-parent is preserved (not broken)
-            if not parent_value:
-                continue
-            # Present but different: enforce overlap threshold
-            intersection_size = len(seed_value & parent_value)
-            seed_size = len(seed_value)
-            if intersection_size / seed_size < NON_STRICT_OVERLAP_RATIO:
-                return rela
-    return None
+    parents = defaultdict(set)
+    for cui1, cui2, rel, rela in cache["mrrel_rows"]:
+        if rel == "CHD" and rela == "isa":
+            parents[cui2].add(cui1)
+    return parents
 
 
-def is_transparent_parent(seed_attrs, parent_attrs):
+def compute_ancestors(parents, target_cuis, max_depth=None):
     """
-    A parent is "transparent" if it has ZERO defining attributes at all.
-    The walk should pass through it without anchoring, since there's nothing
-    to compare against and no clinical-content gradient at this node.
+    For each CUI in target_cuis, compute the set of ALL ancestors via IS-A
+    (including itself). This is the transitive closure of parent links.
 
-    We deliberately do NOT treat "parent has some attributes but none
-    overlap with the seed" as transparent. That earlier rule was too
-    permissive and let walks wander into unrelated subtrees through nodes
-    that happened to share no attribute types with the seed. The current
-    rule is stricter: only empty parents pass through.
+    Used at query time for hierarchical facet matching: when comparing
+    facet values, we want to know if one is an ancestor of the other.
 
-    Why this matters in practice:
-      - 'Wedge pressure technique' (seed has technique_of) -> parent
-        'Technique' has zero attributes. Transparent → walk through to
-        find a real topic.
-      - 'Discharge specimen from penis' (seed has two attrs) -> parent
-        'Discharge specimen' has one attr (substance only). NOT
-        transparent — it has content, just not all of it. The boundary
-        fires here, which is correct: we're looking at a real
-        clinical-content gradient.
+    max_depth=None means full closure (recommended for clinical use).
+    max_depth=N caps walking at N levels above (saves memory).
+
+    Returns: dict[cui] -> frozenset(ancestor_cuis_including_self)
     """
-    return not parent_attrs
+    ancestors_cache = {}
 
+    def get_ancestors(cui):
+        if cui in ancestors_cache:
+            return ancestors_cache[cui]
+        result = {cui}
+        # BFS up the parent tree
+        frontier = {cui}
+        depth = 0
+        while frontier:
+            if max_depth is not None and depth >= max_depth:
+                break
+            next_frontier = set()
+            for c in frontier:
+                for p in parents.get(c, ()):
+                    if p not in result:
+                        next_frontier.add(p)
+                        result.add(p)
+            frontier = next_frontier
+            depth += 1
+        ancestors_cache[cui] = frozenset(result)
+        return ancestors_cache[cui]
 
-def is_sty_compatible(seed_stys, parent_stys):
-    """
-    Return True if a parent is acceptable to traverse to from a seed.
-    Both arguments are frozensets of STY strings (CUIs may have multiple
-    semantic types in UMLS — e.g., a CUI that's both "Finding" and "Sign
-    or Symptom").
-
-    Behavior:
-      - If gating is disabled (VALID_PARENT_STY_BY_SEED_STY is None), always
-        compatible.
-      - The seed is "compatible" with a parent if ANY of the seed's STYs
-        has a policy AND that policy admits AT LEAST ONE of the parent's
-        STYs. (Union semantics: any-of-seed × any-of-parent must match.)
-      - If none of the seed's STYs have a policy entry, no gating applies.
-      - If the parent has no STYs, treat as compatible (don't block on
-        missing metadata).
-    """
-    if VALID_PARENT_STY_BY_SEED_STY is None:
-        return True
-    if not parent_stys:
-        return True
-    seed_stys = seed_stys or frozenset()
-    # Collect the union of allowed parent-STYs across all seed STYs that
-    # have policies. If no seed STY has a policy, we get an empty allowed
-    # set and fall through to "no gating applies".
-    allowed_union = set()
-    any_policy = False
-    for s in seed_stys:
-        allowed = VALID_PARENT_STY_BY_SEED_STY.get(s)
-        if allowed is not None:
-            any_policy = True
-            allowed_union.update(allowed)
-    if not any_policy:
-        return True
-    return not allowed_union.isdisjoint(parent_stys)
-
-
-def find_anchors(seed_cui, parents, attrs, tags):
-    """
-    Per-attribute anchor finding (Fix B), with strict slots as a hard filter.
-
-    Design:
-      - For each NON-STRICT attribute, walk that single axis up the tree.
-        Each axis can find a different anchor.
-      - For an anchor candidate to be valid, it must ALSO preserve all of
-        the seed's STRICT slots (laterality, finding_site).
-      - This means strict slots can't be relaxed via per-axis decomposition.
-        Per-axis walks happen WITHIN the cone of "ancestors that preserve
-        strict slots." If no such cone exists, the seed is self-only.
-
-    Why this design:
-      Naive per-axis decomposition breaks strict-slot guarantees. Example:
-        Pain in left knee → has_finding_site=L_knee, has_laterality=LEFT,
-                            has_morphology=Pain
-        Pain in right knee → has_finding_site=R_knee, has_laterality=RIGHT,
-                             has_morphology=Pain
-        Generic knee pain → has_morphology=Pain (no laterality, no site)
-      Pure per-axis decomposition would let both Pain-left-knee and
-      Pain-right-knee anchor to Generic-knee-pain via the morphology axis.
-      In a retrieval pipeline this would cross-match left and right knee
-      documents — clinically wrong.
-
-      With strict-slot filtering: Generic knee pain is NOT a valid anchor
-      candidate because it's missing has_laterality and has_finding_site
-      (the seeds' strict slots). So the morphology-axis walk goes no
-      higher than concepts that preserve the seed's specific laterality.
-
-    Returns a list of dicts (alphabetical by anchor CUI):
-      [{"anchor":      cui,
-        "lost":        rela_or_None,
-        "path_length": int,
-        "rels_used":   sorted list of (REL, RELA) tuples,
-        "axes":        sorted list of attribute types that drove this anchor}]
-    """
-    seed_attrs = attrs.get(seed_cui, {})
-    if not seed_attrs:
-        # No attributes at all — walk with empty signature
-        return _walk_for_signature(seed_cui, {}, parents, attrs, tags, axis=None)
-
-    # Split into strict and non-strict
-    strict_signature = {k: v for k, v in seed_attrs.items() if k in STRICT_SLOTS}
-    non_strict_axes = [k for k in seed_attrs if k not in STRICT_SLOTS]
-
-    if not non_strict_axes:
-        # Only strict attributes — walk with the strict signature alone
-        return _walk_for_signature(seed_cui, strict_signature, parents, attrs, tags, axis=None)
-
-    # Per-axis walk: each non-strict attribute walks independently, but
-    # the strict slots are added as a mandatory part of every signature.
-    # An anchor must preserve the strict slots AND the per-axis attribute.
-    all_anchors = {}
-    for axis in non_strict_axes:
-        per_axis_signature = dict(strict_signature)
-        per_axis_signature[axis] = seed_attrs[axis]
-        per_axis_results = _walk_for_signature(
-            seed_cui, per_axis_signature, parents, attrs, tags, axis=axis,
-        )
-        for entry in per_axis_results:
-            anchor = entry["anchor"]
-            existing = all_anchors.get(anchor)
-            if existing is None:
-                all_anchors[anchor] = {
-                    "anchor": anchor,
-                    "lost": entry["lost"],
-                    "path_length": entry["path_length"],
-                    "rels_used": set(tuple(r) for r in entry["rels_used"]),
-                    "axes": {axis},
-                }
-            else:
-                if entry["path_length"] > existing["path_length"]:
-                    existing["path_length"] = entry["path_length"]
-                existing["rels_used"].update(tuple(r) for r in entry["rels_used"])
-                existing["axes"].add(axis)
-
-    result = [
-        {"anchor":      e["anchor"],
-         "lost":        e["lost"],
-         "path_length": e["path_length"],
-         "rels_used":   sorted(list(e["rels_used"])),
-         "axes":        sorted(list(e["axes"]))}
-        for e in all_anchors.values()
-    ]
-    result.sort(key=lambda r: r["anchor"])
-    return result
-
-
-def _walk_for_signature(seed_cui, signature_attrs, parents, attrs, tags, axis=None):
-    """
-    Walk every traversal path upward from seed_cui using `signature_attrs`
-    as the seed's attribute signature. This is the per-axis primitive
-    that the new find_anchors() calls once per attribute.
-
-    Behaviors preserved from the previous algorithm:
-      - Walks through transparent parents (no defining attrs)
-      - Never anchors at a transparent terminus — backs up to last
-        meaningful ancestor on the path
-      - Strict-slot rules still apply
-
-    New behavior (this turn):
-      - Semantic-type gating: a parent is only traversable if its STY is
-        in the seed's allowed parent-STY set (per VALID_PARENT_STY_BY_SEED_STY).
-        STY-incompatible parents are rejected outright — not even considered
-        for transparency or attribute matching.
-    """
-    seed_stys = tags.get(seed_cui)
-    found_anchors = {}
-    visited_total = set()
-    signature_is_meaningful = bool(signature_attrs)
-    stack = [(
-        seed_cui, 1, frozenset([seed_cui]), frozenset(),
-        seed_cui if signature_is_meaningful else None,
-        1 if signature_is_meaningful else 0,
-    )]
-
-    while stack:
-        if len(visited_total) > MAX_NODES_PER_TRAVERSAL:
-            break
-
-        (current, depth, visited_on_path, rels_used,
-         last_meaningful, last_meaningful_depth) = stack.pop()
-        visited_total.add(current)
-
-        ps = parents.get(current, {})
-        preserving_parents = []
-        any_break_reason = None
-
-        for parent_cui, rel_key in ps.items():
-            if parent_cui in visited_on_path:
-                continue
-
-            # STY gate: reject parents with incompatible semantic types
-            parent_stys = tags.get(parent_cui)
-            if not is_sty_compatible(seed_stys, parent_stys):
-                if any_break_reason is None:
-                    any_break_reason = "sty_incompatible"
-                continue
-
-            parent_attrs = attrs.get(parent_cui, {})
-            if is_transparent_parent(signature_attrs, parent_attrs):
-                preserving_parents.append((parent_cui, rel_key))
-            else:
-                broken = check_break(signature_attrs, parent_attrs)
-                if broken is None:
-                    preserving_parents.append((parent_cui, rel_key))
-                elif any_break_reason is None:
-                    any_break_reason = broken
-
-        if not preserving_parents:
-            # Terminus reached. Back up to last meaningful if current is
-            # transparent (refuses anchoring at abstract organizing nodes).
-            current_attrs = attrs.get(current, {})
-            if current_attrs:
-                anchor_cui = current
-                anchor_depth = depth
-            elif last_meaningful is not None:
-                anchor_cui = last_meaningful
-                anchor_depth = last_meaningful_depth
-            else:
-                anchor_cui = seed_cui
-                anchor_depth = 1
-
-            existing = found_anchors.get(anchor_cui)
-            if existing is None or anchor_depth > existing["path_length"]:
-                found_anchors[anchor_cui] = {
-                    "lost": any_break_reason,
-                    "path_length": anchor_depth,
-                    "rels_used": rels_used,
-                }
-        else:
-            new_visited = visited_on_path | {current}
-            for parent_cui, rel_key in preserving_parents:
-                parent_attrs = attrs.get(parent_cui, {})
-                if parent_attrs:
-                    next_last_meaningful = parent_cui
-                    next_last_meaningful_depth = depth + 1
-                else:
-                    next_last_meaningful = last_meaningful
-                    next_last_meaningful_depth = last_meaningful_depth
-                stack.append((
-                    parent_cui,
-                    depth + 1,
-                    new_visited,
-                    rels_used | {rel_key},
-                    next_last_meaningful,
-                    next_last_meaningful_depth,
-                ))
-
-    result = [
-        {"anchor": cui,
-         "lost": data["lost"],
-         "path_length": data["path_length"],
-         "rels_used": sorted(list(data["rels_used"]))}
-        for cui, data in found_anchors.items()
-    ]
-    result.sort(key=lambda r: r["anchor"])
-    return result
+    ancestors = {}
+    for i, cui in enumerate(target_cuis):
+        ancestors[cui] = get_ancestors(cui)
+        if (i + 1) % 50000 == 0:
+            print(f"      {i+1:,} / {len(target_cuis):,} ancestor sets computed")
+    return ancestors
 
 
 # ============================================================================
-# Step 4: Orchestration
+# Step 4: Main
 # ============================================================================
 
 def main():
     print("=" * 60)
-    print("Build CUI -> topics pickle")
+    print("UMLS facet-signature builder")
+    print("=" * 60)
     print(f"  project       : {PROJECT}")
     print(f"  dataset       : {DATASET}")
     print(f"  cache         : {CACHE_PATH}")
     print(f"  output        : {OUTPUT_PATH}")
-    print(f"  strict slots  : {sorted(STRICT_SLOTS)}")
-    print(f"  traversal     : {TRAVERSAL_RELS}")
-    print(f"  max members   : {MAX_MEMBERS_PER_ANCHOR if MAX_MEMBERS_PER_ANCHOR else 'no limit'}")
-    print(f"  RELA allowlist: {len(ATTRIBUTE_RELAS) if ATTRIBUTE_RELAS else 'disabled'} entries")
-    print(f"  STY gating    : {len(VALID_PARENT_STY_BY_SEED_STY) if VALID_PARENT_STY_BY_SEED_STY else 'disabled'} policies")
-    print(f"  max_concepts  : {MAX_CONCEPTS if MAX_CONCEPTS else 'all'}")
-    print("=" * 60)
+    print(f"  max_depth     : {MAX_ANCESTOR_DEPTH if MAX_ANCESTOR_DEPTH else 'full closure'}")
 
     print("\n[1/4] Getting UMLS data (cache or BigQuery) ...")
     cache = get_or_fetch_cache()
 
-    print("\n[2/4] Parsing MRREL into parents and attributes ...")
+    print("\n[2/4] Extracting facet signatures from MRREL ...")
     t0 = time.time()
-    parents, attrs, edge_counts = parse_mrrel(cache)
-    n_edges = sum(len(v) for v in parents.values())
-    n_attr_types = sum(len(v) for v in attrs.values())
-    n_attr_values = sum(
-        len(values)
-        for rela_map in attrs.values()
-        for values in rela_map.values()
+    cui_facets = extract_facets(cache)
+    n_cuis_with_facets = len(cui_facets)
+    n_total_facets = sum(len(f) for f in cui_facets.values())
+    n_total_values = sum(
+        len(vals)
+        for f in cui_facets.values()
+        for vals in f.values()
     )
-    print(f"      {n_edges:,} traversal edges, "
-          f"{n_attr_types:,} attribute types "
-          f"({n_attr_values:,} total values) in "
-          f"{time.time()-t0:.1f}s")
-    print(f"      Edge breakdown by (REL, RELA):")
-    for (rel, rela), n in sorted(edge_counts.items(), key=lambda kv: -kv[1]):
-        print(f"        {rel:6s} {str(rela):20s}  {n:>10,d}")
+    facet_counts = defaultdict(int)
+    for f in cui_facets.values():
+        for rela in f:
+            facet_counts[rela] += 1
+    print(f"      {n_cuis_with_facets:,} CUIs have facets")
+    print(f"      {n_total_facets:,} facet entries ({n_total_values:,} total values)")
+    print(f"      in {time.time()-t0:.1f}s")
+    print(f"      Top 10 most common facet types:")
+    for rela, n in sorted(facet_counts.items(), key=lambda kv: -kv[1])[:10]:
+        print(f"        {n:>7,d}  {rela}")
 
-    print("\n[3/4] Finding anchors ...")
+    print("\n[3/4] Computing IS-A ancestor closure ...")
     t0 = time.time()
-    cuis = cache["cuis"]
-    tags = cache["tags"]
-    all_cuis = list(cuis)
-    if MAX_CONCEPTS:
-        all_cuis = all_cuis[:MAX_CONCEPTS]
-        print(f"      LIMITED to first {len(all_cuis):,} CUIs")
-
-    anchors_by_cui = {}
-    multi_anchor_count = 0
-    self_only_count = 0
-    total_anchor_entries = 0
-
-    for i, cui in enumerate(all_cuis):
-        if i % 50000 == 0 and i > 0:
-            rate = i / (time.time() - t0)
-            eta_min = (len(all_cuis) - i) / max(1, rate) / 60
-            print(f"      {i:,} / {len(all_cuis):,}  ({rate:.0f}/sec, "
-                  f"ETA {eta_min:.1f}min)")
-        anchors = find_anchors(cui, parents, attrs, tags)
-        anchors_by_cui[cui] = anchors
-        total_anchor_entries += len(anchors)
-        if len(anchors) > 1:
-            multi_anchor_count += 1
-        if len(anchors) == 1 and anchors[0]["anchor"] == cui:
-            self_only_count += 1
-    print(f"      anchored {len(anchors_by_cui):,} CUIs in {time.time()-t0:.1f}s")
-
-    # ---- Anchor quality post-pass ----
-    if MAX_MEMBERS_PER_ANCHOR is not None:
-        print(f"\n[3.5/4] Filtering over-abstract anchors "
-              f"(threshold = {MAX_MEMBERS_PER_ANCHOR:,} members) ...")
-        t0 = time.time()
-
-        # Count members per anchor across all CUIs
-        member_counts = defaultdict(int)
-        for entries in anchors_by_cui.values():
-            for e in entries:
-                member_counts[e["anchor"]] += 1
-
-        # Identify over-threshold anchors
-        bad_anchors = {a for a, n in member_counts.items()
-                       if n > MAX_MEMBERS_PER_ANCHOR}
-
-        if not bad_anchors:
-            print(f"      no anchors exceed threshold; no changes")
-        else:
-            print(f"      found {len(bad_anchors):,} over-threshold anchors "
-                  f"(will be dropped):")
-            sorted_bad = sorted(((a, member_counts[a]) for a in bad_anchors),
-                                key=lambda kv: -kv[1])
-            for anchor, n in sorted_bad[:15]:
-                label = cache["labels"].get(anchor, "?")
-                # Truncate long labels
-                label_short = label[:60] + ("..." if len(label) > 60 else "")
-                print(f"        {n:>6,d}  {anchor}  {label_short}")
-            if len(sorted_bad) > 15:
-                print(f"        ... and {len(sorted_bad) - 15} more")
-
-            # Apply: drop bad anchors from each CUI's list
-            new_self_only = 0
-            new_multi = 0
-            new_total_entries = 0
-            for cui in list(anchors_by_cui.keys()):
-                entries = anchors_by_cui[cui]
-                # Keep only entries whose anchor is not over-threshold
-                kept = [e for e in entries if e["anchor"] not in bad_anchors]
-                if kept:
-                    anchors_by_cui[cui] = kept
-                else:
-                    # All anchors were over-threshold → self-only
-                    anchors_by_cui[cui] = [{
-                        "anchor": cui, "lost": "abstract_anchors_filtered",
-                        "path_length": 1, "rels_used": [],
-                    }]
-
-            # Recount stats
-            self_only_count = 0
-            multi_anchor_count = 0
-            total_anchor_entries = 0
-            for cui, entries in anchors_by_cui.items():
-                total_anchor_entries += len(entries)
-                if len(entries) > 1:
-                    multi_anchor_count += 1
-                if len(entries) == 1 and entries[0]["anchor"] == cui:
-                    self_only_count += 1
-            print(f"      done in {time.time()-t0:.1f}s")
-            print(f"      self-only after filter:    {self_only_count:,}")
-            print(f"      multi-topic after filter:  {multi_anchor_count:,}")
+    parents = build_isa_parents(cache)
+    # We only need ancestor sets for CUIs that appear as facet values,
+    # PLUS all CUIs in our universe (for query matching).
+    target_cuis = set(cache["cuis"])
+    for f in cui_facets.values():
+        for vals in f.values():
+            target_cuis.update(vals)
+    print(f"      Computing ancestors for {len(target_cuis):,} CUIs ...")
+    ancestors = compute_ancestors(parents, target_cuis, MAX_ANCESTOR_DEPTH)
+    avg_anc = sum(len(a) for a in ancestors.values()) / max(len(ancestors), 1)
+    print(f"      {len(ancestors):,} ancestor sets, avg {avg_anc:.1f} ancestors each")
+    print(f"      in {time.time()-t0:.1f}s")
 
     print("\n[4/4] Saving pickle ...")
     t0 = time.time()
-    unique_anchors = {e["anchor"] for entries in anchors_by_cui.values() for e in entries}
-    labels = cache["labels"]
-    needed = set(anchors_by_cui.keys()) | unique_anchors
-    out_labels = {c: labels[c] for c in needed if c in labels}
-    out_tags = {c: tags[c] for c in needed if c in tags}
-
     payload = {
         "built_at": datetime.datetime.now().isoformat(),
         "cache_fetched_at": cache.get("fetched_at"),
         "config": {
-            "strict_slots": sorted(STRICT_SLOTS),
-            "traversal_rels": TRAVERSAL_RELS,
-            "max_members_per_anchor": MAX_MEMBERS_PER_ANCHOR,
-            "attribute_relas": sorted(ATTRIBUTE_RELAS) if ATTRIBUTE_RELAS else None,
-            "sty_gating": (
-                sorted(VALID_PARENT_STY_BY_SEED_STY.keys())
-                if VALID_PARENT_STY_BY_SEED_STY else None
-            ),
+            "max_ancestor_depth": MAX_ANCESTOR_DEPTH,
         },
-        "anchors": anchors_by_cui,
-        "labels":  out_labels,
-        "tags":    out_tags,
+        "cui_facets":    cui_facets,
+        "isa_ancestors": ancestors,
+        "labels":        cache["labels"],
+        "tags":          cache["tags"],
         "stats": {
-            "total_cuis": len(anchors_by_cui),
-            "unique_anchors": len(unique_anchors),
-            "self_only": self_only_count,
-            "multi_anchor": multi_anchor_count,
-            "total_anchor_entries": total_anchor_entries,
+            "total_cuis":             len(cache["cuis"]),
+            "cuis_with_facets":       n_cuis_with_facets,
+            "total_facet_entries":    n_total_facets,
+            "total_facet_values":     n_total_values,
+            "facet_type_counts":      dict(facet_counts),
         },
     }
     with open(OUTPUT_PATH, "wb") as f:
         pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-    size_mb = os.path.getsize(OUTPUT_PATH) / (1024 * 1024)
+    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
     print(f"      wrote {size_mb:.1f} MB in {time.time()-t0:.1f}s")
 
     print("\n" + "=" * 60)
     print("DONE")
-    print(f"  Total CUIs            : {len(anchors_by_cui):,}")
-    print(f"  Unique anchors        : {len(unique_anchors):,}")
-    print(f"  Self-only             : {self_only_count:,} "
-          f"({100*self_only_count/max(1,len(anchors_by_cui)):.1f}%)")
-    print(f"  Multi-topic CUIs      : {multi_anchor_count:,} "
-          f"({100*multi_anchor_count/max(1,len(anchors_by_cui)):.1f}%)")
-    print(f"  Avg topics per CUI    : "
-          f"{total_anchor_entries/max(1,len(anchors_by_cui)):.2f}")
-    print(f"  Compression           : "
-          f"{len(anchors_by_cui)/max(1,len(unique_anchors)):.2f}x")
-    print(f"  Pickle                : {OUTPUT_PATH} ({size_mb:.1f} MB)")
+    print(f"  Total CUIs              : {len(cache['cuis']):,}")
+    print(f"  CUIs with facets        : {n_cuis_with_facets:,} "
+          f"({100*n_cuis_with_facets/max(len(cache['cuis']),1):.1f}%)")
+    print(f"  Distinct facet types    : {len(facet_counts):,}")
+    print(f"  Avg facets per CUI      : {n_total_facets/max(n_cuis_with_facets,1):.2f}")
+    print(f"  IS-A ancestor sets      : {len(ancestors):,}")
+    print(f"  Pickle                  : {OUTPUT_PATH} ({size_mb:.1f} MB)")
     print("=" * 60)
 
 
