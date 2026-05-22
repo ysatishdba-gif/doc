@@ -51,32 +51,25 @@ SAB           = "SNOMEDCT_US"
 LANGUAGE      = "ENG"
 CACHE_SCHEMA_VERSION = 2
 
-# Mapping from SNOMED RELAs to logical facet names. Each facet may pull
-# from one or more RELAs (e.g., procedure_site_of and direct_procedure_site
-# both feed the "procedure_site" facet).
+# Facet derivation policy.
 #
-# The disorder facet is special: it comes from the seed CUI's own value
-# (normalized), not from a RELA. Handled separately below.
-RELA_TO_FACET = {
-    "has_finding_site":            "site",
-    "finding_site_of":             "site",
-    "has_associated_morphology":   "morphology",
-    "associated_morphology_of":    "morphology",
-    "has_causative_agent":         "agent",
-    "causative_agent_of":          "agent",
-    "has_method":                  "procedure",
-    "method_of":                   "procedure",
-    "has_procedure_site":          "procedure_site",
-    "has_direct_procedure_site":   "procedure_site",
-    "has_indirect_procedure_site": "procedure_site",
-    "has_active_ingredient":       "drug",
-    "active_ingredient_of":        "drug",
-    "has_ingredient":              "drug",
-}
+# Every named RO RELA becomes its own facet, named after the RELA itself.
+# No filtering, no merging, no clinical judgment about which RELAs matter.
+# This is the most data-driven choice: every defining relationship in
+# MRREL contributes to the facet signature.
+#
+# If specific RELAs turn out to be noise in practice, they can be added
+# to RELA_BLOCKLIST below. By default, NO RELAs are blocked.
+#
+# The 'disorder' facet is special: it comes from the seed CUI's own
+# value (normalized), not from a RELA. See SEED_DERIVED_FACETS.
 
-# Facets where we also derive the value from the seed CUI itself
-# (not from a RELA). For these, the CUI's own canonical ancestor is
-# the facet value.
+# Optional blocklist for RELAs you decide are noise. Empty by default.
+RELA_BLOCKLIST = set()
+
+# Facets where the value is derived from the seed CUI itself (not from a
+# RELA). For each facet here, the CUI's own canonical ancestor is the
+# facet value.
 SEED_DERIVED_FACETS = {"disorder"}
 
 # Auto-extraction: for each facet's value space, an IS-A ancestor is
@@ -244,20 +237,22 @@ def build_isa_children(parents):
 
 def extract_raw_facets(cache):
     """
-    Pull RELAs from MRREL and bucket them by logical facet name.
-    Returns cui_raw_facets[cui][facet_name] = set of value CUIs.
+    Pull RELAs from MRREL. Every named RO RELA becomes its own facet,
+    named after the RELA itself (e.g., 'has_finding_site' is the facet
+    name, not 'site').
 
-    Multi-value: a single CUI may have multiple values per RELA AND
-    multiple RELAs feeding the same facet — we union all into one set.
+    RELAs in RELA_BLOCKLIST are excluded.
+
+    Returns cui_raw_facets[cui][rela_name] = set of value CUIs.
     """
     cui_raw_facets = defaultdict(lambda: defaultdict(set))
     for cui1, cui2, rel, rela in cache["mrrel_rows"]:
         if rel != "RO" or not rela or rela == "isa":
             continue
-        facet = RELA_TO_FACET.get(rela)
-        if facet is None:
+        if rela in RELA_BLOCKLIST:
             continue
-        cui_raw_facets[cui2][facet].add(cui1)
+        # The facet name IS the RELA name — no mapping, no merging
+        cui_raw_facets[cui2][rela].add(cui1)
     return cui_raw_facets
 
 
@@ -516,7 +511,10 @@ def main():
     print("=" * 60)
     print(f"  cache         : {CACHE_PATH}")
     print(f"  output        : {OUTPUT_PATH}")
-    print(f"  facets        : {sorted(set(RELA_TO_FACET.values()) | SEED_DERIVED_FACETS)}")
+    print(f"  facet policy  : every named RO RELA becomes a facet")
+    if RELA_BLOCKLIST:
+        print(f"  blocklist     : {sorted(RELA_BLOCKLIST)}")
+    print(f"  seed-derived  : {sorted(SEED_DERIVED_FACETS)}")
     print(f"  bounds        : descendants in [{MIN_DESCENDANTS}, {MAX_DESCENDANTS}]")
 
     print("\n[1/5] Getting UMLS data ...")
@@ -606,7 +604,9 @@ def main():
         "built_at": datetime.datetime.now().isoformat(),
         "cache_fetched_at": cache.get("fetched_at"),
         "config": {
-            "facets":            sorted(set(RELA_TO_FACET.values()) | SEED_DERIVED_FACETS),
+            "facets":            sorted(canonical_sets.keys()),
+            "rela_blocklist":    sorted(RELA_BLOCKLIST),
+            "seed_derived":      sorted(SEED_DERIVED_FACETS),
             "min_descendants":   MIN_DESCENDANTS,
             "max_descendants":   MAX_DESCENDANTS,
             "per_facet_bounds":  PER_FACET_BOUNDS,
