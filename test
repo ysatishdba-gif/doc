@@ -33,8 +33,6 @@ CACHE_PATH = "umls_cache.pkl"
 
 # Pull the same logic from build_facet_index so this matches what the
 # real build would produce.
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_facet_index as bfi
 
 
