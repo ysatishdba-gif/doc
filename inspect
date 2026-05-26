@@ -1,133 +1,261 @@
-"""
-lookup_topics.py
-----------------
-Look up the topic IDs for granular clinical concepts to evaluate
-whether the topic system supports fine-grained retrieval.
+Loaded topic_lookup.pkl
+  built_at        : 2026-05-26T16:58:41.916705
+  total canonicals: 32,778
+  CUIs with topics: 359,245
+  detection       : STY-descendant percentile + mega-root filter
+  excluded CUIs   : ['C2720507']
+  pruning         : False
+  sibling exp.    : False
+  singleton fb    : False
 
-Topics like:
-  - imaging studies (MRI, CT, x-ray)
-  - vital signs
-  - current medication list
-  - allergies (severe)
-  - location-specific pain (left knee pain)
-  - oxygen-related findings
+========================================================================
+  C0011923  Imaging (procedure)
+========================================================================
+  STY: Diagnostic Procedure
+  -> 1 topic(s):
+     C0011923  Imaging (procedure)
+        (65 CUIs share this topic)
 
-The build prints the actual label for each CUI from your cache, so
-if a CUI doesn't match what you expected, the actual label is shown.
-Any CUI returning "?" means the CUI isn't in your cache and should be
-replaced with the correct one.
-"""
+========================================================================
+  C0040405  Computerized transaxial tomography
+========================================================================
+  STY: Diagnostic Procedure
+  -> 1 topic(s):
+     C0040405  Computerized transaxial tomography
+        (29 CUIs share this topic)
 
-import pickle
+========================================================================
+  C0034579  OPG - Orthopantomogram
+========================================================================
+  STY: Diagnostic Procedure
+  -> 2 topic(s):
+     C1962945  Radiographic imaging procedure (procedure)
+        (32 CUIs share this topic)
+     C2711858  Imaging of head
+        (28 CUIs share this topic)
 
+========================================================================
+  C0041618  Ultrasonography
+========================================================================
+  STY: Diagnostic Procedure
+  -> 1 topic(s):
+     C0041618  Ultrasonography
+        (55 CUIs share this topic)
 
-PICKLE_PATH = "topic_lookup.pkl"
+========================================================================
+  C0024487  Magnetic resonance spectroscopy
+========================================================================
+  STY: Diagnostic Procedure
+  -> 1 topic(s):
+     C0024487  Magnetic resonance spectroscopy
+        (12 CUIs share this topic)
 
-# Each tuple is (CUI, expected_concept_for_human_reading).
-# CUIs are best-guess from public UMLS references — verify against
-# the printed actual label.
-CUIS_TO_LOOKUP = [
-    # === IMAGING ===
-    ("C0011923",  "Imaging procedure"),
-    ("C0024485",  "Magnetic resonance imaging (general)"),
-    ("C0040405",  "Computed tomography"),
-    ("C0034579",  "Radiography (general X-ray)"),
-    ("C0041618",  "Ultrasonography"),
-    ("C0024487",  "MRI of brain"),
-    ("C0412636",  "MRI of knee"),
+========================================================================
+  C0412636  ?
+========================================================================
+  -> CUI not in cache (skipping)
 
-    # === VITAL SIGNS ===
-    ("C0518766",  "Vital signs (general concept)"),
-    ("C0005823",  "Blood pressure"),
-    ("C0018810",  "Heart rate"),
-    ("C0231832",  "Respiratory rate"),
-    ("C0005903",  "Body temperature"),
-    ("C0428572",  "Oxygen saturation"),
+========================================================================
+  C0518766  ?
+========================================================================
+  -> CUI not in cache (skipping)
 
-    # === MEDICATION LIST / RECONCILIATION ===
-    ("C0150270",  "Medication review (current med list)"),
-    ("C2587213",  "Medication reconciliation"),
-    ("C0150255",  "Patient medication"),
-    ("C0013227",  "Pharmaceutical preparation (drug)"),
+========================================================================
+  C0005823  Blood pressure
+========================================================================
+  STY: Organism Function
+  -> 1 topic(s):
+     C0005823  Blood pressure
+        (72 CUIs share this topic)
 
-    # === ALLERGY / SEVERE ALLERGY ===
-    ("C0020517",  "Hypersensitivity / Allergy (general)"),
-    ("C1527304",  "Allergic reaction"),
-    ("C0002792",  "Anaphylaxis (severe allergic reaction)"),
-    ("C0013182",  "Drug hypersensitivity"),
-    ("C1318469",  "Severe allergic reaction"),
+========================================================================
+  C0018810  Heart rate
+========================================================================
+  STY: Clinical Attribute
+  -> 1 topic(s):
+     C0018810  Heart rate
+        (10 CUIs share this topic)
 
-    # === LEFT KNEE PAIN (specific location) ===
-    ("C2142181",  "Pain of left knee"),
-    ("C0231749",  "Knee pain (general)"),
-    ("C0030193",  "Pain (general concept)"),
+========================================================================
+  C0231832  Respiratory rate (observable entity)
+========================================================================
+  STY: Clinical Attribute
+  -> 1 topic(s):
+     C1285809  Respiration observable
+        (112 CUIs share this topic)
 
-    # === OXYGEN / RESPIRATORY ===
-    ("C0030054",  "Oxygen"),
-    ("C0030073",  "Oxygen therapy"),
-    ("C2939193",  "Hypoxia / Low oxygen"),
+========================================================================
+  C0005903  Body temperature
+========================================================================
+  STY: Organism Attribute
+  -> 1 topic(s):
+     C0005903  Body temperature
+        (25 CUIs share this topic)
 
-    # === COMMON DIAGNOSES (anchors — already known to work) ===
-    ("C0032285",  "Pneumonia"),
-    ("C0027051",  "Myocardial infarction"),
-    ("C0011849",  "Diabetes mellitus"),
-    ("C0020538",  "Hypertension"),
-]
+========================================================================
+  C0428572  Urine zinc level
+========================================================================
+  STY: Laboratory Procedure
+  -> 1 topic(s):
+     C2711016  Measurement of heavy metal in urine specimen
+        (24 CUIs share this topic)
 
+========================================================================
+  C0150270  Medication management
+========================================================================
+  STY: Health Care Activity
+  -> 1 topic(s):
+     C0150270  Medication management
+        (43 CUIs share this topic)
 
-def lookup(cui, expected_concept, payload):
-    labels = payload["labels"]
-    tags = payload["tags"]
-    cui_topic_ids = payload["cui_topic_ids"]
-    topic_to_canonical = payload["topic_to_canonical"]
-    topic_to_cuis = payload["topic_to_cuis"]
+========================================================================
+  C2587213  Control (attribute)
+========================================================================
+  STY: Functional Concept
+  -> 1 topic(s):
+     C2587213  Control (attribute)
+        (10 CUIs share this topic)
 
-    cui_label = labels.get(cui, "?")
-    cui_stys = sorted(tags.get(cui, frozenset()))
+========================================================================
+  C0150255  Hypothermia treatment
+========================================================================
+  STY: Therapeutic or Preventive Procedure
+  -> 1 topic(s):
+     C0586955  Patient warming therapy
+        (3 CUIs share this topic)
 
-    print(f"\n{'='*72}")
-    print(f"  {cui}  {cui_label}")
-    print(f"  [expected: {expected_concept}]")
-    print(f"{'='*72}")
-    if cui_stys:
-        print(f"  STY: {', '.join(cui_stys)}")
+========================================================================
+  C0013227  Drug or medicament (substance)
+========================================================================
+  STY: Pharmacologic Substance
+  -> 1 topic(s):
+     C0439861  Substances
+        (1,052 CUIs share this topic)
 
-    if cui_label == "?":
-        print(f"  -> CUI not in cache (skipping)")
-        return
+========================================================================
+  C0020517  Hypersensitivity reaction (disorder)
+========================================================================
+  STY: Pathologic Function
+  -> 1 topic(s):
+     C0020517  Hypersensitivity reaction (disorder)
+        (11 CUIs share this topic)
 
-    tids = cui_topic_ids.get(cui)
-    if not tids:
-        print(f"  -> NO TOPICS (orphan)")
-        return
+========================================================================
+  C1527304  Allergic reaction
+========================================================================
+  STY: Pathologic Function
+  -> 1 topic(s):
+     C1527304  Allergic reaction
+        (614 CUIs share this topic)
 
-    print(f"  -> {len(tids)} topic(s):")
-    for tid in sorted(tids):
-        canon_cui = topic_to_canonical.get(tid)
-        canon_label = labels.get(canon_cui, "?") if canon_cui else "?"
-        members = topic_to_cuis.get(tid, set())
-        canon_label_short = canon_label[:55] + "..." if len(canon_label) > 55 else canon_label
-        print(f"     {canon_cui}  {canon_label_short}")
-        print(f"        ({len(members):,} CUIs share this topic)")
+========================================================================
+  C0002792  Anaphylaxis
+========================================================================
+  STY: Pathologic Function
+  -> 1 topic(s):
+     C0002792  Anaphylaxis
+        (27 CUIs share this topic)
 
+========================================================================
+  C0013182  Allergy to drug
+========================================================================
+  STY: Pathologic Function
+  -> 2 topic(s):
+     C0237865  Propensity to adverse reactions to drug
+        (603 CUIs share this topic)
+     C1527304  Allergic reaction
+        (614 CUIs share this topic)
 
-def main():
-    with open(PICKLE_PATH, "rb") as f:
-        payload = pickle.load(f)
-    print(f"Loaded {PICKLE_PATH}")
-    print(f"  built_at        : {payload['built_at']}")
-    print(f"  total canonicals: {len(payload['canonicals']):,}")
-    print(f"  CUIs with topics: {len(payload['cui_topic_ids']):,}")
-    if "config" in payload:
-        cfg = payload["config"]
-        print(f"  detection       : {cfg.get('detection', '?')}")
-        print(f"  excluded CUIs   : {cfg.get('canonical_exclude', '?')}")
-        print(f"  pruning         : {cfg.get('prune_stacked_canonicals', '?')}")
-        print(f"  sibling exp.    : {cfg.get('sibling_expansion', '?')}")
-        print(f"  singleton fb    : {cfg.get('singleton_fallback', '?')}")
+========================================================================
+  C1318469  Lubrication (procedure)
+========================================================================
+  STY: Therapeutic or Preventive Procedure
+  -> NO TOPICS (orphan)
 
-    for cui, expected in CUIS_TO_LOOKUP:
-        lookup(cui, expected, payload)
+========================================================================
+  C2142181  Pain of left knee joint (finding)
+========================================================================
+  STY: Sign or Symptom
+  -> 2 topic(s):
+     C0231749  Pain of knee region
+        (9 CUIs share this topic)
+     C5442019  Pain of left knee
+        (6 CUIs share this topic)
 
+========================================================================
+  C0231749  Pain of knee region
+========================================================================
+  STY: Sign or Symptom
+  -> 1 topic(s):
+     C0231749  Pain of knee region
+        (9 CUIs share this topic)
 
-main()
+========================================================================
+  C0030193  Dolour
+========================================================================
+  STY: Sign or Symptom
+  -> 1 topic(s):
+     C0234185  Pain / sensation finding
+        (86 CUIs share this topic)
+
+========================================================================
+  C0030054  Elemental oxygen
+========================================================================
+  STY: Biologically Active Substance, Element, Ion, or Isotope, Pharmacologic Substance
+  -> 1 topic(s):
+     C0030054  Elemental oxygen
+        (14 CUIs share this topic)
+
+========================================================================
+  C0030073  Oxymorphone-containing product
+========================================================================
+  STY: Organic Chemical, Pharmacologic Substance
+  -> 4 topic(s):
+     C0376196  Opioid receptor agonist-containing product
+        (51 CUIs share this topic)
+     C0304416  Naturally occurring alkaloid
+        (89 CUIs share this topic)
+     C0577749  Phytochemical
+        (176 CUIs share this topic)
+     C4707826  Morphinane alkaloid
+        (47 CUIs share this topic)
+
+========================================================================
+  C2939193  Median
+========================================================================
+  STY: Spatial Concept
+  -> 1 topic(s):
+     C0441986  Relative sites
+        (321 CUIs share this topic)
+
+========================================================================
+  C0032285  Pneumonia (disorder)
+========================================================================
+  STY: Disease or Syndrome
+  -> 1 topic(s):
+     C0032285  Pneumonia (disorder)
+        (39 CUIs share this topic)
+
+========================================================================
+  C0027051  Myocardial infarction
+========================================================================
+  STY: Disease or Syndrome
+  -> 1 topic(s):
+     C0027051  Myocardial infarction
+        (20 CUIs share this topic)
+
+========================================================================
+  C0011849  Diabetes mellitus
+========================================================================
+  STY: Disease or Syndrome
+  -> 1 topic(s):
+     C0011849  Diabetes mellitus
+        (13 CUIs share this topic)
+
+========================================================================
+  C0020538  HTN - Hypertension
+========================================================================
+  STY: Disease or Syndrome
+  -> 1 topic(s):
+     C0020538  HTN - Hypertension
+        (43 CUIs share this topic)
