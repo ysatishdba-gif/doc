@@ -39,9 +39,8 @@ CACHE_PATH = "umls_cache.pkl"
 OUTPUT_PATH = "topic_lookup.pkl"
 
 # Canonical detection on IS-A graph
-STY_LOWER_PERCENTILE = 75
-STY_UPPER_PERCENTILE = 100
-MEGA_ROOT_PERCENTILE = 99
+STY_LOWER_PERCENTILE = 75    # CUI qualifies if STY-descendant count in top 25%
+MEGA_ROOT_PERCENTILE = 99    # but excludes top 1% by direct children count
 
 CANONICAL_EXCLUDE = {
     "C2720507",  # SNOMED CT has been created by combining SNOMED RT...
@@ -236,7 +235,6 @@ def find_subhierarchy_parents(cuis, children, tags):
 
     sorted_sty = sorted(sty_desc_count.values())
     sty_lower = percentile_value(sorted_sty, STY_LOWER_PERCENTILE)
-    sty_upper = percentile_value(sorted_sty, STY_UPPER_PERCENTILE)
 
     sorted_cc = sorted(cc.values())
     mega_root_threshold = percentile_value(sorted_cc, MEGA_ROOT_PERCENTILE)
@@ -245,7 +243,7 @@ def find_subhierarchy_parents(cuis, children, tags):
     for cui in non_leaf:
         n_sty_desc = sty_desc_count[cui]
         n_children = cc[cui]
-        if not (sty_lower <= n_sty_desc <= sty_upper):
+        if n_sty_desc < sty_lower:
             continue
         if n_children > mega_root_threshold:
             continue
@@ -253,7 +251,7 @@ def find_subhierarchy_parents(cuis, children, tags):
             "n_children": n_children,
             "sty_descendant_count": n_sty_desc,
         }
-    return found, sty_lower, sty_upper, mega_root_threshold
+    return found, sty_lower, mega_root_threshold
 
 
 def extract_canonicals(subhier_parents):
@@ -330,7 +328,7 @@ def main():
     print("=" * 60)
     print(f"  cache         : {CACHE_PATH}")
     print(f"  output        : {OUTPUT_PATH}")
-    print(f"  STY band      : [{STY_LOWER_PERCENTILE}, {STY_UPPER_PERCENTILE}]")
+    print(f"  STY threshold : top {100 - STY_LOWER_PERCENTILE}% by STY-descendant count")
     print(f"  mega filter   : exclude top {100-MEGA_ROOT_PERCENTILE}% by direct children")
     print(f"  excluded CUIs : {len(CANONICAL_EXCLUDE)} "
           f"({', '.join(sorted(CANONICAL_EXCLUDE))})")
@@ -381,12 +379,12 @@ def main():
 
     print("\n[5] Finding canonicals (STY-coverage on IS-A graph) ...")
     t0 = time.time()
-    subhier_parents, sty_lower, sty_upper, mega_thresh = find_subhierarchy_parents(
+    subhier_parents, sty_lower, mega_thresh = find_subhierarchy_parents(
         cache["cuis"], isa_children, cache["tags"],
     )
     print(f"  Found {len(subhier_parents):,} candidates "
           f"in {time.time()-t0:.1f}s")
-    print(f"  STY descendant cutoffs: [{sty_lower:,}, {sty_upper:,}]")
+    print(f"  STY descendant cutoff: ≥ {sty_lower:,}")
     print(f"  Mega-root threshold (children count): {mega_thresh}")
 
     canonicals, canonical_info = extract_canonicals(subhier_parents)
@@ -499,10 +497,8 @@ def main():
         "cache_fetched_at": cache.get("fetched_at"),
         "config": {
             "sty_lower_percentile": STY_LOWER_PERCENTILE,
-            "sty_upper_percentile": STY_UPPER_PERCENTILE,
             "mega_root_percentile": MEGA_ROOT_PERCENTILE,
             "actual_sty_lower": sty_lower,
-            "actual_sty_upper": sty_upper,
             "actual_mega_root_threshold": mega_thresh,
             "canonical_exclude": sorted(CANONICAL_EXCLUDE),
             "topic_assignment": "nearest canonical via multi-source BFS",
