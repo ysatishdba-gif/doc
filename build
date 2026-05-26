@@ -1,32 +1,30 @@
 """
 build_topics.py
 ---------------
-Build CUI -> [topic_ids] lookup via nearest-canonical IS-A roll-up.
+Build CUI -> [topic_ids] lookup with TWO topic systems:
+
+  A) cui_isa_topics:  topics reached via IS-A graph only
+  B) cui_rela_topics: topics reached via multi-RELA graph (non-IS-A relations)
+
+Both systems use the SAME canonical set (detected on IS-A graph by
+STY-descendant count). At retrieval time, the caller can use IS-A topics,
+RELA topics, or their union.
 
 ARCHITECTURE:
 
-  1. Organizing nodes (= topics) are detected by their STY-DESCENDANT
-     COUNT — how many of their descendants carry any UMLS semantic
-     type. A node with many STY-bearing descendants organizes
-     clinically meaningful content. A node with few does not.
+  1. Canonicals (= topic anchors) are detected by STY-DESCENDANT count
+     on the IS-A graph. Top 25% by descendant count, minus top 1% by
+     direct children (mega-root filter), minus explicit excludes.
 
-     We use a percentile cut (top 25% by default) on this distribution.
-     Plus a mega-root exclusion (top 1% by direct children count) to
-     prevent SNOMED roots from absorbing the whole ontology.
+  2. IS-A topic mapping: for each CUI, nearest canonical(s) reachable
+     via IS-A edges. Multi-source downward BFS from canonicals.
 
-     Earlier versions used raw children-count percentile, which
-     selected structurally bushy but clinically marginal nodes
-     (taxonomic, anatomical microstructure). STY-descendant count
-     better proxies for clinical centrality.
+  3. RELA topic mapping: for each CUI, nearest canonical(s) reachable
+     via the multi-RELA (non-IS-A) graph. Same BFS algorithm, different
+     edge set. The RELA graph is undirected and uses all non-IS-A
+     relations after deduplicating inverse pairs.
 
-  2. Stacked canonicals are pruned by keep-HIGHEST: if A is an
-     ancestor of B and both are canonical, B is dropped. This keeps
-     broader organizing concepts as topics.
-
-  3. Each CUI's topics = NEAREST canonical ancestors via multi-source
-     downward BFS from all canonicals at once.
-
-
+Output pickle contains BOTH topic mappings plus shared metadata.
 """
 
 import datetime
@@ -40,70 +38,21 @@ from collections import defaultdict, Counter, deque
 CACHE_PATH = "umls_cache.pkl"
 OUTPUT_PATH = "topic_lookup.pkl"
 
-
-# Secondary filter: exclude mega-roots (top MEGA_ROOT_PERCENTILE by
-# children count). These would absorb most of the ontology.
+# Canonical detection on IS-A graph
 STY_LOWER_PERCENTILE = 75
-STY_UPPER_PERCENTILE = 100   # no upper bound — let big organizers in
-MEGA_ROOT_PERCENTILE = 99    # exclude top 1% by direct children count
-
+STY_UPPER_PERCENTILE = 100
+MEGA_ROOT_PERCENTILE = 99
 
 CANONICAL_EXCLUDE = {
     "C2720507",  # SNOMED CT has been created by combining SNOMED RT...
 }
-
-# Whether to prune nested/stacked canonicals.
-
-# When FALSE (default): keep all qualifying canonicals, even when one
-# is an IS-A ancestor of another. The nearest-canonical BFS naturally
-# picks the closest one for each CUI, so a CUI under both Pneumonia
-# (sub-canonical) and Disorder (super-canonical) gets Pneumonia as
-# its topic. CUIs under Disorder but NOT under any sub-canonical get
-# Disorder. Multiple levels of abstraction are preserved.
-#
-# When TRUE: drop canonicals that have other canonicals as ancestors
-# (keep highest). Forces broader topics but can collapse everything
-# to a few mega-roots if SNOMED roots qualify.
-PRUNE_STACKED_CANONICALS = False
-
-# Sibling expansion: after assigning the nearest canonical topic to
-# each CUI, expand the topic set to include OTHER CANONICALS that
-# share an IS-A parent with the assigned canonical.
-#
-# Effect: trades precision for recall. A CUI assigned to Pneumonia
-# (e.g., "Acute streptococcal pneumonia") would also get Bronchitis,
-# Pneumonitis, etc. as topics — any canonical that co-occurs as a
-# child of one of Pneumonia's IS-A parents.
-#
-# When True: wider retrieval but topic count per CUI inflates by the
-# average sibling-canonical degree.
-# When False (default): each CUI keeps its nearest canonical(s) only.
-SIBLING_EXPANSION = False
-
-# When True: CUIs with no canonical ancestor become their OWN topic
-# (a single-member topic). Ensures every CUI is retrievable but inflates
-# the topic count by however many "orphan" CUIs there are.
-SINGLETON_FALLBACK = False
 
 
 # ============================================================================
 # Helpers
 # ============================================================================
 
-def build_isa_graph(cache):
-    """parents[child] -> set of direct IS-A parents
-       children[parent] -> set of direct IS-A children"""
-    parents = defaultdict(set)
-    children = defaultdict(set)
-    for cui1, cui2, rel, rela in cache["mrrel_rows"]:
-        if rel == "CHD" and rela == "isa":
-            parents[cui2].add(cui1)
-            children[cui1].add(cui2)
-    return parents, children
-
-
 def percentile_value(sorted_values, p):
-    """Get the value at percentile p (0-100) from a sorted list."""
     if not sorted_values:
         return 0
     idx = min(int(len(sorted_values) * p / 100), len(sorted_values) - 1)
@@ -115,32 +64,150 @@ def hash_topic(cui):
     return "tp_" + hashlib.sha1(cui.encode()).hexdigest()[:12]
 
 
+def build_isa_graph(cache):
+    """parents[child] -> {direct IS-A parents}
+       children[parent] -> {direct IS-A children}"""
+    parents = defaultdict(set)
+    children = defaultdict(set)
+    for cui1, cui2, rel, rela in cache["mrrel_rows"]:
+        if rel == "CHD" and rela == "isa":
+            parents[cui2].add(cui1)
+            children[cui1].add(cui2)
+    return parents, children
+
+
+def compute_depth_from_roots(cuis, parents, children):
+    """dict[cui] -> minimum BFS depth from any IS-A root."""
+    roots = {c for c in cuis if not parents.get(c)}
+    depth = {}
+    dq = deque((r, 0) for r in roots)
+    while dq:
+        cui, d = dq.popleft()
+        if cui in depth and depth[cui] <= d:
+            continue
+        depth[cui] = d
+        for ch in children.get(cui, ()):
+            dq.append((ch, d + 1))
+    return depth
+
+
 # ============================================================================
-# Subhierarchy parent detection (STY-coverage based)
+# Inverse-pair detection (for the RELA graph)
+# ============================================================================
+
+def detect_inverse_pairs(cache, sample_size=200, count_tol=0.02):
+    """
+    Detect inverse-pair (REL, RELA)s from the cache itself.
+
+    Two (REL, RELA) keys A and B are inverse pairs if:
+      - Their edge counts match within count_tol relative tolerance
+      - For sampled edges (a, b) under A, the reversed (b, a) exists in B
+
+    For each detected pair, keep one side and drop the other:
+      - If one side is CHD/isa, ALWAYS keep CHD/isa
+      - Otherwise: alphabetically-first RELA name wins (deterministic)
+
+    Returns:
+        included_relas: set of (REL, RELA) tuples retained
+        dropped_relas:  set of (REL, RELA) tuples dropped as inverse duplicates
+        pair_map:       dict[dropped_key] -> kept_key (so user sees pairings)
+    """
+    edges_by_key = defaultdict(list)
+    edge_set_by_key = defaultdict(set)
+    for cui1, cui2, rel, rela in cache["mrrel_rows"]:
+        key = (rel, rela)
+        edges_by_key[key].append((cui1, cui2))
+        edge_set_by_key[key].add((cui1, cui2))
+
+    counts = {k: len(v) for k, v in edges_by_key.items()}
+    keys = list(counts.keys())
+
+    # Candidate pairs by similar edge count
+    candidate_pairs = []
+    for i, ka in enumerate(keys):
+        for kb in keys[i+1:]:
+            ca, cb = counts[ka], counts[kb]
+            if ca == 0 or cb == 0:
+                continue
+            ratio = abs(ca - cb) / max(ca, cb)
+            if ratio <= count_tol:
+                candidate_pairs.append((ka, kb))
+
+    # Verify by sampling reversed edges
+    verified_pairs = []
+    for (ka, kb) in candidate_pairs:
+        edges_a = edges_by_key[ka]
+        edges_b_set = edge_set_by_key[kb]
+        sample = edges_a[:sample_size]
+        n_reversed = sum(1 for (a, b) in sample if (b, a) in edges_b_set)
+        if n_reversed >= 0.9 * len(sample):
+            verified_pairs.append((ka, kb))
+
+    dropped = set()
+    pair_map = {}
+    ISA_KEY = ("CHD", "isa")
+    for (ka, kb) in verified_pairs:
+        if ka == ISA_KEY:
+            kept, dropped_one = ka, kb
+        elif kb == ISA_KEY:
+            kept, dropped_one = kb, ka
+        elif ka[1] <= kb[1]:
+            kept, dropped_one = ka, kb
+        else:
+            kept, dropped_one = kb, ka
+        if dropped_one in dropped:
+            continue
+        dropped.add(dropped_one)
+        pair_map[dropped_one] = kept
+
+    included = set(keys) - dropped
+    return included, dropped, pair_map
+
+
+# ============================================================================
+# RELA graph (non-IS-A relations, undirected, deduplicated)
+# ============================================================================
+
+def build_rela_graph(cache, included_relas):
+    """
+    Build an undirected graph from non-IS-A RELAs only.
+
+    Returns:
+        rela_neighbors[cui] -> set of CUIs connected via any non-IS-A
+                               included RELA (bidirectional)
+        rela_edge_counts -> dict[(rel, rela)] -> int
+    """
+    rela_neighbors = defaultdict(set)
+    rela_edge_counts = Counter()
+
+    # Exclude IS-A from the RELA graph — that's the whole point of separation
+    isa_keys = {("CHD", "isa"), ("PAR", "inverse_isa")}
+
+    for cui1, cui2, rel, rela in cache["mrrel_rows"]:
+        key = (rel, rela)
+        if key in isa_keys:
+            continue
+        if key not in included_relas:
+            continue
+        if cui1 == cui2:
+            continue
+        rela_neighbors[cui1].add(cui2)
+        rela_neighbors[cui2].add(cui1)
+        rela_edge_counts[key] += 1
+
+    return rela_neighbors, rela_edge_counts
+
+
+# ============================================================================
+# Canonical detection (on IS-A graph)
 # ============================================================================
 
 def find_subhierarchy_parents(cuis, children, tags):
     """
-    A CUI qualifies as a subhierarchy parent if BOTH:
-      (1) Its STY-bearing-descendant count is in the top
-          [STY_LOWER_PERCENTILE, STY_UPPER_PERCENTILE] of the graph's
-          distribution. This measures "how much typed content does
-          this node organize" — a better proxy for clinical centrality
-          than raw children-count.
-      (2) Its direct children-count is NOT in the top MEGA_ROOT_PERCENTILE
-          (excludes the few mega-roots that would absorb most of the
-          ontology).
-
-    Computing STY-descendant-count requires one reverse-topological
-    pass over the graph. We use memoized BFS on each non-leaf node.
-
-    Returns:
-      found:               dict cui -> structural metrics
-      sty_lower, sty_upper, mega_root_threshold:  the actual cutoffs
+    A CUI qualifies as canonical if:
+      (1) STY-bearing-descendant count in [STY_LOWER_PCT, STY_UPPER_PCT]
+      (2) Direct children count NOT in top MEGA_ROOT_PERCENTILE
     """
-    # Compute STY-descendant-count for every non-leaf node.
-    # A descendant "counts" if it has any UMLS semantic type.
-    sty_desc_count = {}
     desc_cache = {}
 
     def descendants(c):
@@ -160,20 +227,17 @@ def find_subhierarchy_parents(cuis, children, tags):
         return visited
 
     non_leaf = [c for c in cuis if children.get(c)]
+    sty_desc_count = {}
     for cui in non_leaf:
         desc = descendants(cui)
-        n_sty_desc = sum(1 for d in desc if tags.get(d))
-        sty_desc_count[cui] = n_sty_desc
+        sty_desc_count[cui] = sum(1 for d in desc if tags.get(d))
 
-    # Children-count distribution (for mega-root filter)
     cc = {c: len(children.get(c, ())) for c in non_leaf}
 
-    # Percentile cuts on STY-descendant distribution
     sorted_sty = sorted(sty_desc_count.values())
     sty_lower = percentile_value(sorted_sty, STY_LOWER_PERCENTILE)
     sty_upper = percentile_value(sorted_sty, STY_UPPER_PERCENTILE)
 
-    # Mega-root threshold on direct children-count
     sorted_cc = sorted(cc.values())
     mega_root_threshold = percentile_value(sorted_cc, MEGA_ROOT_PERCENTILE)
 
@@ -192,33 +256,7 @@ def find_subhierarchy_parents(cuis, children, tags):
     return found, sty_lower, sty_upper, mega_root_threshold
 
 
-def compute_depth_from_roots(cuis, parents, children):
-    """
-    Returns dict[cui] -> minimum BFS depth from any IS-A root.
-    Roots are CUIs with no IS-A parents in the graph.
-    """
-    roots = {c for c in cuis if not parents.get(c)}
-    depth = {}
-    dq = deque((r, 0) for r in roots)
-    while dq:
-        cui, d = dq.popleft()
-        if cui in depth and depth[cui] <= d:
-            continue
-        depth[cui] = d
-        for ch in children.get(cui, ()):
-            dq.append((ch, d + 1))
-    return depth
-
-
-# ============================================================================
-# Canonical extraction
-# ============================================================================
-
-def extract_canonicals(subhier_parents, children):
-    """
-    Canonicals = the subhierarchy parents themselves (now selected by
-    STY-descendant coverage rather than raw children-count).
-    """
+def extract_canonicals(subhier_parents):
     canonicals = set(subhier_parents.keys())
     canonical_info = {
         c: {
@@ -230,69 +268,28 @@ def extract_canonicals(subhier_parents, children):
     return canonicals, canonical_info
 
 
-def build_sibling_canonical_index(canonicals, parents):
-    """
-    For each canonical c, find OTHER canonicals that share at least one
-    direct IS-A parent with c.
-
-    Returns: dict[cui] -> set of sibling canonical CUIs (excludes c itself)
-
-    Implementation: for each parent in the graph, find which canonicals
-    are direct children of that parent. Every pair becomes mutual siblings.
-    Cheaper than per-canonical lookup of co-children.
-    """
-    # Group canonicals by their direct IS-A parents
-    canon_by_parent = defaultdict(set)
-    for c in canonicals:
-        for p in parents.get(c, ()):
-            canon_by_parent[p].add(c)
-
-    sibling_map = defaultdict(set)
-    for p, canon_kids in canon_by_parent.items():
-        if len(canon_kids) < 2:
-            continue
-        # Every pair of canon_kids is sibling under p
-        canon_kids_list = list(canon_kids)
-        for i, a in enumerate(canon_kids_list):
-            for b in canon_kids_list[i+1:]:
-                sibling_map[a].add(b)
-                sibling_map[b].add(a)
-    return sibling_map
-
-
 # ============================================================================
-# Topic assignment per CUI: NEAREST canonical(s) only
+# Topic assignment (nearest-canonical BFS — used for BOTH systems)
 # ============================================================================
 
-def prune_stacked_canonicals(canonicals, children):
+def compute_topics_per_cui(all_cuis, canonicals, neighbors, label_for_log=""):
+    """
+    Multi-source BFS from all canonicals over a graph defined by `neighbors`.
 
-    canon_set = set(canonicals)
-    shadowed = set()
-    for c in canon_set:
-        # Walk DOWN from c, mark any canonical descendant as shadowed
-        visited = {c}
-        frontier = set(children.get(c, ()))
-        while frontier:
-            shadowed |= (frontier & canon_set)
-            next_frontier = set()
-            for ch in frontier:
-                if ch in visited:
-                    continue
-                visited.add(ch)
-                for gc in children.get(ch, ()):
-                    if gc not in visited:
-                        next_frontier.add(gc)
-            frontier = next_frontier
-    return canon_set - shadowed
+    For the IS-A system: `neighbors` is the IS-A children dict (directed
+    downward). The BFS walks parent → child.
 
+    For the RELA system: `neighbors` is the undirected RELA graph.
+    The BFS walks in all directions.
 
-def compute_topics_per_cui(all_cuis, canonicals, parents, children,
-                           sibling_map=None):
+    Either way: each CUI gets the nearest canonical(s) reachable. DAG ties
+    at the same distance unite all tied canonicals.
 
+    Returns cui_topics: dict[cui] -> set of canonical CUIs.
+    """
     distance = {c: 0 for c in canonicals}
     nearest = {c: {c} for c in canonicals}
 
-    # BFS frontier — only nodes newly assigned at each level
     frontier = set(canonicals)
     level = 0
     t0 = time.time()
@@ -300,255 +297,207 @@ def compute_topics_per_cui(all_cuis, canonicals, parents, children,
         level += 1
         next_frontier = set()
         for node in frontier:
-            candidate_distance = distance[node] + 1
-            for child in children.get(node, ()):
-                if child not in distance:
-                    # First time reaching this child
-                    distance[child] = candidate_distance
-                    nearest[child] = set(nearest[node])
-                    next_frontier.add(child)
-                elif distance[child] == candidate_distance:
-                    # DAG tie at same depth — union additional canonicals
-                    nearest[child] |= nearest[node]
-                # else: distance[child] < candidate_distance, already closer; skip
+            cand_d = distance[node] + 1
+            for nb in neighbors.get(node, ()):
+                if nb not in distance:
+                    distance[nb] = cand_d
+                    nearest[nb] = set(nearest[node])
+                    next_frontier.add(nb)
+                elif distance[nb] == cand_d:
+                    if not nearest[node] <= nearest[nb]:
+                        nearest[nb] |= nearest[node]
         frontier = next_frontier
         if level % 5 == 0:
-            print(f"    BFS level {level}: {len(distance):,} nodes reached "
+            print(f"    [{label_for_log}] BFS level {level}: "
+                  f"{len(distance):,} nodes reached "
                   f"({time.time()-t0:.0f}s elapsed)")
 
     cui_topics = {}
     for cui in all_cuis:
-        topics = nearest.get(cui, set())
-        if topics:
-            if sibling_map:
-                # Expand by sibling canonicals
-                expanded = set(topics)
-                for t in topics:
-                    expanded |= sibling_map.get(t, set())
-                cui_topics[cui] = expanded
-            else:
-                cui_topics[cui] = topics
-        elif SINGLETON_FALLBACK:
-            cui_topics[cui] = {cui}
+        t = nearest.get(cui)
+        if t:
+            cui_topics[cui] = t
     return cui_topics
 
 
+# ============================================================================
 # Main
-
+# ============================================================================
 
 def main():
     print("=" * 60)
+    print("Topic builder (dual: IS-A + RELA)")
+    print("=" * 60)
     print(f"  cache         : {CACHE_PATH}")
     print(f"  output        : {OUTPUT_PATH}")
-    print(f"  STY band      : [{STY_LOWER_PERCENTILE}, {STY_UPPER_PERCENTILE}] of "
-          f"STY-descendant counts")
+    print(f"  STY band      : [{STY_LOWER_PERCENTILE}, {STY_UPPER_PERCENTILE}]")
     print(f"  mega filter   : exclude top {100-MEGA_ROOT_PERCENTILE}% by direct children")
     print(f"  excluded CUIs : {len(CANONICAL_EXCLUDE)} "
           f"({', '.join(sorted(CANONICAL_EXCLUDE))})")
 
-    print("\n[1/5] Loading cache ...")
+    print("\n[1] Loading cache ...")
     t0 = time.time()
     with open(CACHE_PATH, "rb") as f:
         cache = pickle.load(f)
     print(f"  {len(cache['cuis']):,} CUIs in {time.time()-t0:.1f}s")
     labels = cache["labels"]
 
-    print("\n[2/5] Building IS-A graph ...")
+    print("\n[2] Building IS-A graph ...")
     t0 = time.time()
-    parents, children = build_isa_graph(cache)
-    n_edges = sum(len(ps) for ps in parents.values())
-    print(f"  {n_edges:,} IS-A edges in {time.time()-t0:.1f}s")
+    isa_parents, isa_children = build_isa_graph(cache)
+    n_isa_edges = sum(len(ps) for ps in isa_parents.values())
+    print(f"  {n_isa_edges:,} IS-A edges in {time.time()-t0:.1f}s")
 
-    print(f"\n[3/5] Finding subhierarchy parents (STY-coverage based) ...")
+    print("\n[3] Detecting inverse-pair RELAs (auto-dedup) ...")
+    t0 = time.time()
+    included_relas, dropped_relas, pair_map = detect_inverse_pairs(cache)
+    total_relas = len(included_relas) + len(dropped_relas)
+    print(f"  Total distinct (REL, RELA) pairs : {total_relas}")
+    print(f"  Detected inverse duplicates      : {len(dropped_relas)}")
+    print(f"  -> Using                          : {len(included_relas)}")
+    print(f"  Detection time                    : {time.time()-t0:.1f}s")
+    if dropped_relas:
+        print(f"\n  Sample dropped RELAs (first 5):")
+        for d in sorted(dropped_relas)[:5]:
+            k = pair_map[d]
+            print(f"    DROP {d[0]}/{d[1]:<30s}  (inverse of {k[0]}/{k[1]})")
+
+    print("\n[4] Building RELA graph (excluding IS-A, undirected) ...")
+    t0 = time.time()
+    rela_neighbors, rela_edge_counts = build_rela_graph(cache, included_relas)
+    n_rela_input = sum(rela_edge_counts.values())
+    n_rela_undirected = sum(len(s) for s in rela_neighbors.values()) // 2
+    n_cuis_in_rela = len(rela_neighbors)
+    print(f"  {n_rela_input:,} input RELA rows across "
+          f"{len(rela_edge_counts)} RELA types in {time.time()-t0:.1f}s")
+    print(f"  -> {n_rela_undirected:,} undirected edges in RELA graph")
+    print(f"  {n_cuis_in_rela:,} CUIs have ≥1 RELA neighbor")
+    avg_deg = (2 * n_rela_undirected) / max(n_cuis_in_rela, 1)
+    print(f"  Average RELA degree: {avg_deg:.1f}")
+    print(f"\n  Top 10 RELAs by edge count:")
+    for (rel, rela), n in sorted(rela_edge_counts.items(),
+                                  key=lambda kv: -kv[1])[:10]:
+        print(f"    {n:>8,d}  {rel:<4} {rela}")
+
+    print("\n[5] Finding canonicals (STY-coverage on IS-A graph) ...")
     t0 = time.time()
     subhier_parents, sty_lower, sty_upper, mega_thresh = find_subhierarchy_parents(
-        cache["cuis"], children, cache["tags"],
+        cache["cuis"], isa_children, cache["tags"],
     )
-    print(f"  STY-descendant count cutoffs:")
-    print(f"    {STY_LOWER_PERCENTILE}th percentile = {sty_lower:,} STY descendants")
-    print(f"    {STY_UPPER_PERCENTILE}th percentile = {sty_upper:,} STY descendants")
-    print(f"  Mega-root threshold (children-count): {mega_thresh}")
-    print(f"  Found {len(subhier_parents):,} subhierarchy parents "
+    print(f"  Found {len(subhier_parents):,} candidates "
           f"in {time.time()-t0:.1f}s")
-    print(f"\n  Top 30 subhierarchy parents (by STY-descendant count):")
-    sorted_sp = sorted(
-        subhier_parents.items(),
-        key=lambda kv: -kv[1]["sty_descendant_count"],
+    print(f"  STY descendant cutoffs: [{sty_lower:,}, {sty_upper:,}]")
+    print(f"  Mega-root threshold (children count): {mega_thresh}")
+
+    canonicals, canonical_info = extract_canonicals(subhier_parents)
+
+    depth_from_root = compute_depth_from_roots(
+        cache["cuis"], isa_parents, isa_children,
     )
-    for cui, info in sorted_sp[:30]:
-        label = labels.get(cui, "?")
-        print(f"    sty_desc={info['sty_descendant_count']:>6,d}  "
-              f"children={info['n_children']:>4d}  "
-              f"{cui}  {label[:50]}")
-    if len(sorted_sp) > 30:
-        print(f"    ... plus {len(sorted_sp) - 30} more subhier parents")
 
-    print("\n[4/5] Extracting canonical CUIs ...")
-    t0 = time.time()
-    canonicals, canonical_info = extract_canonicals(subhier_parents, children)
-    print(f"  Found {len(canonicals):,} canonical CUIs in "
-          f"{time.time()-t0:.1f}s")
-
-    # Compute depth from roots (for diagnostics)
-    print(f"\n  Computing depth from roots ...")
-    t0 = time.time()
-    depth_from_root = compute_depth_from_roots(cache["cuis"], parents, children)
-    print(f"  Computed in {time.time()-t0:.1f}s")
-
-    # Drop explicitly excluded canonicals (known SNOMED admin/metadata)
     excluded_present = canonicals & CANONICAL_EXCLUDE
     if excluded_present:
         print(f"\n  Excluding {len(excluded_present)} CUI(s) from "
               f"CANONICAL_EXCLUDE:")
         for c in sorted(excluded_present):
-            d = depth_from_root.get(c, "?")
-            lbl = labels.get(c, "?")[:55]
-            print(f"    depth={d}  {c}  {lbl}")
+            print(f"    depth={depth_from_root.get(c, '?')}  {c}  "
+                  f"{labels.get(c, '?')[:55]}")
         canonicals -= excluded_present
-        canonical_info = {c: v for c, v in canonical_info.items() if c in canonicals}
-        print(f"  After exclude: {len(canonicals):,} canonicals")
-
-    if PRUNE_STACKED_CANONICALS:
-        print(f"\n  Pruning stacked canonicals (keep HIGHEST) ...")
-        t0 = time.time()
-        n_before = len(canonicals)
-        canonicals = prune_stacked_canonicals(canonicals, children)
-        canonical_info = {c: canonical_info[c] for c in canonicals if c in canonical_info}
-        n_dropped = n_before - len(canonicals)
-        print(f"  Pruned {n_dropped:,} descendant canonicals "
-              f"in {time.time()-t0:.1f}s")
-    else:
-        print(f"\n  Skipping stacked-canonical pruning (allow nested canonicals)")
-        print(f"  Nearest-canonical BFS will naturally pick closest one")
+        canonical_info = {c: v for c, v in canonical_info.items()
+                          if c in canonicals}
     print(f"  Final canonicals: {len(canonicals):,}")
 
-    print(f"\n  Top 30 canonicals (by STY-descendant count):")
-    sorted_canon = sorted(
-        canonical_info.items(),
-        key=lambda kv: -kv[1]["sty_descendant_count"],
-    )
-    for cui, info in sorted_canon[:30]:
-        cui_label = labels.get(cui, "?")
-        print(f"    sty_desc={info['sty_descendant_count']:>6,d}  "
-              f"children={info['n_children']:>4d}  "
-              f"{cui}  {cui_label[:50]}")
-
-    # Build sibling-canonical index if expansion is enabled
-    sibling_map = None
-    if SIBLING_EXPANSION:
-        print(f"\n  Building sibling-canonical index ...")
-        t0 = time.time()
-        sibling_map = build_sibling_canonical_index(canonicals, parents)
-        n_with_siblings = sum(1 for s in sibling_map.values() if s)
-        avg_siblings = (sum(len(s) for s in sibling_map.values()) /
-                        max(len(sibling_map), 1))
-        print(f"  {n_with_siblings:,} canonicals have at least one sibling "
-              f"in {time.time()-t0:.1f}s")
-        print(f"  Average siblings per canonical (among those with any): "
-              f"{avg_siblings:.1f}")
-
-    print("\n[5/5] Computing nearest-canonical topics (multi-source downward BFS) ...")
-    print(f"  (singleton fallback: {SINGLETON_FALLBACK}, "
-          f"sibling expansion: {SIBLING_EXPANSION})")
+    # ====================================================================
+    # System A: IS-A topics (nearest canonical via IS-A graph)
+    # ====================================================================
+    print("\n[6a] Computing IS-A topics (nearest canonical via IS-A graph) ...")
     t0 = time.time()
-    cui_topics = compute_topics_per_cui(
-        sorted(cache["cuis"]), canonicals, parents, children,
-        sibling_map=sibling_map,
+    cui_isa_topics = compute_topics_per_cui(
+        sorted(cache["cuis"]), canonicals, isa_children, label_for_log="IS-A",
     )
-    print(f"  {len(cui_topics):,} CUIs have at least one topic "
+    print(f"  {len(cui_isa_topics):,} CUIs have ≥1 IS-A topic "
           f"in {time.time()-t0:.1f}s")
 
-    topic_to_cuis = defaultdict(set)
-    cui_topic_ids = {}
-    for cui, canon_set in cui_topics.items():
-        tids = {hash_topic(c) for c in canon_set}
-        cui_topic_ids[cui] = tids
-        for tid in tids:
-            topic_to_cuis[tid].add(cui)
+    # ====================================================================
+    # System B: RELA topics (nearest canonical via undirected RELA graph)
+    # ====================================================================
+    print("\n[6b] Computing RELA topics (nearest canonical via RELA graph) ...")
+    t0 = time.time()
+    cui_rela_topics = compute_topics_per_cui(
+        sorted(cache["cuis"]), canonicals, rela_neighbors, label_for_log="RELA",
+    )
+    print(f"  {len(cui_rela_topics):,} CUIs have ≥1 RELA topic "
+          f"in {time.time()-t0:.1f}s")
 
+    # ====================================================================
+    # Build topic index for both systems
+    # ====================================================================
+    print("\n[7] Building topic index ...")
     topic_to_canonical = {hash_topic(c): c for c in canonicals}
 
+    isa_cui_topic_ids = {}
+    isa_topic_to_cuis = defaultdict(set)
+    for cui, canon_set in cui_isa_topics.items():
+        tids = {hash_topic(c) for c in canon_set}
+        isa_cui_topic_ids[cui] = tids
+        for tid in tids:
+            isa_topic_to_cuis[tid].add(cui)
+
+    rela_cui_topic_ids = {}
+    rela_topic_to_cuis = defaultdict(set)
+    for cui, canon_set in cui_rela_topics.items():
+        tids = {hash_topic(c) for c in canon_set}
+        rela_cui_topic_ids[cui] = tids
+        for tid in tids:
+            rela_topic_to_cuis[tid].add(cui)
+
+    # ====================================================================
+    # Results
+    # ====================================================================
     print("\n" + "=" * 60)
     print("RESULTS")
     print("=" * 60)
-    n_topics_per_cui = [len(ts) for ts in cui_topic_ids.values()]
-    n_topics_distribution = Counter(n_topics_per_cui)
-    avg_topics = sum(n_topics_per_cui) / len(n_topics_per_cui) if n_topics_per_cui else 0
-    print(f"  Total CUIs                  : {len(cache['cuis']):,}")
-    print(f"  CUIs with at least 1 topic  : {len(cui_topic_ids):,} "
-          f"({100*len(cui_topic_ids)/len(cache['cuis']):.1f}%)")
-    print(f"  Total canonical CUIs        : {len(canonicals):,}")
-    print(f"  Average topics per CUI      : {avg_topics:.2f}")
-    print(f"\n  Distribution: topics per CUI:")
-    for n_topics in sorted(n_topics_distribution.keys()):
-        n_cuis = n_topics_distribution[n_topics]
-        pct = 100 * n_cuis / len(cui_topic_ids)
-        if n_topics <= 10 or n_topics % 5 == 0:
-            print(f"    {n_topics:>3d} topics : {n_cuis:>7,d} CUIs ({pct:5.1f}%)")
+    total = len(cache["cuis"])
+    n_isa = len(isa_cui_topic_ids)
+    n_rela = len(rela_cui_topic_ids)
+    n_either = len(set(isa_cui_topic_ids.keys()) | set(rela_cui_topic_ids.keys()))
+    n_both = len(set(isa_cui_topic_ids.keys()) & set(rela_cui_topic_ids.keys()))
 
-    print(f"\n  Top 30 topics by CUI membership:")
-    sorted_topics = sorted(
-        topic_to_cuis.items(),
-        key=lambda kv: -len(kv[1]),
-    )
-    for tid, cuis_in_topic in sorted_topics[:30]:
-        canon_cui = topic_to_canonical[tid]
-        canon_label = labels.get(canon_cui, "?")
-        print(f"    {len(cuis_in_topic):>7,d} CUIs  {tid}  -> {canon_cui}  "
-              f"({canon_label[:50]})")
+    print(f"  Total CUIs                       : {total:,}")
+    print(f"  Total canonical CUIs             : {len(canonicals):,}")
+    print(f"  CUIs with at least 1 IS-A topic  : {n_isa:,} ({100*n_isa/total:.1f}%)")
+    print(f"  CUIs with at least 1 RELA topic  : {n_rela:,} ({100*n_rela/total:.1f}%)")
+    print(f"  CUIs with topic in EITHER system : {n_either:,} ({100*n_either/total:.1f}%)")
+    print(f"  CUIs with topic in BOTH systems  : {n_both:,} ({100*n_both/total:.1f}%)")
 
+    isa_avg = (sum(len(t) for t in isa_cui_topic_ids.values()) /
+               max(n_isa, 1))
+    rela_avg = (sum(len(t) for t in rela_cui_topic_ids.values()) /
+                max(n_rela, 1))
+    print(f"\n  Avg IS-A topics per CUI (with topics)  : {isa_avg:.2f}")
+    print(f"  Avg RELA topics per CUI (with topics)  : {rela_avg:.2f}")
 
-    # Additional diagnostics 
+    print(f"\n  Top 15 IS-A topics by membership:")
+    sorted_isa = sorted(isa_topic_to_cuis.items(), key=lambda kv: -len(kv[1]))
+    for tid, members in sorted_isa[:15]:
+        c = topic_to_canonical[tid]
+        print(f"    {len(members):>6,d} CUIs  {tid}  -> {c}  ({labels.get(c, '?')[:50]})")
 
-    # 1. Canonical depth from roots (depth_from_root already computed earlier)
-    print(f"\n  Diagnostic: canonical depth from roots")
-    canon_depths = [depth_from_root.get(c, -1) for c in canonicals]
-    depth_counter = Counter(canon_depths)
-    for d in sorted(depth_counter.keys()):
-        if d == -1:
-            print(f"    depth=unknown : {depth_counter[d]:>5,d}")
-        else:
-            print(f"    depth={d:>3d}     : {depth_counter[d]:>5,d}")
+    print(f"\n  Top 15 RELA topics by membership:")
+    sorted_rela = sorted(rela_topic_to_cuis.items(), key=lambda kv: -len(kv[1]))
+    for tid, members in sorted_rela[:15]:
+        c = topic_to_canonical[tid]
+        print(f"    {len(members):>6,d} CUIs  {tid}  -> {c}  ({labels.get(c, '?')[:50]})")
 
-    # 2. Multi-parent multiplicity (CUIs with multiple IS-A parents)
-    multi_parent_cuis = [c for c in cache["cuis"] if len(parents.get(c, ())) > 1]
-    multi_parent_topic_counts = Counter()
-    for c in multi_parent_cuis:
-        n = len(cui_topic_ids.get(c, set()))
-        multi_parent_topic_counts[n] += 1
-    print(f"\n  Diagnostic: multi-parent CUIs (DAG nodes)")
-    print(f"    total multi-parent CUIs   : {len(multi_parent_cuis):,}")
-    print(f"    topic-count distribution among them:")
-    for n in sorted(multi_parent_topic_counts.keys()):
-        pct = 100 * multi_parent_topic_counts[n] / max(len(multi_parent_cuis), 1)
-        print(f"      {n:>3d} topics : {multi_parent_topic_counts[n]:>6,d} "
-              f"CUIs ({pct:5.1f}%)")
-
-    # 3. Orphan coverage by STY
-    cuis_without_topic = set(cache["cuis"]) - set(cui_topic_ids.keys())
-    print(f"\n  Diagnostic: orphan coverage by semantic type")
-    print(f"    total orphans (no topic) : {len(cuis_without_topic):,}")
-    sty_orphan_counts = Counter()
-    sty_total_counts = Counter()
-    for c in cache["cuis"]:
-        for sty in cache["tags"].get(c, frozenset()):
-            sty_total_counts[sty] += 1
-            if c in cuis_without_topic:
-                sty_orphan_counts[sty] += 1
-    print(f"    top 20 STYs by orphan count:")
-    for sty, n_orphan in sty_orphan_counts.most_common(20):
-        n_total = sty_total_counts[sty]
-        pct = 100 * n_orphan / n_total if n_total else 0
-        print(f"      {n_orphan:>6,d} / {n_total:>7,d}  "
-              f"({pct:5.1f}%)  {sty}")
-
+    # ====================================================================
+    # Save
+    # ====================================================================
     print("\n[Saving]")
     t0 = time.time()
     payload = {
         "built_at": datetime.datetime.now().isoformat(),
         "cache_fetched_at": cache.get("fetched_at"),
         "config": {
-            "detection": "STY-descendant percentile + mega-root filter",
             "sty_lower_percentile": STY_LOWER_PERCENTILE,
             "sty_upper_percentile": STY_UPPER_PERCENTILE,
             "mega_root_percentile": MEGA_ROOT_PERCENTILE,
@@ -556,19 +505,26 @@ def main():
             "actual_sty_upper": sty_upper,
             "actual_mega_root_threshold": mega_thresh,
             "canonical_exclude": sorted(CANONICAL_EXCLUDE),
-            "topic_assignment": "nearest canonical via multi-source downward BFS",
-            "prune_stacked_canonicals": PRUNE_STACKED_CANONICALS,
-            "sibling_expansion": SIBLING_EXPANSION,
-            "singleton_fallback": SINGLETON_FALLBACK,
+            "topic_assignment": "nearest canonical via multi-source BFS",
+            "n_included_relas": len(included_relas),
+            "included_relas": sorted(f"{r}/{ra}" for (r, ra) in included_relas
+                                     if (r, ra) != ("CHD", "isa")),
+            "dropped_inverse_relas": sorted(f"{r}/{ra}" for (r, ra) in dropped_relas),
+            "rela_edge_counts": {f"{r}/{ra}": c
+                                 for (r, ra), c in rela_edge_counts.items()},
         },
-        "subhierarchy_parents": subhier_parents,
-        "canonicals":          canonicals,
-        "canonical_info":      canonical_info,
-        "cui_topic_ids":       cui_topic_ids,
-        "topic_to_canonical":  topic_to_canonical,
-        "topic_to_cuis":       dict(topic_to_cuis),
-        "labels":              cache["labels"],
-        "tags":                cache["tags"],
+        "canonicals":              canonicals,
+        "canonical_info":          canonical_info,
+        # System A: IS-A topics
+        "isa_cui_topic_ids":       isa_cui_topic_ids,
+        "isa_topic_to_cuis":       dict(isa_topic_to_cuis),
+        # System B: RELA topics
+        "rela_cui_topic_ids":      rela_cui_topic_ids,
+        "rela_topic_to_cuis":      dict(rela_topic_to_cuis),
+        # Shared
+        "topic_to_canonical":      topic_to_canonical,
+        "labels":                  cache["labels"],
+        "tags":                    cache["tags"],
     }
     with open(OUTPUT_PATH, "wb") as f:
         pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
