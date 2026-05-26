@@ -1,208 +1,68 @@
-============================================================
-Topic builder (nearest-canonical, percentile-banded)
-============================================================
-  cache         : umls_cache.pkl
-  output        : topic_lookup.pkl
-  percentile    : [75, 99] of non-leaf children-counts
+"""
+lookup_topics.py
+----------------
+Look up the topic IDs for one or more CUIs.
 
-[1/5] Loading cache ...
-  374,538 CUIs in 3.3s
+Use this to verify the topic assignments after running build_topics.py.
 
-[2/5] Building IS-A graph ...
-  611,398 IS-A edges in 2.2s
+Each CUI has a set of topic IDs (potentially multiple). Each topic ID
+corresponds to a canonical CUI (an organizing concept in SNOMED).
 
-[3/5] Finding subhierarchy parents (percentile band) ...
-  Distribution of non-leaf children-counts:
-    75th percentile = 4 children
-    99th percentile = 42 children
-  Found 38,916 subhierarchy parents in 0.2s
+Edit CUIS_TO_LOOKUP below and run.
+"""
 
-  Top 30 subhierarchy parents (by children count):
-    children=  42  C0025061  Mediastinal disease
-    children=  42  C0006033  Genus Borrelia
-    children=  42  C1285389  Nuclear medicine study by site
-    children=  42  C1292923  Procedure on joint
-    children=  42  C0030499  Parasitic disease
-    children=  42  C0348828  Postprocedural respiratory disorders
-    children=  42  C0425442  Respiratory observations
-    children=  42  C2236823  Arthropathy of left shoulder
-    children=  42  C0021236  Indole
-    children=  42  C1261149  Viral antigen assay
-    children=  42  C1285232  Degenerative disorder of musculoskeletal system
-    children=  42  C0242946  Genus Prevotella (organism)
-    children=  42  C0266617  Congenital deformity of face (disorder)
-    children=  42  C2063247  Accidental poisoning by sedative
-    children=  42  C0018681  Headache (finding)
-    children=  42  C0428712  Intracerebral vascular finding
-    children=  42  C0443715  Antibody to parasite
-    children=  42  C0581400  Gastrointestinal device
-    children=  42  C0852085  Congenital connective tissue disorder
-    children=  42  C0013595  Eczema (disorder)
-    children=  42  C0185911  Operation on vertebra
-    children=  42  C0038898  Operative procedure on digestive system
-    children=  42  C0151571  Lesion of cornea
-    children=  42  C0576788  Organic acid and/or organic acid derivative
-    children=  42  C0026771  Multiple trauma
-    children=  42  C1289883  Flexible fibreoptic endoscope
-    children=  42  C3703842  Imaging of pelvis
-    children=  42  C0161817  Peripheral vascular complication
-    children=  42  C1297885  Open reduction with internal fixation
-    children=  42  C2315278  Percutaneous embolisation of artery using fluoroscopic 
-    ... plus 38886 more subhier parents
+import pickle
 
-[4/5] Extracting canonical CUIs ...
-  Found 38,916 canonical CUIs in 0.0s
 
-  Pruning stacked canonicals (upward marking) ...
-  Pruned 18,057 ancestor canonicals in 0.8s
-  Final canonicals: 20,859
+PICKLE_PATH = "topic_lookup.pkl"
 
-  Top 30 canonicals (by children count):
-    children=  42  C0301873  Immunologic reaction
-    children=  42  C0026846  Muscular atrophy
-    children=  42  C5767467  Blood substance level within reference range
-    children=  42  C1289883  Flexible fibreoptic endoscope
-    children=  42  C0006033  Genus Borrelia
-    children=  42  C2315278  Percutaneous embolisation of artery using fluoroscopic 
-    children=  42  C0242946  Genus Prevotella (organism)
-    children=  42  C1300493  Tumor invasion by site
-    children=  41  C3873822  Radiology table
-    children=  41  C5969483  Union for International Cancer Control clinical T categ
-    children=  41  C0003876  Arthrobacter
-    children=  41  C0183210  Sensor device
-    children=  41  C5969279  Union for International Cancer Control ycT category all
-    children=  40  C0995701  Genus Pseudonocardia
-    children=  40  C0002426  Free-standing clinic
-    children=  40  C0492856  Wheelchair accessory
-    children=  40  C0456764  Negative descriptors
-    children=  40  C5969154  Union for International Cancer Control ypT category all
-    children=  40  C5817639  American Joint Committee on Cancer rcT category allowab
-    children=  40  C4750816  Morphine only product in oral dose form
-    children=  40  C5969060  Union for International Cancer Control pathological T c
-    children=  40  C3532624  Infectious disease suspected
-    children=  40  C5761635  American Joint Committee on Cancer clinical T category 
-    children=  40  C5817491  American Joint Committee on Cancer ycT category allowab
-    children=  39  C1273680  Anatomic location directly invaded by primary malignant
-    children=  39  C5969524  Union for International Cancer Control rcT category all
-    children=  39  C5769003  Adverse reaction to substance with alcohol structure
-    children=  39  C1626390  Accidental ingestion of berries
-    children=  39  C0020780  Family Ictaluridae - bullhead catfish
-    children=  39  C0555908  Human leucocyte antigen A allele
+CUIS_TO_LOOKUP = [
+    "C0032285",   # Pneumonia
+    # Add your test CUIs here
+]
 
-[5/5] Computing nearest-canonical topics (multi-source downward BFS) ...
-  (singleton fallback: False)
-    BFS level 5: 180,988 nodes reached (0s elapsed)
-  181,003 CUIs have at least one topic in 0.9s
 
-============================================================
-RESULTS
-============================================================
-  Total CUIs                  : 374,538
-  CUIs with at least 1 topic  : 181,003 (48.3%)
-  Total canonical CUIs        : 20,859
-  Average topics per CUI      : 1.13
+def lookup(cui, payload):
+    labels = payload["labels"]
+    tags = payload["tags"]
+    cui_topic_ids = payload["cui_topic_ids"]
+    topic_to_canonical = payload["topic_to_canonical"]
+    topic_to_cuis = payload["topic_to_cuis"]
 
-  Distribution: topics per CUI:
-      1 topics : 161,403 CUIs ( 89.2%)
-      2 topics :  16,971 CUIs (  9.4%)
-      3 topics :   2,258 CUIs (  1.2%)
-      4 topics :     307 CUIs (  0.2%)
-      5 topics :      53 CUIs (  0.0%)
-      6 topics :       8 CUIs (  0.0%)
-      7 topics :       2 CUIs (  0.0%)
-      8 topics :       1 CUIs (  0.0%)
+    cui_label = labels.get(cui, "?")
+    cui_stys = sorted(tags.get(cui, frozenset()))
 
-  Top 30 topics by CUI membership:
-        289 CUIs  tp_e368affec181  -> C0010614  (Order Cypriniformes (organism))
-        167 CUIs  tp_22eb26d557a8  -> C0579231  (Lancefield group streptococcus)
-        162 CUIs  tp_6ad23e0cfe8c  -> C1287114  (Finding of language spoken)
-        139 CUIs  tp_fddfa8e75bff  -> C0318154  (Beta-haemolytic Streptococcus)
-        117 CUIs  tp_872eb13910a6  -> C0416571  (Accidental poisoning by anti-infective)
-         86 CUIs  tp_a64a3a1d9f94  -> C4551563  (Microcephaly)
-         80 CUIs  tp_5d8182242e89  -> C0322909  (Subfamily Anophelinae)
-         77 CUIs  tp_da2ac3c8e0fb  -> C1294974  (Cell count by CD antigen phenotype)
-         76 CUIs  tp_39657d4bf520  -> C0412862  (Poisoning by benzodiazepine-based tranquilizer)
-         70 CUIs  tp_51781bfe9e1c  -> C0226986  (Structure of vestibular surface of tooth)
-         70 CUIs  tp_341688564307  -> C0226988  (Mesial surface of tooth)
-         70 CUIs  tp_22c1d53a8dc9  -> C0226989  (Structure of distal surface of tooth (body structu)
-         62 CUIs  tp_e05a9ce4f2db  -> C0501418  (Structure of spinal nerve proper)
-         61 CUIs  tp_1a32fb9f4e66  -> C0578520  (Azo derivative)
-         58 CUIs  tp_8e18ef354387  -> C0026846  (Muscular atrophy)
-         58 CUIs  tp_8d7cddaea1fe  -> C1287407  (Finding of immune status (finding))
-         57 CUIs  tp_6099ab49470d  -> C1258666  (Mucous cyst of skin)
-         57 CUIs  tp_84788abde1b7  -> C1319591  (Unit of drug administration)
-         54 CUIs  tp_2943a93a9382  -> C1283326  (Medulla oblongata tract)
-         54 CUIs  tp_36deafa702f2  -> C1269967  (Presence of direct invasion by primary malignant n)
-         53 CUIs  tp_6f9a96b21421  -> C0445625  (Staphylococcus, coagulase negative)
-         53 CUIs  tp_7ec0747b3b17  -> C0560023  (Medication review)
-         53 CUIs  tp_a53d2990785c  -> C1300493  (Tumor invasion by site)
-         53 CUIs  tp_c2d9a1f75143  -> C1273680  (Anatomic location directly invaded by primary mali)
-         52 CUIs  tp_375a31b389c4  -> C0440090  (Acrylate and methacrylate patch test series - prin)
-         51 CUIs  tp_652686b00567  -> C0518042  (Mineral intake)
-         51 CUIs  tp_4c9799c4e44a  -> C2315278  (Percutaneous embolisation of artery using fluorosc)
-         50 CUIs  tp_9ba0b22a34ea  -> C0003537  (Aphasic disturbance)
-         50 CUIs  tp_cea2f492195b  -> C0227004  (Incisal surface)
-         49 CUIs  tp_f59064517565  -> C4049839  (Substance with Hepatitis C virus NS3/4A protease i)
+    print(f"\n{'='*60}")
+    print(f"{cui}  {cui_label}")
+    print(f"{'='*60}")
+    if cui_stys:
+        print(f"  semantic type(s): {', '.join(cui_stys)}")
 
-  Diagnostic: canonical depth from roots
-    depth=  0     :     4
-    depth=  1     :    12
-    depth=  2     :    99
-    depth=  3     :   809
-    depth=  4     : 3,190
-    depth=  5     : 4,361
-    depth=  6     : 4,966
-    depth=  7     : 3,528
-    depth=  8     : 1,812
-    depth=  9     : 1,214
-    depth= 10     :   549
-    depth= 11     :   193
-    depth= 12     :    84
-    depth= 13     :    22
-    depth= 14     :    12
-    depth= 15     :     3
-    depth= 16     :     1
+    tids = cui_topic_ids.get(cui)
+    if not tids:
+        print(f"\n  No topics. This CUI has no canonical ancestors.")
+        return
 
-  Diagnostic: multi-parent CUIs (DAG nodes)
-    total multi-parent CUIs   : 155,316
-    topic-count distribution among them:
-        0 topics : 69,576 CUIs ( 44.8%)
-        1 topics : 68,181 CUIs ( 43.9%)
-        2 topics : 15,132 CUIs (  9.7%)
-        3 topics :  2,076 CUIs (  1.3%)
-        4 topics :    290 CUIs (  0.2%)
-        5 topics :     50 CUIs (  0.0%)
-        6 topics :      8 CUIs (  0.0%)
-        7 topics :      2 CUIs (  0.0%)
-        8 topics :      1 CUIs (  0.0%)
+    print(f"\n  Has {len(tids)} topic(s):")
+    for tid in sorted(tids):
+        canon_cui = topic_to_canonical.get(tid)
+        canon_label = labels.get(canon_cui, "?") if canon_cui else "?"
+        members = topic_to_cuis.get(tid, set())
+        print(f"    {tid}")
+        print(f"      canonical:    {canon_cui}  ({canon_label})")
+        print(f"      total CUIs:   {len(members):,} share this topic")
 
-  Diagnostic: orphan coverage by semantic type
-    total orphans (no topic) : 193,535
-    top 20 STYs by orphan count:
-      21,155 /  43,374  ( 48.8%)  Disease or Syndrome
-      21,060 /  40,312  ( 52.2%)  Finding
-      16,195 /  34,114  ( 47.5%)  Therapeutic or Preventive Procedure
-      11,658 /  16,823  ( 69.3%)  Pharmacologic Substance
-      10,830 /  25,716  ( 42.1%)  Body Part, Organ, or Organ Component
-       8,586 /  20,979  ( 40.9%)  Injury or Poisoning
-       8,038 /  10,936  ( 73.5%)  Amino Acid, Peptide, or Protein
-       7,690 /  14,827  ( 51.9%)  Bacterium
-       6,984 /   9,260  ( 75.4%)  Organic Chemical
-       6,256 /  12,107  ( 51.7%)  Medical Device
-       5,736 /   9,795  ( 58.6%)  Laboratory Procedure
-       5,318 /  12,024  ( 44.2%)  Neoplastic Process
-       5,112 /  11,406  ( 44.8%)  Clinical Drug
-       4,656 /   7,568  ( 61.5%)  Health Care Activity
-       4,314 /   9,289  ( 46.4%)  Diagnostic Procedure
-       4,181 /   8,345  ( 50.1%)  Pathologic Function
-       3,785 /   6,136  ( 61.7%)  Immunologic Factor
-       3,339 /   3,835  ( 87.1%)  Enzyme
-       3,250 /   4,623  ( 70.3%)  Intellectual Product
-       2,950 /   6,257  ( 47.1%)  Congenital Abnormality
 
-[Saving]
-  wrote 39.4 MB in 0.8s
+def main():
+    with open(PICKLE_PATH, "rb") as f:
+        payload = pickle.load(f)
+    print(f"Loaded {PICKLE_PATH}")
+    print(f"  built_at        : {payload['built_at']}")
+    print(f"  total canonicals: {len(payload['canonicals']):,}")
+    print(f"  CUIs with topics: {len(payload['cui_topic_ids']):,}")
 
-============================================================
-DONE — topic_lookup.pkl
-============================================================
+    for cui in CUIS_TO_LOOKUP:
+        lookup(cui, payload)
+
+
+main()
