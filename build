@@ -1,534 +1,149 @@
 """
-build_topics.py
----------------
-Build CUI -> [topic_ids] lookup with TWO topic systems:
+diagnose_graph_pickle.py
+------------------------
+Inspect an unknown graph pickle to find out:
+  1. What type of object is in it (NetworkX Graph? DiGraph? dict? custom?)
+  2. How many nodes, how many edges
+  3. What attributes exist on nodes and edges
+  4. Whether RELA / REL information is encoded as edge attributes
+  5. A sample of nodes and edges to understand the schema
 
-  A) cui_isa_topics:  topics reached via IS-A graph only
-  B) cui_rela_topics: topics reached via multi-RELA graph (non-IS-A relations)
-
-Both systems use the SAME canonical set (detected on IS-A graph by
-STY-descendant count). At retrieval time, the caller can use IS-A topics,
-RELA topics, or their union.
-
-ARCHITECTURE:
-
-  1. Canonicals (= topic anchors) are detected by STY-DESCENDANT count
-     on the IS-A graph. Top 25% by descendant count, minus top 1% by
-     direct children (mega-root filter), minus explicit excludes.
-
-  2. IS-A topic mapping: for each CUI, nearest canonical(s) reachable
-     via IS-A edges. Multi-source downward BFS from canonicals.
-
-  3. RELA topic mapping: for each CUI, nearest canonical(s) reachable
-     via the multi-RELA (non-IS-A) graph. Same BFS algorithm, different
-     edge set. The RELA graph is undirected and uses all non-IS-A
-     relations after deduplicating inverse pairs.
-
-Output pickle contains BOTH topic mappings plus shared metadata.
+EDIT THE PATH BELOW to point at your graph pickle.
 """
 
-import datetime
-import hashlib
 import pickle
-import os
-import time
-from collections import defaultdict, Counter, deque
+import sys
+from collections import Counter
 
 
-CACHE_PATH = "umls_cache.pkl"
-OUTPUT_PATH = "topic_lookup.pkl"
-
-# Canonical detection on IS-A graph
-STY_LOWER_PERCENTILE = 75    # CUI qualifies if STY-descendant count in top 25%
-MEGA_ROOT_PERCENTILE = 99    # but excludes top 1% by direct children count
-
-CANONICAL_EXCLUDE = {
-    "C2720507",  # SNOMED CT has been created by combining SNOMED RT...
-}
+GRAPH_PATH = "snomed_graph.pkl"  # <-- EDIT THIS
 
 
-# ============================================================================
-# Helpers
-# ============================================================================
-
-def percentile_value(sorted_values, p):
-    if not sorted_values:
-        return 0
-    idx = min(int(len(sorted_values) * p / 100), len(sorted_values) - 1)
-    return sorted_values[idx]
-
-
-def hash_topic(cui):
-    """Stable hash for a canonical CUI -> topic ID."""
-    return "tp_" + hashlib.sha1(cui.encode()).hexdigest()[:12]
+def basic_info(obj):
+    print(f"\n[1] Top-level object")
+    print(f"    type        : {type(obj).__module__}.{type(obj).__name__}")
+    print(f"    repr (short): {repr(obj)[:300]}")
+    if hasattr(obj, '__len__'):
+        try:
+            print(f"    len()       : {len(obj):,}")
+        except Exception as e:
+            print(f"    len()       : <error: {e}>")
 
 
-def build_isa_graph(cache):
-    """parents[child] -> {direct IS-A parents}
-       children[parent] -> {direct IS-A children}"""
-    parents = defaultdict(set)
-    children = defaultdict(set)
-    for cui1, cui2, rel, rela in cache["mrrel_rows"]:
-        if rel == "CHD" and rela == "isa":
-            parents[cui2].add(cui1)
-            children[cui1].add(cui2)
-    return parents, children
+def inspect_networkx(g):
+    """If it looks like a networkx graph, print its shape."""
+    has_nodes = hasattr(g, "nodes")
+    has_edges = hasattr(g, "edges")
+    if not (has_nodes and has_edges):
+        return False
+
+    print(f"\n[2] Looks like a networkx-style graph")
+    try:
+        n_nodes = g.number_of_nodes()
+        n_edges = g.number_of_edges()
+        print(f"    nodes       : {n_nodes:,}")
+        print(f"    edges       : {n_edges:,}")
+    except Exception as e:
+        print(f"    error counting: {e}")
+
+    # Directed or undirected?
+    if hasattr(g, "is_directed"):
+        print(f"    directed    : {g.is_directed()}")
+    if hasattr(g, "is_multigraph"):
+        print(f"    multigraph  : {g.is_multigraph()}")
+
+    # Sample node attributes
+    print(f"\n[3] Sample of nodes (first 5)")
+    for i, node in enumerate(g.nodes()):
+        if i >= 5:
+            break
+        attrs = dict(g.nodes[node]) if hasattr(g.nodes[node], 'keys') else g.nodes[node]
+        print(f"    node {node!r}: {attrs}")
+
+    # Sample edge attributes
+    print(f"\n[4] Sample of edges (first 10)")
+    for i, edge in enumerate(g.edges(data=True)):
+        if i >= 10:
+            break
+        print(f"    edge: {edge}")
+
+    # Aggregate edge-attribute keys
+    print(f"\n[5] Edge-attribute key frequencies (across all edges)")
+    key_counter = Counter()
+    for u, v, data in g.edges(data=True):
+        for k in data.keys():
+            key_counter[k] += 1
+    for k, c in key_counter.most_common():
+        print(f"    {k:<30s} : {c:,}")
+
+    # If REL or RELA attributes exist, get their distribution
+    for attr_name in ["rel", "REL", "rela", "RELA", "label", "type", "relation"]:
+        values = []
+        for u, v, data in g.edges(data=True):
+            if attr_name in data:
+                values.append(data[attr_name])
+        if values:
+            print(f"\n[6] Distinct values of edge attribute '{attr_name}'")
+            value_counter = Counter(values)
+            print(f"    {len(value_counter)} distinct values, "
+                  f"{sum(value_counter.values()):,} total occurrences")
+            for v, c in value_counter.most_common(30):
+                print(f"      {c:>8,d}  {v}")
+            if len(value_counter) > 30:
+                print(f"      ... plus {len(value_counter) - 30} more")
+
+    return True
 
 
-def compute_depth_from_roots(cuis, parents, children):
-    """dict[cui] -> minimum BFS depth from any IS-A root."""
-    roots = {c for c in cuis if not parents.get(c)}
-    depth = {}
-    dq = deque((r, 0) for r in roots)
-    while dq:
-        cui, d = dq.popleft()
-        if cui in depth and depth[cui] <= d:
-            continue
-        depth[cui] = d
-        for ch in children.get(cui, ()):
-            dq.append((ch, d + 1))
-    return depth
+def inspect_dict(obj):
+    """If it's a dict, what are the keys?"""
+    if not isinstance(obj, dict):
+        return False
+    print(f"\n[2] Top-level dict with {len(obj):,} keys")
+    print(f"    first 20 keys + value-types:")
+    for i, (k, v) in enumerate(obj.items()):
+        if i >= 20:
+            break
+        v_type = type(v).__name__
+        v_len = ""
+        if hasattr(v, "__len__"):
+            try:
+                v_len = f" (len={len(v):,})"
+            except Exception:
+                pass
+        print(f"    {k!r:<40s} -> {v_type}{v_len}")
 
+    # If any value looks graph-like, dive in
+    for k, v in obj.items():
+        if hasattr(v, "nodes") and hasattr(v, "edges"):
+            print(f"\n    -> value at key {k!r} looks like a graph")
+            inspect_networkx(v)
+            break
+    return True
 
-# ============================================================================
-# Inverse-pair detection (for the RELA graph)
-# ============================================================================
-
-def detect_inverse_pairs(cache, sample_size=200, count_tol=0.02):
-    """
-    Detect inverse-pair (REL, RELA)s from the cache itself.
-
-    Two (REL, RELA) keys A and B are inverse pairs if:
-      - Their edge counts match within count_tol relative tolerance
-      - For sampled edges (a, b) under A, the reversed (b, a) exists in B
-
-    For each detected pair, keep one side and drop the other:
-      - If one side is CHD/isa, ALWAYS keep CHD/isa
-      - Otherwise: alphabetically-first RELA name wins (deterministic)
-
-    Returns:
-        included_relas: set of (REL, RELA) tuples retained
-        dropped_relas:  set of (REL, RELA) tuples dropped as inverse duplicates
-        pair_map:       dict[dropped_key] -> kept_key (so user sees pairings)
-    """
-    edges_by_key = defaultdict(list)
-    edge_set_by_key = defaultdict(set)
-    for cui1, cui2, rel, rela in cache["mrrel_rows"]:
-        key = (rel, rela)
-        edges_by_key[key].append((cui1, cui2))
-        edge_set_by_key[key].add((cui1, cui2))
-
-    counts = {k: len(v) for k, v in edges_by_key.items()}
-    keys = list(counts.keys())
-
-    # Candidate pairs by similar edge count
-    candidate_pairs = []
-    for i, ka in enumerate(keys):
-        for kb in keys[i+1:]:
-            ca, cb = counts[ka], counts[kb]
-            if ca == 0 or cb == 0:
-                continue
-            ratio = abs(ca - cb) / max(ca, cb)
-            if ratio <= count_tol:
-                candidate_pairs.append((ka, kb))
-
-    # Verify by sampling reversed edges
-    verified_pairs = []
-    for (ka, kb) in candidate_pairs:
-        edges_a = edges_by_key[ka]
-        edges_b_set = edge_set_by_key[kb]
-        sample = edges_a[:sample_size]
-        n_reversed = sum(1 for (a, b) in sample if (b, a) in edges_b_set)
-        if n_reversed >= 0.9 * len(sample):
-            verified_pairs.append((ka, kb))
-
-    dropped = set()
-    pair_map = {}
-    ISA_KEY = ("CHD", "isa")
-    for (ka, kb) in verified_pairs:
-        if ka == ISA_KEY:
-            kept, dropped_one = ka, kb
-        elif kb == ISA_KEY:
-            kept, dropped_one = kb, ka
-        elif ka[1] <= kb[1]:
-            kept, dropped_one = ka, kb
-        else:
-            kept, dropped_one = kb, ka
-        if dropped_one in dropped:
-            continue
-        dropped.add(dropped_one)
-        pair_map[dropped_one] = kept
-
-    included = set(keys) - dropped
-    return included, dropped, pair_map
-
-
-# ============================================================================
-# RELA graph (non-IS-A relations, undirected, deduplicated)
-# ============================================================================
-
-def build_rela_graph(cache, included_relas):
-    """
-    Build an undirected graph from non-IS-A RELAs only.
-
-    Returns:
-        rela_neighbors[cui] -> set of CUIs connected via any non-IS-A
-                               included RELA (bidirectional)
-        rela_edge_counts -> dict[(rel, rela)] -> int
-    """
-    rela_neighbors = defaultdict(set)
-    rela_edge_counts = Counter()
-
-    # Exclude IS-A from the RELA graph — that's the whole point of separation
-    isa_keys = {("CHD", "isa"), ("PAR", "inverse_isa")}
-
-    for cui1, cui2, rel, rela in cache["mrrel_rows"]:
-        key = (rel, rela)
-        if key in isa_keys:
-            continue
-        if key not in included_relas:
-            continue
-        if cui1 == cui2:
-            continue
-        rela_neighbors[cui1].add(cui2)
-        rela_neighbors[cui2].add(cui1)
-        rela_edge_counts[key] += 1
-
-    return rela_neighbors, rela_edge_counts
-
-
-# ============================================================================
-# Canonical detection (on IS-A graph)
-# ============================================================================
-
-def find_subhierarchy_parents(cuis, children, tags):
-    """
-    A CUI qualifies as canonical if:
-      (1) STY-bearing-descendant count in [STY_LOWER_PCT, STY_UPPER_PCT]
-      (2) Direct children count NOT in top MEGA_ROOT_PERCENTILE
-    """
-    desc_cache = {}
-
-    def descendants(c):
-        if c in desc_cache:
-            return desc_cache[c]
-        visited = {c}
-        frontier = {c}
-        while frontier:
-            nxt = set()
-            for n in frontier:
-                for ch in children.get(n, ()):
-                    if ch not in visited:
-                        visited.add(ch)
-                        nxt.add(ch)
-            frontier = nxt
-        desc_cache[c] = visited
-        return visited
-
-    non_leaf = [c for c in cuis if children.get(c)]
-    sty_desc_count = {}
-    for cui in non_leaf:
-        desc = descendants(cui)
-        sty_desc_count[cui] = sum(1 for d in desc if tags.get(d))
-
-    cc = {c: len(children.get(c, ())) for c in non_leaf}
-
-    sorted_sty = sorted(sty_desc_count.values())
-    sty_lower = percentile_value(sorted_sty, STY_LOWER_PERCENTILE)
-
-    sorted_cc = sorted(cc.values())
-    mega_root_threshold = percentile_value(sorted_cc, MEGA_ROOT_PERCENTILE)
-
-    found = {}
-    for cui in non_leaf:
-        n_sty_desc = sty_desc_count[cui]
-        n_children = cc[cui]
-        if n_sty_desc < sty_lower:
-            continue
-        if n_children > mega_root_threshold:
-            continue
-        found[cui] = {
-            "n_children": n_children,
-            "sty_descendant_count": n_sty_desc,
-        }
-    return found, sty_lower, mega_root_threshold
-
-
-def extract_canonicals(subhier_parents):
-    canonicals = set(subhier_parents.keys())
-    canonical_info = {
-        c: {
-            "n_children": subhier_parents[c]["n_children"],
-            "sty_descendant_count": subhier_parents[c]["sty_descendant_count"],
-        }
-        for c in canonicals
-    }
-    return canonicals, canonical_info
-
-
-# ============================================================================
-# Topic assignment (nearest-canonical BFS — used for BOTH systems)
-# ============================================================================
-
-def compute_topics_per_cui(all_cuis, canonicals, neighbors, label_for_log=""):
-    """
-    Multi-source BFS from all canonicals over a graph defined by `neighbors`.
-
-    For the IS-A system: `neighbors` is the IS-A children dict (directed
-    downward). The BFS walks parent → child.
-
-    For the RELA system: `neighbors` is the undirected RELA graph.
-    The BFS walks in all directions.
-
-    Either way: each CUI gets the nearest canonical(s) reachable. DAG ties
-    at the same distance unite all tied canonicals.
-
-    Returns cui_topics: dict[cui] -> set of canonical CUIs.
-    """
-    distance = {c: 0 for c in canonicals}
-    nearest = {c: {c} for c in canonicals}
-
-    frontier = set(canonicals)
-    level = 0
-    t0 = time.time()
-    while frontier:
-        level += 1
-        next_frontier = set()
-        for node in frontier:
-            cand_d = distance[node] + 1
-            for nb in neighbors.get(node, ()):
-                if nb not in distance:
-                    distance[nb] = cand_d
-                    nearest[nb] = set(nearest[node])
-                    next_frontier.add(nb)
-                elif distance[nb] == cand_d:
-                    if not nearest[node] <= nearest[nb]:
-                        nearest[nb] |= nearest[node]
-        frontier = next_frontier
-        if level % 5 == 0:
-            print(f"    [{label_for_log}] BFS level {level}: "
-                  f"{len(distance):,} nodes reached "
-                  f"({time.time()-t0:.0f}s elapsed)")
-
-    cui_topics = {}
-    for cui in all_cuis:
-        t = nearest.get(cui)
-        if t:
-            cui_topics[cui] = t
-    return cui_topics
-
-
-# ============================================================================
-# Main
-# ============================================================================
 
 def main():
-    print("=" * 60)
-    print("Topic builder (dual: IS-A + RELA)")
-    print("=" * 60)
-    print(f"  cache         : {CACHE_PATH}")
-    print(f"  output        : {OUTPUT_PATH}")
-    print(f"  STY threshold : top {100 - STY_LOWER_PERCENTILE}% by STY-descendant count")
-    print(f"  mega filter   : exclude top {100-MEGA_ROOT_PERCENTILE}% by direct children")
-    print(f"  excluded CUIs : {len(CANONICAL_EXCLUDE)} "
-          f"({', '.join(sorted(CANONICAL_EXCLUDE))})")
+    print(f"Loading {GRAPH_PATH} ...")
+    try:
+        with open(GRAPH_PATH, "rb") as f:
+            obj = pickle.load(f)
+    except FileNotFoundError:
+        print(f"ERROR: file not found. Edit GRAPH_PATH at top of file.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"ERROR loading pickle: {e}")
+        sys.exit(1)
 
-    print("\n[1] Loading cache ...")
-    t0 = time.time()
-    with open(CACHE_PATH, "rb") as f:
-        cache = pickle.load(f)
-    print(f"  {len(cache['cuis']):,} CUIs in {time.time()-t0:.1f}s")
-    labels = cache["labels"]
+    basic_info(obj)
 
-    print("\n[2] Building IS-A graph ...")
-    t0 = time.time()
-    isa_parents, isa_children = build_isa_graph(cache)
-    n_isa_edges = sum(len(ps) for ps in isa_parents.values())
-    print(f"  {n_isa_edges:,} IS-A edges in {time.time()-t0:.1f}s")
-
-    print("\n[3] Detecting inverse-pair RELAs (auto-dedup) ...")
-    t0 = time.time()
-    included_relas, dropped_relas, pair_map = detect_inverse_pairs(cache)
-    total_relas = len(included_relas) + len(dropped_relas)
-    print(f"  Total distinct (REL, RELA) pairs : {total_relas}")
-    print(f"  Detected inverse duplicates      : {len(dropped_relas)}")
-    print(f"  -> Using                          : {len(included_relas)}")
-    print(f"  Detection time                    : {time.time()-t0:.1f}s")
-    if dropped_relas:
-        print(f"\n  Sample dropped RELAs (first 5):")
-        for d in sorted(dropped_relas)[:5]:
-            k = pair_map[d]
-            print(f"    DROP {d[0]}/{d[1]:<30s}  (inverse of {k[0]}/{k[1]})")
-
-    print("\n[4] Building RELA graph (excluding IS-A, undirected) ...")
-    t0 = time.time()
-    rela_neighbors, rela_edge_counts = build_rela_graph(cache, included_relas)
-    n_rela_input = sum(rela_edge_counts.values())
-    n_rela_undirected = sum(len(s) for s in rela_neighbors.values()) // 2
-    n_cuis_in_rela = len(rela_neighbors)
-    print(f"  {n_rela_input:,} input RELA rows across "
-          f"{len(rela_edge_counts)} RELA types in {time.time()-t0:.1f}s")
-    print(f"  -> {n_rela_undirected:,} undirected edges in RELA graph")
-    print(f"  {n_cuis_in_rela:,} CUIs have ≥1 RELA neighbor")
-    avg_deg = (2 * n_rela_undirected) / max(n_cuis_in_rela, 1)
-    print(f"  Average RELA degree: {avg_deg:.1f}")
-    print(f"\n  Top 10 RELAs by edge count:")
-    for (rel, rela), n in sorted(rela_edge_counts.items(),
-                                  key=lambda kv: -kv[1])[:10]:
-        print(f"    {n:>8,d}  {rel:<4} {rela}")
-
-    print("\n[5] Finding canonicals (STY-coverage on IS-A graph) ...")
-    t0 = time.time()
-    subhier_parents, sty_lower, mega_thresh = find_subhierarchy_parents(
-        cache["cuis"], isa_children, cache["tags"],
-    )
-    print(f"  Found {len(subhier_parents):,} candidates "
-          f"in {time.time()-t0:.1f}s")
-    print(f"  STY descendant cutoff: ≥ {sty_lower:,}")
-    print(f"  Mega-root threshold (children count): {mega_thresh}")
-
-    canonicals, canonical_info = extract_canonicals(subhier_parents)
-
-    depth_from_root = compute_depth_from_roots(
-        cache["cuis"], isa_parents, isa_children,
-    )
-
-    excluded_present = canonicals & CANONICAL_EXCLUDE
-    if excluded_present:
-        print(f"\n  Excluding {len(excluded_present)} CUI(s) from "
-              f"CANONICAL_EXCLUDE:")
-        for c in sorted(excluded_present):
-            print(f"    depth={depth_from_root.get(c, '?')}  {c}  "
-                  f"{labels.get(c, '?')[:55]}")
-        canonicals -= excluded_present
-        canonical_info = {c: v for c, v in canonical_info.items()
-                          if c in canonicals}
-    print(f"  Final canonicals: {len(canonicals):,}")
-
-    # ====================================================================
-    # System A: IS-A topics (nearest canonical via IS-A graph)
-    # ====================================================================
-    print("\n[6a] Computing IS-A topics (nearest canonical via IS-A graph) ...")
-    t0 = time.time()
-    cui_isa_topics = compute_topics_per_cui(
-        sorted(cache["cuis"]), canonicals, isa_children, label_for_log="IS-A",
-    )
-    print(f"  {len(cui_isa_topics):,} CUIs have ≥1 IS-A topic "
-          f"in {time.time()-t0:.1f}s")
-
-    # ====================================================================
-    # System B: RELA topics (nearest canonical via undirected RELA graph)
-    # ====================================================================
-    print("\n[6b] Computing RELA topics (nearest canonical via RELA graph) ...")
-    t0 = time.time()
-    cui_rela_topics = compute_topics_per_cui(
-        sorted(cache["cuis"]), canonicals, rela_neighbors, label_for_log="RELA",
-    )
-    print(f"  {len(cui_rela_topics):,} CUIs have ≥1 RELA topic "
-          f"in {time.time()-t0:.1f}s")
-
-    # ====================================================================
-    # Build topic index for both systems
-    # ====================================================================
-    print("\n[7] Building topic index ...")
-    topic_to_canonical = {hash_topic(c): c for c in canonicals}
-
-    isa_cui_topic_ids = {}
-    isa_topic_to_cuis = defaultdict(set)
-    for cui, canon_set in cui_isa_topics.items():
-        tids = {hash_topic(c) for c in canon_set}
-        isa_cui_topic_ids[cui] = tids
-        for tid in tids:
-            isa_topic_to_cuis[tid].add(cui)
-
-    rela_cui_topic_ids = {}
-    rela_topic_to_cuis = defaultdict(set)
-    for cui, canon_set in cui_rela_topics.items():
-        tids = {hash_topic(c) for c in canon_set}
-        rela_cui_topic_ids[cui] = tids
-        for tid in tids:
-            rela_topic_to_cuis[tid].add(cui)
-
-    # ====================================================================
-    # Results
-    # ====================================================================
-    print("\n" + "=" * 60)
-    print("RESULTS")
-    print("=" * 60)
-    total = len(cache["cuis"])
-    n_isa = len(isa_cui_topic_ids)
-    n_rela = len(rela_cui_topic_ids)
-    n_either = len(set(isa_cui_topic_ids.keys()) | set(rela_cui_topic_ids.keys()))
-    n_both = len(set(isa_cui_topic_ids.keys()) & set(rela_cui_topic_ids.keys()))
-
-    print(f"  Total CUIs                       : {total:,}")
-    print(f"  Total canonical CUIs             : {len(canonicals):,}")
-    print(f"  CUIs with at least 1 IS-A topic  : {n_isa:,} ({100*n_isa/total:.1f}%)")
-    print(f"  CUIs with at least 1 RELA topic  : {n_rela:,} ({100*n_rela/total:.1f}%)")
-    print(f"  CUIs with topic in EITHER system : {n_either:,} ({100*n_either/total:.1f}%)")
-    print(f"  CUIs with topic in BOTH systems  : {n_both:,} ({100*n_both/total:.1f}%)")
-
-    isa_avg = (sum(len(t) for t in isa_cui_topic_ids.values()) /
-               max(n_isa, 1))
-    rela_avg = (sum(len(t) for t in rela_cui_topic_ids.values()) /
-                max(n_rela, 1))
-    print(f"\n  Avg IS-A topics per CUI (with topics)  : {isa_avg:.2f}")
-    print(f"  Avg RELA topics per CUI (with topics)  : {rela_avg:.2f}")
-
-    print(f"\n  Top 15 IS-A topics by membership:")
-    sorted_isa = sorted(isa_topic_to_cuis.items(), key=lambda kv: -len(kv[1]))
-    for tid, members in sorted_isa[:15]:
-        c = topic_to_canonical[tid]
-        print(f"    {len(members):>6,d} CUIs  {tid}  -> {c}  ({labels.get(c, '?')[:50]})")
-
-    print(f"\n  Top 15 RELA topics by membership:")
-    sorted_rela = sorted(rela_topic_to_cuis.items(), key=lambda kv: -len(kv[1]))
-    for tid, members in sorted_rela[:15]:
-        c = topic_to_canonical[tid]
-        print(f"    {len(members):>6,d} CUIs  {tid}  -> {c}  ({labels.get(c, '?')[:50]})")
-
-    # ====================================================================
-    # Save
-    # ====================================================================
-    print("\n[Saving]")
-    t0 = time.time()
-    payload = {
-        "built_at": datetime.datetime.now().isoformat(),
-        "cache_fetched_at": cache.get("fetched_at"),
-        "config": {
-            "sty_lower_percentile": STY_LOWER_PERCENTILE,
-            "mega_root_percentile": MEGA_ROOT_PERCENTILE,
-            "actual_sty_lower": sty_lower,
-            "actual_mega_root_threshold": mega_thresh,
-            "canonical_exclude": sorted(CANONICAL_EXCLUDE),
-            "topic_assignment": "nearest canonical via multi-source BFS",
-            "n_included_relas": len(included_relas),
-            "included_relas": sorted(f"{r}/{ra}" for (r, ra) in included_relas
-                                     if (r, ra) != ("CHD", "isa")),
-            "dropped_inverse_relas": sorted(f"{r}/{ra}" for (r, ra) in dropped_relas),
-            "rela_edge_counts": {f"{r}/{ra}": c
-                                 for (r, ra), c in rela_edge_counts.items()},
-        },
-        "canonicals":              canonicals,
-        "canonical_info":          canonical_info,
-        # System A: IS-A topics
-        "isa_cui_topic_ids":       isa_cui_topic_ids,
-        "isa_topic_to_cuis":       dict(isa_topic_to_cuis),
-        # System B: RELA topics
-        "rela_cui_topic_ids":      rela_cui_topic_ids,
-        "rela_topic_to_cuis":      dict(rela_topic_to_cuis),
-        # Shared
-        "topic_to_canonical":      topic_to_canonical,
-        "labels":                  cache["labels"],
-        "tags":                    cache["tags"],
-    }
-    with open(OUTPUT_PATH, "wb") as f:
-        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
-    print(f"  wrote {size_mb:.1f} MB in {time.time()-t0:.1f}s")
-    print("\n" + "=" * 60)
-    print(f"DONE — {OUTPUT_PATH}")
-    print("=" * 60)
+    handled = False
+    if hasattr(obj, "nodes") and hasattr(obj, "edges"):
+        handled = inspect_networkx(obj)
+    if not handled:
+        handled = inspect_dict(obj)
+    if not handled:
+        print(f"\n[!] Don't know how to introspect this object type.")
+        print(f"    dir(): {[x for x in dir(obj) if not x.startswith('_')][:30]}")
 
 
 main()
