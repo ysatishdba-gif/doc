@@ -1,18 +1,24 @@
 Loaded topic_lookup.pkl
-  built_at        : 2026-05-26T16:02:23.403781
-  total canonicals: 20,859
-  CUIs with topics: 181,003
+  built_at        : 2026-05-26T16:30:56.573590
+  total canonicals: 32,779
+  CUIs with topics: 367,787
 
 ============================================================
 C0032285  Pneumonia (disorder)
 ============================================================
   semantic type(s): Disease or Syndrome
 
-  No topics. This CUI has no canonical ancestors.
+  Has 1 topic(s):
+    tp_4385b55dfcd9
+      canonical:    C0032285  (Pneumonia (disorder))
+      total CUIs:   39 share this topic
 
 ============================================================
 C0041296  Infection caused by Mycobacterium tuberculosis
 ============================================================
   semantic type(s): Disease or Syndrome
 
-  No topics. This CUI has no canonical ancestors.
+  Has 1 topic(s):
+    tp_9109941743b9
+      canonical:    C0026918  (Mycobacteriosis (disorder))
+      total CUIs:   113 share this topic
