@@ -1,7 +1,10 @@
 """
-build_topics.py (UPDATED - GCP SAFE VERSION)
---------------------------------------------
-Fix: Stage 6 memory blowup replaced with bitset-based BFS.
+build_topics.py (GCP STABLE + PERFORMANCE FIXED)
+------------------------------------------------
+Fixes:
+- Stage 6 slowdown (frontier explosion + redundant revisits)
+- Improves BFS convergence behavior
+- Keeps bitset-based topic representation
 """
 
 import datetime
@@ -19,15 +22,13 @@ STY_LOWER_PERCENTILE = 75
 STY_UPPER_PERCENTILE = 100
 MEGA_ROOT_PERCENTILE = 99
 
-CANONICAL_EXCLUDE = {
-    "C2720507",
-}
+CANONICAL_EXCLUDE = {"C2720507"}
 
 MAX_TOPIC_HOPS = 3
 
 
 # ============================================================
-# Helpers
+# BASIC HELPERS
 # ============================================================
 
 def build_isa_graph(cache):
@@ -45,28 +46,32 @@ def build_topic_graph(cache, included_relas):
     rela_edge_counts = Counter()
 
     for cui1, cui2, rel, rela in cache["mrrel_rows"]:
-        key = (rel, rela)
-        if key not in included_relas:
+        if (rel, rela) not in included_relas:
             continue
         if cui1 == cui2:
             continue
         topic_neighbors[cui1].add(cui2)
         topic_neighbors[cui2].add(cui1)
-        rela_edge_counts[key] += 1
+        rela_edge_counts[(rel, rela)] += 1
 
     return topic_neighbors, rela_edge_counts
 
 
-def percentile_value(sorted_values, p):
-    if not sorted_values:
+def percentile_value(values, p):
+    if not values:
         return 0
-    idx = min(int(len(sorted_values) * p / 100), len(sorted_values) - 1)
-    return sorted_values[idx]
+    values = sorted(values)
+    idx = min(int(len(values) * p / 100), len(values) - 1)
+    return values[idx]
 
 
 def hash_topic(cui):
     return "tp_" + hashlib.sha1(cui.encode()).hexdigest()[:12]
 
+
+# ============================================================
+# IS-A DEPTH
+# ============================================================
 
 def compute_depth_from_roots(cuis, parents, children):
     roots = {c for c in cuis if not parents.get(c)}
@@ -74,78 +79,79 @@ def compute_depth_from_roots(cuis, parents, children):
     dq = deque((r, 0) for r in roots)
 
     while dq:
-        cui, d = dq.popleft()
-        if cui in depth and depth[cui] <= d:
+        c, d = dq.popleft()
+        if c in depth and depth[c] <= d:
             continue
-        depth[cui] = d
-        for ch in children.get(cui, ()):
+        depth[c] = d
+        for ch in children.get(c, ()):
             dq.append((ch, d + 1))
 
     return depth
 
 
 # ============================================================
-# Canonical detection
+# CANONICAL DETECTION
 # ============================================================
 
 def find_subhierarchy_parents(cuis, children, tags):
-    sty_desc_count = {}
+
     desc_cache = {}
 
     def descendants(c):
         if c in desc_cache:
             return desc_cache[c]
-        visited = {c}
-        frontier = {c}
 
-        while frontier:
-            nxt = set()
-            for n in frontier:
-                for ch in children.get(n, ()):
-                    if ch not in visited:
-                        visited.add(ch)
-                        nxt.add(ch)
-            frontier = nxt
+        visited = {c}
+        stack = [c]
+
+        while stack:
+            node = stack.pop()
+            for ch in children.get(node, ()):
+                if ch not in visited:
+                    visited.add(ch)
+                    stack.append(ch)
 
         desc_cache[c] = visited
         return visited
 
     non_leaf = [c for c in cuis if children.get(c)]
 
-    for cui in non_leaf:
-        desc = descendants(cui)
-        sty_desc_count[cui] = sum(1 for d in desc if tags.get(d))
+    sty_desc_count = {}
+    child_counts = {}
 
-    cc = {c: len(children.get(c, ())) for c in non_leaf}
+    for c in non_leaf:
+        desc = descendants(c)
+        sty_desc_count[c] = sum(1 for d in desc if tags.get(d))
+        child_counts[c] = len(children.get(c, ()))
 
-    sorted_sty = sorted(sty_desc_count.values())
-    sty_lower = percentile_value(sorted_sty, STY_LOWER_PERCENTILE)
+    sty_vals = list(sty_desc_count.values())
+    cc_vals = list(child_counts.values())
 
-    sorted_cc = sorted(cc.values())
-    mega_root_threshold = percentile_value(sorted_cc, MEGA_ROOT_PERCENTILE)
+    sty_lower = percentile_value(sty_vals, STY_LOWER_PERCENTILE)
+    mega_root_threshold = percentile_value(cc_vals, MEGA_ROOT_PERCENTILE)
 
     found = {}
 
-    for cui in non_leaf:
-        if sty_desc_count[cui] < sty_lower:
+    for c in non_leaf:
+        if sty_desc_count[c] < sty_lower:
             continue
-        if cc[cui] > mega_root_threshold:
+        if child_counts[c] > mega_root_threshold:
             continue
 
-        found[cui] = {
-            "n_children": cc[cui],
-            "sty_descendant_count": sty_desc_count[cui],
+        found[c] = {
+            "n_children": child_counts[c],
+            "sty_descendant_count": sty_desc_count[c],
         }
 
     return found, sty_lower, mega_root_threshold
 
 
-def extract_canonicals(subhier_parents):
-    canonicals = set(subhier_parents.keys())
+def extract_canonicals(subhier):
+    canonicals = set(subhier.keys())
     info = {
         c: {
-            "n_children": subhier_parents[c]["n_children"],
-            "sty_descendant_count": subhier_parents[c]["sty_descendant_count"],
+            "n_children": subhier[c]["n_children"],
+            "sty_descendant_count": subhier[c]["sty_descendant_count"],
         }
         for c in canonicals
     }
@@ -153,53 +159,67 @@ def extract_canonicals(subhier_parents):
 
 
 # ============================================================
-# 🔥 FIXED STAGE 6 (BITSET BFS - NO SET EXPLOSION)
+# 🚀 FIXED STAGE 6 (FAST + STABLE BFS)
 # ============================================================
 
-def compute_topics_per_cui_bitset(all_cuis, canonicals, neighbors, max_hops):
+def compute_topics_per_cui_fast(all_cuis, canonicals, neighbors, max_hops):
+
     canonicals = list(canonicals)
     idx = {c: i for i, c in enumerate(canonicals)}
 
     topics = {}
+    last_updated = {}
+
     frontier = set()
 
+    # init
     for c in canonicals:
         topics[c] = 1 << idx[c]
+        last_updated[c] = 0
         frontier.add(c)
 
-    distance = {c: 0 for c in canonicals}
-
     for d in range(1, max_hops + 1):
+
         next_frontier = set()
 
         for node in frontier:
             node_bits = topics[node]
 
             for nb in neighbors.get(node, ()):
-                if nb not in topics:
-                    topics[nb] = node_bits
-                    distance[nb] = d
-                    next_frontier.add(nb)
-                else:
-                    merged = topics[nb] | node_bits
-                    if merged != topics[nb]:
-                        topics[nb] = merged
-                        next_frontier.add(nb)
 
-        print(f"    hop {d}: reached={len(topics):,}, frontier={len(next_frontier):,}")
+                prev = topics.get(nb)
+
+                if prev is None:
+                    topics[nb] = node_bits
+                    last_updated[nb] = d
+                    next_frontier.add(nb)
+
+                else:
+                    merged = prev | node_bits
+
+                    # ONLY propagate if meaningful change
+                    if merged != prev:
+                        topics[nb] = merged
+
+                        # prevents repeated churn
+                        if last_updated.get(nb, -1) < d:
+                            last_updated[nb] = d
+                            next_frontier.add(nb)
+
+        print(f"    hop {d}: nodes={len(topics):,}, frontier={len(next_frontier):,}")
 
         if not next_frontier:
             break
 
         frontier = next_frontier
 
-    # decode
+    # decode bitsets
     cui_topics = {}
 
     for cui, mask in topics.items():
         canon_set = set()
-        i = 0
         m = mask
+        i = 0
 
         while m:
             if m & 1:
@@ -217,8 +237,9 @@ def compute_topics_per_cui_bitset(all_cuis, canonicals, neighbors, max_hops):
 # ============================================================
 
 def main():
+
     print("=" * 60)
-    print("TOPIC BUILDER (GCP SAFE VERSION)")
+    print("TOPIC BUILDER (FIXED + STABLE)")
     print("=" * 60)
 
     print("\n[1] loading cache")
@@ -231,10 +252,7 @@ def main():
     parents, children = build_isa_graph(cache)
 
     print("\n[3] topic graph")
-    included_relas = set(
-        (rel, rela) for _, _, rel, rela in cache["mrrel_rows"]
-    )
-
+    included_relas = set((rel, rela) for _, _, rel, rela in cache["mrrel_rows"])
     topic_neighbors, rela_counts = build_topic_graph(cache, included_relas)
 
     print("\n[4] canonical detection")
@@ -244,19 +262,20 @@ def main():
 
     canonicals, canonical_info = extract_canonicals(subhier)
 
-    print(f"canonicals: {len(canonicals):,}")
+    print(f"canonicals = {len(canonicals):,}")
 
     print("\n[5] depth")
     depth = compute_depth_from_roots(cache["cuis"], parents, children)
 
-    print("\n[6] topics (BITSET BFS)")
-    cui_topics = compute_topics_per_cui_bitset(
+    print("\n[6] topics (FAST BFS)")
+    cui_topics = compute_topics_per_cui_fast(
         cache["cuis"],
         canonicals,
         topic_neighbors,
         MAX_TOPIC_HOPS,
     )
 
+    # build outputs
     topic_to_cuis = defaultdict(set)
     cui_topic_ids = {}
 
@@ -268,10 +287,7 @@ def main():
 
     topic_to_canonical = {hash_topic(c): c for c in canonicals}
 
-    # ========================================================
     # SAVE
-    # ========================================================
-
     payload = {
         "canonicals": canonicals,
         "canonical_info": canonical_info,
@@ -281,10 +297,11 @@ def main():
         "labels": labels,
     }
 
+    print("\n[saving]")
     with open(OUTPUT_PATH, "wb") as f:
         pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    print("\nDONE ->", OUTPUT_PATH)
+    print("DONE ->", OUTPUT_PATH)
 
 
 if __name__ == "__main__":
