@@ -1,158 +1,145 @@
+import os
 import math
 import collections
 import pandas as pd
 import networkx as nx
+from google.cloud import bigquery
 
-class ClinicalDualLayerTopicEngine:
+# =====================================================================
+# GCP CONFIGURATION
+# =====================================================================
+PROJECT_ID = "your-project-id"       # <-- Replace with your GCP Project
+DATASET_ID = "your_dataset_name"     # <-- Replace with your BQ Dataset
+
+# Initialize the BigQuery Client
+bq_client = bigquery.Client(project=PROJECT_ID)
+
+# =====================================================================
+# CLINICAL DUAL-LAYER TOPIC ENGINE
+# =====================================================================
+class GCPClinicalTopicEngine:
     def __init__(self, ic_lower_bound=1.0, ic_upper_bound=3.0):
-        """
-        ic_lower_bound: Lower limit for topics (prevents choosing overly broad concepts like "Disease").
-        ic_upper_bound: Upper limit for topics (prevents choosing hyper-specific concepts like "Anterior STEMI").
-        """
         self.ic_min = ic_lower_bound
         self.ic_max = ic_upper_bound
-        
-        # Layer 1: Taxonomic Backbone Graph (Strictly Child -> Parent 'is_a' paths)
         self.backbone_graph = nx.DiGraph()
-        
-        # Layer 2: Lateral Bridge Mapping (Substance/Symptom CUI -> Related Disease/Condition CUIs)
         self.lateral_bridge_map = collections.defaultdict(list)
-        
-        # System Lookup Tables
         self.ic_scores = {}
         self.cui_to_topic_map = {}
         self.cui_to_name = {}
 
-    def build_dual_layer_graphs(self, mrrel_df, mrconso_df=None):
-        """
-        Parses MRREL to build independent Hierarchical and Associative layers.
-        Expects columns: ['CUI1', 'CUI2', 'REL', 'RELA', 'SAB']
-        """
-        print("[1/4] Parsing UMLS Metathesaurus relationships into Dual-Layer architecture...")
+    def build_dual_layer_graphs(self, mrrel_df, mrconso_df):
+        print("-> Processing UMLS Dataframes into Graph Architecture...")
         
-        # Optional: Ingest string names for debugging visibility
-        if mrconso_df is not None:
-            self.cui_to_name = dict(zip(mrconso_df['CUI'], mrconso_df['STR']))
+        # Populate Preferred Names map
+        self.cui_to_name = dict(zip(mrconso_df['CUI'], mrconso_df['STR']))
             
         # Isolate SNOMED CT entries
         snomed_df = mrrel_df[mrrel_df['SAB'] == 'SNOMEDCT_US']
 
-        # --- LAYER 1: TAXONOMIC BACKBONE ---
-        # Capture strict hierarchical mappings ('is_a'). CUI2 is Parent, CUI1 is Child.
+        # Layer 1: Backbone (Strict Taxonomic 'is_a' paths)
         layer1_df = snomed_df[(snomed_df['REL'] == 'PAR') & (snomed_df['RELA'] == 'is_a')]
         edges = list(zip(layer1_df['CUI1'], layer1_df['CUI2']))
         self.backbone_graph.add_edges_from(edges)
-        print(f" -> Layer 1 Backbone populated: {self.backbone_graph.number_of_nodes()} nodes.")
 
-        # --- LAYER 2: LATERAL ASSOCIATIVE BRIDGES ---
-        # Capture clinical cross-links that bridge distinct medical domains (e.g., Substances to Allergies)
-        lateral_rela_targets = {
-            'causative_agent_of', 'due_to', 
-            'has_finding_site', 'has_manifestation',
-            'associated_with'
-        }
+        # Layer 2: Lateral Bridges (Associative links)
+        lateral_rela_targets = {'causative_agent_of', 'due_to', 'has_finding_site', 'has_manifestation'}
         layer2_df = snomed_df[snomed_df['RELA'].isin(lateral_rela_targets)]
         
         for _, row in layer2_df.iterrows():
-            cui_source = row['CUI1']
-            cui_target = row['CUI2']
-            # Map lateral cross-links bilaterally so a query can hit from either side
+            cui_source, cui_target = row['CUI1'], row['CUI2']
             self.lateral_bridge_map[cui_source].append(cui_target)
             self.lateral_bridge_map[cui_target].append(cui_source)
-        print(f" -> Layer 2 Lateral Cross-links populated: {len(self.lateral_bridge_map)} unique concepts bridged.")
 
-    def calculate_corpus_information_content(self, corpus_cuis_list):
-        """
-        Calculates mathematical data density using Layer 1 (taxonomic hierarchy) only.
-        """
-        print("[2/4] Calculating data-driven Information Content (IC) scores...")
-        
-        # 1. Count base occurrences across the patient records/documents
+    def calculate_corpus_ic(self, corpus_cuis_list):
+        print("-> Calculating Corpus Information Content (IC)...")
         raw_counts = collections.Counter()
         for doc in corpus_cuis_list:
             raw_counts.update(doc)
             
-        total_concepts_logged = sum(raw_counts.values())
-        if total_concepts_logged == 0:
-            raise ValueError("Corpus CUI extraction empty. Cannot compute statistical metrics.")
+        total_concepts = sum(raw_counts.values())
+        if total_concepts == 0:
+            raise ValueError("Extraction corpus is empty.")
 
-        # 2. Accumulate frequency weight down the tree branches
-        rev_backbone = self.backbone_graph.reverse() # Directing paths from Parent -> Child
-        cumulative_counts = {}
-        
+        rev_backbone = self.backbone_graph.reverse()
         for node in self.backbone_graph.nodes():
             descendants = nx.descendants(rev_backbone, node) | {node}
             sub_tree_weight = sum(raw_counts[desc_cui] for desc_cui in descendants)
-            cumulative_counts[node] = sub_tree_weight
-
-        # 3. Compute final mathematical IC values
-        for node, weight in cumulative_counts.items():
-            if weight == 0:
-                self.ic_scores[node] = float('inf') # Rare condition never observed
+            
+            if sub_tree_weight == 0:
+                self.ic_scores[node] = float('inf')
             else:
-                probability = weight / total_concepts_logged
-                self.ic_scores[node] = -math.log(probability)
+                self.ic_scores[node] = -math.log(sub_tree_weight / total_concepts)
 
     def _trace_backbone_to_topic(self, cui, visited=None):
-        """
-        Recursive walk up Layer 1 to find an ancestor inside the target IC boundaries.
-        """
-        if visited is None:
-            visited = set()
-        if cui in visited:
-            return None
+        if visited is None: visited = set()
+        if cui in visited: return None
         visited.add(cui)
 
         cui_ic = self.ic_scores.get(cui, float('inf'))
-
-        # Standard Threshold Gates
         if self.ic_min <= cui_ic <= self.ic_max:
             return cui
         if cui_ic < self.ic_min:
-            return None # Dropped below minimum boundaries into terms too generic
+            return None 
 
         parents = list(self.backbone_graph.successors(cui))
-        if not parents:
-            return cui # Leaf boundary fallback
+        if not parents: return cui
 
         for parent in parents:
             topic = self._trace_backbone_to_topic(parent, visited)
-            if topic:
-                return topic
+            if topic: return topic
         return cui
 
     def precompute_static_topic_maps(self):
-        """
-        Compiles the pre-computed, flat lookup matrix for fast execution.
-        """
-        print("[3/4] Precompiling O(1) Topic Alignment Matrix...")
+        print("-> Generating Static Mapping Array...")
         for cui in self.backbone_graph.nodes():
             assigned_topic = self._trace_backbone_to_topic(cui)
-            if assigned_topic:
-                self.cui_to_topic_map[cui] = assigned_topic
-            else:
-                self.cui_to_topic_map[cui] = cui
+            self.cui_to_topic_map[cui] = assigned_topic if assigned_topic else cui
 
-    def resolve_cui_to_topics(self, input_cui, is_runtime_query=False):
-        """
-        Unified Entry Point for indexing documents and processing search queries.
-        
-        If is_runtime_query=True, it activates Layer 2 (Lateral Cross-Links) to interpret 
-        implicit connections if the direct structural path isn't enough.
-        """
-        topics = set()
-        
-        # Check primary direct Layer 1 hierarchical path mapping
-        direct_topic = self.cui_to_topic_map.get(input_cui)
-        if direct_topic:
-            topics.add(direct_topic)
-            
-        # If executing a varying user query, activate Layer 2 Cross-Links
-        if is_runtime_query and input_cui in self.lateral_bridge_map:
-            for linked_cui in self.lateral_bridge_map[input_cui]:
-                # Map the crossed-over concept up to its corresponding Layer 1 topic
-                linked_topic = self.cui_to_topic_map.get(linked_cui)
-                if linked_topic:
-                    topics.add(linked_topic)
-                    
-        return list(topics) if topics else [input_cui]
+    def export_mapping_to_dataframe(self):
+        """Converts internal dictionary maps to a structured Pandas Dataframe for BQ Storage"""
+        records = []
+        for source_cui, topic_cui in self.cui_to_topic_map.items():
+            records.append({
+                "source_cui": source_cui,
+                "source_name": self.cui_to_name.get(source_cui, "Unknown"),
+                "topic_cui": topic_cui,
+                "topic_name": self.cui_to_name.get(topic_cui, "Unknown")
+            })
+        return pd.DataFrame(records)
+
+# =====================================================================
+# RUNTIME PIPELINE EXECUTION
+# =====================================================================
+
+# Step 1: Pull UMLS tables directly from BigQuery into Notebook Memory
+print("Pulling UMLS source structures from BigQuery...")
+query_mrrel = f"SELECT CUI1, CUI2, REL, RELA, SAB FROM `{PROJECT_ID}.{DATASET_ID}.mrrel`"
+query_mrconso = f"SELECT CUI, STR FROM `{PROJECT_ID}.{DATASET_ID}.mrconso` WHERE LAT = 'ENG' AND ISPREF = 'Y'"
+
+mrrel_df = bq_client.query(query_mrrel).to_dataframe()
+mrconso_df = bq_client.query(query_mrconso).to_dataframe()
+
+# Step 2: Fetch your Clinical Corpus (e.g., extracted patient clinical note CUIs)
+# Replace this query with your actual clinical token/patient document matrix table
+query_corpus = f"SELECT mapped_cuis_array FROM `{PROJECT_ID}.{DATASET_ID}.patient_extracted_features`"
+# For this example script, we simulate a small corpus read if your table isn't built yet:
+corpus_sample = [["C0026639"], ["C0026639"], ["C0013221"], ["C0030843"]] 
+
+# Step 3: Run Engine Processing Logic
+engine = GCPClinicalTopicEngine(ic_lower_bound=0.5, ic_upper_bound=2.0)
+engine.build_dual_layer_graphs(mrrel_df, mrconso_df)
+engine.calculate_corpus_ic(corpus_sample) # Swap with database corpus list if ready
+engine.precompute_static_topic_maps()
+
+# Step 4: Export Computed Dataframe back to BigQuery
+output_df = engine.export_mapping_to_dataframe()
+
+table_ref = f"{PROJECT_ID}.{DATASET_ID}.static_cui_to_topic_map"
+job_config = bigquery.LoadJobConfig(
+    write_disposition="WRITE_TRUNCATE" # Overwrites table completely with fresh topics
+)
+
+print(f"Writing static topic mapping table directly to: {table_ref}...")
+job = bq_client.load_table_from_dataframe(output_df, table_ref, job_config=job_config)
+job.result() # Blocks thread execution until load job completes successfully
+print("Pipeline complete. BigQuery table optimized and active.")
