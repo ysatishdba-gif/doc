@@ -1,149 +1,33 @@
-"""
-diagnose_graph_pickle.py
-------------------------
-Inspect an unknown graph pickle to find out:
-  1. What type of object is in it (NetworkX Graph? DiGraph? dict? custom?)
-  2. How many nodes, how many edges
-  3. What attributes exist on nodes and edges
-  4. Whether RELA / REL information is encoded as edge attributes
-  5. A sample of nodes and edges to understand the schema
+Loading networkx_cui_context_v1_3_0.pkl ...
 
-EDIT THE PATH BELOW to point at your graph pickle.
-"""
+[1] Top-level object
+    type        : networkx.classes.digraph.DiGraph
+    repr (short): <networkx.classes.digraph.DiGraph object at 0x7f9608ff1600>
+    len()       : 24,055,828
 
-import pickle
-import sys
-from collections import Counter
+[2] Looks like a networkx-style graph
+    nodes       : 24,055,828
+    edges       : 46,328,555
+    directed    : True
+    multigraph  : False
 
+[3] Sample of nodes (first 5)
+    node 'Context': {}
+    node 'CCSR_ICD10PCS.Empty': {}
+    node 'CDCREC.Empty': {}
+    node 'CPT.Empty': {}
+    node 'GO.Empty': {}
 
-GRAPH_PATH = "snomed_graph.pkl"  # <-- EDIT THIS
+[4] Sample of edges (first 10)
+    edge: ('Context', 'CCSR_ICD10PCS.Empty', {})
+    edge: ('Context', 'CDCREC.Empty', {})
+    edge: ('Context', 'CPT.Empty', {})
+    edge: ('Context', 'GO.Empty', {})
+    edge: ('Context', 'HL7V2.5.Empty', {})
+    edge: ('Context', 'HL7V3.0.Empty', {})
+    edge: ('Context', 'HPO.Empty', {})
+    edge: ('Context', 'ICD10.Empty', {})
+    edge: ('Context', 'ICD10CM.Empty', {})
+    edge: ('Context', 'ICD10PCS.Empty', {})
 
-
-def basic_info(obj):
-    print(f"\n[1] Top-level object")
-    print(f"    type        : {type(obj).__module__}.{type(obj).__name__}")
-    print(f"    repr (short): {repr(obj)[:300]}")
-    if hasattr(obj, '__len__'):
-        try:
-            print(f"    len()       : {len(obj):,}")
-        except Exception as e:
-            print(f"    len()       : <error: {e}>")
-
-
-def inspect_networkx(g):
-    """If it looks like a networkx graph, print its shape."""
-    has_nodes = hasattr(g, "nodes")
-    has_edges = hasattr(g, "edges")
-    if not (has_nodes and has_edges):
-        return False
-
-    print(f"\n[2] Looks like a networkx-style graph")
-    try:
-        n_nodes = g.number_of_nodes()
-        n_edges = g.number_of_edges()
-        print(f"    nodes       : {n_nodes:,}")
-        print(f"    edges       : {n_edges:,}")
-    except Exception as e:
-        print(f"    error counting: {e}")
-
-    # Directed or undirected?
-    if hasattr(g, "is_directed"):
-        print(f"    directed    : {g.is_directed()}")
-    if hasattr(g, "is_multigraph"):
-        print(f"    multigraph  : {g.is_multigraph()}")
-
-    # Sample node attributes
-    print(f"\n[3] Sample of nodes (first 5)")
-    for i, node in enumerate(g.nodes()):
-        if i >= 5:
-            break
-        attrs = dict(g.nodes[node]) if hasattr(g.nodes[node], 'keys') else g.nodes[node]
-        print(f"    node {node!r}: {attrs}")
-
-    # Sample edge attributes
-    print(f"\n[4] Sample of edges (first 10)")
-    for i, edge in enumerate(g.edges(data=True)):
-        if i >= 10:
-            break
-        print(f"    edge: {edge}")
-
-    # Aggregate edge-attribute keys
-    print(f"\n[5] Edge-attribute key frequencies (across all edges)")
-    key_counter = Counter()
-    for u, v, data in g.edges(data=True):
-        for k in data.keys():
-            key_counter[k] += 1
-    for k, c in key_counter.most_common():
-        print(f"    {k:<30s} : {c:,}")
-
-    # If REL or RELA attributes exist, get their distribution
-    for attr_name in ["rel", "REL", "rela", "RELA", "label", "type", "relation"]:
-        values = []
-        for u, v, data in g.edges(data=True):
-            if attr_name in data:
-                values.append(data[attr_name])
-        if values:
-            print(f"\n[6] Distinct values of edge attribute '{attr_name}'")
-            value_counter = Counter(values)
-            print(f"    {len(value_counter)} distinct values, "
-                  f"{sum(value_counter.values()):,} total occurrences")
-            for v, c in value_counter.most_common(30):
-                print(f"      {c:>8,d}  {v}")
-            if len(value_counter) > 30:
-                print(f"      ... plus {len(value_counter) - 30} more")
-
-    return True
-
-
-def inspect_dict(obj):
-    """If it's a dict, what are the keys?"""
-    if not isinstance(obj, dict):
-        return False
-    print(f"\n[2] Top-level dict with {len(obj):,} keys")
-    print(f"    first 20 keys + value-types:")
-    for i, (k, v) in enumerate(obj.items()):
-        if i >= 20:
-            break
-        v_type = type(v).__name__
-        v_len = ""
-        if hasattr(v, "__len__"):
-            try:
-                v_len = f" (len={len(v):,})"
-            except Exception:
-                pass
-        print(f"    {k!r:<40s} -> {v_type}{v_len}")
-
-    # If any value looks graph-like, dive in
-    for k, v in obj.items():
-        if hasattr(v, "nodes") and hasattr(v, "edges"):
-            print(f"\n    -> value at key {k!r} looks like a graph")
-            inspect_networkx(v)
-            break
-    return True
-
-
-def main():
-    print(f"Loading {GRAPH_PATH} ...")
-    try:
-        with open(GRAPH_PATH, "rb") as f:
-            obj = pickle.load(f)
-    except FileNotFoundError:
-        print(f"ERROR: file not found. Edit GRAPH_PATH at top of file.")
-        sys.exit(1)
-    except Exception as e:
-        print(f"ERROR loading pickle: {e}")
-        sys.exit(1)
-
-    basic_info(obj)
-
-    handled = False
-    if hasattr(obj, "nodes") and hasattr(obj, "edges"):
-        handled = inspect_networkx(obj)
-    if not handled:
-        handled = inspect_dict(obj)
-    if not handled:
-        print(f"\n[!] Don't know how to introspect this object type.")
-        print(f"    dir(): {[x for x in dir(obj) if not x.startswith('_')][:30]}")
-
-
-main()
+[5] Edge-attribute key frequencies (across all edges)
