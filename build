@@ -81,6 +81,20 @@ MEGA_ROOT_PERCENTILE = 99    # exclude top 1% by direct children count
 # to a few mega-roots if SNOMED roots qualify.
 PRUNE_STACKED_CANONICALS = False
 
+# Sibling expansion: after assigning the nearest canonical topic to
+# each CUI, expand the topic set to include OTHER CANONICALS that
+# share an IS-A parent with the assigned canonical.
+#
+# Effect: trades precision for recall. A CUI assigned to Pneumonia
+# (e.g., "Acute streptococcal pneumonia") would also get Bronchitis,
+# Pneumonitis, etc. as topics — any canonical that co-occurs as a
+# child of one of Pneumonia's IS-A parents.
+#
+# When True: wider retrieval but topic count per CUI inflates by the
+# average sibling-canonical degree.
+# When False (default): each CUI keeps its nearest canonical(s) only.
+SIBLING_EXPANSION = False
+
 # When True: CUIs with no canonical ancestor become their OWN topic
 # (a single-member topic). Ensures every CUI is retrievable but inflates
 # the topic count by however many "orphan" CUIs there are.
@@ -213,6 +227,36 @@ def extract_canonicals(subhier_parents, children):
     return canonicals, canonical_info
 
 
+def build_sibling_canonical_index(canonicals, parents):
+    """
+    For each canonical c, find OTHER canonicals that share at least one
+    direct IS-A parent with c.
+
+    Returns: dict[cui] -> set of sibling canonical CUIs (excludes c itself)
+
+    Implementation: for each parent in the graph, find which canonicals
+    are direct children of that parent. Every pair becomes mutual siblings.
+    Cheaper than per-canonical lookup of co-children.
+    """
+    # Group canonicals by their direct IS-A parents
+    canon_by_parent = defaultdict(set)
+    for c in canonicals:
+        for p in parents.get(c, ()):
+            canon_by_parent[p].add(c)
+
+    sibling_map = defaultdict(set)
+    for p, canon_kids in canon_by_parent.items():
+        if len(canon_kids) < 2:
+            continue
+        # Every pair of canon_kids is sibling under p
+        canon_kids_list = list(canon_kids)
+        for i, a in enumerate(canon_kids_list):
+            for b in canon_kids_list[i+1:]:
+                sibling_map[a].add(b)
+                sibling_map[b].add(a)
+    return sibling_map
+
+
 # ============================================================================
 # Topic assignment per CUI: NEAREST canonical(s) only
 # ============================================================================
@@ -262,7 +306,8 @@ def prune_stacked_canonicals(canonicals, children):
     return canon_set - shadowed
 
 
-def compute_topics_per_cui(all_cuis, canonicals, parents, children):
+def compute_topics_per_cui(all_cuis, canonicals, parents, children,
+                           sibling_map=None):
     """
     Multi-source downward BFS from all canonicals at once.
 
@@ -286,7 +331,11 @@ def compute_topics_per_cui(all_cuis, canonicals, parents, children):
     invariant explicit and robust to future refactors (e.g., switching
     to a deque-based BFS).
 
-    Returns cui_topics: dict[cui] -> set of nearest canonical CUIs.
+    If sibling_map is provided, the final topic set is expanded: for
+    each nearest-canonical c in a CUI's topics, also include sibling
+    canonicals of c (other canonicals sharing a direct IS-A parent).
+
+    Returns cui_topics: dict[cui] -> set of canonical CUIs.
     """
     distance = {c: 0 for c in canonicals}
     nearest = {c: {c} for c in canonicals}
@@ -319,7 +368,14 @@ def compute_topics_per_cui(all_cuis, canonicals, parents, children):
     for cui in all_cuis:
         topics = nearest.get(cui, set())
         if topics:
-            cui_topics[cui] = topics
+            if sibling_map:
+                # Expand by sibling canonicals
+                expanded = set(topics)
+                for t in topics:
+                    expanded |= sibling_map.get(t, set())
+                cui_topics[cui] = expanded
+            else:
+                cui_topics[cui] = topics
         elif SINGLETON_FALLBACK:
             cui_topics[cui] = {cui}
     return cui_topics
@@ -407,11 +463,27 @@ def main():
               f"children={info['n_children']:>4d}  "
               f"{cui}  {cui_label[:50]}")
 
+    # Build sibling-canonical index if expansion is enabled
+    sibling_map = None
+    if SIBLING_EXPANSION:
+        print(f"\n  Building sibling-canonical index ...")
+        t0 = time.time()
+        sibling_map = build_sibling_canonical_index(canonicals, parents)
+        n_with_siblings = sum(1 for s in sibling_map.values() if s)
+        avg_siblings = (sum(len(s) for s in sibling_map.values()) /
+                        max(len(sibling_map), 1))
+        print(f"  {n_with_siblings:,} canonicals have at least one sibling "
+              f"in {time.time()-t0:.1f}s")
+        print(f"  Average siblings per canonical (among those with any): "
+              f"{avg_siblings:.1f}")
+
     print("\n[5/5] Computing nearest-canonical topics (multi-source downward BFS) ...")
-    print(f"  (singleton fallback: {SINGLETON_FALLBACK})")
+    print(f"  (singleton fallback: {SINGLETON_FALLBACK}, "
+          f"sibling expansion: {SIBLING_EXPANSION})")
     t0 = time.time()
     cui_topics = compute_topics_per_cui(
         sorted(cache["cuis"]), canonicals, parents, children,
+        sibling_map=sibling_map,
     )
     print(f"  {len(cui_topics):,} CUIs have at least one topic "
           f"in {time.time()-t0:.1f}s")
@@ -526,6 +598,7 @@ def main():
             "actual_mega_root_threshold": mega_thresh,
             "topic_assignment": "nearest canonical via multi-source downward BFS",
             "prune_stacked_canonicals": PRUNE_STACKED_CANONICALS,
+            "sibling_expansion": SIBLING_EXPANSION,
             "singleton_fallback": SINGLETON_FALLBACK,
         },
         "subhierarchy_parents": subhier_parents,
