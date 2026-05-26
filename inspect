@@ -1,21 +1,13 @@
 """
 lookup_topics.py
 ----------------
-Look up the topic IDs for granular clinical concepts to evaluate
-whether the topic system supports fine-grained retrieval.
+Look up topics for CUIs in the DUAL system (IS-A + RELA).
 
-Topics like:
-  - imaging studies (MRI, CT, x-ray)
-  - vital signs
-  - current medication list
-  - allergies (severe)
-  - location-specific pain (left knee pain)
-  - oxygen-related findings
+For each CUI, prints both:
+  - IS-A topics (via IS-A graph, nearest canonical)
+  - RELA topics (via undirected RELA graph, nearest canonical)
 
-The build prints the actual label for each CUI from your cache, so
-if a CUI doesn't match what you expected, the actual label is shown.
-Any CUI returning "?" means the CUI isn't in your cache and should be
-replaced with the correct one.
+Also shows overlap and union, since retrieval will likely use the union.
 """
 
 import pickle
@@ -23,72 +15,50 @@ import pickle
 
 PICKLE_PATH = "topic_lookup.pkl"
 
-# Each tuple is (CUI, expected_concept_for_human_reading).
-# CUIs are best-guess from public UMLS references — verify against
-# the printed actual label.
+# CUIs to look up — focused on the allergy retrieval scenario
 CUIS_TO_LOOKUP = [
-    # === IMAGING ===
-    ("C0011923",  "Imaging procedure"),
-    ("C0024485",  "Magnetic resonance imaging (general)"),
-    ("C0040405",  "Computed tomography"),
-    ("C0034579",  "Radiography (general X-ray)"),
-    ("C0041618",  "Ultrasonography"),
-    ("C0024487",  "MRI of brain"),
-    ("C0412636",  "MRI of knee"),
+    # === Allergy core (THE PAIR YOU CARE ABOUT) ===
+    ("C1527304", "Allergic reaction (the query)"),
+    ("C0020517", "Hypersensitivity / Allergy (general)"),
+    ("C0002792", "Anaphylaxis (severe)"),
+    ("C0013182", "Allergy to drug"),
+    # Specific allergies — these are the document-side concepts
+    ("C0559470", "Peanut allergy (guess #1)"),
+    ("C0269811", "Peanut allergy (guess #2)"),
+    ("C1257794", "Food allergy (general)"),
+    ("C2939115", "Allergy to food (alternate)"),
+    ("C0157738", "Allergy to milk (guess)"),
+    ("C0264937", "Atopic eczema (allergy-adjacent)"),
 
-    # === VITAL SIGNS ===
-    ("C0518766",  "Vital signs (general concept)"),
-    ("C0005823",  "Blood pressure"),
-    ("C0018810",  "Heart rate"),
-    ("C0231832",  "Respiratory rate"),
-    ("C0005903",  "Body temperature"),
-    ("C0428572",  "Oxygen saturation"),
+    # === Anchors (sanity check — unchanged from previous runs) ===
+    ("C0032285", "Pneumonia"),
+    ("C0027051", "Myocardial infarction"),
+    ("C0011849", "Diabetes mellitus"),
+    ("C0020538", "Hypertension"),
 
-    # === MEDICATION LIST / RECONCILIATION ===
-    ("C0150270",  "Medication review (current med list)"),
-    ("C2587213",  "Medication reconciliation"),
-    ("C0150255",  "Patient medication"),
-    ("C0013227",  "Pharmaceutical preparation (drug)"),
-
-    # === ALLERGY / SEVERE ALLERGY ===
-    ("C0020517",  "Hypersensitivity / Allergy (general)"),
-    ("C1527304",  "Allergic reaction"),
-    ("C0002792",  "Anaphylaxis (severe allergic reaction)"),
-    ("C0013182",  "Drug hypersensitivity"),
-    ("C1318469",  "Severe allergic reaction"),
-
-    # === LEFT KNEE PAIN (specific location) ===
-    ("C2142181",  "Pain of left knee"),
-    ("C0231749",  "Knee pain (general)"),
-    ("C0030193",  "Pain (general concept)"),
-
-    # === OXYGEN / RESPIRATORY ===
-    ("C0030054",  "Oxygen"),
-    ("C0030073",  "Oxygen therapy"),
-    ("C2939193",  "Hypoxia / Low oxygen"),
-
-    # === COMMON DIAGNOSES (anchors — already known to work) ===
-    ("C0032285",  "Pneumonia"),
-    ("C0027051",  "Myocardial infarction"),
-    ("C0011849",  "Diabetes mellitus"),
-    ("C0020538",  "Hypertension"),
+    # === Cross-axis test cases ===
+    ("C0024109", "Lung structure (anatomy)"),
+    ("C0014834", "Escherichia coli (organism)"),
+    ("C0021368", "Inflammation (pathology)"),
 ]
 
 
-def lookup(cui, expected_concept, payload):
+def lookup(cui, expected, payload):
     labels = payload["labels"]
     tags = payload["tags"]
-    cui_topic_ids = payload["cui_topic_ids"]
-    topic_to_canonical = payload["topic_to_canonical"]
-    topic_to_cuis = payload["topic_to_cuis"]
+    isa_map = payload["isa_cui_topic_ids"]
+    rela_map = payload["rela_cui_topic_ids"]
+    topic_to_canon = payload["topic_to_canonical"]
+    isa_topic_to_cuis = payload["isa_topic_to_cuis"]
+    rela_topic_to_cuis = payload["rela_topic_to_cuis"]
 
     cui_label = labels.get(cui, "?")
     cui_stys = sorted(tags.get(cui, frozenset()))
 
-    print(f"\n{'='*72}")
+    print(f"\n{'='*78}")
     print(f"  {cui}  {cui_label}")
-    print(f"  [expected: {expected_concept}]")
-    print(f"{'='*72}")
+    print(f"  [expected: {expected}]")
+    print(f"{'='*78}")
     if cui_stys:
         print(f"  STY: {', '.join(cui_stys)}")
 
@@ -96,19 +66,85 @@ def lookup(cui, expected_concept, payload):
         print(f"  -> CUI not in cache (skipping)")
         return
 
-    tids = cui_topic_ids.get(cui)
-    if not tids:
-        print(f"  -> NO TOPICS (orphan)")
-        return
+    isa_tids = isa_map.get(cui, set())
+    rela_tids = rela_map.get(cui, set())
 
-    print(f"  -> {len(tids)} topic(s):")
-    for tid in sorted(tids):
-        canon_cui = topic_to_canonical.get(tid)
-        canon_label = labels.get(canon_cui, "?") if canon_cui else "?"
-        members = topic_to_cuis.get(tid, set())
-        canon_label_short = canon_label[:55] + "..." if len(canon_label) > 55 else canon_label
-        print(f"     {canon_cui}  {canon_label_short}")
-        print(f"        ({len(members):,} CUIs share this topic)")
+    # Convert to canonical sets for readability
+    isa_canons = {topic_to_canon[t] for t in isa_tids}
+    rela_canons = {topic_to_canon[t] for t in rela_tids}
+
+    print(f"\n  IS-A topics  ({len(isa_canons)}):")
+    if isa_canons:
+        for c in sorted(isa_canons):
+            members = len(isa_topic_to_cuis.get(hash_for(c), set()))
+            print(f"     {c}  {labels.get(c, '?')[:50]}  "
+                  f"({members:,} CUIs share)")
+    else:
+        print(f"     <none>")
+
+    print(f"\n  RELA topics  ({len(rela_canons)}):")
+    if rela_canons:
+        for c in sorted(rela_canons):
+            members = len(rela_topic_to_cuis.get(hash_for(c), set()))
+            print(f"     {c}  {labels.get(c, '?')[:50]}  "
+                  f"({members:,} CUIs share)")
+    else:
+        print(f"     <none>")
+
+    # Combined
+    union = isa_canons | rela_canons
+    both = isa_canons & rela_canons
+    if both:
+        print(f"\n  Shared between systems ({len(both)}): "
+              f"{sorted([labels.get(c, c)[:30] for c in both])}")
+    print(f"  Union ({len(union)} topics)")
+
+
+def hash_for(cui):
+    import hashlib
+    return "tp_" + hashlib.sha1(cui.encode()).hexdigest()[:12]
+
+
+def check_overlap(cui_a, cui_b, label_a, label_b, payload):
+    """
+    Check whether two CUIs share any topic — this is what retrieval needs.
+    """
+    isa_map = payload["isa_cui_topic_ids"]
+    rela_map = payload["rela_cui_topic_ids"]
+    topic_to_canon = payload["topic_to_canonical"]
+    labels = payload["labels"]
+
+    a_isa = isa_map.get(cui_a, set())
+    b_isa = isa_map.get(cui_b, set())
+    a_rela = rela_map.get(cui_a, set())
+    b_rela = rela_map.get(cui_b, set())
+
+    a_all = a_isa | a_rela
+    b_all = b_isa | b_rela
+
+    print(f"\n{'#'*78}")
+    print(f"# OVERLAP TEST: '{label_a}'  vs  '{label_b}'")
+    print(f"#   {cui_a}  '{labels.get(cui_a, '?')}'")
+    print(f"#   {cui_b}  '{labels.get(cui_b, '?')}'")
+    print(f"{'#'*78}")
+    isa_overlap = a_isa & b_isa
+    rela_overlap = a_rela & b_rela
+    cross1 = a_isa & b_rela
+    cross2 = a_rela & b_isa
+    any_overlap = (a_all & b_all)
+
+    def fmt(tids):
+        return sorted({labels.get(topic_to_canon[t], '?')[:40] for t in tids})
+
+    print(f"  IS-A ∩ IS-A: {len(isa_overlap)}  {fmt(isa_overlap)}")
+    print(f"  RELA ∩ RELA: {len(rela_overlap)}  {fmt(rela_overlap)}")
+    print(f"  A.IS-A ∩ B.RELA: {len(cross1)}  {fmt(cross1)}")
+    print(f"  A.RELA ∩ B.IS-A: {len(cross2)}  {fmt(cross2)}")
+    print(f"  TOTAL UNION ∩ UNION: {len(any_overlap)}")
+    if any_overlap:
+        print(f"  RESULT: RETRIEVAL POSSIBLE — shared topics: {fmt(any_overlap)}")
+    else:
+        print(f"  RESULT: NO RETRIEVAL — CUIs don't share any topic")
 
 
 def main():
@@ -117,14 +153,35 @@ def main():
     print(f"Loaded {PICKLE_PATH}")
     print(f"  built_at        : {payload['built_at']}")
     print(f"  total canonicals: {len(payload['canonicals']):,}")
-    print(f"  CUIs with topics: {len(payload['cui_topic_ids']):,}")
-    if "config" in payload:
-        cfg = payload["config"]
-        print(f"  detection       : {cfg.get('detection', '?')}")
-        print(f"  excluded CUIs   : {cfg.get('canonical_exclude', '?')}")
+    print(f"  CUIs w/ IS-A    : {len(payload['isa_cui_topic_ids']):,}")
+    print(f"  CUIs w/ RELA    : {len(payload['rela_cui_topic_ids']):,}")
+    cfg = payload.get("config", {})
+    print(f"  n RELAs (non-isa): {cfg.get('n_included_relas', '?')}")
 
+    print("\n" + "#"*78)
+    print("# PART 1: Individual CUI lookups")
+    print("#"*78)
     for cui, expected in CUIS_TO_LOOKUP:
         lookup(cui, expected, payload)
+
+    # Explicit pair-overlap tests — the allergy retrieval scenario
+    print("\n\n" + "#"*78)
+    print("# PART 2: Pair overlap tests")
+    print("#"*78)
+
+    # The pair you specifically asked about
+    pairs = [
+        ("C1527304", "Allergic reaction", "C0559470", "Peanut allergy #1"),
+        ("C1527304", "Allergic reaction", "C0269811", "Peanut allergy #2"),
+        ("C1527304", "Allergic reaction", "C2939115", "Food allergy"),
+        ("C1527304", "Allergic reaction", "C0157738", "Milk allergy"),
+        ("C1527304", "Allergic reaction", "C0002792", "Anaphylaxis"),
+        ("C1527304", "Allergic reaction", "C0013182", "Drug allergy"),
+        # Cross-domain check
+        ("C0032285", "Pneumonia", "C0024109", "Lung structure"),
+    ]
+    for cui_a, label_a, cui_b, label_b in pairs:
+        check_overlap(cui_a, cui_b, label_a, label_b, payload)
 
 
 main()
