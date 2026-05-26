@@ -1,68 +1,18 @@
-"""
-lookup_topics.py
-----------------
-Look up the topic IDs for one or more CUIs.
+Loaded topic_lookup.pkl
+  built_at        : 2026-05-26T16:02:23.403781
+  total canonicals: 20,859
+  CUIs with topics: 181,003
 
-Use this to verify the topic assignments after running build_topics.py.
+============================================================
+C0032285  Pneumonia (disorder)
+============================================================
+  semantic type(s): Disease or Syndrome
 
-Each CUI has a set of topic IDs (potentially multiple). Each topic ID
-corresponds to a canonical CUI (an organizing concept in SNOMED).
+  No topics. This CUI has no canonical ancestors.
 
-Edit CUIS_TO_LOOKUP below and run.
-"""
+============================================================
+C0041296  Infection caused by Mycobacterium tuberculosis
+============================================================
+  semantic type(s): Disease or Syndrome
 
-import pickle
-
-
-PICKLE_PATH = "topic_lookup.pkl"
-
-CUIS_TO_LOOKUP = [
-    "C0032285",   # Pneumonia
-    # Add your test CUIs here
-]
-
-
-def lookup(cui, payload):
-    labels = payload["labels"]
-    tags = payload["tags"]
-    cui_topic_ids = payload["cui_topic_ids"]
-    topic_to_canonical = payload["topic_to_canonical"]
-    topic_to_cuis = payload["topic_to_cuis"]
-
-    cui_label = labels.get(cui, "?")
-    cui_stys = sorted(tags.get(cui, frozenset()))
-
-    print(f"\n{'='*60}")
-    print(f"{cui}  {cui_label}")
-    print(f"{'='*60}")
-    if cui_stys:
-        print(f"  semantic type(s): {', '.join(cui_stys)}")
-
-    tids = cui_topic_ids.get(cui)
-    if not tids:
-        print(f"\n  No topics. This CUI has no canonical ancestors.")
-        return
-
-    print(f"\n  Has {len(tids)} topic(s):")
-    for tid in sorted(tids):
-        canon_cui = topic_to_canonical.get(tid)
-        canon_label = labels.get(canon_cui, "?") if canon_cui else "?"
-        members = topic_to_cuis.get(tid, set())
-        print(f"    {tid}")
-        print(f"      canonical:    {canon_cui}  ({canon_label})")
-        print(f"      total CUIs:   {len(members):,} share this topic")
-
-
-def main():
-    with open(PICKLE_PATH, "rb") as f:
-        payload = pickle.load(f)
-    print(f"Loaded {PICKLE_PATH}")
-    print(f"  built_at        : {payload['built_at']}")
-    print(f"  total canonicals: {len(payload['canonicals']):,}")
-    print(f"  CUIs with topics: {len(payload['cui_topic_ids']):,}")
-
-    for cui in CUIS_TO_LOOKUP:
-        lookup(cui, payload)
-
-
-main()
+  No topics. This CUI has no canonical ancestors.
