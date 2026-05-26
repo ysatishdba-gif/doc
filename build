@@ -1,13 +1,13 @@
-import pickle
-with open("networkx_cui_context_v1_3_0.pkl", "rb") as f:
-    g = pickle.load(f)
+Pneumonia has 46 suffix children.
 
-# For Pneumonia, look at each suffix child's OTHER parent
-parent = "C0032285"
-children = list(g.successors(parent))
-print(f"Pneumonia has {len(children)} suffix children.")
-print(f"\nFor first 10 children, who is the OTHER parent (the CUI on the other side):")
-for c in children[:10]:
-    predecessors = list(g.predecessors(c))
-    others = [p for p in predecessors if p != parent]
-    print(f"  {c}: other parents = {others}")
+For first 10 children, who is the OTHER parent (the CUI on the other side):
+  C0032285-0: other parents = ['C0339951-0']
+  C0032285-1: other parents = ['C1456599-0']
+  C0032285-2: other parents = ['C3714514-0']
+  C0032285-3: other parents = ['C0024115-1']
+  C0032285-4: other parents = ['C0035243-0']
+  C0032285-5: other parents = ['C0035243-1']
+  C0032285-6: other parents = ['C0035243-2']
+  C0032285-7: other parents = ['C4022803-0']
+  C0032285-8: other parents = ['C1335019-0']
+  C0032285-9: other parents = ['C1335019-1']
