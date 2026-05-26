@@ -1,326 +1,133 @@
-Loaded topic_lookup.pkl
-  built_at        : 2026-05-26T16:36:45.317083
-  total canonicals: 32,779
-  CUIs with topics: 367,787
-  detection       : STY-descendant percentile + mega-root filter
-  pruning         : False
-  sibling exp.    : False
-  singleton fb    : False
+"""
+lookup_topics.py
+----------------
+Look up the topic IDs for granular clinical concepts to evaluate
+whether the topic system supports fine-grained retrieval.
 
-======================================================================
-  C2142181  Pain of left knee joint (finding)
-  [expected: Pain of left knee joint]
-======================================================================
-  STY: Sign or Symptom
-  -> 2 topic(s):
-     C0231749  Pain of knee region
-        (9 CUIs share this topic)
-     C5442019  Pain of left knee
-        (6 CUIs share this topic)
+Topics like:
+  - imaging studies (MRI, CT, x-ray)
+  - vital signs
+  - current medication list
+  - allergies (severe)
+  - location-specific pain (left knee pain)
+  - oxygen-related findings
 
-======================================================================
-  C0041296  Infection caused by Mycobacterium tuberculosis
-  [expected: Tuberculosis]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0026918  Mycobacteriosis (disorder)
-        (113 CUIs share this topic)
+The build prints the actual label for each CUI from your cache, so
+if a CUI doesn't match what you expected, the actual label is shown.
+Any CUI returning "?" means the CUI isn't in your cache and should be
+replaced with the correct one.
+"""
 
-======================================================================
-  C0010200  Observation of cough
-  [expected: Coughing]
-======================================================================
-  STY: Sign or Symptom
-  -> 1 topic(s):
-     C0010200  Observation of cough
-        (45 CUIs share this topic)
+import pickle
 
-======================================================================
-  C0205082  High grade
-  [expected: Severe ]
-======================================================================
-  STY: Finding
-  -> 1 topic(s):
-     C0439793  Severity
-        (10 CUIs share this topic)
 
-======================================================================
-  C0032285  Pneumonia (disorder)
-  [expected: Pneumonia]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0032285  Pneumonia (disorder)
-        (39 CUIs share this topic)
+PICKLE_PATH = "topic_lookup.pkl"
 
-======================================================================
-  C0041296  Infection caused by Mycobacterium tuberculosis
-  [expected: Tuberculosis]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0026918  Mycobacteriosis (disorder)
-        (113 CUIs share this topic)
+# Each tuple is (CUI, expected_concept_for_human_reading).
+# CUIs are best-guess from public UMLS references — verify against
+# the printed actual label.
+CUIS_TO_LOOKUP = [
+    # === IMAGING ===
+    ("C0011923",  "Imaging procedure"),
+    ("C0024485",  "Magnetic resonance imaging (general)"),
+    ("C0040405",  "Computed tomography"),
+    ("C0034579",  "Radiography (general X-ray)"),
+    ("C0041618",  "Ultrasonography"),
+    ("C0024487",  "MRI of brain"),
+    ("C0412636",  "MRI of knee"),
 
-======================================================================
-  C0027051  Myocardial infarction
-  [expected: Myocardial infarction]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0027051  Myocardial infarction
-        (20 CUIs share this topic)
+    # === VITAL SIGNS ===
+    ("C0518766",  "Vital signs (general concept)"),
+    ("C0005823",  "Blood pressure"),
+    ("C0018810",  "Heart rate"),
+    ("C0231832",  "Respiratory rate"),
+    ("C0005903",  "Body temperature"),
+    ("C0428572",  "Oxygen saturation"),
 
-======================================================================
-  C0038454  Stroke
-  [expected: Stroke / Cerebrovascular accident]
-======================================================================
-  STY: Disease or Syndrome
-  -> 2 topic(s):
-     C0560570  Cardiovascular injury
-        (46 CUIs share this topic)
-     C1456496  Brain damage
-        (79 CUIs share this topic)
+    # === MEDICATION LIST / RECONCILIATION ===
+    ("C0150270",  "Medication review (current med list)"),
+    ("C2587213",  "Medication reconciliation"),
+    ("C0150255",  "Patient medication"),
+    ("C0013227",  "Pharmaceutical preparation (drug)"),
 
-======================================================================
-  C0018802  Congestive heart failure
-  [expected: Congestive heart failure]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0018802  Congestive heart failure
-        (30 CUIs share this topic)
+    # === ALLERGY / SEVERE ALLERGY ===
+    ("C0020517",  "Hypersensitivity / Allergy (general)"),
+    ("C1527304",  "Allergic reaction"),
+    ("C0002792",  "Anaphylaxis (severe allergic reaction)"),
+    ("C0013182",  "Drug hypersensitivity"),
+    ("C1318469",  "Severe allergic reaction"),
 
-======================================================================
-  C0020538  HTN - Hypertension
-  [expected: Hypertension]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0020538  HTN - Hypertension
-        (43 CUIs share this topic)
+    # === LEFT KNEE PAIN (specific location) ===
+    ("C2142181",  "Pain of left knee"),
+    ("C0231749",  "Knee pain (general)"),
+    ("C0030193",  "Pain (general concept)"),
 
-======================================================================
-  C0011849  Diabetes mellitus
-  [expected: Diabetes mellitus]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0011849  Diabetes mellitus
-        (13 CUIs share this topic)
+    # === OXYGEN / RESPIRATORY ===
+    ("C0030054",  "Oxygen"),
+    ("C0030073",  "Oxygen therapy"),
+    ("C2939193",  "Hypoxia / Low oxygen"),
 
-======================================================================
-  C0020473  Hyperlipidaemia
-  [expected: Hyperlipidemia]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0020473  Hyperlipidaemia
-        (16 CUIs share this topic)
+    # === COMMON DIAGNOSES (anchors — already known to work) ===
+    ("C0032285",  "Pneumonia"),
+    ("C0027051",  "Myocardial infarction"),
+    ("C0011849",  "Diabetes mellitus"),
+    ("C0020538",  "Hypertension"),
+]
 
-======================================================================
-  C0024117  Chronic obstructive airway disease
-  [expected: COPD / Chronic obstructive pulmonary disease]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0024117  Chronic obstructive airway disease
-        (10 CUIs share this topic)
 
-======================================================================
-  C0004096  Asthmatic
-  [expected: Asthma]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0004096  Asthmatic
-        (32 CUIs share this topic)
+def lookup(cui, expected_concept, payload):
+    labels = payload["labels"]
+    tags = payload["tags"]
+    cui_topic_ids = payload["cui_topic_ids"]
+    topic_to_canonical = payload["topic_to_canonical"]
+    topic_to_cuis = payload["topic_to_cuis"]
 
-======================================================================
-  C0007282  Carotid artery narrowing
-  [expected: Carcinoma]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0007282  Carotid artery narrowing
-        (12 CUIs share this topic)
+    cui_label = labels.get(cui, "?")
+    cui_stys = sorted(tags.get(cui, frozenset()))
 
-======================================================================
-  C0006142  Malignant tumor of breast
-  [expected: Breast neoplasm / cancer]
-======================================================================
-  STY: Neoplastic Process
-  -> 1 topic(s):
-     C0006142  Malignant tumor of breast
-        (19 CUIs share this topic)
+    print(f"\n{'='*72}")
+    print(f"  {cui}  {cui_label}")
+    print(f"  [expected: {expected_concept}]")
+    print(f"{'='*72}")
+    if cui_stys:
+        print(f"  STY: {', '.join(cui_stys)}")
 
-======================================================================
-  C0009450  Communicable disease
-  [expected: Communicable disease]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C1298232  Special concept
-        (655 CUIs share this topic)
+    if cui_label == "?":
+        print(f"  -> CUI not in cache (skipping)")
+        return
 
-======================================================================
-  C0021400  Grippe
-  [expected: Influenza]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0021400  Grippe
-        (12 CUIs share this topic)
+    tids = cui_topic_ids.get(cui)
+    if not tids:
+        print(f"  -> NO TOPICS (orphan)")
+        return
 
-======================================================================
-  C0019163  Hepatitis B
-  [expected: Hepatitis B]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0019163  Hepatitis B
-        (11 CUIs share this topic)
+    print(f"  -> {len(tids)} topic(s):")
+    for tid in sorted(tids):
+        canon_cui = topic_to_canonical.get(tid)
+        canon_label = labels.get(canon_cui, "?") if canon_cui else "?"
+        members = topic_to_cuis.get(tid, set())
+        canon_label_short = canon_label[:55] + "..." if len(canon_label) > 55 else canon_label
+        print(f"     {canon_cui}  {canon_label_short}")
+        print(f"        ({len(members):,} CUIs share this topic)")
 
-======================================================================
-  C0021368  Inflammation
-  [expected: Inflammation]
-======================================================================
-  STY: Pathologic Function
-  -> 1 topic(s):
-     C0030660  Pathological process (attribute)
-        (15 CUIs share this topic)
 
-======================================================================
-  C0040405  Computerized transaxial tomography
-  [expected: X-ray procedure / Radiography]
-======================================================================
-  STY: Diagnostic Procedure
-  -> 1 topic(s):
-     C0040405  Computerized transaxial tomography
-        (29 CUIs share this topic)
+def main():
+    with open(PICKLE_PATH, "rb") as f:
+        payload = pickle.load(f)
+    print(f"Loaded {PICKLE_PATH}")
+    print(f"  built_at        : {payload['built_at']}")
+    print(f"  total canonicals: {len(payload['canonicals']):,}")
+    print(f"  CUIs with topics: {len(payload['cui_topic_ids']):,}")
+    if "config" in payload:
+        cfg = payload["config"]
+        print(f"  detection       : {cfg.get('detection', '?')}")
+        print(f"  excluded CUIs   : {cfg.get('canonical_exclude', '?')}")
+        print(f"  pruning         : {cfg.get('prune_stacked_canonicals', '?')}")
+        print(f"  sibling exp.    : {cfg.get('sibling_expansion', '?')}")
+        print(f"  singleton fb    : {cfg.get('singleton_fallback', '?')}")
 
-======================================================================
-  C0010055  CBG - Coronary bypass graft
-  [expected: Coronary artery bypass graft]
-======================================================================
-  STY: Therapeutic or Preventive Procedure
-  -> 1 topic(s):
-     C0010055  CBG - Coronary bypass graft
-        (43 CUIs share this topic)
+    for cui, expected in CUIS_TO_LOOKUP:
+        lookup(cui, expected, payload)
 
-======================================================================
-  C0021107  Implantation procedure
-  [expected: Surgical procedure]
-======================================================================
-  STY: Therapeutic or Preventive Procedure
-  -> 1 topic(s):
-     C2720507  SNOMED CT has been created by combining SNOMED RT and a...
-        (12,733 CUIs share this topic)
 
-======================================================================
-  C0011946  Dialysis procedure (procedure)
-  [expected: Diagnostic imaging]
-======================================================================
-  STY: Therapeutic or Preventive Procedure
-  -> 1 topic(s):
-     C0011946  Dialysis procedure (procedure)
-        (10 CUIs share this topic)
-
-======================================================================
-  C0030193  Dolour
-  [expected: Pain]
-======================================================================
-  STY: Sign or Symptom
-  -> 1 topic(s):
-     C0234185  Pain / sensation finding
-        (86 CUIs share this topic)
-
-======================================================================
-  C0009326  Collagen disease
-  [expected: Cognitive impairment]
-======================================================================
-  STY: Disease or Syndrome
-  -> 1 topic(s):
-     C0009326  Collagen disease
-        (13 CUIs share this topic)
-
-======================================================================
-  C0015967  Has a temperature
-  [expected: Fever]
-======================================================================
-  STY: Sign or Symptom
-  -> 1 topic(s):
-     C0015967  Has a temperature
-        (33 CUIs share this topic)
-
-======================================================================
-  C0042963  Vomiting symptom (finding)
-  [expected: Vomiting]
-======================================================================
-  STY: Sign or Symptom
-  -> 1 topic(s):
-     C0042963  Vomiting symptom (finding)
-        (40 CUIs share this topic)
-
-======================================================================
-  C0024109  Lung
-  [expected: Lung structure]
-======================================================================
-  STY: Body Part, Organ, or Organ Component
-  -> 1 topic(s):
-     C0024109  Lung
-        (7 CUIs share this topic)
-
-======================================================================
-  C0018787  Cardiac structure
-  [expected: Heart structure]
-======================================================================
-  STY: Body Part, Organ, or Organ Component
-  -> 1 topic(s):
-     C0018787  Cardiac structure
-        (5 CUIs share this topic)
-
-======================================================================
-  C0024485  Magnetic resonance imaging
-  [expected: Magnetic resonance imaging structure?]
-======================================================================
-  STY: Diagnostic Procedure
-  -> 1 topic(s):
-     C0024485  Magnetic resonance imaging
-        (28 CUIs share this topic)
-
-======================================================================
-  C0007855  Polyp of cervix (disorder)
-  [expected: Cervix]
-======================================================================
-  STY: Neoplastic Process
-  -> 2 topic(s):
-     C0567210  Lump of cervix
-        (11 CUIs share this topic)
-     C0235656  Lesion of cervix
-        (44 CUIs share this topic)
-
-======================================================================
-  C0042890  Vitamin
-  [expected: Vitamin]
-======================================================================
-  STY: Organic Chemical, Pharmacologic Substance, Vitamin
-  -> 1 topic(s):
-     C0042890  Vitamin
-        (8 CUIs share this topic)
-
-======================================================================
-  C0003232  ?
-  [expected: Antibacterial agent]
-======================================================================
-  -> NO TOPICS (orphan)
-
-======================================================================
-  C0020156  Humanism
-  [expected: Hormone]
-======================================================================
-  STY: Idea or Concept
-  -> 1 topic(s):
-     C0037414  Social context (social concept)
-        (72 CUIs share this topic)
+main()
