@@ -1,226 +1,666 @@
-============================================================
-Topic builder (STY-coverage based, nearest-canonical)
-============================================================
-  cache         : umls_cache.pkl
-  output        : topic_lookup.pkl
-  STY band      : [75, 100] of STY-descendant counts
-  mega filter   : exclude top 1% by direct children
-  excluded CUIs : 1 (C2720507)
+"""
+build_topics.py
+---------------
+Build CUI -> [topic_ids] lookup via nearest-canonical IS-A roll-up.
 
-[1/5] Loading cache ...
-  374,538 CUIs in 2.0s
+ARCHITECTURE:
 
-[2/5] Building IS-A graph ...
-  611,398 IS-A edges in 2.3s
+  1. Organizing nodes (= topics) are detected by their STY-DESCENDANT
+     COUNT — how many of their descendants carry any UMLS semantic
+     type. A node with many STY-bearing descendants organizes
+     clinically meaningful content. A node with few does not.
 
-[3/5] Finding subhierarchy parents (STY-coverage based) ...
-  STY-descendant count cutoffs:
-    75th percentile = 10 STY descendants
-    100th percentile = 367,695 STY descendants
-  Mega-root threshold (children-count): 42
-  Found 32,779 subhierarchy parents in 14.0s
+     We use a percentile cut (top 25% by default) on this distribution.
+     Plus a mega-root exclusion (top 1% by direct children count) to
+     prevent SNOMED roots from absorbing the whole ontology.
 
-  Top 30 subhierarchy parents (by STY-descendant count):
-    sty_desc=367,695  children=  19  C2720507  SNOMED CT has been created by combining SNOMED RT 
-    sty_desc=89,265  children=   5  C3540689  SNOMED CT Model Component (metadata)
-    sty_desc=88,565  children=   2  C0332280  Linkage concept
-    sty_desc=88,556  children=   5  C0449234  Attribute
-    sty_desc=81,843  children=   8  C1268086  Body structures
-    sty_desc=53,689  children=  12  C0439861  Substances
-    sty_desc=44,929  children=   3  C1260954  Morphologically altered structure
-    sty_desc=44,908  children=  26  C0332447  Morphologically abnormal structure
-    sty_desc=38,869  children=   3  C0729759  Substance categorized by structure
-    sty_desc=38,820  children=   5  C0220806  Chemical
-    sty_desc=38,774  children=  27  C0729761  Chemical categorized by structure
-    sty_desc=37,444  children=   3  C2711400  Anatomical or acquired body structure
-    sty_desc=37,057  children=  18  C0700276  Anatomical structure
-    sty_desc=34,309  children=   6  C0029235  Organism
-    sty_desc=33,542  children=  16  C0005898  Body region
-    sty_desc=32,113  children=  18  C0460002  Body system structure (body structure)
-    sty_desc=31,796  children=  34  C1285153  Procedure on body system
-    sty_desc=31,466  children=   4  C0229962  Body part structure (body structure)
-    sty_desc=27,813  children=  25  C0579140  Finding of trunk structure
-    sty_desc=26,875  children=  22  C0229983  Body organ structure
-    sty_desc=26,435  children=   1  C1298232  Special concept
-    sty_desc=24,156  children=  35  C0263978  Disorder of soft tissue
-    sty_desc=23,692  children=  14  C0332191  Adjectival modifier
-    sty_desc=22,981  children=   6  C4075421  Structure of subdivision of organ system
-    sty_desc=22,687  children=  25  C0441712  Mechanism (attribute)
-    sty_desc=22,686  children=  29  C0521126  Modifier related to clinical specialty AND/OR occu
-    sty_desc=22,272  children=  26  C0684298  Nitrogen compound (substance)
-    sty_desc=21,453  children=  12  C0333010  Mechanical abnormality
-    sty_desc=19,619  children=   2  C1268087  Upper body structure
-    sty_desc=19,617  children=   3  C0229963  Upper body part structure
-    ... plus 32749 more subhier parents
+     Earlier versions used raw children-count percentile, which
+     selected structurally bushy but clinically marginal nodes
+     (taxonomic, anatomical microstructure). STY-descendant count
+     better proxies for clinical centrality.
 
-[4/5] Extracting canonical CUIs ...
-  Found 32,779 canonical CUIs in 0.0s
+  2. Stacked canonicals are pruned by keep-HIGHEST: if A is an
+     ancestor of B and both are canonical, B is dropped. This keeps
+     broader organizing concepts as topics.
 
-  Computing depth from roots ...
-  Computed in 0.8s
+  3. Each CUI's topics = NEAREST canonical ancestors via multi-source
+     downward BFS from all canonicals at once.
 
-  Excluding 1 CUI(s) from CANONICAL_EXCLUDE:
-    depth=0  C2720507  SNOMED CT has been created by combining SNOMED RT and a
-  After exclude: 32,778 canonicals
+USAGE (GCP notebook): paste the contents of this file into a cell.
+The call to main() at the bottom runs the build.
+"""
 
-  Skipping stacked-canonical pruning (allow nested canonicals)
-  Nearest-canonical BFS will naturally pick closest one
-  Final canonicals: 32,778
+import datetime
+import hashlib
+import pickle
+import os
+import time
+from collections import defaultdict, Counter, deque
 
-  Top 30 canonicals (by STY-descendant count):
-    sty_desc=89,265  children=   5  C3540689  SNOMED CT Model Component (metadata)
-    sty_desc=88,565  children=   2  C0332280  Linkage concept
-    sty_desc=88,556  children=   5  C0449234  Attribute
-    sty_desc=81,843  children=   8  C1268086  Body structures
-    sty_desc=53,689  children=  12  C0439861  Substances
-    sty_desc=44,929  children=   3  C1260954  Morphologically altered structure
-    sty_desc=44,908  children=  26  C0332447  Morphologically abnormal structure
-    sty_desc=38,869  children=   3  C0729759  Substance categorized by structure
-    sty_desc=38,820  children=   5  C0220806  Chemical
-    sty_desc=38,774  children=  27  C0729761  Chemical categorized by structure
-    sty_desc=37,444  children=   3  C2711400  Anatomical or acquired body structure
-    sty_desc=37,057  children=  18  C0700276  Anatomical structure
-    sty_desc=34,309  children=   6  C0029235  Organism
-    sty_desc=33,542  children=  16  C0005898  Body region
-    sty_desc=32,113  children=  18  C0460002  Body system structure (body structure)
-    sty_desc=31,796  children=  34  C1285153  Procedure on body system
-    sty_desc=31,466  children=   4  C0229962  Body part structure (body structure)
-    sty_desc=27,813  children=  25  C0579140  Finding of trunk structure
-    sty_desc=26,875  children=  22  C0229983  Body organ structure
-    sty_desc=26,435  children=   1  C1298232  Special concept
-    sty_desc=24,156  children=  35  C0263978  Disorder of soft tissue
-    sty_desc=23,692  children=  14  C0332191  Adjectival modifier
-    sty_desc=22,981  children=   6  C4075421  Structure of subdivision of organ system
-    sty_desc=22,687  children=  25  C0441712  Mechanism (attribute)
-    sty_desc=22,686  children=  29  C0521126  Modifier related to clinical specialty AND/OR occu
-    sty_desc=22,272  children=  26  C0684298  Nitrogen compound (substance)
-    sty_desc=21,453  children=  12  C0333010  Mechanical abnormality
-    sty_desc=19,619  children=   2  C1268087  Upper body structure
-    sty_desc=19,617  children=   3  C0229963  Upper body part structure
-    sty_desc=18,105  children=  27  C0005515  Biological substance
 
-[5/5] Computing nearest-canonical topics (multi-source downward BFS) ...
-  (singleton fallback: False, sibling expansion: False)
-    BFS level 5: 358,233 nodes reached (2s elapsed)
-    BFS level 10: 359,245 nodes reached (2s elapsed)
-  359,245 CUIs have at least one topic in 2.3s
+CACHE_PATH = "umls_cache.pkl"
+OUTPUT_PATH = "topic_lookup.pkl"
 
-============================================================
-RESULTS
-============================================================
-  Total CUIs                  : 374,538
-  CUIs with at least 1 topic  : 359,245 (95.9%)
-  Total canonical CUIs        : 32,778
-  Average topics per CUI      : 1.42
+# Canonical selection — STY-coverage based with structural filter.
+#
+# Empirical finding from running on real SNOMED: pure children-count
+# percentile selection picks structurally bushy nodes that are NOT
+# clinically central. Common clinical concepts (Pneumonia, TB, MI) are
+# not necessarily bushy; they organize meaningful clinical regions
+# without having dozens of direct children.
+#
+# The fix: measure "how much clinical content does this node organize"
+# instead of "how locally bushy is this node." Specifically, count
+# how many descendants carry ANY UMLS semantic type — these are the
+# concepts that participate in clinical retrieval.
+#
+# A node becomes a candidate canonical if its STY-bearing descendant
+# count is in the top STY_PERCENTILE_BAND of the graph's distribution.
+# This naturally elevates clinically-central organizers (Pneumonia
+# has many Disease-typed descendants) over structurally-bushy noise
+# (Cypriniformes has many descendants but they're all organism CUIs,
+# which is fine, but it competes evenly with Disease).
+#
+# Secondary filter: exclude mega-roots (top MEGA_ROOT_PERCENTILE by
+# children count). These would absorb most of the ontology.
+STY_LOWER_PERCENTILE = 75
+STY_UPPER_PERCENTILE = 100   # no upper bound — let big organizers in
+MEGA_ROOT_PERCENTILE = 99    # exclude top 1% by direct children count
 
-  Distribution: topics per CUI:
-      1 topics : 259,894 CUIs ( 72.3%)
-      2 topics :  65,749 CUIs ( 18.3%)
-      3 topics :  20,822 CUIs (  5.8%)
-      4 topics :   8,430 CUIs (  2.3%)
-      5 topics :   2,984 CUIs (  0.8%)
-      6 topics :     790 CUIs (  0.2%)
-      7 topics :     330 CUIs (  0.1%)
-      8 topics :     155 CUIs (  0.0%)
-      9 topics :      53 CUIs (  0.0%)
-     10 topics :      20 CUIs (  0.0%)
+# Explicit list of CUIs to exclude from the canonical set.
+#
+# Use this for known administrative/modeling roots that pass the
+# structural tests but absorb large fractions of the ontology without
+# providing clinical organization. Empirical example: C2720507 is the
+# SNOMED CT "has been created by combining SNOMED RT..." pseudo-root
+# that ends up as the topic for ~12K otherwise-unanchored CUIs.
+#
+# This is a small, explicit, defensible list — each entry should be
+# justified by being a known SNOMED admin/metadata concept.
+CANONICAL_EXCLUDE = {
+    "C2720507",  # SNOMED CT has been created by combining SNOMED RT...
+}
 
-  Top 30 topics by CUI membership:
-      3,407 CUIs  tp_b9ee9d8231bc  -> C1305923  (Polypeptide)
-      3,314 CUIs  tp_7a3cfdb49579  -> C4543632  (Protein and/or protein derivative)
-      3,314 CUIs  tp_fa191c7049d9  -> C5548442  (Protein and/or protein derivative-containing produ)
-      2,549 CUIs  tp_1948b6132850  -> C0014442  (Enzyme)
-      2,480 CUIs  tp_a5a275d0840d  -> C0420206  (Situation with explicit context)
-      2,275 CUIs  tp_85433e1b248f  -> C0441065  (Clinical equipment and/or device)
-      2,245 CUIs  tp_433634e28bf5  -> C1444750  (Concept model attribute)
-      1,524 CUIs  tp_83c0195a38be  -> C0432488  (Staging and scales)
-      1,480 CUIs  tp_bafd26017afc  -> C0347997  (Physical objects)
-      1,166 CUIs  tp_a433c95d5f86  -> C1275777  (Salmonella enterica subsp. enterica (organism))
-      1,052 CUIs  tp_e8ad22ebf5a6  -> C0439861  (Substances)
-        772 CUIs  tp_c6b9e64c94fc  -> C0449234  (Attribute)
-        761 CUIs  tp_3f2e71280dbc  -> C0042567  (Vertebrate)
-        751 CUIs  tp_0884eabb1a82  -> C1270753  (Superclass Osteichthyes (organism))
-        736 CUIs  tp_acaca95c7aac  -> C0360722  (Enzyme-containing product)
-        688 CUIs  tp_cffd038657cb  -> C0853846  (Intentional poisoning (disorder))
-        655 CUIs  tp_0d154c45fec6  -> C1298232  (Special concept)
-        614 CUIs  tp_efde21f90a91  -> C1527304  (Allergic reaction)
-        603 CUIs  tp_382c1947e0ae  -> C0237865  (Propensity to adverse reactions to drug)
-        601 CUIs  tp_5e82d3920597  -> C0021054  (Immunologic substance (substance))
-        511 CUIs  tp_cf2d010eb726  -> C1290915  (Measurement finding)
-        508 CUIs  tp_ec4e25ab7de0  -> C0038424  (Family Streptomycetaceae (organism))
-        507 CUIs  tp_fd45de3665e8  -> C0085451  (Endospore forming gram-positive rod)
-        471 CUIs  tp_d206d5d7b0d7  -> C0014834  (Escherichia coli)
-        448 CUIs  tp_47aaab13a350  -> C1720295  (Group of anatomical entities)
-        446 CUIs  tp_a847d61fa18f  -> C0019047  (Abnormal haemoglobin)
-        424 CUIs  tp_dec2f5a67114  -> C0729761  (Chemical categorized by structure)
-        421 CUIs  tp_f0dd7e750668  -> C0263978  (Disorder of soft tissue)
-        407 CUIs  tp_78a3390cebc9  -> C0332191  (Adjectival modifier)
-        402 CUIs  tp_b7fca7c84689  -> C0446208  (Wild flowers)
+# Whether to prune nested/stacked canonicals.
+#
+# When FALSE (default): keep all qualifying canonicals, even when one
+# is an IS-A ancestor of another. The nearest-canonical BFS naturally
+# picks the closest one for each CUI, so a CUI under both Pneumonia
+# (sub-canonical) and Disorder (super-canonical) gets Pneumonia as
+# its topic. CUIs under Disorder but NOT under any sub-canonical get
+# Disorder. Multiple levels of abstraction are preserved.
+#
+# When TRUE: drop canonicals that have other canonicals as ancestors
+# (keep highest). Forces broader topics but can collapse everything
+# to a few mega-roots if SNOMED roots qualify.
+PRUNE_STACKED_CANONICALS = False
 
-  Diagnostic: canonical depth from roots
-    depth=  0     :    11
-    depth=  1     :    28
-    depth=  2     :   388
-    depth=  3     : 2,480
-    depth=  4     : 5,236
-    depth=  5     : 7,564
-    depth=  6     : 7,268
-    depth=  7     : 4,667
-    depth=  8     : 2,575
-    depth=  9     : 1,526
-    depth= 10     :   652
-    depth= 11     :   248
-    depth= 12     :    79
-    depth= 13     :    31
-    depth= 14     :    16
-    depth= 15     :     8
-    depth= 16     :     1
+# Sibling expansion: after assigning the nearest canonical topic to
+# each CUI, expand the topic set to include OTHER CANONICALS that
+# share an IS-A parent with the assigned canonical.
+#
+# Effect: trades precision for recall. A CUI assigned to Pneumonia
+# (e.g., "Acute streptococcal pneumonia") would also get Bronchitis,
+# Pneumonitis, etc. as topics — any canonical that co-occurs as a
+# child of one of Pneumonia's IS-A parents.
+#
+# When True: wider retrieval but topic count per CUI inflates by the
+# average sibling-canonical degree.
+# When False (default): each CUI keeps its nearest canonical(s) only.
+SIBLING_EXPANSION = False
 
-  Diagnostic: multi-parent CUIs (DAG nodes)
-    total multi-parent CUIs   : 155,316
-    topic-count distribution among them:
-        0 topics :    627 CUIs (  0.4%)
-        1 topics : 81,011 CUIs ( 52.2%)
-        2 topics : 46,549 CUIs ( 30.0%)
-        3 topics : 16,197 CUIs ( 10.4%)
-        4 topics :  6,992 CUIs (  4.5%)
-        5 topics :  2,682 CUIs (  1.7%)
-        6 topics :    714 CUIs (  0.5%)
-        7 topics :    308 CUIs (  0.2%)
-        8 topics :    148 CUIs (  0.1%)
-        9 topics :     50 CUIs (  0.0%)
-       10 topics :     20 CUIs (  0.0%)
-       11 topics :     13 CUIs (  0.0%)
-       12 topics :      4 CUIs (  0.0%)
-       13 topics :      1 CUIs (  0.0%)
+# When True: CUIs with no canonical ancestor become their OWN topic
+# (a single-member topic). Ensures every CUI is retrievable but inflates
+# the topic count by however many "orphan" CUIs there are.
+SINGLETON_FALLBACK = False
 
-  Diagnostic: orphan coverage by semantic type
-    total orphans (no topic) : 15,293
-    top 20 STYs by orphan count:
-       2,071 /  40,312  (  5.1%)  Finding
-       1,727 /   7,568  ( 22.8%)  Health Care Activity
-       1,335 /  43,374  (  3.1%)  Disease or Syndrome
-         942 /  20,979  (  4.5%)  Injury or Poisoning
-         812 /  34,114  (  2.4%)  Therapeutic or Preventive Procedure
-         442 /   2,228  ( 19.8%)  Laboratory or Test Result
-         349 /     815  ( 42.8%)  Educational Activity
-         317 /   8,345  (  3.8%)  Pathologic Function
-         316 /   9,289  (  3.4%)  Diagnostic Procedure
-         274 /   9,260  (  3.0%)  Organic Chemical
-         247 /   2,074  ( 11.9%)  Anatomical Abnormality
-         236 /  16,823  (  1.4%)  Pharmacologic Substance
-         173 /     279  ( 62.0%)  Occupational Activity
-         171 /   1,601  ( 10.7%)  Qualitative Concept
-         146 /  12,024  (  1.2%)  Neoplastic Process
-         140 /  10,936  (  1.3%)  Amino Acid, Peptide, or Protein
-         134 /   1,122  ( 11.9%)  Functional Concept
-         122 /   2,281  (  5.3%)  Quantitative Concept
-         121 /     939  ( 12.9%)  Temporal Concept
-         114 /     836  ( 13.6%)  Language
 
-[Saving]
-  wrote 49.4 MB in 1.4s
+# ============================================================================
+# Helpers
+# ============================================================================
 
-============================================================
-DONE — topic_lookup.pkl
-============================================================
+def build_isa_graph(cache):
+    """parents[child] -> set of direct IS-A parents
+       children[parent] -> set of direct IS-A children"""
+    parents = defaultdict(set)
+    children = defaultdict(set)
+    for cui1, cui2, rel, rela in cache["mrrel_rows"]:
+        if rel == "CHD" and rela == "isa":
+            parents[cui2].add(cui1)
+            children[cui1].add(cui2)
+    return parents, children
+
+
+def percentile_value(sorted_values, p):
+    """Get the value at percentile p (0-100) from a sorted list."""
+    if not sorted_values:
+        return 0
+    idx = min(int(len(sorted_values) * p / 100), len(sorted_values) - 1)
+    return sorted_values[idx]
+
+
+def hash_topic(cui):
+    """Stable hash for a canonical CUI -> topic ID."""
+    return "tp_" + hashlib.sha1(cui.encode()).hexdigest()[:12]
+
+
+# ============================================================================
+# Subhierarchy parent detection (STY-coverage based)
+# ============================================================================
+
+def find_subhierarchy_parents(cuis, children, tags):
+    """
+    A CUI qualifies as a subhierarchy parent if BOTH:
+      (1) Its STY-bearing-descendant count is in the top
+          [STY_LOWER_PERCENTILE, STY_UPPER_PERCENTILE] of the graph's
+          distribution. This measures "how much typed content does
+          this node organize" — a better proxy for clinical centrality
+          than raw children-count.
+      (2) Its direct children-count is NOT in the top MEGA_ROOT_PERCENTILE
+          (excludes the few mega-roots that would absorb most of the
+          ontology).
+
+    Computing STY-descendant-count requires one reverse-topological
+    pass over the graph. We use memoized BFS on each non-leaf node.
+
+    Returns:
+      found:               dict cui -> structural metrics
+      sty_lower, sty_upper, mega_root_threshold:  the actual cutoffs
+    """
+    # Compute STY-descendant-count for every non-leaf node.
+    # A descendant "counts" if it has any UMLS semantic type.
+    sty_desc_count = {}
+    desc_cache = {}
+
+    def descendants(c):
+        if c in desc_cache:
+            return desc_cache[c]
+        visited = {c}
+        frontier = {c}
+        while frontier:
+            nxt = set()
+            for n in frontier:
+                for ch in children.get(n, ()):
+                    if ch not in visited:
+                        visited.add(ch)
+                        nxt.add(ch)
+            frontier = nxt
+        desc_cache[c] = visited
+        return visited
+
+    non_leaf = [c for c in cuis if children.get(c)]
+    for cui in non_leaf:
+        desc = descendants(cui)
+        n_sty_desc = sum(1 for d in desc if tags.get(d))
+        sty_desc_count[cui] = n_sty_desc
+
+    # Children-count distribution (for mega-root filter)
+    cc = {c: len(children.get(c, ())) for c in non_leaf}
+
+    # Percentile cuts on STY-descendant distribution
+    sorted_sty = sorted(sty_desc_count.values())
+    sty_lower = percentile_value(sorted_sty, STY_LOWER_PERCENTILE)
+    sty_upper = percentile_value(sorted_sty, STY_UPPER_PERCENTILE)
+
+    # Mega-root threshold on direct children-count
+    sorted_cc = sorted(cc.values())
+    mega_root_threshold = percentile_value(sorted_cc, MEGA_ROOT_PERCENTILE)
+
+    found = {}
+    for cui in non_leaf:
+        n_sty_desc = sty_desc_count[cui]
+        n_children = cc[cui]
+        if not (sty_lower <= n_sty_desc <= sty_upper):
+            continue
+        if n_children > mega_root_threshold:
+            continue
+        found[cui] = {
+            "n_children": n_children,
+            "sty_descendant_count": n_sty_desc,
+        }
+    return found, sty_lower, sty_upper, mega_root_threshold
+
+
+def compute_depth_from_roots(cuis, parents, children):
+    """
+    Returns dict[cui] -> minimum BFS depth from any IS-A root.
+    Roots are CUIs with no IS-A parents in the graph.
+    """
+    roots = {c for c in cuis if not parents.get(c)}
+    depth = {}
+    dq = deque((r, 0) for r in roots)
+    while dq:
+        cui, d = dq.popleft()
+        if cui in depth and depth[cui] <= d:
+            continue
+        depth[cui] = d
+        for ch in children.get(cui, ()):
+            dq.append((ch, d + 1))
+    return depth
+
+
+# ============================================================================
+# Canonical extraction
+# ============================================================================
+
+def extract_canonicals(subhier_parents, children):
+    """
+    Canonicals = the subhierarchy parents themselves (now selected by
+    STY-descendant coverage rather than raw children-count).
+    """
+    canonicals = set(subhier_parents.keys())
+    canonical_info = {
+        c: {
+            "n_children": subhier_parents[c]["n_children"],
+            "sty_descendant_count": subhier_parents[c]["sty_descendant_count"],
+        }
+        for c in canonicals
+    }
+    return canonicals, canonical_info
+
+
+def build_sibling_canonical_index(canonicals, parents):
+    """
+    For each canonical c, find OTHER canonicals that share at least one
+    direct IS-A parent with c.
+
+    Returns: dict[cui] -> set of sibling canonical CUIs (excludes c itself)
+
+    Implementation: for each parent in the graph, find which canonicals
+    are direct children of that parent. Every pair becomes mutual siblings.
+    Cheaper than per-canonical lookup of co-children.
+    """
+    # Group canonicals by their direct IS-A parents
+    canon_by_parent = defaultdict(set)
+    for c in canonicals:
+        for p in parents.get(c, ()):
+            canon_by_parent[p].add(c)
+
+    sibling_map = defaultdict(set)
+    for p, canon_kids in canon_by_parent.items():
+        if len(canon_kids) < 2:
+            continue
+        # Every pair of canon_kids is sibling under p
+        canon_kids_list = list(canon_kids)
+        for i, a in enumerate(canon_kids_list):
+            for b in canon_kids_list[i+1:]:
+                sibling_map[a].add(b)
+                sibling_map[b].add(a)
+    return sibling_map
+
+
+# ============================================================================
+# Topic assignment per CUI: NEAREST canonical(s) only
+# ============================================================================
+
+def prune_stacked_canonicals(canonicals, children):
+    """
+    Drop canonicals that have another canonical as an IS-A ANCESTOR.
+    Keeps the HIGHEST canonicals only.
+
+    Algorithm: for each canonical, walk DOWNWARD through descendants.
+    Any descendant that is also in the canonical set is "shadowed" —
+    there's a higher canonical (us) above it, so the descendant is
+    redundant.
+
+    Why keep HIGHEST: empirical evidence from running on real SNOMED
+    showed that keeping LOWEST canonicals caused common clinical
+    concepts (Pneumonia, TB, MI) to lose topic assignments. Mid-level
+    clinical organizers were getting pruned in favor of niche
+    sub-branches deeper in the tree. Keeping highest pushes broad
+    clinical concepts to the top of the topic space, which is what
+    retrieval actually wants.
+
+    Trade-off: more specific CUIs that satisfy structural criteria
+    (like "Bacterial pneumonia") no longer get their own topic —
+    they roll up to "Pneumonia" instead. This loses granularity but
+    dramatically improves clinical coverage.
+
+    Each canonical's downward walk only touches its own subtree.
+    """
+    canon_set = set(canonicals)
+    shadowed = set()
+    for c in canon_set:
+        # Walk DOWN from c, mark any canonical descendant as shadowed
+        visited = {c}
+        frontier = set(children.get(c, ()))
+        while frontier:
+            shadowed |= (frontier & canon_set)
+            next_frontier = set()
+            for ch in frontier:
+                if ch in visited:
+                    continue
+                visited.add(ch)
+                for gc in children.get(ch, ()):
+                    if gc not in visited:
+                        next_frontier.add(gc)
+            frontier = next_frontier
+    return canon_set - shadowed
+
+
+def compute_topics_per_cui(all_cuis, canonicals, parents, children,
+                           sibling_map=None):
+    """
+    Multi-source downward BFS from all canonicals at once.
+
+    Equivalent in result to running per-CUI upward BFS, but each edge is
+    touched at most once across the whole computation. Total work is
+    O(|V| + |E|) instead of O(|V| × avg_upward_radius).
+
+    Algorithm:
+      Initialize: distance[c] = 0 and nearest[c] = {c} for each canonical
+      BFS forward over child edges. For each child visited via parent:
+        - candidate_distance = distance[parent] + 1
+        - If child has no distance yet: record candidate_distance and
+          copy parent's nearest canonicals
+        - If child's existing distance == candidate_distance (DAG tie):
+          union parent's nearest canonicals into child's set
+        - If child's existing distance < candidate_distance: skip
+          (already assigned a closer canonical via another path)
+
+    Note: distance is computed explicitly from parent's distance, not
+    from an external "level" counter. This makes the BFS layering
+    invariant explicit and robust to future refactors (e.g., switching
+    to a deque-based BFS).
+
+    If sibling_map is provided, the final topic set is expanded: for
+    each nearest-canonical c in a CUI's topics, also include sibling
+    canonicals of c (other canonicals sharing a direct IS-A parent).
+
+    Returns cui_topics: dict[cui] -> set of canonical CUIs.
+    """
+    distance = {c: 0 for c in canonicals}
+    nearest = {c: {c} for c in canonicals}
+
+    # BFS frontier — only nodes newly assigned at each level
+    frontier = set(canonicals)
+    level = 0
+    t0 = time.time()
+    while frontier:
+        level += 1
+        next_frontier = set()
+        for node in frontier:
+            candidate_distance = distance[node] + 1
+            for child in children.get(node, ()):
+                if child not in distance:
+                    # First time reaching this child
+                    distance[child] = candidate_distance
+                    nearest[child] = set(nearest[node])
+                    next_frontier.add(child)
+                elif distance[child] == candidate_distance:
+                    # DAG tie at same depth — union additional canonicals
+                    nearest[child] |= nearest[node]
+                # else: distance[child] < candidate_distance, already closer; skip
+        frontier = next_frontier
+        if level % 5 == 0:
+            print(f"    BFS level {level}: {len(distance):,} nodes reached "
+                  f"({time.time()-t0:.0f}s elapsed)")
+
+    cui_topics = {}
+    for cui in all_cuis:
+        topics = nearest.get(cui, set())
+        if topics:
+            if sibling_map:
+                # Expand by sibling canonicals
+                expanded = set(topics)
+                for t in topics:
+                    expanded |= sibling_map.get(t, set())
+                cui_topics[cui] = expanded
+            else:
+                cui_topics[cui] = topics
+        elif SINGLETON_FALLBACK:
+            cui_topics[cui] = {cui}
+    return cui_topics
+
+
+# ============================================================================
+# Main
+# ============================================================================
+
+def main():
+    print("=" * 60)
+    print("Topic builder (STY-coverage based, nearest-canonical)")
+    print("=" * 60)
+    print(f"  cache         : {CACHE_PATH}")
+    print(f"  output        : {OUTPUT_PATH}")
+    print(f"  STY band      : [{STY_LOWER_PERCENTILE}, {STY_UPPER_PERCENTILE}] of "
+          f"STY-descendant counts")
+    print(f"  mega filter   : exclude top {100-MEGA_ROOT_PERCENTILE}% by direct children")
+    print(f"  excluded CUIs : {len(CANONICAL_EXCLUDE)} "
+          f"({', '.join(sorted(CANONICAL_EXCLUDE))})")
+
+    print("\n[1/5] Loading cache ...")
+    t0 = time.time()
+    with open(CACHE_PATH, "rb") as f:
+        cache = pickle.load(f)
+    print(f"  {len(cache['cuis']):,} CUIs in {time.time()-t0:.1f}s")
+    labels = cache["labels"]
+
+    print("\n[2/5] Building IS-A graph ...")
+    t0 = time.time()
+    parents, children = build_isa_graph(cache)
+    n_edges = sum(len(ps) for ps in parents.values())
+    print(f"  {n_edges:,} IS-A edges in {time.time()-t0:.1f}s")
+
+    print(f"\n[3/5] Finding subhierarchy parents (STY-coverage based) ...")
+    t0 = time.time()
+    subhier_parents, sty_lower, sty_upper, mega_thresh = find_subhierarchy_parents(
+        cache["cuis"], children, cache["tags"],
+    )
+    print(f"  STY-descendant count cutoffs:")
+    print(f"    {STY_LOWER_PERCENTILE}th percentile = {sty_lower:,} STY descendants")
+    print(f"    {STY_UPPER_PERCENTILE}th percentile = {sty_upper:,} STY descendants")
+    print(f"  Mega-root threshold (children-count): {mega_thresh}")
+    print(f"  Found {len(subhier_parents):,} subhierarchy parents "
+          f"in {time.time()-t0:.1f}s")
+    print(f"\n  Top 30 subhierarchy parents (by STY-descendant count):")
+    sorted_sp = sorted(
+        subhier_parents.items(),
+        key=lambda kv: -kv[1]["sty_descendant_count"],
+    )
+    for cui, info in sorted_sp[:30]:
+        label = labels.get(cui, "?")
+        print(f"    sty_desc={info['sty_descendant_count']:>6,d}  "
+              f"children={info['n_children']:>4d}  "
+              f"{cui}  {label[:50]}")
+    if len(sorted_sp) > 30:
+        print(f"    ... plus {len(sorted_sp) - 30} more subhier parents")
+
+    print("\n[4/5] Extracting canonical CUIs ...")
+    t0 = time.time()
+    canonicals, canonical_info = extract_canonicals(subhier_parents, children)
+    print(f"  Found {len(canonicals):,} canonical CUIs in "
+          f"{time.time()-t0:.1f}s")
+
+    # Compute depth from roots (for diagnostics)
+    print(f"\n  Computing depth from roots ...")
+    t0 = time.time()
+    depth_from_root = compute_depth_from_roots(cache["cuis"], parents, children)
+    print(f"  Computed in {time.time()-t0:.1f}s")
+
+    # Drop explicitly excluded canonicals (known SNOMED admin/metadata)
+    excluded_present = canonicals & CANONICAL_EXCLUDE
+    if excluded_present:
+        print(f"\n  Excluding {len(excluded_present)} CUI(s) from "
+              f"CANONICAL_EXCLUDE:")
+        for c in sorted(excluded_present):
+            d = depth_from_root.get(c, "?")
+            lbl = labels.get(c, "?")[:55]
+            print(f"    depth={d}  {c}  {lbl}")
+        canonicals -= excluded_present
+        canonical_info = {c: v for c, v in canonical_info.items() if c in canonicals}
+        print(f"  After exclude: {len(canonicals):,} canonicals")
+
+    if PRUNE_STACKED_CANONICALS:
+        print(f"\n  Pruning stacked canonicals (keep HIGHEST) ...")
+        t0 = time.time()
+        n_before = len(canonicals)
+        canonicals = prune_stacked_canonicals(canonicals, children)
+        canonical_info = {c: canonical_info[c] for c in canonicals if c in canonical_info}
+        n_dropped = n_before - len(canonicals)
+        print(f"  Pruned {n_dropped:,} descendant canonicals "
+              f"in {time.time()-t0:.1f}s")
+    else:
+        print(f"\n  Skipping stacked-canonical pruning (allow nested canonicals)")
+        print(f"  Nearest-canonical BFS will naturally pick closest one")
+    print(f"  Final canonicals: {len(canonicals):,}")
+
+    print(f"\n  Top 30 canonicals (by STY-descendant count):")
+    sorted_canon = sorted(
+        canonical_info.items(),
+        key=lambda kv: -kv[1]["sty_descendant_count"],
+    )
+    for cui, info in sorted_canon[:30]:
+        cui_label = labels.get(cui, "?")
+        print(f"    sty_desc={info['sty_descendant_count']:>6,d}  "
+              f"children={info['n_children']:>4d}  "
+              f"{cui}  {cui_label[:50]}")
+
+    # Build sibling-canonical index if expansion is enabled
+    sibling_map = None
+    if SIBLING_EXPANSION:
+        print(f"\n  Building sibling-canonical index ...")
+        t0 = time.time()
+        sibling_map = build_sibling_canonical_index(canonicals, parents)
+        n_with_siblings = sum(1 for s in sibling_map.values() if s)
+        avg_siblings = (sum(len(s) for s in sibling_map.values()) /
+                        max(len(sibling_map), 1))
+        print(f"  {n_with_siblings:,} canonicals have at least one sibling "
+              f"in {time.time()-t0:.1f}s")
+        print(f"  Average siblings per canonical (among those with any): "
+              f"{avg_siblings:.1f}")
+
+    print("\n[5/5] Computing nearest-canonical topics (multi-source downward BFS) ...")
+    print(f"  (singleton fallback: {SINGLETON_FALLBACK}, "
+          f"sibling expansion: {SIBLING_EXPANSION})")
+    t0 = time.time()
+    cui_topics = compute_topics_per_cui(
+        sorted(cache["cuis"]), canonicals, parents, children,
+        sibling_map=sibling_map,
+    )
+    print(f"  {len(cui_topics):,} CUIs have at least one topic "
+          f"in {time.time()-t0:.1f}s")
+
+    topic_to_cuis = defaultdict(set)
+    cui_topic_ids = {}
+    for cui, canon_set in cui_topics.items():
+        tids = {hash_topic(c) for c in canon_set}
+        cui_topic_ids[cui] = tids
+        for tid in tids:
+            topic_to_cuis[tid].add(cui)
+
+    topic_to_canonical = {hash_topic(c): c for c in canonicals}
+
+    print("\n" + "=" * 60)
+    print("RESULTS")
+    print("=" * 60)
+    n_topics_per_cui = [len(ts) for ts in cui_topic_ids.values()]
+    n_topics_distribution = Counter(n_topics_per_cui)
+    avg_topics = sum(n_topics_per_cui) / len(n_topics_per_cui) if n_topics_per_cui else 0
+    print(f"  Total CUIs                  : {len(cache['cuis']):,}")
+    print(f"  CUIs with at least 1 topic  : {len(cui_topic_ids):,} "
+          f"({100*len(cui_topic_ids)/len(cache['cuis']):.1f}%)")
+    print(f"  Total canonical CUIs        : {len(canonicals):,}")
+    print(f"  Average topics per CUI      : {avg_topics:.2f}")
+    print(f"\n  Distribution: topics per CUI:")
+    for n_topics in sorted(n_topics_distribution.keys()):
+        n_cuis = n_topics_distribution[n_topics]
+        pct = 100 * n_cuis / len(cui_topic_ids)
+        if n_topics <= 10 or n_topics % 5 == 0:
+            print(f"    {n_topics:>3d} topics : {n_cuis:>7,d} CUIs ({pct:5.1f}%)")
+
+    print(f"\n  Top 30 topics by CUI membership:")
+    sorted_topics = sorted(
+        topic_to_cuis.items(),
+        key=lambda kv: -len(kv[1]),
+    )
+    for tid, cuis_in_topic in sorted_topics[:30]:
+        canon_cui = topic_to_canonical[tid]
+        canon_label = labels.get(canon_cui, "?")
+        print(f"    {len(cuis_in_topic):>7,d} CUIs  {tid}  -> {canon_cui}  "
+              f"({canon_label[:50]})")
+
+    # ------------------------------------------------------------------
+    # Additional diagnostics
+    # ------------------------------------------------------------------
+
+    # 1. Canonical depth from roots (depth_from_root already computed earlier)
+    print(f"\n  Diagnostic: canonical depth from roots")
+    canon_depths = [depth_from_root.get(c, -1) for c in canonicals]
+    depth_counter = Counter(canon_depths)
+    for d in sorted(depth_counter.keys()):
+        if d == -1:
+            print(f"    depth=unknown : {depth_counter[d]:>5,d}")
+        else:
+            print(f"    depth={d:>3d}     : {depth_counter[d]:>5,d}")
+
+    # 2. Multi-parent multiplicity (CUIs with multiple IS-A parents)
+    multi_parent_cuis = [c for c in cache["cuis"] if len(parents.get(c, ())) > 1]
+    multi_parent_topic_counts = Counter()
+    for c in multi_parent_cuis:
+        n = len(cui_topic_ids.get(c, set()))
+        multi_parent_topic_counts[n] += 1
+    print(f"\n  Diagnostic: multi-parent CUIs (DAG nodes)")
+    print(f"    total multi-parent CUIs   : {len(multi_parent_cuis):,}")
+    print(f"    topic-count distribution among them:")
+    for n in sorted(multi_parent_topic_counts.keys()):
+        pct = 100 * multi_parent_topic_counts[n] / max(len(multi_parent_cuis), 1)
+        print(f"      {n:>3d} topics : {multi_parent_topic_counts[n]:>6,d} "
+              f"CUIs ({pct:5.1f}%)")
+
+    # 3. Orphan coverage by STY
+    cuis_without_topic = set(cache["cuis"]) - set(cui_topic_ids.keys())
+    print(f"\n  Diagnostic: orphan coverage by semantic type")
+    print(f"    total orphans (no topic) : {len(cuis_without_topic):,}")
+    sty_orphan_counts = Counter()
+    sty_total_counts = Counter()
+    for c in cache["cuis"]:
+        for sty in cache["tags"].get(c, frozenset()):
+            sty_total_counts[sty] += 1
+            if c in cuis_without_topic:
+                sty_orphan_counts[sty] += 1
+    print(f"    top 20 STYs by orphan count:")
+    for sty, n_orphan in sty_orphan_counts.most_common(20):
+        n_total = sty_total_counts[sty]
+        pct = 100 * n_orphan / n_total if n_total else 0
+        print(f"      {n_orphan:>6,d} / {n_total:>7,d}  "
+              f"({pct:5.1f}%)  {sty}")
+
+    print("\n[Saving]")
+    t0 = time.time()
+    payload = {
+        "built_at": datetime.datetime.now().isoformat(),
+        "cache_fetched_at": cache.get("fetched_at"),
+        "config": {
+            "detection": "STY-descendant percentile + mega-root filter",
+            "sty_lower_percentile": STY_LOWER_PERCENTILE,
+            "sty_upper_percentile": STY_UPPER_PERCENTILE,
+            "mega_root_percentile": MEGA_ROOT_PERCENTILE,
+            "actual_sty_lower": sty_lower,
+            "actual_sty_upper": sty_upper,
+            "actual_mega_root_threshold": mega_thresh,
+            "canonical_exclude": sorted(CANONICAL_EXCLUDE),
+            "topic_assignment": "nearest canonical via multi-source downward BFS",
+            "prune_stacked_canonicals": PRUNE_STACKED_CANONICALS,
+            "sibling_expansion": SIBLING_EXPANSION,
+            "singleton_fallback": SINGLETON_FALLBACK,
+        },
+        "subhierarchy_parents": subhier_parents,
+        "canonicals":          canonicals,
+        "canonical_info":      canonical_info,
+        "cui_topic_ids":       cui_topic_ids,
+        "topic_to_canonical":  topic_to_canonical,
+        "topic_to_cuis":       dict(topic_to_cuis),
+        "labels":              cache["labels"],
+        "tags":                cache["tags"],
+    }
+    with open(OUTPUT_PATH, "wb") as f:
+        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
+    print(f"  wrote {size_mb:.1f} MB in {time.time()-t0:.1f}s")
+    print("\n" + "=" * 60)
+    print(f"DONE — {OUTPUT_PATH}")
+    print("=" * 60)
+
+
+main()
