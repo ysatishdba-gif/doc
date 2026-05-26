@@ -1,13 +1,54 @@
-Pneumonia has 46 suffix children.
+# Use the already-loaded graph (you called it `data`)
+g = data
 
-For first 10 children, who is the OTHER parent (the CUI on the other side):
-  C0032285-0: other parents = ['C0339951-0']
-  C0032285-1: other parents = ['C1456599-0']
-  C0032285-2: other parents = ['C3714514-0']
-  C0032285-3: other parents = ['C0024115-1']
-  C0032285-4: other parents = ['C0035243-0']
-  C0032285-5: other parents = ['C0035243-1']
-  C0032285-6: other parents = ['C0035243-2']
-  C0032285-7: other parents = ['C4022803-0']
-  C0032285-8: other parents = ['C1335019-0']
-  C0032285-9: other parents = ['C1335019-1']
+print(f"type    : {type(g).__name__}")
+print(f"nodes   : {g.number_of_nodes():,}")
+print(f"edges   : {g.number_of_edges():,}")
+
+TEST_CUIS = [
+    "C0032285",  # Pneumonia
+    "C0021368",  # Inflammation
+    "C0024109",  # Lung
+]
+
+for cui in TEST_CUIS:
+    print("\n" + "=" * 78)
+    print(f"  TRACING: {cui}")
+    print("=" * 78)
+    if cui not in g:
+        print(f"  -> not in graph")
+        continue
+
+    children = list(g.successors(cui))
+    print(f"\n  {cui} -> {len(children)} suffix children")
+
+    # Full neighborhood for first 5 suffix children
+    for sc in children[:5]:
+        preds = list(g.predecessors(sc))
+        succs = list(g.successors(sc))
+        print(f"\n  Suffix '{sc}':")
+        print(f"    predecessors ({len(preds)}): {preds}")
+        print(f"    successors   ({len(succs)}): {succs}")
+
+        # Trace the "other parent"
+        others = [p for p in preds if p != cui]
+        for other in others:
+            other_preds = list(g.predecessors(other))
+            other_succs = list(g.successors(other))
+            print(f"    -> other side '{other}':")
+            print(f"         predecessors ({len(other_preds)}): {other_preds}")
+            print(f"         successors   ({len(other_succs)}): {other_succs}")
+
+    # Count distinct CUIs reached via this pattern
+    reached = set()
+    for sc in children:
+        for other in g.predecessors(sc):
+            if other == cui:
+                continue
+            # `other` is a suffix; find its CUI parent
+            for gp in g.predecessors(other):
+                if gp != "CUI" and "-" not in gp and gp != cui:
+                    reached.add(gp)
+    print(f"\n  {cui} reaches {len(reached)} distinct CUIs via suffix-bridge pattern")
+    if reached:
+        print(f"  Sample: {sorted(reached)[:15]}")
