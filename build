@@ -1,152 +1,82 @@
-"""
-diagnose_graph_pickle.py  (v2 — smarter sampling)
--------------------------------------------------
-Inspect a large NetworkX graph pickle.
+Loading networkx_cui_context_v1_3_0.pkl ...
+  type     : DiGraph
+  nodes    : 24,055,828
+  edges    : 46,328,555
+  directed : True
 
-v2 improvements over v1:
-  - Samples edges from REAL CUI-looking nodes, not just the first few
-    encountered (which were all meta-hub edges with empty attrs).
-  - Uses random sampling instead of iterating all 46M edges for attribute
-    statistics.
-  - Recognises "Vocab.CUI" or "CUI" node naming patterns.
-"""
+[A] Random node-name pattern (sample of 200)
+    meta nodes ('Context', '*.Empty')   : 0 / 200
+    CUI-like names                       : 16 / 200
+    other (showing 10)                   : 184 / 200
+      'C5967146-2124'  attrs={}
+      'C1207460-0'  attrs={}
+      'C2845920-1'  attrs={}
+      'C5788726-462'  attrs={}
+      'C1641130-916'  attrs={}
+      'C5769707-1694'  attrs={}
+      'C4024060-159'  attrs={}
+      'C0222581-233'  attrs={}
+      'C3678747-0'  attrs={}
+      'C4708689-125'  attrs={}
 
-import pickle
-import random
-import sys
-from collections import Counter
+[B] Sampling 50 CUI-like nodes and inspecting their edges
 
+    node 'C4101796'
+      attrs    : {}
+      out-deg  : 1
+      in-deg   : 1
+      sample out-edges (first 5):
+        ('C4101796', 'C4101796-0', {})
+      sample in-edges (first 5):
+        ('CUI', 'C4101796', {})
 
-GRAPH_PATH = "networkx_cui_context_v1_3_0.pkl"
-SAMPLE_N_NODES = 50          # how many random nodes to inspect
-SAMPLE_N_EDGES = 5000        # how many random edges to sample for attr stats
+    node 'C1531725'
+      attrs    : {}
+      out-deg  : 2
+      in-deg   : 1
+      sample out-edges (first 5):
+        ('C1531725', 'C1531725-0', {})
+        ('C1531725', 'C1531725-1', {})
+      sample in-edges (first 5):
+        ('CUI', 'C1531725', {})
 
+    node 'C1912405'
+      attrs    : {}
+      out-deg  : 1
+      in-deg   : 1
+      sample out-edges (first 5):
+        ('C1912405', 'C1912405-0', {})
+      sample in-edges (first 5):
+        ('CUI', 'C1912405', {})
 
-def is_meta_node(node):
-    """Heuristic: skip 'Context' meta-root and '<Vocab>.Empty' placeholders."""
-    s = str(node)
-    return s == "Context" or s.endswith(".Empty")
+    node 'C5687500'
+      attrs    : {}
+      out-deg  : 2
+      in-deg   : 1
+      sample out-edges (first 5):
+        ('C5687500', 'C5687500-0', {})
+        ('C5687500', 'C5687500-1', {})
+      sample in-edges (first 5):
+        ('CUI', 'C5687500', {})
 
+    node 'C0263926'
+      attrs    : {}
+      out-deg  : 37
+      in-deg   : 1
+      sample out-edges (first 5):
+        ('C0263926', 'C0263926-0', {})
+        ('C0263926', 'C0263926-1', {})
+        ('C0263926', 'C0263926-2', {})
+        ('C0263926', 'C0263926-3', {})
+        ('C0263926', 'C0263926-4', {})
+      sample in-edges (first 5):
+        ('CUI', 'C0263926', {})
 
-def is_cui_like(node):
-    """Heuristic: a CUI looks like 'C' followed by digits, possibly prefixed
-    by '<Vocab>.'."""
-    s = str(node)
-    # plain 'C0123456' style
-    if s.startswith("C") and len(s) >= 4 and s[1:].isdigit():
-        return True
-    # 'SNOMEDCT_US.C0123456' style
-    if "." in s:
-        tail = s.split(".")[-1]
-        if tail.startswith("C") and len(tail) >= 4 and tail[1:].isdigit():
-            return True
-    return False
+[C] Random edge sampling (5000 edges) for attribute stats
+    edges with any attribute   : 0 / 5000 (0.0%)
+    edges touching meta nodes  : 0 / 5000 (0.0%)
+    edges between CUI-like     : 0 / 5000 (0.0%)
 
-
-def main():
-    print(f"Loading {GRAPH_PATH} ...")
-    with open(GRAPH_PATH, "rb") as f:
-        g = pickle.load(f)
-
-    n_nodes = g.number_of_nodes()
-    n_edges = g.number_of_edges()
-    print(f"  type     : {type(g).__name__}")
-    print(f"  nodes    : {n_nodes:,}")
-    print(f"  edges    : {n_edges:,}")
-    print(f"  directed : {g.is_directed()}")
-
-    # ----- Node-name pattern detection -----
-    print(f"\n[A] Random node-name pattern (sample of 200)")
-    all_nodes_list = list(g.nodes())
-    random.seed(42)
-    sample_nodes = random.sample(all_nodes_list, min(200, n_nodes))
-    n_meta = sum(1 for n in sample_nodes if is_meta_node(n))
-    n_cui_like = sum(1 for n in sample_nodes if is_cui_like(n))
-    n_other = len(sample_nodes) - n_meta - n_cui_like
-    print(f"    meta nodes ('Context', '*.Empty')   : {n_meta} / {len(sample_nodes)}")
-    print(f"    CUI-like names                       : {n_cui_like} / {len(sample_nodes)}")
-    print(f"    other (showing 10)                   : {n_other} / {len(sample_nodes)}")
-    other_examples = [n for n in sample_nodes
-                      if not is_meta_node(n) and not is_cui_like(n)][:10]
-    for x in other_examples:
-        attrs = dict(g.nodes[x])
-        print(f"      {x!r}  attrs={attrs}")
-
-    # ----- Sample some real CUI nodes and look at their edges -----
-    print(f"\n[B] Sampling {SAMPLE_N_NODES} CUI-like nodes and inspecting their edges")
-    cui_nodes = [n for n in sample_nodes if is_cui_like(n)]
-    if not cui_nodes:
-        # Linear scan up to a limit to find CUI-like ones
-        print(f"    None in initial sample — scanning more nodes ...")
-        for i, n in enumerate(g.nodes()):
-            if is_cui_like(n):
-                cui_nodes.append(n)
-                if len(cui_nodes) >= SAMPLE_N_NODES:
-                    break
-            if i > 500_000:
-                break
-        print(f"    found {len(cui_nodes)} CUI-like nodes")
-
-    for n in cui_nodes[:5]:
-        attrs = dict(g.nodes[n])
-        print(f"\n    node {n!r}")
-        print(f"      attrs    : {attrs}")
-        out_edges = list(g.out_edges(n, data=True))
-        in_edges = list(g.in_edges(n, data=True))
-        print(f"      out-deg  : {len(out_edges)}")
-        print(f"      in-deg   : {len(in_edges)}")
-        print(f"      sample out-edges (first 5):")
-        for e in out_edges[:5]:
-            print(f"        {e}")
-        print(f"      sample in-edges (first 5):")
-        for e in in_edges[:5]:
-            print(f"        {e}")
-
-    # ----- Random edge sample for attribute stats -----
-    print(f"\n[C] Random edge sampling ({SAMPLE_N_EDGES} edges) for attribute stats")
-    all_edges_list = list(g.edges(data=True))
-    sample_edges = random.sample(all_edges_list, min(SAMPLE_N_EDGES, n_edges))
-
-    n_with_attrs = 0
-    attr_key_counter = Counter()
-    attr_value_counters = {}   # attr_name -> Counter(values)
-    n_meta_edges = 0
-    n_cui_to_cui_edges = 0
-
-    for u, v, data in sample_edges:
-        if is_meta_node(u) or is_meta_node(v):
-            n_meta_edges += 1
-        if is_cui_like(u) and is_cui_like(v):
-            n_cui_to_cui_edges += 1
-        if data:
-            n_with_attrs += 1
-            for k, val in data.items():
-                attr_key_counter[k] += 1
-                attr_value_counters.setdefault(k, Counter())[val] += 1
-
-    print(f"    edges with any attribute   : {n_with_attrs} / {len(sample_edges)} "
-          f"({100*n_with_attrs/len(sample_edges):.1f}%)")
-    print(f"    edges touching meta nodes  : {n_meta_edges} / {len(sample_edges)} "
-          f"({100*n_meta_edges/len(sample_edges):.1f}%)")
-    print(f"    edges between CUI-like     : {n_cui_to_cui_edges} / {len(sample_edges)} "
-          f"({100*n_cui_to_cui_edges/len(sample_edges):.1f}%)")
-
-    if attr_key_counter:
-        print(f"\n[D] Attribute key frequencies in sample")
-        for k, c in attr_key_counter.most_common():
-            print(f"    {k:<30s}: {c:,}")
-
-        print(f"\n[E] Distinct values per attribute (top 30 each)")
-        for k, vc in attr_value_counters.items():
-            print(f"\n    --- {k} ({len(vc)} distinct values) ---")
-            for v, c in vc.most_common(30):
-                print(f"      {c:>6,d}  {v!r}")
-            if len(vc) > 30:
-                print(f"      ... plus {len(vc) - 30} more")
-    else:
-        print(f"\n[D] No edge attributes found in random sample.")
-        print(f"    This either means edges genuinely have no attrs,")
-        print(f"    or our sample missed annotated edges. Try increasing SAMPLE_N_EDGES.")
-
-
-main()
+[D] No edge attributes found in random sample.
+    This either means edges genuinely have no attrs,
+    or our sample missed annotated edges. Try increasing SAMPLE_N_EDGES.
