@@ -1,1414 +1,952 @@
-Loading umls_cache.pkl ...
-  374,538 CUIs
-  2,748,222 MRREL rows
-
-221 distinct (REL, RELA) pairs:
-
-     EDGES  REL    RELA
-------------------------------------------------------------
-   615,978  CHD    isa
-   615,942  PAR    inverse_isa
-   106,424  RO     finding_site_of
-   106,423  RO     has_finding_site
-    79,784  RO     has_associated_morphology
-    78,747  RO     associated_morphology_of
-    68,889  RO     has_method
-    68,889  RO     method_of
-    46,130  RO     mapped_from
-    46,130  RO     mapped_to
-    39,547  RO     interprets
-    39,547  RO     is_interpreted_by
-    38,934  RO     direct_procedure_site_of
-    38,934  RO     has_direct_procedure_site
-    28,107  RO     has_pathological_process
-    28,107  RO     pathological_process_of
-    25,414  RO     has_laterality
-    25,414  RO     laterality_of
-    22,576  RO     has_occurrence
-    22,576  RO     occurs_in
-    19,078  RO     has_interpretation
-    19,078  RO     interpretation_of
-    18,907  RO     cause_of
-    18,907  RO     due_to
-    18,647  RO     causative_agent_of
-    18,647  RO     has_causative_agent
-    17,559  RO     active_ingredient_of
-    17,559  RO     has_active_ingredient
-    15,612  RO     dose_form_of
-    15,612  RO     has_dose_form
-    15,573  RO     entire_anatomy_structure_of
-    15,573  RO     has_entire_anatomy_structure
-    12,686  RO     possibly_equivalent_to
-     9,858  RO     basis_of_strength_substance_of
-     9,858  RO     precise_active_ingredient_of
-     9,858  RO     has_basis_of_strength_substance
-     9,858  RO     has_precise_active_ingredient
-     9,465  RO     has_direct_morphology
-     9,465  RO     direct_morphology_of
-     9,413  RO     disposition_of
-     9,413  RO     has_disposition
-     8,695  RO     has_indirect_procedure_site
-     8,695  RO     indirect_procedure_site_of
-     8,421  RO     has_component
-     8,421  RO     component_of
-     7,170  RO     device_used_by
-     7,170  RO     uses_device
-     6,620  RO     presentation_strength_denominator_unit_of
-     6,620  RO     presentation_strength_numerator_unit_of
-     6,620  RO     has_presentation_strength_numerator_unit
-     6,620  RO     has_presentation_strength_denominator_unit
-     6,267  RO     clinical_course_of
-     6,267  RO     has_clinical_course
-     5,524  RO     unit_of_presentation_of
-     5,524  RO     has_unit_of_presentation
-     5,496  RO     has_subject_relationship_context
-     5,496  RO     subject_relationship_context_of
-     5,467  RO     temporal_context_of
-     5,467  RO     has_temporal_context
-     5,450  RO     has_focus
-     5,450  RO     focus_of
-     5,278  RO     direct_device_of
-     5,278  RO     has_direct_device
-     4,258  RO     has_direct_substance
-     4,258  RO     direct_substance_of
-     4,122  RO     uses_substance
-     4,122  RO     substance_used_by
-     3,437  RO     occurs_before
-     3,437  RO     occurs_after
-     3,334  RO     intent_of
-     3,334  RO     has_intent
-     3,238  RO     concentration_strength_denominator_unit_of
-     3,238  RO     concentration_strength_numerator_unit_of
-     3,238  RO     has_concentration_strength_numerator_unit
-     3,238  RO     has_concentration_strength_denominator_unit
-     3,097  RO     has_procedure_site
-     3,097  RO     procedure_site_of
-     3,080  RO     associated_with
-     3,079  RO     specimen_of
-     3,079  RO     has_specimen
-     2,784  RO     has_finding_context
-     2,784  RO     finding_context_of
-     2,725  RO     has_associated_finding
-     2,725  RO     associated_finding_of
-     2,702  RO     has_associated_procedure
-     2,702  RO     associated_procedure_of
-     2,662  RO     procedure_context_of
-     2,662  RO     has_procedure_context
-     2,517  RO     finding_method_of
-     2,517  RO     has_finding_method
-     2,404  RO     has_modification
-     2,404  RO     is_modification_of
-     2,238  SY     same_as
-     2,050  RO     access_of
-     2,050  RO     has_access
-     2,046  RO     property_of
-     2,046  RO     has_property
-     1,797  RN     refers_to
-     1,797  RB     referred_to_by
-     1,686  RO     has_realization
-     1,686  RO     realization_of
-     1,556  RO     characterized_by
-     1,556  RO     characterizes
-     1,541  RO     moved_from
-     1,541  RO     moved_to
-     1,520  RO     inheres_in
-     1,520  RO     has_inherent_attribute
-     1,486  RO     has_surgical_approach
-     1,486  RO     surgical_approach_of
-     1,454  RO     has_specimen_source_topography
-     1,454  RO     specimen_source_topography_of
-     1,418  RO     has_scale_type
-     1,418  RO     scale_type_of
-     1,244  RO     revision_status_of
-     1,244  RO     has_revision_status
-     1,231  RO     access_device_used_by
-     1,231  RO     uses_access_device
-     1,097  RO     time_aspect_of
-     1,097  RO     has_time_aspect
-     1,088  RO     has_specimen_substance
-     1,088  RO     specimen_substance_of
-     1,027  RO     has_specimen_procedure
-     1,027  RO     specimen_procedure_of
-       957  RO     replaces
-       957  RO     replaced_by
-       942  RO     uses_energy
-       942  RO     energy_used_by
-       861  RO     has_device_intended_site
-       861  RO     device_intended_site_of
-       857  RN     was_a
-       857  RB     inverse_was_a
-       790  RO     has_inherent_location
-       790  RO     inherent_location_of
-       642  RO     technique_of
-       642  RO     has_technique
-       611  RO     has_indirect_morphology
-       611  RO     indirect_morphology_of
-       587  RO     direct_site_of
-       587  RO     has_direct_site
-       474  RO     process_acts_on
-       474  RO     acted_on_by_process
-       454  RO     dose_form_intended_site_of
-       454  RO     has_dose_form_intended_site
-       415  RO     dose_form_release_characteristic_of
-       415  RO     has_dose_form_release_characteristic
-       409  RO     dose_form_administration_method_of
-       409  RO     has_dose_form_administration_method
-       396  RO     during
-       394  RO     basic_dose_form_of
-       394  RO     has_basic_dose_form
-       394  RO     has_dose_form_transformation
-       394  RO     dose_form_transformation_of
-       352  RO     compositional_material_of
-       352  RO     has_compositional_material
-       344  RO     process_duration_of
-       344  RO     has_process_duration
-       320  RO     part_anatomy_structure_of
-       320  RO     has_part_anatomy_structure
-       271  RO     route_of_administration_of
-       271  RO     has_route_of_administration
-       263  RO     has_priority
-       263  RO     priority_of
-       254  RO     is_sterile
-       254  RO     answer_to_is_sterile
-       253  RO     procedure_device_of
-       253  RO     has_procedure_device
-       232  RO     partially_equivalent_to
-       226  RO     role_played_by
-       226  RO     plays_role
-       198  RO     temporally_related_to
-       178  RO     has_specimen_source_morphology
-       178  RO     specimen_source_morphology_of
-       174  RO     relative_to
-       172  RO     absorbability_of
-       172  RO     has_absorbability
-       162  RO     has_procedure_morphology
-       162  RO     procedure_morphology_of
-       135  RO     recipient_category_of
-       135  RO     has_recipient_category
-       131  RO     extended_to_by_process
-       131  RO     process_extends_to
-       130  RO     finding_informer_of
-       130  RO     has_finding_informer
-        94  RN     has_alternative
-        94  RB     alternative_of
-        92  RO     has_indirect_device
-        92  RO     indirect_device_of
-        69  RO     state_of_matter_of
-        69  RO     has_state_of_matter
-        58  RO     has_precondition
-        58  RO     precondition_of
-        55  RO     has_specimen_source_identity
-        55  RO     specimen_source_identity_of
-        38  RO     has_severity
-        38  RO     severity_of
-        37  RO     has_coating_material
-        37  RO     coating_material_of
-        24  RO     has_units
-        24  RO     units_of
-        21  RO     process_output_of
-        21  RO     has_process_output
-        19  RO     has_target_population
-        19  RO     target_population_of
-        17  RO     measurement_method_of
-        17  RO     has_measurement_method
-        15  RO     possibly_replaces
-        15  RO     possibly_replaced_by
-         8  RO     has_dependent
-         8  RO     dependent_of
-         7  RO     filling_of
-         7  RO     has_filling
-         7  RO     has_ingredient_qualitative_strength
-         7  RO     ingredient_qualitative_strength_of
-         4  RO     has_surface_texture
-         4  RO     surface_texture_of
-         2  RO     part_referred_to_by
-         2  RO     relative_to_part_of
-         1  RO     before
-         1  RO     towards
-         1  RO     away_from
-         1  RO     after
-
-
-Examples per (REL, RELA):
-
-  [CHD / isa]  (615,978 edges)
-    C1333064 'Classical Hodgkin lymphoma' --[CHD/isa]--> C0152268 'Classical Hodgkin lymphoma, nodular scle'
-    C1333064 'Classical Hodgkin lymphoma' --[CHD/isa]--> C5235037 'Hodgkin's sarcoma'
-    C1333097 'Neuroendocrine neoplasm of colon' --[CHD/isa]--> C5921007 'Neuroendocrine neoplasm of ascending col'
-
-  [PAR / inverse_isa]  (615,942 edges)
-    C1332930 'Aggressive fibromatosis of chest wall' --[PAR/inverse_isa]--> C0684832 'Neoplasm of uncertain behaviour of chest'
-    C1332932 'Lipoma of chest wall' --[PAR/inverse_isa]--> C4281770 'Lipoma of trunk (disorder)'
-    C1333064 'Classical Hodgkin lymphoma' --[PAR/inverse_isa]--> C0019829 'Hodgkin's disease'
-
-  [RO / finding_site_of]  (106,424 edges)
-    C1333139 'Complex endometrial hyperplasia without ' --[RO/finding_site_of]--> C0014180 'Endometrium'
-    C1333321 'Gastrinoma of duodenum' --[RO/finding_site_of]--> C0013303 'Duodenal structure'
-    C1333467 'Squamous cell papilloma of oesophagus' --[RO/finding_site_of]--> C0014876 'Oesophagus'
-
-  [RO / has_finding_site]  (106,423 edges)
-    C0205827 'Sacral plexus structure (body structure)' --[RO/has_finding_site]--> C0434219 'Closed injury sacral plexus'
-    C0206187 'Extrahepatic bile duct' --[RO/has_finding_site]--> C0238019 'Carcinoma of extrahepatic bile duct (dis'
-    C0206187 'Extrahepatic bile duct' --[RO/has_finding_site]--> C0686113 'Neoplasm of uncertain behavior of extrah'
-
-  [RO / has_associated_morphology]  (79,784 edges)
-    C1334014 'High grade glandular intraepithelial neo' --[RO/has_associated_morphology]--> C5395092 'High grade flat intraepithelial neoplasi'
-    C1334014 'High grade glandular intraepithelial neo' --[RO/has_associated_morphology]--> C5686078 'High grade glandular intraepithelial neo'
-    C1334715 'Metastatic well-differentiated neuroendo' --[RO/has_associated_morphology]--> C5967915 'Metastatic well-differentiated neuroendo'
-
-  [RO / associated_morphology_of]  (78,747 edges)
-    C1332917 'Carcinosarcoma of cervix uteri' --[RO/associated_morphology_of]--> C0007140 'Carcinosarcoma'
-    C1332930 'Aggressive fibromatosis of chest wall' --[RO/associated_morphology_of]--> C0079218 'Aggressive fibromatosis'
-    C1333149 'Pedunculated conjunctival papilloma' --[RO/associated_morphology_of]--> C5548501 'Benign papilloma'
-
-  [RO / has_method]  (68,889 edges)
-    C0030247 'Palpation - action (qualifier value)' --[RO/has_method]--> C0030249 'Palpation of liver'
-    C0030247 'Palpation - action (qualifier value)' --[RO/has_method]--> C5688561 'Palpation of urinary bladder'
-    C1322279 'Dilation - action (qualifier value)' --[RO/has_method]--> C0012358 'Dilation and curettage of uterus (proced'
-
-  [RO / method_of]  (68,889 edges)
-    C0206054 'Transoesophageal echocardiography' --[RO/method_of]--> C0041618 'Ultrasonography'
-    C0220931 'Functional training (procedure)' --[RO/method_of]--> C1292797 'Training - action'
-    C0812489 'Open arteriovenous anastomosis by transp' --[RO/method_of]--> C0677554 'Anastomosis - action (qualifier value)'
-
-  [RO / mapped_from]  (46,130 edges)
-    C1332911 'Cervical adenoid cystic carcinoma' --[RO/mapped_from]--> C0007847 'Malignant tumour of cervix'
-    C1333071 'Chordoma of clivus' --[RO/mapped_from]--> C0346653 'Malignant neoplasm of bones of skull and'
-    C1333139 'Complex endometrial hyperplasia without ' --[RO/mapped_from]--> C2712711 'Benign endometrial hyperplasia (disorder'
-
-  [RO / mapped_to]  (46,130 edges)
-    C1333768 'Gastrointestinal stromal tumor of stomac' --[RO/mapped_to]--> C5547338 'Gastrointestinal stromal neoplasm of car'
-    C1335996 'Gastrointestinal stromal tumor of small ' --[RO/mapped_to]--> C5547337 'Gastrointestinal stromal neoplasm of jej'
-    C1384514 'Conn's syndrome' --[RO/mapped_to]--> C0342451 'Primary hyperaldosteronism due to hyperp'
-
-  [RO / interprets]  (39,547 edges)
-    C0205949 'Sexual orientation' --[RO/interprets]--> C0237209 'Sexual orientation confusion'
-    C0205949 'Sexual orientation' --[RO/interprets]--> C0242658 'Male homosexuality'
-    C0205949 'Sexual orientation' --[RO/interprets]--> C0424397 'Concern about sexual orientation'
-
-  [RO / is_interpreted_by]  (39,547 edges)
-    C0205564 'Clinical stage I' --[RO/is_interpreted_by]--> C1286325 'Lesion observable'
-    C0205578 'Clinical stage III' --[RO/is_interpreted_by]--> C1286325 'Lesion observable'
-    C0205599 'Clark melanoma level 2' --[RO/is_interpreted_by]--> C1286325 'Lesion observable'
-
-  [RO / direct_procedure_site_of]  (38,934 edges)
-    C0812489 'Open arteriovenous anastomosis by transp' --[RO/direct_procedure_site_of]--> C0226801 'Structure of basilic vein'
-    C0844312 'Repair of oval window' --[RO/direct_procedure_site_of]--> C0029922 'Vestibular window structure (body struct'
-    C0845202 'Open reduction of dislocation of carpome' --[RO/direct_procedure_site_of]--> C0224620 'Carpometacarpal joint structure'
-
-  [RO / has_direct_procedure_site]  (38,934 edges)
-    C0205814 'Superior laryngeal nerve' --[RO/has_direct_procedure_site]--> C0196612 'Division of superior laryngeal nerve'
-    C0206207 'Articular capsule' --[RO/has_direct_procedure_site]--> C0185390 'Joint capsuloplasty'
-    C0206207 'Articular capsule' --[RO/has_direct_procedure_site]--> C0185391 'Joint capsulodesis'
-
-  [RO / has_pathological_process]  (28,107 edges)
-    C1534674 'Primary malignant neoplastic proliferati' --[RO/has_pathological_process]--> C0345950 'Primary bronchial cancer'
-    C1534674 'Primary malignant neoplastic proliferati' --[RO/has_pathological_process]--> C0346642 'Primary malignant neoplasm of common bil'
-    C1534674 'Primary malignant neoplastic proliferati' --[RO/has_pathological_process]--> C0346659 'Primary malignant neoplasm of occipital '
-
-  [RO / pathological_process_of]  (28,107 edges)
-    C1333260 'Primary ameloblastic carcinoma' --[RO/pathological_process_of]--> C1534674 'Primary malignant neoplastic proliferati'
-    C1333482 'Exaggerated placental site (disorder)' --[RO/pathological_process_of]--> C0586102 'Pathological developmental process'
-    C1364022 'Systemic lupus erythematosus-related syn' --[RO/pathological_process_of]--> C0443146 'Autoimmune reaction (finding)'
-
-  [RO / has_laterality]  (25,414 edges)
-    C0205090 'Right side' --[RO/has_laterality]--> C0225460 'Right frontal sinus'
-    C0205090 'Right side' --[RO/has_laterality]--> C0225469 'Right ethmoid sinus structure'
-    C0205090 'Right side' --[RO/has_laterality]--> C0225608 'Right main bronchus structure'
-
-  [RO / laterality_of]  (25,414 edges)
-    C0205814 'Superior laryngeal nerve' --[RO/laterality_of]--> C0441987 'Side'
-    C0205826 'Lumbar plexus structure (body structure)' --[RO/laterality_of]--> C0441987 'Side'
-    C0205956 'Ventral spinal nerve root' --[RO/laterality_of]--> C0441987 'Side'
-
-  [RO / has_occurrence]  (22,576 edges)
-    C1333482 'Exaggerated placental site (disorder)' --[RO/has_occurrence]--> C5566148 'Maternal pregnancy period'
-    C0205710 'Gray matter degeneration' --[RO/has_occurrence]--> C0231335 'Childhood - period'
-    C0220659 'Acrodysostosis (disorder)' --[RO/has_occurrence]--> C1744681 'Congenital'
-
-  [RO / occurs_in]  (22,576 edges)
-    C0700597 'Adulthood - period' --[RO/occurs_in]--> C0221056 'Adult onset dermatomyositis'
-    C0700597 'Adulthood - period' --[RO/occurs_in]--> C0236859 'Physical abuse of adult'
-    C0700597 'Adulthood - period' --[RO/occurs_in]--> C0236860 'Sexual abuse of adult'
-
-  [RO / has_interpretation]  (19,078 edges)
-    C0220938 'White colour' --[RO/has_interpretation]--> C1411610 'Phlegmasia alba dolens in pregnancy'
-    C0221099 'Impaired (qualifier value)' --[RO/has_interpretation]--> C0002624 'Retrograde amnesia (finding)'
-    C0221099 'Impaired (qualifier value)' --[RO/has_interpretation]--> C0003504 'Aortic valve insufficiency'
-
-  [RO / interpretation_of]  (19,078 edges)
-    C1334171 'Ineffective hematopoiesis' --[RO/interpretation_of]--> C0205161 'Abnormal (qualifier value)'
-    C1367053 'Blue baby' --[RO/interpretation_of]--> C1260957 'Blue colour'
-    C0205858 'Progressive general paresis' --[RO/interpretation_of]--> C0221099 'Impaired (qualifier value)'
-
-  [RO / cause_of]  (18,907 edges)
-    C0220655 'Pericardial effusion co-occurrent and du' --[RO/cause_of]--> C0006826 'Malignant neoplasm'
-    C0221053 'Acute berylliosis' --[RO/cause_of]--> C5191459 'Inhalation of substance'
-    C0221405 'Pituitary cachexia' --[RO/cause_of]--> C0312435 'Decreased hormone secretion'
-
-  [RO / due_to]  (18,907 edges)
-    C1384586 'Forceps delivery' --[RO/due_to]--> C5685990 'Disorder of early neonate and/or fetus d'
-    C0206042 'Fatal familial insomnia' --[RO/due_to]--> C5787663 'Dementia due to fatal familial insomnia'
-    C0206245 'Familial polyneuropathic amyloidosis' --[RO/due_to]--> C5569059 'Glomerular disorder due to neuropathic h'
-
-  [RO / causative_agent_of]  (18,647 edges)
-    C0206525 'Drug resistant tuberculosis' --[RO/causative_agent_of]--> C1032649 'Mycobacterium tuberculosis group'
-    C0206615 'Disease caused by Pneumovirus' --[RO/causative_agent_of]--> C0206543 'Pneumovirus'
-    C0221052 'Chronic berylliosis' --[RO/causative_agent_of]--> C0005139 'Be - Beryllium'
-
-  [RO / has_causative_agent]  (18,647 edges)
-    C0205662 'Ockelbo virus' --[RO/has_causative_agent]--> C0343597 'Ockelbo disease'
-    C0205704 'Cascara sagrada' --[RO/has_causative_agent]--> C0567843 'Cascara poisoning'
-    C0205725 'Human herpesvirus 5' --[RO/has_causative_agent]--> C0877072 'Cytomegalovirus chorioretinitis'
-
-  [RO / active_ingredient_of]  (17,559 edges)
-    C1321284 'Product containing epinephrine and guane' --[RO/active_ingredient_of]--> C0014563 'Adrenaline-containing product'
-    C1321284 'Product containing epinephrine and guane' --[RO/active_ingredient_of]--> C0018318 'Guanethidine (substance)'
-    C1329980 'Aspirin- and pravastatin-containing prod' --[RO/active_ingredient_of]--> C0085542 'Pravastatin (substance)'
-
-  [RO / has_active_ingredient]  (17,559 edges)
-    C1367202 'Ipilimumab' --[RO/has_active_ingredient]--> C4753651 'Ipilimumab only product'
-    C0205705 'Casanthranol' --[RO/has_active_ingredient]--> C3206258 'Casanthranol-containing product in oral '
-    C0205976 'Product containing toluene di-isocyanate' --[RO/has_active_ingredient]--> C4755057 'Toluene di-isocyanate only product'
-
-  [RO / dose_form_of]  (15,612 edges)
-    C1340346 'Theophylline anhydrous 50 mg oral capsul' --[RO/dose_form_of]--> C0991533 'Oral capsule'
-    C1340496 'Imatinib (as imatinib mesilate) 50 mg or' --[RO/dose_form_of]--> C0991533 'Oral capsule'
-    C1341010 'Product containing precisely propranolol' --[RO/dose_form_of]--> C0991505 'Prolonged-release oral capsule'
-
-  [RO / has_dose_form]  (15,612 edges)
-    C0029083 'Ophthalmic solution' --[RO/has_dose_form]--> C0357626 'Product containing precisely dibrompropa'
-    C0029083 'Ophthalmic solution' --[RO/has_dose_form]--> C0358668 'Guanethidine 30 mg/mL eye solution'
-    C0029083 'Ophthalmic solution' --[RO/has_dose_form]--> C0358796 'Scopolamine (as scopolamine hydrobromide'
-
-  [RO / entire_anatomy_structure_of]  (15,573 edges)
-    C1367111 'Accessory thyroid' --[RO/entire_anatomy_structure_of]--> C4512731 'Entire accessory thyroid'
-    C0205889 'Structure of epineurium' --[RO/entire_anatomy_structure_of]--> C4512400 'Entire epineurium'
-    C0206207 'Articular capsule' --[RO/entire_anatomy_structure_of]--> C1306518 'Entire articular capsule (body structure'
-
-  [RO / has_entire_anatomy_structure]  (15,573 edges)
-    C1321505 'Entire anal valve' --[RO/has_entire_anatomy_structure]--> C0227426 'Anal valves'
-    C1321509 'Entire axis vertebra' --[RO/has_entire_anatomy_structure]--> C0004457 'Bone structure of axis (body structure)'
-    C1321528 'Entire flexor hallucis longus tendon (bo' --[RO/has_entire_anatomy_structure]--> C0224959 'Structure of flexor hallucis longus musc'
-
-  [RO / possibly_equivalent_to]  (12,686 edges)
-    C1334731 'Metastatic malignant neoplasm to nasopha' --[RO/possibly_equivalent_to]--> C0684946 'Metastatic malignant neoplasm of nasopha'
-    C1368709 'Benign neoplasm of nasopharyngeal wall' --[RO/possibly_equivalent_to]--> C0153938 'Benign tumour of nasopharynx'
-    C1377996 'Construction vaginoplasty' --[RO/possibly_equivalent_to]--> C0195196 'Reconstruction of vagina (procedure)'
-
-  [RO / basis_of_strength_substance_of]  (9,858 edges)
-    C1341010 'Product containing precisely propranolol' --[RO/basis_of_strength_substance_of]--> C0282321 'Propranolol hydrochloride'
-    C1341011 'Product containing precisely propranolol' --[RO/basis_of_strength_substance_of]--> C0282321 'Propranolol hydrochloride'
-    C1344517 'Ampicillin (as ampicillin sodium) 500 mg' --[RO/basis_of_strength_substance_of]--> C0002680 'Ampicillin-containing product'
-
-  [RO / precise_active_ingredient_of]  (9,858 edges)
-    C1341104 'Product containing precisely diclofenac ' --[RO/precise_active_ingredient_of]--> C0700583 'Diclofenac sodium'
-    C1341971 'Product containing precisely pheniramine' --[RO/precise_active_ingredient_of]--> C0887016 'Pheniramine maleate'
-    C1342861 'Product containing precisely iron (as ir' --[RO/precise_active_ingredient_of]--> C0063866 'Iron sorbitol'
-
-  [RO / has_basis_of_strength_substance]  (9,858 edges)
-    C1365493 'Bemiparin sodium' --[RO/has_basis_of_strength_substance]--> C1444961 'Bemiparin sodium 22500 unit/mL solution '
-    C1365493 'Bemiparin sodium' --[RO/has_basis_of_strength_substance]--> C4758314 'Bemiparin sodium 17500 unit/mL solution '
-    C1365493 'Bemiparin sodium' --[RO/has_basis_of_strength_substance]--> C4758315 'Bemiparin sodium 25000 unit/mL solution '
-
-  [RO / has_precise_active_ingredient]  (9,858 edges)
-    C1365510 'Paroxetine mesilate' --[RO/has_precise_active_ingredient]--> C4048436 'Product containing precisely paroxetine '
-    C1367795 'Ambroxol hydrochloride' --[RO/has_precise_active_ingredient]--> C5569131 'Acetylcysteine 300 mg and ambroxol hydro'
-    C0205992 'Vancomycin hydrochloride' --[RO/has_precise_active_ingredient]--> C0980948 'Product containing precisely vancomycin '
-
-  [RO / has_direct_morphology]  (9,465 edges)
-    C0206620 'Cystic lymphangioma' --[RO/has_direct_morphology]--> C0398498 'Diathermy of cystic hygroma'
-    C0206631 'Lipomatous tumor (disorder)' --[RO/has_direct_morphology]--> C0554640 'Excision of lipoma (procedure)'
-    C0206631 'Lipomatous tumor (disorder)' --[RO/has_direct_morphology]--> C3472430 'Excision of lipoma of subcutaneous tissu'
-
-  [RO / direct_morphology_of]  (9,465 edges)
-    C0845202 'Open reduction of dislocation of carpome' --[RO/direct_morphology_of]--> C0012691 'Dislocation'
-    C0845310 'Closed reduction of fracture of clavicle' --[RO/direct_morphology_of]--> C0016658 'Fracture'
-    C0845312 'Open reduction of fracture of clavicle w' --[RO/direct_morphology_of]--> C0016658 'Fracture'
-
-  [RO / disposition_of]  (9,413 edges)
-    C1337241 'Esomeprazole sodium' --[RO/disposition_of]--> C4521480 'Hydrogen/potassium adenosine triphosphat'
-    C1384530 'Hydroperoxide dehydratase' --[RO/disposition_of]--> C4521961 'Isomerase'
-    C0205758 'Epinephrine racemic' --[RO/disposition_of]--> C4521956 'Adrenal medulla hormone'
-
-  [RO / has_disposition]  (9,413 edges)
-    C5445151 'Erythropoietin receptor agonist (disposi' --[RO/has_disposition]--> C0937950 'Darbepoetin alfa-containing product'
-    C5445167 'Melanocortin receptor agonist (dispositi' --[RO/has_disposition]--> C5424238 'Setmelanotide acetate'
-    C4520980 'Alpha-2 adrenergic receptor antagonist (' --[RO/has_disposition]--> C0304513 'Alpha-2 adrenergic receptor antagonist'
-
-  [RO / has_indirect_procedure_site]  (8,695 edges)
-    C0206250 'Autonomic nerve structure (body structur' --[RO/has_indirect_procedure_site]--> C0581273 'Neurolytic autonomic nerve block (proced'
-    C0221315 'Structure of paraurethral gland (body st' --[RO/has_indirect_procedure_site]--> C0194554 'Drainage of Skene gland cyst'
-    C0817096 'Thoracic structure' --[RO/has_indirect_procedure_site]--> C0189531 'Plombage of lung'
-
-  [RO / indirect_procedure_site_of]  (8,695 edges)
-    C0846817 'Direct capping of pulp of tooth' --[RO/indirect_procedure_site_of]--> C0011399 'Pulp of tooth'
-    C0848813 'Fitting of contact lens' --[RO/indirect_procedure_site_of]--> C0700042 'Orbital region structure'
-    C0202880 'Infusion of intra-arterial thrombolytic ' --[RO/indirect_procedure_site_of]--> C0003842 'Artery'
-
-  [RO / has_component]  (8,421 edges)
-    C1333235 'Mismatch repair endonuclease PMS2 (subst' --[RO/has_component]--> C5768774 'Presence of mismatch repair endonuclease'
-    C1333235 'Mismatch repair endonuclease PMS2 (subst' --[RO/has_component]--> C5768778 'Presence of mismatch repair endonuclease'
-    C1336737 'Thiopurine methyltransferase (substance)' --[RO/has_component]--> C3165166 'Measurement of thiopurine methyltransfer'
-
-  [RO / component_of]  (8,421 edges)
-    C0202157 'Palmitate measurement' --[RO/component_of]--> C0030234 'Palmitic acid'
-    C0202159 'PTH measurement' --[RO/component_of]--> C0030520 'Parathyroid hormone'
-    C0202162 'Parathyroid hormone measurement, functio' --[RO/component_of]--> C0030520 'Parathyroid hormone'
-
-  [RO / device_used_by]  (7,170 edges)
-    C0221536 'Encephalography' --[RO/device_used_by]--> C1260599 'Echoencephalograph'
-    C0812509 'Laparoscopic pyeloplasty' --[RO/device_used_by]--> C0023036 'Laparoscope, device'
-    C0812514 'Laparoscopic incision of ureter and remo' --[RO/device_used_by]--> C0023036 'Laparoscope, device'
-
-  [RO / uses_device]  (7,170 edges)
-    C0030163 'Cardiac pacemaker, device' --[RO/uses_device]--> C0199640 'Cardiac pacing'
-    C0030163 'Cardiac pacemaker, device' --[RO/uses_device]--> C0199642 'Induction of arrhythmia by electrical pa'
-    C0030163 'Cardiac pacemaker, device' --[RO/uses_device]--> C0199647 'Intra-atrial pacing'
-
-  [RO / presentation_strength_denominator_unit_of]  (6,620 edges)
-    C1340909 'Dipyridamole 200 mg prolonged-release or' --[RO/presentation_strength_denominator_unit_of]--> C4319574 'Capsule'
-    C1340950 'Product containing precisely hydromorpho' --[RO/presentation_strength_denominator_unit_of]--> C4319574 'Capsule'
-    C1341015 'Trandolapril 2 mg and verapamil hydrochl' --[RO/presentation_strength_denominator_unit_of]--> C4319574 'Capsule'
-
-  [RO / presentation_strength_numerator_unit_of]  (6,620 edges)
-    C1340957 'Hydromorphone hydrochloride 8 mg prolong' --[RO/presentation_strength_numerator_unit_of]--> C0439210 'milligram (qualifier value)'
-    C1341010 'Product containing precisely propranolol' --[RO/presentation_strength_numerator_unit_of]--> C0439210 'milligram (qualifier value)'
-    C1341011 'Product containing precisely propranolol' --[RO/presentation_strength_numerator_unit_of]--> C0439210 'milligram (qualifier value)'
-
-  [RO / has_presentation_strength_numerator_unit]  (6,620 edges)
-    C1306898 'MU' --[RO/has_presentation_strength_numerator_unit]--> C4708741 'Lenograstim 13.4 million unit powder for'
-    C0560040 'kBq' --[RO/has_presentation_strength_numerator_unit]--> C0361319 'Cobalt-57 18.5 kBq oral capsule'
-    C0439148 'Units' --[RO/has_presentation_strength_numerator_unit]--> C0355794 'AbobotulinumtoxinA 500 unit powder for s'
-
-  [RO / has_presentation_strength_denominator_unit]  (6,620 edges)
-    C4318418 'Stick (unit of presentation)' --[RO/has_presentation_strength_denominator_unit]--> C0974166 'Alprostadil 250 microgram urethral stick'
-    C4318427 'System' --[RO/has_presentation_strength_denominator_unit]--> C4290719 'Product containing precisely levonorgest'
-    C4319574 'Capsule' --[RO/has_presentation_strength_denominator_unit]--> C0353775 'Sodium bicarbonate 500 mg oral capsule'
-
-  [RO / clinical_course_of]  (6,267 edges)
-    C0221053 'Acute berylliosis' --[RO/clinical_course_of]--> C1828128 'Sudden onset AND/OR short duration'
-    C0221154 'Paroxysmal hypertension' --[RO/clinical_course_of]--> C1828128 'Sudden onset AND/OR short duration'
-    C0839111 'Calcific tendinitis of hand' --[RO/clinical_course_of]--> C1828128 'Sudden onset AND/OR short duration'
-
-  [RO / has_clinical_course]  (6,267 edges)
-    C0205191 'Chronic' --[RO/has_clinical_course]--> C0009088 'Cluster headache'
-    C0205191 'Chronic' --[RO/has_clinical_course]--> C0017155 'Hypertrophic gastritis'
-    C0205191 'Chronic' --[RO/has_clinical_course]--> C0017665 'MGN - Membranous glomerulonephritis'
-
-  [RO / unit_of_presentation_of]  (5,524 edges)
-    C1339690 'Thiocolchicoside 4 mg oral capsule' --[RO/unit_of_presentation_of]--> C4319574 'Capsule'
-    C1340951 'Product containing precisely hydromorpho' --[RO/unit_of_presentation_of]--> C4319574 'Capsule'
-    C1341017 'Product containing precisely isosorbide ' --[RO/unit_of_presentation_of]--> C4319574 'Capsule'
-
-  [RO / has_unit_of_presentation]  (5,524 edges)
-    C4318418 'Stick (unit of presentation)' --[RO/has_unit_of_presentation]--> C0974166 'Alprostadil 250 microgram urethral stick'
-    C4318427 'System' --[RO/has_unit_of_presentation]--> C5761725 'Dinoprostone 10 mg prolonged-release vag'
-    C4319574 'Capsule' --[RO/has_unit_of_presentation]--> C0353544 'Ketoprofen 150 mg prolonged-release oral'
-
-  [RO / has_subject_relationship_context]  (5,496 edges)
-    C0030551 'Parent of' --[RO/has_subject_relationship_context]--> C0418950 'Providing reassurance to parent'
-    C0030551 'Parent of' --[RO/has_subject_relationship_context]--> C0559476 'Parent unemployed'
-    C0030551 'Parent of' --[RO/has_subject_relationship_context]--> C4039308 'Abuse counselling for non-offending pare'
-
-  [RO / subject_relationship_context_of]  (5,496 edges)
-    C1319340 'Echocardiogram declined' --[RO/subject_relationship_context_of]--> C1444713 'Subject of record'
-    C1319479 'No unmet drug need identified' --[RO/subject_relationship_context_of]--> C1444713 'Subject of record'
-    C1319811 'Disorder of nervous system suspected' --[RO/subject_relationship_context_of]--> C1444713 'Subject of record'
-
-  [RO / temporal_context_of]  (5,467 edges)
-    C0221550 'Ineffective community coping' --[RO/temporal_context_of]--> C1444635 'Current or past'
-    C0221614 'FH: Rheumatoid arthritis' --[RO/temporal_context_of]--> C1444635 'Current or past'
-    C1319325 'Exercise tolerance test declined' --[RO/temporal_context_of]--> C1444635 'Current or past'
-
-  [RO / has_temporal_context]  (5,467 edges)
-    C1444636 'Current or specified' --[RO/has_temporal_context]--> C0577815 'Pericardial friction rub absent'
-    C1444636 'Current or specified' --[RO/has_temporal_context]--> C0580723 'Tonsillectomy planned'
-    C1444636 'Current or specified' --[RO/has_temporal_context]--> C0580725 'Varicose vein operation planned'
-
-  [RO / has_focus]  (5,450 edges)
-    C1384495 'Cardiovascular stress testing (procedure' --[RO/has_focus]--> C2314961 'MRI stress study of heart'
-    C0221074 'Postpartum depression' --[RO/has_focus]--> C3494640 'Maternal postpartum depression screening'
-    C0221074 'Postpartum depression' --[RO/has_focus]--> C3697613 'Discussion about postnatal depression'
-
-  [RO / focus_of]  (5,450 edges)
-    C0206075 'Haemodiafiltration' --[RO/focus_of]--> C0035078 'Renal failure syndrome (disorder)'
-    C0206216 'Management of safety' --[RO/focus_of]--> C4040277 'Implementation of safety regime'
-    C0845017 'Lip adhesion of bilateral cleft lips' --[RO/focus_of]--> C0392005 'Bilateral cleft lip'
-
-  [RO / direct_device_of]  (5,278 edges)
-    C0812481 'Implantation of patient-activated cardia' --[RO/direct_device_of]--> C2051658 'Patient-activated electrocardiographic m'
-    C0203024 'Insertion of inferior vena caval filter' --[RO/direct_device_of]--> C0080306 'Vena cava filter'
-    C0203024 'Insertion of inferior vena caval filter' --[RO/direct_device_of]--> C0080306 'Vena cava filter'
-
-  [RO / has_direct_device]  (5,278 edges)
-    C0850458 'Carotid artery stent' --[RO/has_direct_device]--> C4076386 'Fluoroscopy guided percutaneous translum'
-    C0029331 'Orthodontic appliance' --[RO/has_direct_device]--> C0399160 'Adjust acrylic component of orthodontic '
-    C0029331 'Orthodontic appliance' --[RO/has_direct_device]--> C0559725 'Adjust orthodontic appliance'
-
-  [RO / has_direct_substance]  (4,258 edges)
-    C0220806 'Chemical' --[RO/has_direct_substance]--> C0394936 'Thoracic chemical sympathectomy'
-    C0220806 'Chemical' --[RO/has_direct_substance]--> C0394937 'Lumbar chemical sympathectomy'
-    C0028959 'Oligosaccharide (substance)' --[RO/has_direct_substance]--> C5768809 'Fermentable oligosaccharide, disaccharid'
-
-  [RO / direct_substance_of]  (4,258 edges)
-    C0203621 'Radionuclide therapy for hyperthyroidism' --[RO/direct_substance_of]--> C0034595 'Radioisotope'
-    C0204176 'Topical application of fluoride includin' --[RO/direct_substance_of]--> C0016327 'Fluoride-containing product'
-    C0204225 'Amalgam restoration, four or more surfac' --[RO/direct_substance_of]--> C0011324 'Dental amalgam'
-
-  [RO / uses_substance]  (4,122 edges)
-    C0205733 'Deuteron' --[RO/uses_substance]--> C0436227 'Deuteron therapy'
-    C0211492 'Technetium (99m-Tc) tetrofosmin (substan' --[RO/uses_substance]--> C2733281 'Single photon emission computed tomograp'
-    C0220806 'Chemical' --[RO/uses_substance]--> C2711471 'Percutaneous transluminal ablation of se'
-
-  [RO / substance_used_by]  (4,122 edges)
-    C0202824 'Computerised axial tomography of thorax ' --[RO/substance_used_by]--> C0009924 'Contrast media'
-    C0203018 'Fluoroscopy guided percutaneous translum' --[RO/substance_used_by]--> C0009924 'Contrast media'
-    C0203075 'Barium enema' --[RO/substance_used_by]--> C0009924 'Contrast media'
-
-  [RO / occurs_before]  (3,437 edges)
-    C1367166 'Traumatic subdural intracranial haemorrh' --[RO/occurs_before]--> C4751223 'Traumatic event'
-    C1368022 'Pulmonary insufficiency following surger' --[RO/occurs_before]--> C4751223 'Traumatic event'
-    C1319200 'Postoperative confusion (disorder)' --[RO/occurs_before]--> C0543467 'Surgical procedure (procedure)'
-
-  [RO / occurs_after]  (3,437 edges)
-    C0203024 'Insertion of inferior vena caval filter' --[RO/occurs_after]--> C5768078 'Malposition of inferior vena cava filter'
-    C0203608 'Internal metabolic radiotherapy' --[RO/occurs_after]--> C0342168 'Hypothyroidism following radioiodine the'
-    C0029002 'Ocular onchocerciasis' --[RO/occurs_after]--> C5688813 'Glaucoma following ocular onchocerciasis'
-
-  [RO / intent_of]  (3,334 edges)
-    C0202399 'Lead screening, blood' --[RO/intent_of]--> C1305399 'Screening intent'
-    C0202664 'CT guided localisation' --[RO/intent_of]--> C2316380 'Guidance intent'
-    C0202882 'Infusion of intra-arterial thrombolytic ' --[RO/intent_of]--> C2316380 'Guidance intent'
-
-  [RO / has_intent]  (3,334 edges)
-    C1456501 'Preventive - procedure intent (qualifier' --[RO/has_intent]--> C0026581 'Control of mosquitoes'
-    C1456501 'Preventive - procedure intent (qualifier' --[RO/has_intent]--> C0150171 'Circulatory precautions'
-    C1456501 'Preventive - procedure intent (qualifier' --[RO/has_intent]--> C0150357 'Subarachnoid hemorrhage precautions'
-
-  [RO / concentration_strength_denominator_unit_of]  (3,238 edges)
-    C1341971 'Product containing precisely pheniramine' --[RO/concentration_strength_denominator_unit_of]--> C0439242 'Milliliter'
-    C1344946 'Terbinafine (as terbinafine hydrochlorid' --[RO/concentration_strength_denominator_unit_of]--> C0439208 'gram'
-    C1347065 'Product containing precisely halometason' --[RO/concentration_strength_denominator_unit_of]--> C0439208 'gram'
-
-  [RO / concentration_strength_numerator_unit_of]  (3,238 edges)
-    C1345946 'Product containing precisely prednisolon' --[RO/concentration_strength_numerator_unit_of]--> C0439210 'milligram (qualifier value)'
-    C1348018 'Product containing precisely miconazole ' --[RO/concentration_strength_numerator_unit_of]--> C0439210 'milligram (qualifier value)'
-    C1348018 'Product containing precisely miconazole ' --[RO/concentration_strength_numerator_unit_of]--> C0439210 'milligram (qualifier value)'
-
-  [RO / has_concentration_strength_numerator_unit]  (3,238 edges)
-    C1306898 'MU' --[RO/has_concentration_strength_numerator_unit]--> C1589847 'Product containing precisely interferon '
-    C0439148 'Units' --[RO/has_concentration_strength_numerator_unit]--> C0777393 'Epoetin alfa 10000 unit/mL solution for '
-    C0439148 'Units' --[RO/has_concentration_strength_numerator_unit]--> C0788621 'Human isophane insulin 60 unit/mL and re'
-
-  [RO / has_concentration_strength_denominator_unit]  (3,238 edges)
-    C0439210 'milligram (qualifier value)' --[RO/has_concentration_strength_denominator_unit]--> C0979077 'Product containing precisely nystatin 10'
-    C0439227 'hour' --[RO/has_concentration_strength_denominator_unit]--> C1168699 'Product containing precisely ethinylestr'
-    C0439227 'hour' --[RO/has_concentration_strength_denominator_unit]--> C1321187 'Product containing precisely estradiol 1'
-
-  [RO / has_procedure_site]  (3,097 edges)
-    C0206417 'Peripheral nervous system' --[RO/has_procedure_site]--> C0430804 'Peripheral neurophysiological procedures'
-    C0206417 'Peripheral nervous system' --[RO/has_procedure_site]--> C0430815 'Surface electromyography'
-    C0206417 'Peripheral nervous system' --[RO/has_procedure_site]--> C0430829 'Sacral reflex studies'
-
-  [RO / procedure_site_of]  (3,097 edges)
-    C0203071 'Gastric transit study' --[RO/procedure_site_of]--> C0017189 'Gastrointestinal tract structure (body s'
-    C0204051 'Manual testing of muscle function' --[RO/procedure_site_of]--> C0027763 'Structure of nervous system'
-    C0204056 'Electrical muscle-testing' --[RO/procedure_site_of]--> C0027763 'Structure of nervous system'
-
-  [RO / associated_with]  (3,080 edges)
-    C0205882 'Parvovirus infection' --[RO/associated_with]--> C0456093 'Parvo virus arthritis'
-    C0206238 'Artificial skin, device' --[RO/associated_with]--> C2585606 'Complication of artificial skin graft an'
-    C0220806 'Chemical' --[RO/associated_with]--> C4510510 'Exposure to potentially hazardous chemic'
-
-  [RO / specimen_of]  (3,079 edges)
-    C0202151 'Osmolality measurement, serum (procedure' --[RO/specimen_of]--> C1550100 'Serum sample'
-    C0202173 'Phosphatidylglycerol measurement, semi-q' --[RO/specimen_of]--> C1292529 'Amniotic fluid specimen'
-    C0202176 'Phosphofructokinase measurement, erythro' --[RO/specimen_of]--> C0444265 'Erythrocyte specimen'
-
-  [RO / has_specimen]  (3,079 edges)
-    C1608383 'Whole blood specimen' --[RO/has_specimen]--> C1273371 'Whole blood pyruvate level'
-    C1610733 'Urine specimen (specimen)' --[RO/has_specimen]--> C0042014 'Urinalysis'
-    C1610733 'Urine specimen (specimen)' --[RO/has_specimen]--> C0201844 'Aldosterone measurement, urine'
-
-  [RO / has_finding_context]  (2,784 edges)
-    C0205309 'Known (qualifier value)' --[RO/has_finding_context]--> C4722037 'Caregiver unable to cope'
-    C0205309 'Known (qualifier value)' --[RO/has_finding_context]--> C5817407 'Caregiver able to administer subcutaneou'
-    C0205309 'Known (qualifier value)' --[RO/has_finding_context]--> C5924858 'Has contact with poultry bird'
-
-  [RO / finding_context_of]  (2,784 edges)
-    C1318616 'H/O: recreational drug use' --[RO/finding_context_of]--> C1444639 'Known present'
-    C1319471 'Down syndrome suspected' --[RO/finding_context_of]--> C0750491 'Suspected'
-    C1319801 'Born by breech delivery' --[RO/finding_context_of]--> C1444639 'Known present'
-
-  [RO / has_associated_finding]  (2,725 edges)
-    C1336708 'Germ cell tumor of testis' --[RO/has_associated_finding]--> C4075936 'History of malignant germ cell neoplasm '
-    C0205748 'Dysplastic naevus' --[RO/has_associated_finding]--> C3266788 'History of atypical nevus'
-    C0205851 'Germ cell tumour' --[RO/has_associated_finding]--> C4038766 'History of germ cell tumor'
-
-  [RO / associated_finding_of]  (2,725 edges)
-    C0221550 'Ineffective community coping' --[RO/associated_finding_of]--> C0582154 'Difficulty coping'
-    C0221613 'FH: Gout' --[RO/associated_finding_of]--> C0018099 'Gout'
-    C1319811 'Disorder of nervous system suspected' --[RO/associated_finding_of]--> C0027765 'Disorder of nervous system'
-
-  [RO / has_associated_procedure]  (2,702 edges)
-    C0202930 'Renal arteriography' --[RO/has_associated_procedure]--> C0436420 'Renal arteriogram requested'
-    C0204924 'Disease process or condition education' --[RO/has_associated_procedure]--> C4040463 'Family education about disease'
-    C0204957 'Wound treatment education' --[RO/has_associated_procedure]--> C3662773 'Educated about wound care'
-
-  [RO / associated_procedure_of]  (2,702 edges)
-    C1319527 'Diabetic foot examination not indicated' --[RO/associated_procedure_of]--> C1303165 'Diabetic foot examination'
-    C1320630 'Plastic bindings placed for legal restra' --[RO/associated_procedure_of]--> C1320629 'Placing plastic bindings for legal restr'
-    C1320647 'History of percutaneous coronary interve' --[RO/associated_procedure_of]--> C5970187 'Percutaneous transluminal coronary inter'
-
-  [RO / procedure_context_of]  (2,662 edges)
-    C1318598 'Drug treatment no longer needed' --[RO/procedure_context_of]--> C1444645 'Post-starting action status'
-    C1319333 'Primary health care team falls assessmen' --[RO/procedure_context_of]--> C1705116 'Refused'
-    C1319346 'Carotid artery Doppler declined' --[RO/procedure_context_of]--> C1705116 'Refused'
-
-  [RO / has_procedure_context]  (2,662 edges)
-    C1444645 'Post-starting action status' --[RO/has_procedure_context]--> C0522770 'Failed attempted procedure'
-    C1444645 'Post-starting action status' --[RO/has_procedure_context]--> C1301914 'Failed regional anaesthesia'
-    C1444645 'Post-starting action status' --[RO/has_procedure_context]--> C2317181 'Failed instrumental delivery'
-
-  [RO / finding_method_of]  (2,517 edges)
-    C0206275 'Widow' --[RO/finding_method_of]--> C0199182 'History taking, health'
-    C0217846 'Social migrant' --[RO/finding_method_of]--> C0199182 'History taking, health'
-    C0221755 'Abdominal bruit' --[RO/finding_method_of]--> C0004339 'Auscultation - action'
-
-  [RO / has_finding_method]  (2,517 edges)
-    C0030247 'Palpation - action (qualifier value)' --[RO/has_finding_method]--> C0151206 'Scalp tenderness'
-    C0030247 'Palpation - action (qualifier value)' --[RO/has_finding_method]--> C0231893 'Pleural friction fremitus'
-    C0030247 'Palpation - action (qualifier value)' --[RO/has_finding_method]--> C0231894 'Tussive fremitus'
-
-  [RO / has_modification]  (2,404 edges)
-    C0205808 'Ioxaglate sodium' --[RO/has_modification]--> C0022041 'Ioxaglic acid'
-    C0205881 'Paromomycin sulphate' --[RO/has_modification]--> C0030576 'Product containing paromomycin (medicina'
-    C0209453 'Gadobenate dimeglumine' --[RO/has_modification]--> C0246154 'Gadobenic acid'
-
-  [RO / is_modification_of]  (2,404 edges)
-    C0209210 'Dolasetron' --[RO/is_modification_of]--> C0065818 'Dolasetron mesylate'
-    C0216278 'Product containing tinzaparin (medicinal' --[RO/is_modification_of]--> C0354599 'Tinzaparin sodium'
-    C0028902 'Ofloxacin-containing product' --[RO/is_modification_of]--> C0771051 'Ofloxacin hydrochloride'
-
-  [SY / same_as]  (2,238 edges)
-    C1334603 'Mesodermal mixed tumor' --[SY/same_as]--> C0007140 'Carcinosarcoma'
-    C1337073 'Peripheral T-cell lymphoma pleomorphic s' --[SY/same_as]--> C0079774 'Peripheral T-cell lymphoma'
-    C1384489 'Scratch mark' --[SY/same_as]--> C0238909 'Cat scratch'
-
-  [RO / access_of]  (2,050 edges)
-    C0812489 'Open arteriovenous anastomosis by transp' --[RO/access_of]--> C0348025 'Open surgery'
-    C0202882 'Infusion of intra-arterial thrombolytic ' --[RO/access_of]--> C0522523 'Percutaneous'
-    C0202888 'Percutaneous transluminal renal artery b' --[RO/access_of]--> C0522523 'Percutaneous'
-
-  [RO / has_access]  (2,050 edges)
-    C0677512 'Closed approach - access' --[RO/has_access]--> C0190074 'Closed heart valvotomy of pulmonary valv'
-    C0677512 'Closed approach - access' --[RO/has_access]--> C0204809 'Closed chest suction'
-    C0677512 'Closed approach - access' --[RO/has_access]--> C0392832 'Closed tricuspid commissurotomy'
-
-  [RO / property_of]  (2,046 edges)
-    C0205603 'Breslow depth staging for melanoma of sk' --[RO/property_of]--> C0205125 'Depth (attribute)'
-    C0203922 'Measurement of limb length' --[RO/property_of]--> C1444754 'Lengths'
-    C1319740 'Thrombin time ratio' --[RO/property_of]--> C0456603 'RATIO'
-
-  [RO / has_property]  (2,046 edges)
-    C0205125 'Depth (attribute)' --[RO/has_property]--> C5568360 'Depth of direct invasion by primary mali'
-    C5545335 'Histologic grade' --[RO/has_property]--> C1273606 'Gleason pattern'
-    C5545335 'Histologic grade' --[RO/has_property]--> C1302574 'Histologic grade of intraepithelial neop'
-
-  [RN / refers_to]  (1,797 edges)
-    C1334642 'Adenocarcinoma of maxillary sinus' --[RN/refers_to]--> C3854175 'Primary adenocarcinoma of maxillary sinu'
-    C1335336 'Adenocarcinoma of accessory sinus' --[RN/refers_to]--> C3854174 'Primary adenocarcinoma of accessory sinu'
-    C1368669 'Benign neoplasm of adrenal cortex (disor' --[RN/refers_to]--> C0001618 'Neoplasm of adrenal cortex'
-
-  [RB / referred_to_by]  (1,797 edges)
-    C0206141 'Idiopathic hypereosinophilic syndrome' --[RB/referred_to_by]--> C1540912 'HES - hypereosinophilic syndrome'
-    C0206141 'Idiopathic hypereosinophilic syndrome' --[RB/referred_to_by]--> C1540912 'HES - hypereosinophilic syndrome'
-    C0206733 'Strawberry naevus of skin' --[RB/referred_to_by]--> C5441573 'Naevus sanguineous'
-
-  [RO / has_realization]  (1,686 edges)
-    C1320716 'Cardiovascular event' --[RO/has_realization]--> C1273410 'At increased risk for cardiovascular eve'
-    C1320716 'Cardiovascular event' --[RO/has_realization]--> C1443393 'At increased risk for acute ischaemic ca'
-    C1635035 'Mumps exposure' --[RO/has_realization]--> C5767766 'At increased risk of exposure to Mumps v'
-
-  [RO / realization_of]  (1,686 edges)
-    C1628514 'Allergy to shrimp' --[RO/realization_of]--> C3532483 'Allergic process'
-    C1630645 'Allergy to red meat' --[RO/realization_of]--> C3532483 'Allergic process'
-    C1638314 'Allergy to coconut oil' --[RO/realization_of]--> C3532483 'Allergic process'
-
-  [RO / characterized_by]  (1,556 edges)
-    C1319894 'Sitting diastolic blood pressure' --[RO/characterized_by]--> C4283748 'Diastole'
-    C1319895 'Lying systolic blood pressure' --[RO/characterized_by]--> C4284018 'Systolic phase (qualifier value)'
-    C1997188 'Posterior tibial pulse rate' --[RO/characterized_by]--> C2256369 'Heart beating process'
-
-  [RO / characterizes]  (1,556 edges)
-    C5548424 'Discontinuous metastatic spread' --[RO/characterizes]--> C5767285 'Presence of metastatic discontinuous spr'
-    C5548424 'Discontinuous metastatic spread' --[RO/characterizes]--> C5787627 'Number of metastatic discontinuous tumou'
-    C5548424 'Discontinuous metastatic spread' --[RO/characterizes]--> C5852805 'Relative location of involved inguinal l'
-
-  [RO / moved_from]  (1,541 edges)
-    C1368683 'Epithelial neoplasm (morphologic abnorma' --[RO/moved_from]--> C1299996 'Extension Namespace {1000000}'
-    C1384494 'Carcinoma, metastatic' --[RO/moved_from]--> C1299996 'Extension Namespace {1000000}'
-    C0205650 'Papillary adenoma' --[RO/moved_from]--> C1299996 'Extension Namespace {1000000}'
-
-  [RO / moved_to]  (1,541 edges)
-    C1299996 'Extension Namespace {1000000}' --[RO/moved_to]--> C0000737 'Abdominal pain'
-    C1299996 'Extension Namespace {1000000}' --[RO/moved_to]--> C0000737 'Abdominal pain'
-    C1299996 'Extension Namespace {1000000}' --[RO/moved_to]--> C0001430 'Benign adenoma (disorder)'
-
-  [RO / inheres_in]  (1,520 edges)
-    C1384494 'Carcinoma, metastatic' --[RO/inheres_in]--> C5548426 'Presence of direct invasion by metastati'
-    C0029235 'Organism' --[RO/inheres_in]--> C5879459 'Identification of organism in respirator'
-    C0029235 'Organism' --[RO/inheres_in]--> C5880289 'Identification of organism in wet smear '
-
-  [RO / has_inherent_attribute]  (1,520 edges)
-    C1319895 'Lying systolic blood pressure' --[RO/has_inherent_attribute]--> C0007226 'Structure of cardiovascular system'
-    C1321208 'Tumor size, right ovary' --[RO/has_inherent_attribute]--> C0027651 'Neoplasm (morphologic abnormality)'
-    C1321211 'Tumour nodule size, additional dimension' --[RO/has_inherent_attribute]--> C0027651 'Neoplasm (morphologic abnormality)'
-
-  [RO / has_surgical_approach]  (1,486 edges)
-    C0205496 'Abdominal approach' --[RO/has_surgical_approach]--> C0191060 'Direct thrombectomy of iliac vein by abd'
-    C0205496 'Abdominal approach' --[RO/has_surgical_approach]--> C0191061 'Direct thrombectomy of vena cava by abdo'
-    C0205496 'Abdominal approach' --[RO/has_surgical_approach]--> C0191066 'Thrombectomy with catheter of iliac vein'
-
-  [RO / surgical_approach_of]  (1,486 edges)
-    C1319074 'Excision of cervical rib by transaxillar' --[RO/surgical_approach_of]--> C0442341 'Transaxillary approach'
-    C1320890 'Fluoroscopy guided percutaneous translum' --[RO/surgical_approach_of]--> C0522520 'Transluminal approach (qualifier value)'
-    C1320943 'Division of scalenus anterior muscle by ' --[RO/surgical_approach_of]--> C0589496 'Supraclavicular approach'
-
-  [RO / has_specimen_source_topography]  (1,454 edges)
-    C0029939 'Ovarian structure (body structure)' --[RO/has_specimen_source_topography]--> C0586787 'Tissue specimen from ovary'
-    C0029939 'Ovarian structure (body structure)' --[RO/has_specimen_source_topography]--> C4707439 'Hysterectomy and left salpingo-oophorect'
-    C0030274 'Pancreas' --[RO/has_specimen_source_topography]--> C1301003 'Specimen from pancreas obtained by pylor'
-
-  [RO / specimen_source_topography_of]  (1,454 edges)
-    C1629510 'Oral swab' --[RO/specimen_source_topography_of]--> C0226896 'Oral cavity structure'
-    C1444693 'Respiratory fluid specimen' --[RO/specimen_source_topography_of]--> C0282335 'Respiratory tract'
-    C1827141 'Specimen from appendix and colon obtaine' --[RO/specimen_source_topography_of]--> C0009368 'Colon structure'
-
-  [RO / has_scale_type]  (1,418 edges)
-    C0205556 'Qualitative value' --[RO/has_scale_type]--> C0201661 'Rheumatoid factor, qualitative (procedur'
-    C0205556 'Qualitative value' --[RO/has_scale_type]--> C0201714 'Immunodiffusion, qualitative'
-    C0205556 'Qualitative value' --[RO/has_scale_type]--> C0201715 'Immunodiffusion, qualitative by Ouchterl'
-
-  [RO / scale_type_of]  (1,418 edges)
-    C0202302 'Acetylsalicylic acid measurement, quanti' --[RO/scale_type_of]--> C0392762 'Quantitative value (qualifier value)'
-    C0202512 'Urinalysis, protein, qualitative' --[RO/scale_type_of]--> C0205556 'Qualitative value'
-    C0202524 'Melanin measurement, urine, qualitative' --[RO/scale_type_of]--> C0205556 'Qualitative value'
-
-  [RO / revision_status_of]  (1,244 edges)
-    C1320848 'Revision of abdominal vascular prosthesi' --[RO/revision_status_of]--> C0439617 'Redo'
-    C1320848 'Revision of abdominal vascular prosthesi' --[RO/revision_status_of]--> C0439617 'Redo'
-    C1320851 'Revision of upper limb vascular prosthes' --[RO/revision_status_of]--> C0439617 'Redo'
-
-  [RO / has_revision_status]  (1,244 edges)
-    C0439617 'Redo' --[RO/has_revision_status]--> C0161869 'Revision of stapedectomy'
-    C0439617 'Redo' --[RO/has_revision_status]--> C0185036 'Surgical repair and revision of shunt'
-    C0439617 'Redo' --[RO/has_revision_status]--> C0185316 'Revision of internal fixation device, br'
-
-  [RO / access_device_used_by]  (1,231 edges)
-    C1997193 'Insertion of endotracheal tube using lar' --[RO/access_device_used_by]--> C0180453 'Laryngoscope'
-    C1997744 'Ureteroscopic endoluminal rupture of ste' --[RO/access_device_used_by]--> C0184213 'Ureteroscope'
-    C0729702 'Temporary percutaneous endoscopic gastro' --[RO/access_device_used_by]--> C0181020 'Gastroscope'
-
-  [RO / uses_access_device]  (1,231 edges)
-    C0014243 'Endoscope' --[RO/uses_access_device]--> C0008310 'Endoscopic retrograde cholangiopancreato'
-    C0014243 'Endoscope' --[RO/uses_access_device]--> C0008310 'Endoscopic retrograde cholangiopancreato'
-    C0014243 'Endoscope' --[RO/uses_access_device]--> C0184978 'Endoscopy and cryocautery'
-
-  [RO / time_aspect_of]  (1,097 edges)
-    C5545336 'Presence of direct invasion by primary m' --[RO/time_aspect_of]--> C1292424 'Single point in time'
-    C5546835 'Histologic type of primary malignant neo' --[RO/time_aspect_of]--> C1292424 'Single point in time'
-    C5546848 'Histologic type of primary malignant neo' --[RO/time_aspect_of]--> C1292424 'Single point in time'
-
-  [RO / has_time_aspect]  (1,097 edges)
-    C1292424 'Single point in time' --[RO/has_time_aspect]--> C0200345 'Specimen collection'
-    C1292424 'Single point in time' --[RO/has_time_aspect]--> C0455829 'Waist circumference'
-    C1292424 'Single point in time' --[RO/has_time_aspect]--> C1268948 'Status of periprostatic fat invasion by '
-
-  [RO / has_specimen_substance]  (1,088 edges)
-    C0030296 'Pancreatic fluid' --[RO/has_specimen_substance]--> C0444147 'Pancreatic fluid specimen'
-    C1531612 'Body tissue material' --[RO/has_specimen_substance]--> C0444063 'Abscess tissue'
-    C1531612 'Body tissue material' --[RO/has_specimen_substance]--> C0444071 'Burn tissue'
-
-  [RO / specimen_substance_of]  (1,088 edges)
-    C1608383 'Whole blood specimen' --[RO/specimen_substance_of]--> C0370231 'Whole blood'
-    C1611838 'Lacrimal fluid specimen (specimen)' --[RO/specimen_substance_of]--> C0039409 'Tears (substance)'
-    C1828398 'Specimen from appendix and right colon o' --[RO/specimen_substance_of]--> C1531612 'Body tissue material'
-
-  [RO / has_specimen_procedure]  (1,027 edges)
-    C0029936 'Oophorectomy (procedure)' --[RO/has_specimen_procedure]--> C1292652 'Specimen from ovary obtained by hysterec'
-    C0728940 'Surgical removal - action (qualifier val' --[RO/has_specimen_procedure]--> C1960741 'Specimen obtained by wide resection'
-    C0728940 'Surgical removal - action (qualifier val' --[RO/has_specimen_procedure]--> C2584568 'Tissue specimen obtained by excision'
-
-  [RO / specimen_procedure_of]  (1,027 edges)
-    C1320611 'Specimen obtained by radical excision' --[RO/specimen_procedure_of]--> C0184918 'Radical excision'
-    C1827141 'Specimen from appendix and colon obtaine' --[RO/specimen_procedure_of]--> C0003611 'Excision of appendix'
-    C1828398 'Specimen from appendix and right colon o' --[RO/specimen_procedure_of]--> C0003611 'Excision of appendix'
-
-  [RO / replaces]  (957 edges)
-    C1363843 'Changes in retinal vascular appearance' --[RO/replaces]--> C0154833 'Retinal vascular disorder'
-    C0029076 'Ophthalmia neonatorum' --[RO/replaces]--> C0456113 'Neonatal bacterial conjunctivitis'
-    C1331543 'Postpartum fever' --[RO/replaces]--> C0269936 'Postpartum sepsis'
-
-  [RO / replaced_by]  (957 edges)
-    C0206558 'Simplexvirus' --[RO/replaced_by]--> C0206679 'HSV 1 - Herpes simplex virus 1'
-    C0206706 'Verrucous carcinoma' --[RO/replaced_by]--> C0276264 'Anogenital verrucous carcinoma of Buschk'
-    C0202533 'Semen analysis' --[RO/replaced_by]--> C1412038 'Semen examination - general'
-
-  [RO / uses_energy]  (942 edges)
-    C0851346 'Rays' --[RO/uses_energy]--> C0203520 'Radiation therapy isodose plan, wedge fi'
-    C0851346 'Rays' --[RO/uses_energy]--> C1520143 'Whole brain radiation therapy'
-    C0851346 'Rays' --[RO/uses_energy]--> C5546632 'Radiation therapy following chemotherapy'
-
-  [RO / energy_used_by]  (942 edges)
-    C0203616 'Intra-articular radionuclide therapy' --[RO/energy_used_by]--> C0034538 'Ionising radiation'
-    C0204027 'Short wave diathermy' --[RO/energy_used_by]--> C0564462 'Short wave radiation'
-    C1320959 'Diathermy of vein' --[RO/energy_used_by]--> C0013790 'Electric current'
-
-  [RO / has_device_intended_site]  (861 edges)
-    C0206417 'Peripheral nervous system' --[RO/has_device_intended_site]--> C3874065 'Transcutaneous electrical neural stimula'
-    C0206417 'Peripheral nervous system' --[RO/has_device_intended_site]--> C3875686 'Trigeminal nerve electrical stimulator'
-    C0206417 'Peripheral nervous system' --[RO/has_device_intended_site]--> C3875850 'Implantable sleep apnoea treatment syste'
-
-  [RO / device_intended_site_of]  (861 edges)
-    C0850458 'Carotid artery stent' --[RO/device_intended_site_of]--> C0007272 'Carotid artery'
-    C3203751 'Nasogastric decompression tube' --[RO/device_intended_site_of]--> C0017189 'Gastrointestinal tract structure (body s'
-    C5545432 'Vascular embolisation coil detacher' --[RO/device_intended_site_of]--> C0007226 'Structure of cardiovascular system'
-
-  [RN / was_a]  (857 edges)
-    C0205990 'Vaginal wall prolapse' --[RN/was_a]--> C0404540 'Vaginal wall prolapse without uterine pr'
-    C0029408 'Osteoarthrosis' --[RN/was_a]--> C0409929 'Osteoarthritis of toe joint'
-    C0029408 'Osteoarthrosis' --[RN/was_a]--> C0409931 'Osteoarthritis of ankle'
-
-  [RB / inverse_was_a]  (857 edges)
-    C0030489 'Paraproteinaemia' --[RB/inverse_was_a]--> C1136085 'Monoclonal paraproteinemia'
-    C1997307 'Infective arthritis of joint of hand' --[RB/inverse_was_a]--> C0003869 'Pyogenic arthritis'
-    C0001169 'Acquired coagulation factor deficiency' --[RB/inverse_was_a]--> C0398622 'Acquired coagulation disorder'
-
-  [RO / has_inherent_location]  (790 edges)
-    C0206187 'Extrahepatic bile duct' --[RO/has_inherent_location]--> C1300753 'Presence of neoplasm at surgical margin '
-    C0206187 'Extrahepatic bile duct' --[RO/has_inherent_location]--> C5566054 'Surgical margin involved by primary mali'
-    C0206187 'Extrahepatic bile duct' --[RO/has_inherent_location]--> C5566094 'Presence of primary malignant neoplasm o'
-
-  [RO / inherent_location_of]  (790 edges)
-    C1321268 'Presence of neoplasm at mesenteric surgi' --[RO/inherent_location_of]--> C0025483 'Structure of large intestine mesentery ('
-    C5545340 'Nottingham glandular differentiation sco' --[RO/inherent_location_of]--> C0006141 'Breast'
-    C5546820 'Anatomic location directly invaded macro' --[RO/inherent_location_of]--> C0006141 'Breast'
-
-  [RO / technique_of]  (642 edges)
-    C3203027 'Gleason grade score' --[RO/technique_of]--> C5545342 'Gleason scoring system for malignant neo'
-    C5545339 'Gleason pattern of primary malignant neo' --[RO/technique_of]--> C0332326 'Gleason grading system for prostatic can'
-    C5545340 'Nottingham glandular differentiation sco' --[RO/technique_of]--> C3164683 'Nottingham histologic grading system'
-
-  [RO / has_technique]  (642 edges)
-    C5547834 'World Health Organization classification' --[RO/has_technique]--> C5852804 'Histologic grade of primary malignant ne'
-    C5549821 'United States household food security su' --[RO/has_technique]--> C5549819 'United States household food security su'
-    C2700446 'Self reported' --[RO/has_technique]--> C5566482 'Self reported systolic blood pressure'
-
-  [RO / has_indirect_morphology]  (611 edges)
-    C0206620 'Cystic lymphangioma' --[RO/has_indirect_morphology]--> C0398497 'Aspiration of cystic hygroma'
-    C0206620 'Cystic lymphangioma' --[RO/has_indirect_morphology]--> C0398501 'Incision and drainage of cystic hygroma'
-    C0221198 'Lesion' --[RO/has_indirect_morphology]--> C0400491 'Endoscopic retrograde drainage of lesion'
-
-  [RO / indirect_morphology_of]  (611 edges)
-    C0204331 'Drainage of cyst of dentoalveolar struct' --[RO/indirect_morphology_of]--> C0010709 'Cyst (morphologic abnormality)'
-    C1321091 'Removal of mesh from wound' --[RO/indirect_morphology_of]--> C0043250 'Wound (morphologic abnormality)'
-    C0730001 'Two layer compression bandage for skin u' --[RO/indirect_morphology_of]--> C0041582 'Ulcus'
-
-  [RO / direct_site_of]  (587 edges)
-    C1997188 'Posterior tibial pulse rate' --[RO/direct_site_of]--> C0086835 'Posterior tibial artery'
-    C5548397 'Length of largest metastatic neoplasm in' --[RO/direct_site_of]--> C2584568 'Tissue specimen obtained by excision'
-    C5548426 'Presence of direct invasion by metastati' --[RO/direct_site_of]--> C1300691 'Lymph node from regional lymph node diss'
-
-  [RO / has_direct_site]  (587 edges)
-    C1300687 'Specimen from skin obtained by excision' --[RO/has_direct_site]--> C1827084 'Anatomic location of malignant melanoma '
-    C1300687 'Specimen from skin obtained by excision' --[RO/has_direct_site]--> C5788660 'Deep surgical margin closest to Merkel c'
-    C1301275 'Specimen from breast obtained by excisio' --[RO/has_direct_site]--> C5566196 'Presence of primary malignant neoplasm o'
-
-  [RO / process_acts_on]  (474 edges)
-    C0030342 'Pantothenic acid' --[RO/process_acts_on]--> C5231065 'Estimated quantity of intake of pantothe'
-    C0030342 'Pantothenic acid' --[RO/process_acts_on]--> C5546590 'Measured quantity of intake of pantothen'
-    C0061078 'Gamma-linolenic acid' --[RO/process_acts_on]--> C0556126 'Gamma-linolenic acid intake'
-
-  [RO / acted_on_by_process]  (474 edges)
-    C5545917 'Measured quantity of intake of galactose' --[RO/acted_on_by_process]--> C0016945 'Galactose (substance)'
-    C5545923 'Estimated quantity of intake of lactose ' --[RO/acted_on_by_process]--> C0022949 'Lactose-containing product'
-    C5546266 'Measured quantity of intake of selenium ' --[RO/acted_on_by_process]--> C0036581 'Selenium-containing product'
-
-  [RO / dose_form_intended_site_of]  (454 edges)
-    C1337415 'Emulsion for inhalation' --[RO/dose_form_intended_site_of]--> C4522268 'Pulmonary'
-    C1337416 'Suspension for inhalation' --[RO/dose_form_intended_site_of]--> C4522268 'Pulmonary'
-    C1337630 'Concentrate for solution for infusion' --[RO/dose_form_intended_site_of]--> C4522267 'Parenteral'
-
-  [RO / has_dose_form_intended_site]  (454 edges)
-    C4520890 'Nasal (intended site)' --[RO/has_dose_form_intended_site]--> C1273004 'Ear and eye and nose drops'
-    C4520890 'Nasal (intended site)' --[RO/has_dose_form_intended_site]--> C4707341 'Ear and eye and nose drops solution'
-    C4521130 'Intraocular (intended site)' --[RO/has_dose_form_intended_site]--> C4545947 'Intraocular dose form'
-
-  [RO / dose_form_release_characteristic_of]  (415 edges)
-    C1337415 'Emulsion for inhalation' --[RO/dose_form_release_characteristic_of]--> C4544675 'Conventional release'
-    C1337424 'Powder for rectal solution' --[RO/dose_form_release_characteristic_of]--> C4544675 'Conventional release'
-    C1321911 'Conventional release oral gum' --[RO/dose_form_release_characteristic_of]--> C4544675 'Conventional release'
-
-  [RO / has_dose_form_release_characteristic]  (415 edges)
-    C4544674 'Delayed-release' --[RO/has_dose_form_release_characteristic]--> C0039226 'Delayed-release oral tablet'
-    C4544674 'Delayed-release' --[RO/has_dose_form_release_characteristic]--> C4706596 'Gastro-resistant oral suspension'
-    C4544674 'Delayed-release' --[RO/has_dose_form_release_characteristic]--> C4707292 'Gastro-resistant oral soft capsule'
-
-  [RO / dose_form_administration_method_of]  (409 edges)
-    C1337632 'Ear drops suspension' --[RO/dose_form_administration_method_of]--> C4521682 'Instill'
-    C0731847 'Hemodialysis liquid concentrate' --[RO/dose_form_administration_method_of]--> C4723631 'Dialysis system (administration method)'
-    C4520971 'Conventional release oral effervescent p' --[RO/dose_form_administration_method_of]--> C4521686 'Swallow (administration method)'
-
-  [RO / has_dose_form_administration_method]  (409 edges)
-    C4521676 'Apply (administration method)' --[RO/has_dose_form_administration_method]--> C0042238 'Vaginal cream'
-    C4521676 'Apply (administration method)' --[RO/has_dose_form_administration_method]--> C0042257 'Vaginal gel'
-    C4521676 'Apply (administration method)' --[RO/has_dose_form_administration_method]--> C0991552 'Cutaneous lotion'
-
-  [RO / during]  (396 edges)
-    C0018821 'Cardiac surgery procedure' --[RO/during]--> C5969832 'Cerebrovascular accident during operatio'
-    C0259945 'Hospital care' --[RO/during]--> C0010356 'Cross infection'
-    C0259945 'Hospital care' --[RO/during]--> C1443238 'Healthcare associated bacterial pneumoni'
-
-  [RO / basic_dose_form_of]  (394 edges)
-    C1337416 'Suspension for inhalation' --[RO/basic_dose_form_of]--> C0038960 'Suspension (basic dose form)'
-    C4545815 'Eye drops emulsion' --[RO/basic_dose_form_of]--> C4520839 'Emulsion (basic dose form)'
-    C1300461 'Powder for nebulizer solution' --[RO/basic_dose_form_of]--> C1382110 'Powder'
-
-  [RO / has_basic_dose_form]  (394 edges)
-    C1378128 'Cream (basic dose form)' --[RO/has_basic_dose_form]--> C5687915 'Oromucosal cream'
-    C1382100 'Solution (basic dose form)' --[RO/has_basic_dose_form]--> C0026647 'Conventional release oromucosal solution'
-    C1382100 'Solution (basic dose form)' --[RO/has_basic_dose_form]--> C0991536 'Oral solution'
-
-  [RO / has_dose_form_transformation]  (394 edges)
-    C4521688 'Dissolve' --[RO/has_dose_form_transformation]--> C1273628 'Granules for oral syrup'
-    C4521688 'Dissolve' --[RO/has_dose_form_transformation]--> C1720132 'Powder for inhalation solution'
-    C4521688 'Dissolve' --[RO/has_dose_form_transformation]--> C1720556 'Tablet for oral solution'
-
-  [RO / dose_form_transformation_of]  (394 edges)
-    C4529084 'Gas for insufflation' --[RO/dose_form_transformation_of]--> C4545856 'No transformation'
-    C4545815 'Eye drops emulsion' --[RO/dose_form_transformation_of]--> C4545856 'No transformation'
-    C1300459 'Suspension for nebuliser' --[RO/dose_form_transformation_of]--> C4545856 'No transformation'
-
-  [RO / compositional_material_of]  (352 edges)
-    C1319756 'Collagen and oxidized regenerated cellul' --[RO/compositional_material_of]--> C0007649 'Oxidised cellulose'
-    C1323022 'Polymeric esophageal stent' --[RO/compositional_material_of]--> C0032521 'Polymer'
-    C5545618 'Polyurethane foam sterile film dressing ' --[RO/compositional_material_of]--> C0071696 'Polyurethane foam'
-
-  [RO / has_compositional_material]  (352 edges)
-    C0071696 'Polyurethane foam' --[RO/has_compositional_material]--> C5545638 'Polyurethane foam sterile film dressing '
-    C0071696 'Polyurethane foam' --[RO/has_compositional_material]--> C5545643 'Soft silicone wound contact sterile dres'
-    C0071696 'Polyurethane foam' --[RO/has_compositional_material]--> C5545702 'Silver impregnated polyurethane foam ste'
-
-  [RO / process_duration_of]  (344 edges)
-    C5545790 'Measured quantity of intake of glutamine' --[RO/process_duration_of]--> C1442770 '24 hours'
-    C5545914 'Measured quantity of intake of simple ca' --[RO/process_duration_of]--> C1442770 '24 hours'
-    C5545918 'Estimated quantity of intake of galactos' --[RO/process_duration_of]--> C1442770 '24 hours'
-
-  [RO / has_process_duration]  (344 edges)
-    C1442770 '24 hours' --[RO/has_process_duration]--> C5192887 'Estimated complex carbohydrate quantity '
-    C1442770 '24 hours' --[RO/has_process_duration]--> C5192888 'Estimated quantity of intake of simple c'
-    C1442770 '24 hours' --[RO/has_process_duration]--> C5230451 'Estimated quantity of intake of fat and '
-
-  [RO / part_anatomy_structure_of]  (320 edges)
-    C0014133 'Endocrine gland structure (body structur' --[RO/part_anatomy_structure_of]--> C1268159 'Endocrine gland part'
-    C0018787 'Cardiac structure' --[RO/part_anatomy_structure_of]--> C1268110 'Heart part'
-    C1266926 'Bony orbit structure (body structure)' --[RO/part_anatomy_structure_of]--> C1299178 'Part of bony orbit'
-
-  [RO / has_part_anatomy_structure]  (320 edges)
-    C1827280 'Part of male urethra' --[RO/has_part_anatomy_structure]--> C0458452 'Male urethra'
-    C1267666 'Part of uterine cervix' --[RO/has_part_anatomy_structure]--> C0007874 'Cervix uteri'
-    C1268127 'Ureter part' --[RO/has_part_anatomy_structure]--> C0041951 'Ureteric structure (body structure)'
-
-  [RO / route_of_administration_of]  (271 edges)
-    C0204178 'Topical application of fluoride includin' --[RO/route_of_administration_of]--> C1522168 'Topical route'
-    C0729617 'Intravenous injection of anticytomegalov' --[RO/route_of_administration_of]--> C1522726 'IV route'
-    C0730403 'Application of dental fluoride varnish' --[RO/route_of_administration_of]--> C1522168 'Topical route'
-
-  [RO / has_route_of_administration]  (271 edges)
-    C1527415 'Oral use' --[RO/has_route_of_administration]--> C0559681 'Oral antibiotic therapy'
-    C1527415 'Oral use' --[RO/has_route_of_administration]--> C4039035 'Administration of cytotoxic agent via or'
-    C1527415 'Oral use' --[RO/has_route_of_administration]--> C5396452 'Administration of antiarrhythmic drug vi'
-
-  [RO / has_priority]  (263 edges)
-    C0205547 'Routine (qualifier value)' --[RO/has_priority]--> C0420538 'Non-urgent trauma admission'
-    C0205547 'Routine (qualifier value)' --[RO/has_priority]--> C0420540 'Non-urgent rheumatology admission'
-    C0205547 'Routine (qualifier value)' --[RO/has_priority]--> C0420541 'Non-urgent dermatology admission'
-
-  [RO / priority_of]  (263 edges)
-    C0204292 'Emergency endodontic procedure' --[RO/priority_of]--> C0175673 'Emergency (qualifier value)'
-    C0420533 'Non-urgent psychiatric admission' --[RO/priority_of]--> C0205547 'Routine (qualifier value)'
-    C0420541 'Non-urgent dermatology admission' --[RO/priority_of]--> C0205547 'Routine (qualifier value)'
-
-  [RO / is_sterile]  (254 edges)
-    C0205237 'Pseudo' --[RO/is_sterile]--> C3875708 'Defibrinated blood dressing, non-sterile'
-    C0205237 'Pseudo' --[RO/is_sterile]--> C3875767 'Carbon dioxide cartridge, non-sterile'
-    C0205237 'Pseudo' --[RO/is_sterile]--> C3876032 'Universal tube holder, non-sterile'
-
-  [RO / answer_to_is_sterile]  (254 edges)
-    C5545742 'Non-woven fabric swab non-sterile' --[RO/answer_to_is_sterile]--> C0205237 'Pseudo'
-    C5547493 'Sterile bioabsorbable synthetic suture' --[RO/answer_to_is_sterile]--> C0205238 'True'
-    C1273152 'Nelaton Tiemann tip urethral catheter wi' --[RO/answer_to_is_sterile]--> C0205238 'True'
-
-  [RO / procedure_device_of]  (253 edges)
-    C0204369 'Prosthodontic procedure' --[RO/procedure_device_of]--> C0162686 'Dental prosthesis'
-    C1997302 'Procedure involving peritoneal dialysis ' --[RO/procedure_device_of]--> C0179783 'Peritoneal dialysis catheter'
-    C1827984 'Maintenance of temporary epicardial card' --[RO/procedure_device_of]--> C1828041 'Temporary cardiac pacemaker, device'
-
-  [RO / has_procedure_device]  (253 edges)
-    C0030163 'Cardiac pacemaker, device' --[RO/has_procedure_device]--> C0199703 'Check artificial pacemaker for voltage t'
-    C0030163 'Cardiac pacemaker, device' --[RO/has_procedure_device]--> C0199704 'Check artificial pacemaker by slew rate '
-    C0030163 'Cardiac pacemaker, device' --[RO/has_procedure_device]--> C3275122 'Cardiac pacemaker procedure (procedure)'
-
-  [RO / partially_equivalent_to]  (232 edges)
-    C0202640 'Fluoroscopy of regions' --[RO/partially_equivalent_to]--> C1306645 'Plain X-ray'
-    C0029051 'Oophoritis (disorder)' --[RO/partially_equivalent_to]--> C0036133 'Tubo-ovarian inflammatory disease'
-    C1970972 'Esophageal operation (including hiatus h' --[RO/partially_equivalent_to]--> C0014857 'Repair of paraoesophageal diaphragmatic '
-
-  [RO / role_played_by]  (226 edges)
-    C5548399 'Bordetella pertussis and Clostridium tet' --[RO/role_played_by]--> C5395204 'Active immunity stimulant role'
-    C5548579 'Acellular Bordetella pertussis, Clostrid' --[RO/role_played_by]--> C5395204 'Active immunity stimulant role'
-    C5557949 'Streptococcus pneumoniae Danish serotype' --[RO/role_played_by]--> C5395204 'Active immunity stimulant role'
-
-  [RO / plays_role]  (226 edges)
-    C2986420 'Carrier oil' --[RO/plays_role]--> C5395157 'Carrier oil-containing product'
-    C5395204 'Active immunity stimulant role' --[RO/plays_role]--> C1660580 'Vaccine product containing only Neisseri'
-    C5395204 'Active immunity stimulant role' --[RO/plays_role]--> C3850126 'Live attenuated mumps vaccine'
-
-  [RO / temporally_related_to]  (198 edges)
-    C5546891 'Intermittent orthostatic proteinuria' --[RO/temporally_related_to]--> C0231472 'Standing'
-    C0557863 'Self-electrocution' --[RO/temporally_related_to]--> C2063687 'Attempted suicide by electrocution'
-    C0567542 'Intentional paracetamol poisoning' --[RO/temporally_related_to]--> C4759339 'Suicide attempt by acetaminophen overdos'
-
-  [RO / has_specimen_source_morphology]  (178 edges)
-    C0000833 'Abscess (morphologic abnormality)' --[RO/has_specimen_source_morphology]--> C0444189 'Abscess swab'
-    C0000833 'Abscess (morphologic abnormality)' --[RO/has_specimen_source_morphology]--> C1292526 'Specimen from abscess'
-    C0000833 'Abscess (morphologic abnormality)' --[RO/has_specimen_source_morphology]--> C2959779 'Specimen from abscess obtained by aspira'
-
-  [RO / specimen_source_morphology_of]  (178 edges)
-    C5547919 'Specimen from pelvic abscess' --[RO/specimen_source_morphology_of]--> C0000833 'Abscess (morphologic abnormality)'
-    C1827048 'Specimen from peritoneal tumor implant' --[RO/specimen_source_morphology_of]--> C2939419 'Metastatic neoplasm'
-    C4543005 'Specimen from mass of retroperitoneum' --[RO/specimen_source_morphology_of]--> C0577559 'Mass (morphologic abnormality)'
-
-  [RO / relative_to]  (174 edges)
-    C1302773 'Low grade squamous intraepithelial neopl' --[RO/relative_to]--> C5817629 'Surgical margin involved by low grade sq'
-    C0027651 'Neoplasm (morphologic abnormality)' --[RO/relative_to]--> C1321238 'Percentage of neoplasm involved by necro'
-    C0027708 'Embryonal adenosarcoma' --[RO/relative_to]--> C5788311 'Percentage of nephroblastoma involved by'
-
-  [RO / absorbability_of]  (172 edges)
-    C5547489 'Sterile nonbioabsorbable braided silk su' --[RO/absorbability_of]--> C5396170 'Nonbioabsorbable'
-    C5547490 'Sterile nonbioabsorbable braided nylon s' --[RO/absorbability_of]--> C5396170 'Nonbioabsorbable'
-    C5547494 'Sterile nonbioabsorbable monofilament ny' --[RO/absorbability_of]--> C5396170 'Nonbioabsorbable'
-
-  [RO / has_absorbability]  (172 edges)
-    C5395723 'Bioabsorbable' --[RO/has_absorbability]--> C1576039 'Vicryl suture'
-    C5395723 'Bioabsorbable' --[RO/has_absorbability]--> C1962924 'Catgut suture, chromic'
-    C5395723 'Bioabsorbable' --[RO/has_absorbability]--> C3873680 'Bioabsorbable hemostatic agent'
-
-  [RO / has_procedure_morphology]  (162 edges)
-    C0221198 'Lesion' --[RO/has_procedure_morphology]--> C0396558 'Procedure for lung lesion'
-    C0221198 'Lesion' --[RO/has_procedure_morphology]--> C0405733 'Needle aspiration of lesion of umbilicus'
-    C0221198 'Lesion' --[RO/has_procedure_morphology]--> C0405897 'Mediastinoscopy and aspiration of lesion'
-
-  [RO / procedure_morphology_of]  (162 edges)
-    C0186332 'Operation for injury of radius AND ulna' --[RO/procedure_morphology_of]--> C0010957 'Damage'
-    C0188417 'Operation for bone injury on phalanges o' --[RO/procedure_morphology_of]--> C0010957 'Damage'
-    C0189793 'Resection of subvalvular tissue for disc' --[RO/procedure_morphology_of]--> C1261287 'Stenosis (morphologic abnormality)'
-
-  [RO / recipient_category_of]  (135 edges)
-    C0204551 'Interactive group medical psychotherapy' --[RO/recipient_category_of]--> C1257890 'Group'
-    C0204554 'Body contact-exploration therapy' --[RO/recipient_category_of]--> C1257890 'Group'
-    C1636776 'Family medication education' --[RO/recipient_category_of]--> C0015576 'Family (social concept)'
-
-  [RO / has_recipient_category]  (135 edges)
-    C0030551 'Parent of' --[RO/has_recipient_category]--> C0150297 'Parent education: childrearing family'
-    C1257890 'Group' --[RO/has_recipient_category]--> C0199388 'Group preventive medicine education'
-    C1257890 'Group' --[RO/has_recipient_category]--> C0204552 'Group analytical psychotherapy'
-
-  [RO / extended_to_by_process]  (131 edges)
-    C5547611 'Presence of direct invasion by primary m' --[RO/extended_to_by_process]--> C5548423 'Structure of lymphatic vessel and/or sma'
-    C5547624 'Presence of direct invasion by primary m' --[RO/extended_to_by_process]--> C5548423 'Structure of lymphatic vessel and/or sma'
-    C5547631 'Presence of direct invasion by primary m' --[RO/extended_to_by_process]--> C5548423 'Structure of lymphatic vessel and/or sma'
-
-  [RO / process_extends_to]  (131 edges)
-    C5548401 'Structure of lymphatic vessel and/or sma' --[RO/process_extends_to]--> C5547036 'Presence of direct invasion by primary m'
-    C5548423 'Structure of lymphatic vessel and/or sma' --[RO/process_extends_to]--> C1272668 'Status of lymphatic (small vessel) invas'
-    C5548423 'Structure of lymphatic vessel and/or sma' --[RO/process_extends_to]--> C5547614 'Presence of direct invasion by primary m'
-
-  [RO / finding_informer_of]  (130 edges)
-    C1321306 'Glare disability' --[RO/finding_informer_of]--> C1637797 'Subject of record or other provider of h'
-    C5688278 'Eye strain of left eye' --[RO/finding_informer_of]--> C1637797 'Subject of record or other provider of h'
-    C0278213 'Nervous asthenopia' --[RO/finding_informer_of]--> C1637797 'Subject of record or other provider of h'
-
-  [RO / has_finding_informer]  (130 edges)
-    C1637797 'Subject of record or other provider of h' --[RO/has_finding_informer]--> C0016204 'Flatus, function (observable entity)'
-    C1637797 'Subject of record or other provider of h' --[RO/has_finding_informer]--> C0231918 'Nasal symptom'
-    C1637797 'Subject of record or other provider of h' --[RO/has_finding_informer]--> C0233803 'Jamais vu'
-
-  [RN / has_alternative]  (94 edges)
-    C0692887 'Nortriptyline (as nortriptyline hydrochl' --[RN/has_alternative]--> C0991723 'Product containing precisely nortriptyli'
-    C5547100 'Nitrate vasodilator overdose' --[RN/has_alternative]--> C0274734 'Poisoning by nitrate'
-    C0394243 'Clipping of aneurysm of intracranial art' --[RN/has_alternative]--> C1970971 'Clipping of aneurysm of cerebral artery '
-
-  [RB / alternative_of]  (94 edges)
-    C0411310 'Replacement of prosthesis in stomach' --[RB/alternative_of]--> C0399761 'Insertion of prosthesis into stomach'
-    C1536657 'Plain X-ray of sacrococcygeal spine' --[RB/alternative_of]--> C5921178 'Plain X-ray of sacral spine'
-    C1536657 'Plain X-ray of sacrococcygeal spine' --[RB/alternative_of]--> C5921185 'Plain X-ray of coccygeal region of back'
-
-  [RO / has_indirect_device]  (92 edges)
-    C0728823 'Ventricular shunt' --[RO/has_indirect_device]--> C0394215 'Injection of substance into ventricular '
-    C0728823 'Ventricular shunt' --[RO/has_indirect_device]--> C0553782 'Maintenance of proximal catheter of cere'
-    C1828453 'Permanent cardiac pacemaker, device' --[RO/has_indirect_device]--> C3472562 'Replacement of pulse generator of perman'
-
-  [RO / indirect_device_of]  (92 edges)
-    C0189613 'Removal of thrombus from arteriovenous s' --[RO/indirect_device_of]--> C0336636 'Arteriovenous shunt (physical object)'
-    C5761392 'Changing of drainage bag' --[RO/indirect_device_of]--> C0180499 'Drain, device'
-    C5852698 'Replacement of battery of neurostimulato' --[RO/indirect_device_of]--> C0582124 'Neurostimulation device'
-
-  [RO / state_of_matter_of]  (69 edges)
-    C1337629 'Compressed lozenge' --[RO/state_of_matter_of]--> C0205208 'Solid - descriptor'
-    C1378701 'Gum (basic dose form)' --[RO/state_of_matter_of]--> C0205208 'Solid - descriptor'
-    C5575039 'Cement (basic dose form)' --[RO/state_of_matter_of]--> C4544501 'Semi-solid'
-
-  [RO / has_state_of_matter]  (69 edges)
-    C0205208 'Solid - descriptor' --[RO/has_state_of_matter]--> C0006935 'Capsule (basic dose form)'
-    C0205208 'Solid - descriptor' --[RO/has_state_of_matter]--> C0039225 'Tablet'
-    C0205208 'Solid - descriptor' --[RO/has_state_of_matter]--> C1704229 'Implant'
-
-  [RO / has_precondition]  (58 edges)
-    C0279025 'Hormone therapy' --[RO/has_precondition]--> C5818639 'Presence of regression of primary malign'
-    C0580206 'Early neonatal period' --[RO/has_precondition]--> C0005612 'Birth weight'
-    C5789088 'Neoadjuvant antineoplastic therapy' --[RO/has_precondition]--> C5787568 'Presence of regression of primary malign'
-
-  [RO / precondition_of]  (58 edges)
-    C5145582 'Pre-dialysis body weight' --[RO/precondition_of]--> C1264634 'Pre-dialysis'
-    C5787555 'Presence of regression of primary malign' --[RO/precondition_of]--> C5789088 'Neoadjuvant antineoplastic therapy'
-    C5787559 'Presence of regression of primary malign' --[RO/precondition_of]--> C5789088 'Neoadjuvant antineoplastic therapy'
-
-  [RO / has_specimen_source_identity]  (55 edges)
-    C0030705 'Patient' --[RO/has_specimen_source_identity]--> C1292513 'Platelet poor plasma specimen from patie'
-    C0019005 'Hemodialysis machine' --[RO/has_specimen_source_identity]--> C0444132 'Machine haemodialysate specimen'
-    C2315378 'Autologous blood bag, device' --[RO/has_specimen_source_identity]--> C1292466 'Specimen from blood bag from patient'
-
-  [RO / specimen_source_identity_of]  (55 edges)
-    C3266588 'Sand specimen' --[RO/specimen_source_identity_of]--> C0014406 'Environments'
-    C3532406 'Swab from catheter' --[RO/specimen_source_identity_of]--> C0085590 'Catheter, device'
-    C3532427 'Swab from central venous catheter' --[RO/specimen_source_identity_of]--> C1145640 'Central venous catheter, device (physica'
-
-  [RO / has_severity]  (38 edges)
-    C0205081 'Moderate severity' --[RO/has_severity]--> C3266752 'Moderate left ventricular systolic dysfu'
-    C0205081 'Moderate severity' --[RO/has_severity]--> C4305459 'Moderate thinness in adulthood'
-    C0205081 'Moderate severity' --[RO/has_severity]--> C4759554 'Moderate muscle atrophy'
-
-  [RO / severity_of]  (38 edges)
-    C5549822 'Moderate food insecurity on United State' --[RO/severity_of]--> C0205081 'Moderate severity'
-    C3266752 'Moderate left ventricular systolic dysfu' --[RO/severity_of]--> C0205081 'Moderate severity'
-    C3266753 'Severe left ventricular systolic dysfunc' --[RO/severity_of]--> C0205082 'High grade'
-
-  [RO / has_coating_material]  (37 edges)
-    C5700169 'Silicone (substance)' --[RO/has_coating_material]--> C5699985 'Evacuated blood collection tube, silicon'
-    C0025552 'Metal (substance)' --[RO/has_coating_material]--> C3878455 'Intrauterine device, metal-covered'
-    C0025552 'Metal (substance)' --[RO/has_coating_material]--> C3880597 'Metal-backed elbow ulna prosthesis'
-
-  [RO / coating_material_of]  (37 edges)
-    C3877522 'Ceramic-on-metal total hip prosthesis' --[RO/coating_material_of]--> C0007742 'Ceramic'
-    C3878789 'Metal dental crown with polymer coating' --[RO/coating_material_of]--> C0032521 'Polymer'
-    C4274273 'Non-sterile polymer coated metal trachea' --[RO/coating_material_of]--> C0032521 'Polymer'
-
-  [RO / has_units]  (24 edges)
-    C1519269 'Serving' --[RO/has_units]--> C5192882 'Estimated intake of fruit servings in 24'
-    C0560724 'g/meal' --[RO/has_units]--> C5438605 'Measured quantity of fat and oil intake '
-    C2348028 'Cycles per minute' --[RO/has_units]--> C1704519 'Cranial rhythmic impulse'
-
-  [RO / units_of]  (24 edges)
-    C5437793 'Estimated intake of mammalian milk based' --[RO/units_of]--> C1519269 'Serving'
-    C5437998 'Measured intake of mammalian milk based ' --[RO/units_of]--> C1519269 'Serving'
-    C5437999 'Measured intake of protein and/or protei' --[RO/units_of]--> C1519269 'Serving'
-
-  [RO / process_output_of]  (21 edges)
-    C1302171 'Heart rate on admission' --[RO/process_output_of]--> C4302123 'Entire cardiac cycle process'
-    C5566457 'Volume of drainage of pancreatic fluid' --[RO/process_output_of]--> C0030296 'Pancreatic fluid'
-    C0429477 'Baseline foetal heart rate' --[RO/process_output_of]--> C4302123 'Entire cardiac cycle process'
-
-  [RO / has_process_output]  (21 edges)
-    C4302123 'Entire cardiac cycle process' --[RO/has_process_output]--> C0232117 'Pulse rate'
-    C0038352 'Gastric contents' --[RO/has_process_output]--> C5566455 'Volume of drainage of gastric contents'
-    C4302123 'Entire cardiac cycle process' --[RO/has_process_output]--> C0018810 'Heart rate'
-
-  [RO / has_target_population]  (19 edges)
-    C5547365 'Paediatric population' --[RO/has_target_population]--> C5397523 'Acellular Bordetella pertussis and Clost'
-    C5547366 'Adult population' --[RO/has_target_population]--> C5397352 'Hepatitis A adult vaccine'
-    C5547365 'Paediatric population' --[RO/has_target_population]--> C5397389 'Whole cell Bordetella pertussis and Cory'
-
-  [RO / target_population_of]  (19 edges)
-    C5879555 'Paediatric B and BA.4/BA.5 lineage SARS-' --[RO/target_population_of]--> C5547365 'Paediatric population'
-    C5397522 'Acellular Bordetella pertussis and Clost' --[RO/target_population_of]--> C5547365 'Paediatric population'
-    C5548579 'Acellular Bordetella pertussis, Clostrid' --[RO/target_population_of]--> C5547365 'Paediatric population'
-
-  [RO / measurement_method_of]  (17 edges)
-    C2711841 'Measurement of protein and glucose in ur' --[RO/measurement_method_of]--> C1294300 'Test strip method'
-    C0523252 'Measurement of microbial antibody using ' --[RO/measurement_method_of]--> C1318793 'Immunofluorescent stain method'
-    C2711305 'Measurement of ethanol using gas chromat' --[RO/measurement_method_of]--> C0008555 'Gas chromatography measurement'
-
-  [RO / has_measurement_method]  (17 edges)
-    C1293919 'Calculated laboratory test method' --[RO/has_measurement_method]--> C2711642 'Serum ascites albumin gradient'
-    C1293919 'Calculated laboratory test method' --[RO/has_measurement_method]--> C2711642 'Serum ascites albumin gradient'
-    C0079365 'Fluorescence polarisation immunoassay' --[RO/has_measurement_method]--> C2711467 'Measurement of barbiturate in urine spec'
-
-  [RO / possibly_replaces]  (15 edges)
-    C0202851 'Angiocardiography, negative contrast' --[RO/possibly_replaces]--> C0013518 'Contrast echocardiography (procedure)'
-    C0013312 'Palmar fascial fibromatosis' --[RO/possibly_replaces]--> C0334163 'Fibrous bands'
-    C0031106 'Aggressive periodontitis' --[RO/possibly_replaces]--> C3698494 'Periodontitis as manifestation of system'
-
-  [RO / possibly_replaced_by]  (15 edges)
-    C3698494 'Periodontitis as manifestation of system' --[RO/possibly_replaced_by]--> C0031106 'Aggressive periodontitis'
-    C1689989 'Victim of emotional abuse' --[RO/possibly_replaced_by]--> C0562384 'Victim of psychological abuse'
-    C0334163 'Fibrous bands' --[RO/possibly_replaced_by]--> C0013312 'Palmar fascial fibromatosis'
-
-  [RO / has_dependent]  (8 edges)
-    C3645707 'SNOMED CT to ICD-10-CM rule-based mappin' --[RO/has_dependent]--> C3540690 'SNOMED CT model component module (core m'
-    C3645707 'SNOMED CT to ICD-10-CM rule-based mappin' --[RO/has_dependent]--> C3645626 'SNOMED CT core'
-    C3645708 'US National Library of Medicine maintain' --[RO/has_dependent]--> C3540690 'SNOMED CT model component module (core m'
-
-  [RO / dependent_of]  (8 edges)
-    C3540690 'SNOMED CT model component module (core m' --[RO/dependent_of]--> C3645626 'SNOMED CT core'
-    C3540690 'SNOMED CT model component module (core m' --[RO/dependent_of]--> C3645708 'US National Library of Medicine maintain'
-    C3645626 'SNOMED CT core' --[RO/dependent_of]--> C3645708 'US National Library of Medicine maintain'
-
-  [RO / filling_of]  (7 edges)
-    C5231287 'Silicone gel-filled polyurethane foam co' --[RO/filling_of]--> C0599034 'Silicone gel'
-    C4708703 'Saline-filled smooth breast implant' --[RO/filling_of]--> C0037494 'Sodium chloride'
-    C4708705 'Saline-filled textured breast implant' --[RO/filling_of]--> C0037494 'Sodium chloride'
-
-  [RO / has_filling]  (7 edges)
-    C0599034 'Silicone gel' --[RO/has_filling]--> C0741713 'Silicone gel-filled breast implant'
-    C0599034 'Silicone gel' --[RO/has_filling]--> C4708706 'Silicone gel-filled textured breast impl'
-    C0037494 'Sodium chloride' --[RO/has_filling]--> C4708703 'Saline-filled smooth breast implant'
-
-  [RO / has_ingredient_qualitative_strength]  (7 edges)
-    C0445550 'Low dose' --[RO/has_ingredient_qualitative_strength]--> C5397414 'Clostridium tetani and low dose Coryneba'
-    C0445550 'Low dose' --[RO/has_ingredient_qualitative_strength]--> C5399685 'Vaccine product containing only low dose'
-    C0445550 'Low dose' --[RO/has_ingredient_qualitative_strength]--> C5397432 'Clostridium tetani and low dose Coryneba'
-
-  [RO / ingredient_qualitative_strength_of]  (7 edges)
-    C5397432 'Clostridium tetani and low dose Coryneba' --[RO/ingredient_qualitative_strength_of]--> C0445550 'Low dose'
-    C5397502 'Acellular Bordetella pertussis and Clost' --[RO/ingredient_qualitative_strength_of]--> C0445550 'Low dose'
-    C5880846 'Hepatitis B high dose recombinant surfac' --[RO/ingredient_qualitative_strength_of]--> C0444956 'High dose'
-
-  [RO / has_surface_texture]  (4 edges)
-    C0205357 'Smooth' --[RO/has_surface_texture]--> C4708704 'Silicone gel-filled smooth breast implan'
-    C0449582 'Textured' --[RO/has_surface_texture]--> C4708705 'Saline-filled textured breast implant'
-    C0205357 'Smooth' --[RO/has_surface_texture]--> C4708703 'Saline-filled smooth breast implant'
-
-  [RO / surface_texture_of]  (4 edges)
-    C4708703 'Saline-filled smooth breast implant' --[RO/surface_texture_of]--> C0205357 'Smooth'
-    C4708706 'Silicone gel-filled textured breast impl' --[RO/surface_texture_of]--> C0449582 'Textured'
-    C4708704 'Silicone gel-filled smooth breast implan' --[RO/surface_texture_of]--> C0205357 'Smooth'
-
-  [RO / part_referred_to_by]  (2 edges)
-    C1328319 'Ankle brachial pressure index' --[RO/part_referred_to_by]--> C0006087 'Structure of brachial artery (body struc'
-    C3873516 'Toe brachial pressure index' --[RO/part_referred_to_by]--> C0006087 'Structure of brachial artery (body struc'
-
-  [RO / relative_to_part_of]  (2 edges)
-    C0006087 'Structure of brachial artery (body struc' --[RO/relative_to_part_of]--> C1328319 'Ankle brachial pressure index'
-    C0006087 'Structure of brachial artery (body struc' --[RO/relative_to_part_of]--> C3873516 'Toe brachial pressure index'
-
-  [RO / before]  (1 edges)
-    C0022671 'Kidney transplantation' --[RO/before]--> C0456361 'Pre-existing disease in renal transplant'
-
-  [RO / towards]  (1 edges)
-    C0003204 'Anti-infective agent' --[RO/towards]--> C5818607 'Antimicrobial susceptibility of organism'
-
-  [RO / away_from]  (1 edges)
-    C5818607 'Antimicrobial susceptibility of organism' --[RO/away_from]--> C0003204 'Anti-infective agent'
-
-  [RO / after]  (1 edges)
-    C0456361 'Pre-existing disease in renal transplant' --[RO/after]--> C0022671 'Kidney transplantation'
-
-
-Likely inverse-pair RELAs:
-  absorbability_of (172) <-> has_absorbability (172)
-  access_of (2,050) <-> has_access (2,050)
-  active_ingredient_of (17,559) <-> has_active_ingredient (17,559)
-  alternative_of (94) <-> has_alternative (94)
-  associated_finding_of (2,725) <-> has_associated_finding (2,725)
-  associated_morphology_of (78,747) <-> has_associated_morphology (79,784)
-  associated_procedure_of (2,702) <-> has_associated_procedure (2,702)
-  basic_dose_form_of (394) <-> has_basic_dose_form (394)
-  basis_of_strength_substance_of (9,858) <-> has_basis_of_strength_substance (9,858)
-  causative_agent_of (18,647) <-> has_causative_agent (18,647)
-  clinical_course_of (6,267) <-> has_clinical_course (6,267)
-  coating_material_of (37) <-> has_coating_material (37)
-  component_of (8,421) <-> has_component (8,421)
-  compositional_material_of (352) <-> has_compositional_material (352)
-  concentration_strength_denominator_unit_of (3,238) <-> has_concentration_strength_denominator_unit (3,238)
-  concentration_strength_numerator_unit_of (3,238) <-> has_concentration_strength_numerator_unit (3,238)
-  dependent_of (8) <-> has_dependent (8)
-  device_intended_site_of (861) <-> has_device_intended_site (861)
-  direct_device_of (5,278) <-> has_direct_device (5,278)
-  direct_morphology_of (9,465) <-> has_direct_morphology (9,465)
-  direct_procedure_site_of (38,934) <-> has_direct_procedure_site (38,934)
-  direct_site_of (587) <-> has_direct_site (587)
-  direct_substance_of (4,258) <-> has_direct_substance (4,258)
-  disposition_of (9,413) <-> has_disposition (9,413)
-  dose_form_administration_method_of (409) <-> has_dose_form_administration_method (409)
-  dose_form_intended_site_of (454) <-> has_dose_form_intended_site (454)
-  dose_form_of (15,612) <-> has_dose_form (15,612)
-  dose_form_release_characteristic_of (415) <-> has_dose_form_release_characteristic (415)
-  dose_form_transformation_of (394) <-> has_dose_form_transformation (394)
-  entire_anatomy_structure_of (15,573) <-> has_entire_anatomy_structure (15,573)
-  filling_of (7) <-> has_filling (7)
-  finding_context_of (2,784) <-> has_finding_context (2,784)
-  finding_informer_of (130) <-> has_finding_informer (130)
-  finding_method_of (2,517) <-> has_finding_method (2,517)
-  finding_site_of (106,424) <-> has_finding_site (106,423)
-  focus_of (5,450) <-> has_focus (5,450)
-  indirect_device_of (92) <-> has_indirect_device (92)
-  indirect_morphology_of (611) <-> has_indirect_morphology (611)
-  indirect_procedure_site_of (8,695) <-> has_indirect_procedure_site (8,695)
-  ingredient_qualitative_strength_of (7) <-> has_ingredient_qualitative_strength (7)
-  inherent_location_of (790) <-> has_inherent_location (790)
-  intent_of (3,334) <-> has_intent (3,334)
-  interpretation_of (19,078) <-> has_interpretation (19,078)
-  isa (615,978) <-> inverse_isa (615,942)
-  laterality_of (25,414) <-> has_laterality (25,414)
-  measurement_method_of (17) <-> has_measurement_method (17)
-  method_of (68,889) <-> has_method (68,889)
-  part_anatomy_structure_of (320) <-> has_part_anatomy_structure (320)
-  pathological_process_of (28,107) <-> has_pathological_process (28,107)
-  precise_active_ingredient_of (9,858) <-> has_precise_active_ingredient (9,858)
-  precondition_of (58) <-> has_precondition (58)
-  presentation_strength_denominator_unit_of (6,620) <-> has_presentation_strength_denominator_unit (6,620)
-  presentation_strength_numerator_unit_of (6,620) <-> has_presentation_strength_numerator_unit (6,620)
-  priority_of (263) <-> has_priority (263)
-  procedure_context_of (2,662) <-> has_procedure_context (2,662)
-  procedure_device_of (253) <-> has_procedure_device (253)
-  procedure_morphology_of (162) <-> has_procedure_morphology (162)
-  procedure_site_of (3,097) <-> has_procedure_site (3,097)
-  process_duration_of (344) <-> has_process_duration (344)
-  process_output_of (21) <-> has_process_output (21)
-  property_of (2,046) <-> has_property (2,046)
-  realization_of (1,686) <-> has_realization (1,686)
-  recipient_category_of (135) <-> has_recipient_category (135)
-  revision_status_of (1,244) <-> has_revision_status (1,244)
-  route_of_administration_of (271) <-> has_route_of_administration (271)
-  scale_type_of (1,418) <-> has_scale_type (1,418)
-  severity_of (38) <-> has_severity (38)
-  specimen_of (3,079) <-> has_specimen (3,079)
-  specimen_procedure_of (1,027) <-> has_specimen_procedure (1,027)
-  specimen_source_identity_of (55) <-> has_specimen_source_identity (55)
-  specimen_source_morphology_of (178) <-> has_specimen_source_morphology (178)
-  specimen_source_topography_of (1,454) <-> has_specimen_source_topography (1,454)
-  specimen_substance_of (1,088) <-> has_specimen_substance (1,088)
-  state_of_matter_of (69) <-> has_state_of_matter (69)
-  subject_relationship_context_of (5,496) <-> has_subject_relationship_context (5,496)
-  surface_texture_of (4) <-> has_surface_texture (4)
-  surgical_approach_of (1,486) <-> has_surgical_approach (1,486)
-  target_population_of (19) <-> has_target_population (19)
-  technique_of (642) <-> has_technique (642)
-  temporal_context_of (5,467) <-> has_temporal_context (5,467)
-  time_aspect_of (1,097) <-> has_time_aspect (1,097)
-  unit_of_presentation_of (5,524) <-> has_unit_of_presentation (5,524)
-  units_of (24) <-> has_units (24)
-  was_a (857) <-> inverse_was_a (857)
+Loaded topics_lookup.pkl
+  built_at        : 2026-05-26T20:57:07.440930
+  total canonicals: 32,778
+  CUIs w/ IS-A    : 359,245
+  CUIs w/ RELA    : 269,547
+
+==============================================================================
+  C1527304  Allergic reaction
+==============================================================================
+  STY: Pathologic Function
+
+  IS-A topics  (1):
+     C1527304  Allergic reaction  (614 CUIs share)
+
+  RELA topics  (1):
+     C1527304  Allergic reaction  (1,008 CUIs share)
+
+  Union (1 topics)
+
+==============================================================================
+  C0020517  Hypersensitivity reaction (disorder)
+==============================================================================
+  STY: Pathologic Function
+
+  IS-A topics  (1):
+     C0020517  Hypersensitivity reaction (disorder)  (11 CUIs share)
+
+  RELA topics  (1):
+     C0020517  Hypersensitivity reaction (disorder)  (53 CUIs share)
+
+  Union (1 topics)
+
+==============================================================================
+  C0002792  Anaphylaxis
+==============================================================================
+  STY: Pathologic Function
+
+  IS-A topics  (1):
+     C0002792  Anaphylaxis  (27 CUIs share)
+
+  RELA topics  (1):
+     C0002792  Anaphylaxis  (53 CUIs share)
+
+  Union (1 topics)
+
+==============================================================================
+  C0013182  Allergy to drug
+==============================================================================
+  STY: Pathologic Function
+
+  IS-A topics  (2):
+     C0237865  Propensity to adverse reactions to drug  (603 CUIs share)
+     C1527304  Allergic reaction  (614 CUIs share)
+
+  RELA topics  (3):
+     C0237865  Propensity to adverse reactions to drug  (124 CUIs share)
+     C0474189  Drug desensitisation therapy  (130 CUIs share)
+     C3662272  Drug pseudoallergy  (136 CUIs share)
+
+  Union (4 topics)
+
+==============================================================================
+  C0559470  Allergy to peanut
+==============================================================================
+  STY: Disease or Syndrome
+
+  IS-A topics  (1):
+     C2227759  Allergy to vegetable  (13 CUIs share)
+
+  RELA topics  (61):
+     C0002390  EAA - Extrinsic allergic alveolitis  (960 CUIs share)
+     C0016470  Food allergy  (957 CUIs share)
+     C0018621  Seasonal allergic rhinitis (disorder)  (1,609 CUIs share)
+     C0030824  Penicillin allergy  (953 CUIs share)
+     C0038757  Sulfonamide allergy  (954 CUIs share)
+     C0155877  Allergic asthma  (1,566 CUIs share)
+     C0267422  Allergic enteritis of intestine  (1,564 CUIs share)
+     C0413234  Acute allergic reaction  (1,085 CUIs share)
+     C0559960  Allergic reaction to venom  (953 CUIs share)
+     C0559961  Allergic reaction to insect venom  (953 CUIs share)
+     C0570537  Allergy to non-steroidal anti-inflammatory agent  (955 CUIs share)
+     C0570642  Allergy to local anaesthetic  (1,063 CUIs share)
+     C0570663  Allergy to alkylating agent  (953 CUIs share)
+     C0570881  Allergy to beta adrenergic receptor antagonist  (953 CUIs share)
+     C0570904  Allergy to alpha adrenergic receptor antagonist  (953 CUIs share)
+     C0570943  Allergy to alpha adrenergic receptor agonist  (953 CUIs share)
+     C0570952  Allergy to beta-2 adrenergic receptor agonist  (953 CUIs share)
+     C0571026  Allergy to histamine H1 receptor antagonist  (954 CUIs share)
+     C0571141  Allergy to nondepolarising agent  (953 CUIs share)
+     C0571165  Prostaglandin allergy  (953 CUIs share)
+     C0571176  Allergy to terpene  (953 CUIs share)
+     C0571374  Aminoglycoside allergy  (953 CUIs share)
+     C0571444  Allergy to cephalosporin  (953 CUIs share)
+     C0571550  Vaccine allergy  (953 CUIs share)
+     C0571586  Allergy to corticosteroid and/or corticosteroid derivat  (953 CUIs share)
+     C0571636  Sulfonylurea allergy  (953 CUIs share)
+     C0571652  Allergy to progestational hormone  (953 CUIs share)
+     C0571663  Anabolic steroids allergy  (953 CUIs share)
+     C0571679  Androgen allergy  (953 CUIs share)
+     C0571687  Allergy to estrogen  (953 CUIs share)
+     C0585186  Cutaneous hypersensitivity  (953 CUIs share)
+     C0685898  Food anaphylaxis  (1,023 CUIs share)
+     C0685900  Seafood allergy  (953 CUIs share)
+     C0685901  Allergy to fruit  (953 CUIs share)
+     C0743607  Allergy to substance with ether structure  (955 CUIs share)
+     C1262480  Allergic gastritis  (1,566 CUIs share)
+     C1504369  Allergic disorder of respiratory system  (953 CUIs share)
+     C1527304  Allergic reaction  (1,008 CUIs share)
+     C1626923  Allergic reaction to chemical  (954 CUIs share)
+     C1629019  Allergy to phenothiazine derivative  (953 CUIs share)
+     C1630647  Allergic reaction to animal  (953 CUIs share)
+     C1690580  Allergic reaction to food  (953 CUIs share)
+     C1720579  Allergic disorder of digestive system  (953 CUIs share)
+     C1720649  Allergic disorder  (953 CUIs share)
+     C1998306  Allergy to sulphonamide antibiotic  (955 CUIs share)
+     C2227759  Allergy to vegetable  (956 CUIs share)
+     C4082933  Animal allergy  (954 CUIs share)
+     C4316577  Allergy to opiate agonist  (967 CUIs share)
+     C4543742  Allergic disorder of respiratory tract  (953 CUIs share)
+     C4544977  Allergic enteritis of small intestine  (1,564 CUIs share)
+     C4546431  Exacerbation of allergic asthma  (1,680 CUIs share)
+     C4708163  Allergy to benzodiazepine  (959 CUIs share)
+     C4749634  Allergic reaction caused by vaccine product  (953 CUIs share)
+     C4758642  Allergy to iron compound  (954 CUIs share)
+     C5395878  Allergy to imidazole  (954 CUIs share)
+     C5395978  Allergy to carbamate  (953 CUIs share)
+     C5395980  Allergy to benzimidazole  (954 CUIs share)
+     C5395981  Allergy to azole  (954 CUIs share)
+     C5397077  Allergy to folic acid and/or iron compound  (953 CUIs share)
+     C5547712  Allergy to metal and/or metal compound  (954 CUIs share)
+     C5549840  Anaphylaxis caused by component of vaccine product  (990 CUIs share)
+
+  Union (61 topics)
+
+==============================================================================
+  C0269811  Grand multipara
+==============================================================================
+  STY: Finding
+
+  IS-A topics  (1):
+     C0026751  Multiparous (finding)  (11 CUIs share)
+
+  RELA topics  (1):
+     C5566148  Maternal pregnancy period  (1,175 CUIs share)
+
+  Union (2 topics)
+
+==============================================================================
+  C1257794  ?
+==============================================================================
+  -> CUI not in cache
+
+==============================================================================
+  C2939115  ?
+==============================================================================
+  -> CUI not in cache
+
+==============================================================================
+  C0157738  Chronic ulcer of skin
+==============================================================================
+  STY: Disease or Syndrome
+
+  IS-A topics  (1):
+     C0157738  Chronic ulcer of skin  (10 CUIs share)
+
+  RELA topics  (1):
+     C0157738  Chronic ulcer of skin  (5 CUIs share)
+
+  Union (1 topics)
+
+==============================================================================
+  C0264937  ?
+==============================================================================
+  -> CUI not in cache
+
+==============================================================================
+  C0032285  Pneumonia (disorder)
+==============================================================================
+  STY: Disease or Syndrome
+
+  IS-A topics  (1):
+     C0032285  Pneumonia (disorder)  (39 CUIs share)
+
+  RELA topics  (1):
+     C0032285  Pneumonia (disorder)  (1,742 CUIs share)
+
+  Union (1 topics)
+
+==============================================================================
+  C0027051  Myocardial infarction
+==============================================================================
+  STY: Disease or Syndrome
+
+  IS-A topics  (1):
+     C0027051  Myocardial infarction  (20 CUIs share)
+
+  RELA topics  (1):
+     C0027051  Myocardial infarction  (33 CUIs share)
+
+  Union (1 topics)
+
+==============================================================================
+  C0011849  Diabetes mellitus
+==============================================================================
+  STY: Disease or Syndrome
+
+  IS-A topics  (1):
+     C0011849  Diabetes mellitus  (13 CUIs share)
+
+  RELA topics  (1):
+     C0011849  Diabetes mellitus  (315 CUIs share)
+
+  Union (1 topics)
+
+==============================================================================
+  C0020538  HTN - Hypertension
+==============================================================================
+  STY: Disease or Syndrome
+
+  IS-A topics  (1):
+     C0020538  HTN - Hypertension  (43 CUIs share)
+
+  RELA topics  (1):
+     C0020538  HTN - Hypertension  (510 CUIs share)
+
+  Union (1 topics)
+
+==============================================================================
+  C0024109  Lung
+==============================================================================
+  STY: Body Part, Organ, or Organ Component
+
+  IS-A topics  (1):
+     C0024109  Lung  (7 CUIs share)
+
+  RELA topics  (1):
+     C0024109  Lung  (17,298 CUIs share)
+
+  Union (1 topics)
+
+==============================================================================
+  C0014834  Escherichia coli
+==============================================================================
+  STY: Bacterium
+
+  IS-A topics  (1):
+     C0014834  Escherichia coli  (471 CUIs share)
+
+  RELA topics  (1):
+     C0014834  Escherichia coli  (26 CUIs share)
+
+  Union (1 topics)
+
+==============================================================================
+  C0021368  Inflammation
+==============================================================================
+  STY: Pathologic Function
+
+  IS-A topics  (1):
+     C0030660  Pathological process (attribute)  (15 CUIs share)
+
+  RELA topics  (688):
+     C0003509  Aortitis  (612 CUIs share)
+     C0003615  Appendicitis  (631 CUIs share)
+     C0003860  Inflammation of artery  (655 CUIs share)
+     C0003869  Pyogenic arthritis  (1,745 CUIs share)
+     C0003872  Psoriatic arthritis  (614 CUIs share)
+     C0003873  Rheumatoid arthritis  (635 CUIs share)
+     C0003875  Viral arthritis  (1,730 CUIs share)
+     C0004626  Bacterial pneumonia  (1,745 CUIs share)
+     C0004690  Inflammatory disorder of penis (disorder)  (620 CUIs share)
+     C0004943  Behcet's syndrome  (665 CUIs share)
+     C0005741  Blepharitis (disorder)  (665 CUIs share)
+     C0005743  Blepharoconjunctivitis  (637 CUIs share)
+     C0006271  Bronchiolitis  (615 CUIs share)
+     C0006277  Bronchitis  (616 CUIs share)
+     C0006444  Bursitis (disorder)  (612 CUIs share)
+     C0006902  Capillaritis  (612 CUIs share)
+     C0007860  Inflammation of cervix (disorder)  (628 CUIs share)
+     C0007971  Cheilitis (disorder)  (612 CUIs share)
+     C0008311  Cholangitis (disorder)  (634 CUIs share)
+     C0008325  Inflamed gallbladder  (617 CUIs share)
+     C0008513  Retinochoroiditis  (640 CUIs share)
+     C0008526  Choroiditis  (613 CUIs share)
+     C0008690  Chronic iritis  (613 CUIs share)
+     C0009319  Colon inflammation  (614 CUIs share)
+     C0009763  Conjunctivitis (disorder)  (613 CUIs share)
+     C0009766  Allergic conjunctivitis  (644 CUIs share)
+     C0009768  Bacterial conjunctivitis (disorder)  (1,750 CUIs share)
+     C0009770  Chlamydial conjunctivitis (disorder)  (1,733 CUIs share)
+     C0009774  Viral conjunctivitis  (2,095 CUIs share)
+     C0010346  Crohn disease  (632 CUIs share)
+     C0010543  Cyclitis  (613 CUIs share)
+     C0010692  Bladder infection  (620 CUIs share)
+     C0010930  Dacryocystitis (disorder)  (639 CUIs share)
+     C0011606  Exfoliative dermatitis  (866 CUIs share)
+     C0011615  Atopic dermatitis  (623 CUIs share)
+     C0011616  Contact dermatitis  (625 CUIs share)
+     C0011620  Venous eczema  (614 CUIs share)
+     C0011633  Polymyositis with skin involvement  (977 CUIs share)
+     C0012624  Discitis  (612 CUIs share)
+     C0013298  Duodenitis  (627 CUIs share)
+     C0013371  Infection by Shigella  (2,113 CUIs share)
+     C0013595  Eczema (disorder)  (617 CUIs share)
+     C0014038  Encephalitis  (622 CUIs share)
+     C0014070  Encephalomyelitis (disorder)  (613 CUIs share)
+     C0014118  Endocarditis  (617 CUIs share)
+     C0014121  Bacterial endocarditis  (1,742 CUIs share)
+     C0014179  Endometritis (disorder)  (616 CUIs share)
+     C0014236  Inflammatory disorder of the eye (disorder)  (619 CUIs share)
+     C0014335  Inflammation of small intestine  (612 CUIs share)
+     C0014356  Inflammation of small intestine and colon  (612 CUIs share)
+     C0014534  Epididymitis (disorder)  (613 CUIs share)
+     C0014541  Epiglottitis (disorder)  (614 CUIs share)
+     C0014574  Epiphysitis (disorder)  (614 CUIs share)
+     C0014583  Episcleritis  (635 CUIs share)
+     C0014743  Erythema nodosum  (619 CUIs share)
+     C0014868  Oesophagitis  (636 CUIs share)
+     C0015029  Ethmoidal sinusitis (disorder)  (613 CUIs share)
+     C0015645  Fasciitis (disorder)  (613 CUIs share)
+     C0016436  Hair follicle inflammation (morphologic abnormality)  (612 CUIs share)
+     C0017152  Gastritis (disorder)  (624 CUIs share)
+     C0017160  Gastroenteritis  (612 CUIs share)
+     C0017574  Gingivitis (disorder)  (612 CUIs share)
+     C0017658  Glomerulonephritis  (617 CUIs share)
+     C0017675  Glossitis  (628 CUIs share)
+     C0018378  Guillain-Barré syndrome  (745 CUIs share)
+     C0018621  Seasonal allergic rhinitis (disorder)  (1,609 CUIs share)
+     C0019158  Inflammatory disease of liver (disorder)  (616 CUIs share)
+     C0019163  Hepatitis B  (1,748 CUIs share)
+     C0019193  Toxic hepatitis  (612 CUIs share)
+     C0019196  Type C viral hepatitis  (1,736 CUIs share)
+     C0019357  Herpetic keratitis  (1,738 CUIs share)
+     C0019360  Herpes zoster infection  (1,760 CUIs share)
+     C0019364  Herpes zoster ophthalmicus  (1,745 CUIs share)
+     C0020877  Ileitis  (613 CUIs share)
+     C0021342  Infectious enteritis  (1,731 CUIs share)
+     C0021355  Infective otitis externa  (1,730 CUIs share)
+     C0021390  Inflammatory bowel disease  (627 CUIs share)
+     C0022073  Iridocyclitis (disorder)  (627 CUIs share)
+     C0022081  Iritis (disorder)  (614 CUIs share)
+     C0022568  Keratitis (disorder)  (614 CUIs share)
+     C0022573  Keratoconjunctivitis  (658 CUIs share)
+     C0022893  Labyrinthitis (disorder)  (634 CUIs share)
+     C0023067  Laryngitis  (612 CUIs share)
+     C0023076  Laryngotracheitis (disorder)  (612 CUIs share)
+     C0023643  Lichen (disorder)  (612 CUIs share)
+     C0023646  Lichen planus  (632 CUIs share)
+     C0024205  Lymphadenitis  (612 CUIs share)
+     C0024225  Lymphangitis  (626 CUIs share)
+     C0024904  Mastoiditis  (616 CUIs share)
+     C0024959  Maxillary sinusitis  (613 CUIs share)
+     C0025064  Inflammatory disorder of mediastinum (disorder)  (618 CUIs share)
+     C0025289  Meningitis (disorder)  (643 CUIs share)
+     C0025290  Aseptic meningitis  (613 CUIs share)
+     C0025297  Meningitis, viral  (2,082 CUIs share)
+     C0025309  Meningoencephalitis (disorder)  (613 CUIs share)
+     C0026769  Multiple sclerosis  (641 CUIs share)
+     C0026780  Mumps parotitis (disorder)  (1,732 CUIs share)
+     C0026975  Myelitis (disorder)  (613 CUIs share)
+     C0027059  Myocardial inflammation  (627 CUIs share)
+     C0027121  Inflammatory myopathy  (613 CUIs share)
+     C0027134  Myringitis  (613 CUIs share)
+     C0027441  Nasopharyngitis (disorder)  (615 CUIs share)
+     C0027697  Nephritis (disorder)  (614 CUIs share)
+     C0027813  Neuritis  (612 CUIs share)
+     C0028796  Occupational dermatitis  (613 CUIs share)
+     C0028992  Omphalitis (disorder)  (1,730 CUIs share)
+     C0029051  Oophoritis (disorder)  (613 CUIs share)
+     C0029076  Ophthalmia neonatorum  (826 CUIs share)
+     C0029134  ON - Optic neuritis  (641 CUIs share)
+     C0029191  Inflammation of testis  (615 CUIs share)
+     C0029400  Bone inflammatory disease  (612 CUIs share)
+     C0029420  Osteochondritis  (612 CUIs share)
+     C0029443  Osteomyelitis (disorder)  (1,763 CUIs share)
+     C0029877  Otitis (disorder)  (612 CUIs share)
+     C0029878  Otitis externa  (619 CUIs share)
+     C0029882  Otitis media  (628 CUIs share)
+     C0029895  Otomycosis (disorder)  (1,730 CUIs share)
+     C0030305  Pancreatitis (disorder)  (617 CUIs share)
+     C0030326  Panniculitis  (620 CUIs share)
+     C0030343  Panuveitis (disorder)  (612 CUIs share)
+     C0030353  Optic disc edema  (696 CUIs share)
+     C0030583  Parotitis (disorder)  (612 CUIs share)
+     C0031037  Periarthritis (disorder)  (613 CUIs share)
+     C0031046  Pericarditis  (614 CUIs share)
+     C0031053  Perichondritis  (612 CUIs share)
+     C0031099  Periodontitis (disorder)  (612 CUIs share)
+     C0031111  Periostitis  (612 CUIs share)
+     C0031154  Peritonitis (disorder)  (620 CUIs share)
+     C0031350  Pharyngitis (disorder)  (612 CUIs share)
+     C0031542  Inflammation of vein  (618 CUIs share)
+     C0031762  Photodermatitis (disorder)  (843 CUIs share)
+     C0032231  Pleuritis  (632 CUIs share)
+     C0032273  Pneumoconiosis (disorder)  (618 CUIs share)
+     C0032285  Pneumonia (disorder)  (1,742 CUIs share)
+     C0032310  Viral pneumonia  (1,731 CUIs share)
+     C0032371  Acute poliomyelitis  (2,216 CUIs share)
+     C0032541  Polyneuritis  (612 CUIs share)
+     C0033246  Proctitis  (613 CUIs share)
+     C0033247  Colorectitis  (614 CUIs share)
+     C0033581  Inflammation of prostate  (617 CUIs share)
+     C0034103  Pulpitis  (624 CUIs share)
+     C0034183  Pyelitis  (612 CUIs share)
+     C0034186  Pyelonephritis (disorder)  (1,730 CUIs share)
+     C0034544  Radiculitis (disorder)  (613 CUIs share)
+     C0034561  Dermatitis caused by radiation  (613 CUIs share)
+     C0035333  Retinitis  (615 CUIs share)
+     C0035436  Rheumatic fever  (784 CUIs share)
+     C0035450  Rheumatoid nodule  (649 CUIs share)
+     C0035455  Rhinitis  (612 CUIs share)
+     C0035457  Perennial allergic rhinitis  (642 CUIs share)
+     C0036130  Inflammation of fallopian tube  (614 CUIs share)
+     C0036133  Tubo-ovarian inflammatory disease  (630 CUIs share)
+     C0036416  Inflammation of white of eye  (638 CUIs share)
+     C0036508  Seborrhoeic dermatitis  (635 CUIs share)
+     C0036686  Severe sepsis with acute organ dysfunction caused by Gr  (633 CUIs share)
+     C0036689  Streptococcal sore throat  (1,737 CUIs share)
+     C0037023  Sialoadenitis (disorder)  (637 CUIs share)
+     C0037074  Sigmoiditis  (613 CUIs share)
+     C0037116  Pneumoconiosis caused by silica  (614 CUIs share)
+     C0037199  Sinusitis  (613 CUIs share)
+     C0038012  Spondylitis (disorder)  (612 CUIs share)
+     C0038362  Stomatitis (disorder)  (613 CUIs share)
+     C0039103  Synovitis (disorder)  (615 CUIs share)
+     C0039520  Tenosynovitis  (620 CUIs share)
+     C0040147  Thyroiditis  (618 CUIs share)
+     C0040425  Angina tonsillaris  (614 CUIs share)
+     C0040584  Tracheitis (disorder)  (613 CUIs share)
+     C0040586  Tracheobronchitis  (612 CUIs share)
+     C0041349  Tubulointerstitial nephritis  (617 CUIs share)
+     C0041976  Urethritis (disorder)  (614 CUIs share)
+     C0042164  Intraocular inflammation  (626 CUIs share)
+     C0042165  Anterior uveitis (disorder)  (612 CUIs share)
+     C0042166  Intermediate uveitis  (613 CUIs share)
+     C0042167  Posterior uveitis  (612 CUIs share)
+     C0042267  Vaginitis (disorder)  (614 CUIs share)
+     C0042384  Vasculitis (disorder)  (623 CUIs share)
+     C0042708  Viral enteritis  (1,730 CUIs share)
+     C0042721  Viral hepatitis (disorder)  (1,737 CUIs share)
+     C0042996  Vulvitis  (613 CUIs share)
+     C0042998  Vulvovaginitis  (614 CUIs share)
+     C0085160  Hidradenitis (disorder)  (612 CUIs share)
+     C0085166  Bacterial vaginosis  (1,745 CUIs share)
+     C0085435  Reactive arthritis  (635 CUIs share)
+     C0085437  Bacterial meningitis  (1,748 CUIs share)
+     C0085438  Fungal meningitis  (1,730 CUIs share)
+     C0085574  Hench-Rosenberg syndrome  (626 CUIs share)
+     C0085655  PM - Polymyositis  (626 CUIs share)
+     C0149642  Cervical lymphadenitis  (612 CUIs share)
+     C0149704  Gingivostomatitis  (612 CUIs share)
+     C0149881  Inflammation of testis and epididymis  (613 CUIs share)
+     C0151328  Viral carditis  (1,745 CUIs share)
+     C0151435  Enteropathic arthritis (disorder)  (618 CUIs share)
+     C0151448  Inflammation of rotator cuff tendon  (612 CUIs share)
+     C0152026  Retinal vasculitis  (612 CUIs share)
+     C0152516  Inflammation of intestine caused by bacteria (disorder)  (1,740 CUIs share)
+     C0152517  Viral gastroenteritis  (1,730 CUIs share)
+     C0154874  Neuroretinitis (disorder)  (612 CUIs share)
+     C0155074  Superficial keratitis  (640 CUIs share)
+     C0155088  Interstitial keratitis  (631 CUIs share)
+     C0155176  Noninfectious dermatosis of eyelid  (660 CUIs share)
+     C0155178  Allergic contact dermatitis of eyelid  (613 CUIs share)
+     C0155223  Dacryadenitis  (637 CUIs share)
+     C0155353  Anterior scleritis  (615 CUIs share)
+     C0155389  Perichondritis of pinna  (635 CUIs share)
+     C0155428  Eustachian tube salpingitis  (620 CUIs share)
+     C0155448  Petrositis (disorder)  (627 CUIs share)
+     C0155877  Allergic asthma  (1,566 CUIs share)
+     C0156146  Crohns disease, small intestine  (636 CUIs share)
+     C0156147  Crohn disease of large bowel  (626 CUIs share)
+     C0157843  Infective arthritis of shoulder region  (1,730 CUIs share)
+     C0158026  Monoarthritis  (612 CUIs share)
+     C0158353  Infectious myositis  (1,732 CUIs share)
+     C0162323  Inflammatory arthritis of multiple joints  (983 CUIs share)
+     C0162820  Allergic contact dermatitis  (639 CUIs share)
+     C0162823  Non-allergic contact dermatitis  (632 CUIs share)
+     C0162830  Phototoxic dermatitis  (847 CUIs share)
+     C0206139  Oral lichen planus  (612 CUIs share)
+     C0221238  Mesangial proliferative glomerulonephritis  (612 CUIs share)
+     C0221759  Shoulder girdle syndrome  (613 CUIs share)
+     C0235024  Cranial neuritis  (612 CUIs share)
+     C0235812  Vitritis  (612 CUIs share)
+     C0238051  Cerebral vasculitis (disorder)  (613 CUIs share)
+     C0238634  Anal inflammation  (612 CUIs share)
+     C0239161  Dactylitis  (612 CUIs share)
+     C0239816  Hand eczema  (613 CUIs share)
+     C0240111  Arthritis of knee  (622 CUIs share)
+     C0241812  Staphylococcal blepharitis  (1,730 CUIs share)
+     C0242172  Pelvic inflammatory disease  (2,091 CUIs share)
+     C0243010  Viral encephalitis  (2,093 CUIs share)
+     C0259795  Radiation enteritis of intestine  (612 CUIs share)
+     C0262399  Bursitis of shoulder  (637 CUIs share)
+     C0262972  Acute dermatitis  (729 CUIs share)
+     C0262976  Dermatitis of the newborn  (825 CUIs share)
+     C0262988  Vasculitis of the skin  (971 CUIs share)
+     C0263011  Septal panniculitis  (612 CUIs share)
+     C0263016  Inflammatory hyperkeratotic dermatosis  (612 CUIs share)
+     C0263221  Acute eczema  (729 CUIs share)
+     C0263449  Perioral dermatitis  (621 CUIs share)
+     C0263776  Arthritis of hip (disorder)  (615 CUIs share)
+     C0263854  Cervical arthritis (disorder)  (613 CUIs share)
+     C0263857  Thoracic arthritis (disorder)  (613 CUIs share)
+     C0263907  Capsulitis  (612 CUIs share)
+     C0263922  Bursitis of hip  (612 CUIs share)
+     C0263962  Student's elbow  (623 CUIs share)
+     C0263997  Parasitic myositis  (1,409 CUIs share)
+     C0264014  Osteitis of upper arm  (612 CUIs share)
+     C0264015  Osteitis of forearm  (612 CUIs share)
+     C0264016  Osteitis of hand  (612 CUIs share)
+     C0264017  Osteitis of thigh  (612 CUIs share)
+     C0264018  Osteitis of lower leg  (612 CUIs share)
+     C0264019  Osteitis of ankle AND/OR foot  (612 CUIs share)
+     C0264022  Osteomyelitis of shoulder region  (1,732 CUIs share)
+     C0264024  Osteomyelitis of forearm  (1,730 CUIs share)
+     C0264025  Osteomyelitis of hand  (1,730 CUIs share)
+     C0264026  Osteomyelitis of pelvic region  (1,730 CUIs share)
+     C0264027  Osteomyelitis of femur  (1,732 CUIs share)
+     C0264028  Osteomyelitis of lower leg (disorder)  (1,730 CUIs share)
+     C0264029  Osteomyelitis of ankle AND/OR foot  (1,730 CUIs share)
+     C0264073  Pedal osteitis  (612 CUIs share)
+     C0264110  Juvenile apophysitis  (613 CUIs share)
+     C0264431  Pneumoconiosis caused by inorganic dust  (613 CUIs share)
+     C0264865  Valvular endocarditis (disorder)  (665 CUIs share)
+     C0264939  Systemic vasculitis  (615 CUIs share)
+     C0265054  Phlebitis of superficial veins of lower extremity  (612 CUIs share)
+     C0265060  Phlebitis of deep veins of lower extremity  (612 CUIs share)
+     C0265147  Infectious pericarditis  (1,744 CUIs share)
+     C0266968  Osteomyelitis of jaw  (1,732 CUIs share)
+     C0266973  Periostitis of jaw  (614 CUIs share)
+     C0267418  Noninfectious gastroenteritis  (612 CUIs share)
+     C0267421  Noninfectious enteritis of intestine  (612 CUIs share)
+     C0267422  Allergic enteritis of intestine  (1,564 CUIs share)
+     C0267430  Noninfectious colitis  (612 CUIs share)
+     C0267853  Calculus of gallbladder with cholecystitis (disorder)  (612 CUIs share)
+     C0267917  Acute cholangitis  (728 CUIs share)
+     C0269047  Inflammatory disease of the uterus  (632 CUIs share)
+     C0269084  Vulvar vestibulitis  (614 CUIs share)
+     C0269245  Infective mastitis  (1,740 CUIs share)
+     C0270650  Phlebitis of intracranial venous sinus  (612 CUIs share)
+     C0270933  Inflammatory neuropathy  (612 CUIs share)
+     C0271308  Contact dermatitis of eyelid  (613 CUIs share)
+     C0275548  Bacterial pleurisy  (1,740 CUIs share)
+     C0275800  Staphylococcal arthritis  (1,730 CUIs share)
+     C0275808  Arthritis caused by Streptococcus  (1,735 CUIs share)
+     C0276138  Viral myocarditis  (1,737 CUIs share)
+     C0276141  Viral bronchitis  (1,730 CUIs share)
+     C0276143  Viral pharyngitis  (1,730 CUIs share)
+     C0276226  Encephalitis caused by Herpesviridae  (1,743 CUIs share)
+     C0276430  Meningitis caused by Enterovirus  (1,739 CUIs share)
+     C0277524  Infectious colitis  (1,731 CUIs share)
+     C0277525  Infectious gastroenteritis  (1,730 CUIs share)
+     C0277526  Dysenteric diarrhoea  (1,770 CUIs share)
+     C0302160  Superficial folliculitis (disorder)  (612 CUIs share)
+     C0333355  Mucosal inflammation  (615 CUIs share)
+     C0338424  Bacterial encephalitis  (1,740 CUIs share)
+     C0339069  Infective dermatitis of eyelid  (1,731 CUIs share)
+     C0339072  Viral dermatitis of eyelid  (1,730 CUIs share)
+     C0339219  Inflammatory corneal ulcer  (639 CUIs share)
+     C0339406  Viral retinitis  (1,730 CUIs share)
+     C0339409  Bacterial chorioretinitis  (1,740 CUIs share)
+     C0339413  Parasitic choroiditis  (1,410 CUIs share)
+     C0340175  Metal pneumoconiosis  (613 CUIs share)
+     C0340184  Mixed mineral dust pneumoconiosis  (613 CUIs share)
+     C0340445  Bacterial pericarditis  (1,741 CUIs share)
+     C0340671  Secondary systemic vasculitis  (631 CUIs share)
+     C0341107  Infective esophagitis  (1,730 CUIs share)
+     C0341186  Infective gastritis  (1,730 CUIs share)
+     C0341276  Jejunitis  (613 CUIs share)
+     C0341503  Bacterial peritonitis (disorder)  (1,740 CUIs share)
+     C0342409  Hypophysitis (disorder)  (612 CUIs share)
+     C0343179  Toxic synovitis  (672 CUIs share)
+     C0343187  Primary systemic vasculitis  (613 CUIs share)
+     C0347883  Phlebitis of iliac vein  (612 CUIs share)
+     C0348776  Acute paralytic poliomyelitis  (1,875 CUIs share)
+     C0391821  Post-cardiac injury syndrome  (612 CUIs share)
+     C0392666  Infestation caused by Demodex  (1,450 CUIs share)
+     C0393439  Parasitic meningitis  (1,409 CUIs share)
+     C0393442  Non-infective meningitis  (613 CUIs share)
+     C0393785  Trigeminal nerve inflammation  (612 CUIs share)
+     C0395819  Non-infective otitis externa  (612 CUIs share)
+     C0400894  Hepatitis due to infection (disorder)  (1,730 CUIs share)
+     C0403690  Infective urethritis  (1,731 CUIs share)
+     C0404521  PV - Vaginal infection  (1,732 CUIs share)
+     C0406245  Constitutional eczema of hand  (614 CUIs share)
+     C0406272  Contact dermatitis caused by plants  (613 CUIs share)
+     C0406370  Site-specific lichen planus  (612 CUIs share)
+     C0409210  Arthritis of wrist  (615 CUIs share)
+     C0409212  Arthritis of elbow  (615 CUIs share)
+     C0409510  Infective polyarthritis  (1,739 CUIs share)
+     C0409521  Infective arthritis of hip  (1,730 CUIs share)
+     C0409525  Infective arthritis of wrist  (1,730 CUIs share)
+     C0409527  Infective arthritis of elbow  (1,730 CUIs share)
+     C0409611  Post-dysenteric reactive arthritis  (612 CUIs share)
+     C0409637  Rheumatoid arthritis of knee  (612 CUIs share)
+     C0409639  Rheumatoid arthritis of hip  (612 CUIs share)
+     C0409643  Rheumatoid arthritis of wrist  (612 CUIs share)
+     C0409645  Rheumatoid arthritis of elbow  (612 CUIs share)
+     C0409651  Seropositive rheumatoid arthritis  (1,112 CUIs share)
+     C0409652  Seronegative rheumatoid arthritis (disorder)  (707 CUIs share)
+     C0409679  Seronegative arthritis  (707 CUIs share)
+     C0409700  Synovitis of knee  (619 CUIs share)
+     C0409703  Secondary inflammatory arthritis  (631 CUIs share)
+     C0409861  HADD - hydroxyapatite deposition disease  (618 CUIs share)
+     C0410092  Bursitis of knee region  (616 CUIs share)
+     C0410118  Bursitis of foot region  (612 CUIs share)
+     C0423172  Lacrimal canaliculus inflamed  (613 CUIs share)
+     C0427311  Lower limb joint arthritis  (622 CUIs share)
+     C0452155  Calculus of bile duct with cholangitis  (623 CUIs share)
+     C0452163  Female gonococcal pelvic inflammatory disease  (1,743 CUIs share)
+     C0452221  Osteomyelitis of vertebra  (1,730 CUIs share)
+     C0456103  Sepsis of the newborn  (847 CUIs share)
+     C0456113  Neonatal bacterial conjunctivitis  (1,947 CUIs share)
+     C0457798  Dermatitis of eyelid (disorder)  (612 CUIs share)
+     C0458509  Infective vulvitis  (1,731 CUIs share)
+     C0477765  Inflammatory disorder of male genital organ  (973 CUIs share)
+     C0497209  Infective conjunctivitis  (1,730 CUIs share)
+     C0521521  Osteomyelitis of cranium  (1,732 CUIs share)
+     C0521585  Gastrointestinal mucositis  (613 CUIs share)
+     C0521604  Inflammatory diarrhoea  (642 CUIs share)
+     C0521747  Inflammation of orbit  (612 CUIs share)
+     C0549398  Meibomitis  (612 CUIs share)
+     C0554478  Perianal dermatitis  (625 CUIs share)
+     C0558142  Wound inflammation (finding)  (686 CUIs share)
+     C0558348  Bacterial gastroenteritis  (1,740 CUIs share)
+     C0558381  Obstetric mastitis  (613 CUIs share)
+     C0559258  Infective discitis  (1,731 CUIs share)
+     C0559684  Inflamed tonsils (finding)  (612 CUIs share)
+     C0563238  Viral gastritis  (1,731 CUIs share)
+     C0564785  Rheumatoid arthritis of hand joint  (613 CUIs share)
+     C0564786  Rheumatoid arthritis - ankle and/or foot  (612 CUIs share)
+     C0564800  Bursitis of bursa of ankle and/or foot  (612 CUIs share)
+     C0566909  Inflammation of vulva  (613 CUIs share)
+     C0574941  Inflammation of joint (finding)  (622 CUIs share)
+     C0574942  Inflammation of temporomandibular joint  (612 CUIs share)
+     C0574943  Inflammation of shoulder joint  (612 CUIs share)
+     C0574944  Inflammation of elbow joint  (612 CUIs share)
+     C0574945  Inflammation of joint of wrist  (612 CUIs share)
+     C0574946  Inflammation of joint of hand  (612 CUIs share)
+     C0574948  Inflammation of finger joint  (612 CUIs share)
+     C0574950  Inflammation of joint of hip  (612 CUIs share)
+     C0574951  Inflammation of knee joint  (612 CUIs share)
+     C0574952  Inflammation of joint of ankle  (612 CUIs share)
+     C0574953  Inflammation of joint of foot  (612 CUIs share)
+     C0574954  Inflammation of subtalar joint  (612 CUIs share)
+     C0574955  Inflammation of metatarsophalangeal joint  (612 CUIs share)
+     C0574957  Inflammation of cervical spine joint  (612 CUIs share)
+     C0574958  Inflammation of thoracic spine joint  (612 CUIs share)
+     C0574959  Inflammation of lumbar spine joint  (612 CUIs share)
+     C0574960  Sacroiliitis  (612 CUIs share)
+     C0575178  Cervical spine inflamed  (612 CUIs share)
+     C0575279  Thoracic spine inflamed  (612 CUIs share)
+     C0575373  Lumbar spine inflamed  (612 CUIs share)
+     C0578160  Tympanic membrane inflamed  (613 CUIs share)
+     C0578878  Inflammation of large intestine  (612 CUIs share)
+     C0581314  Synovitis of hip  (616 CUIs share)
+     C0581355  Infective sialoadenitis  (1,730 CUIs share)
+     C0586560  Infective balanitis  (1,731 CUIs share)
+     C0586748  Foot eczema  (613 CUIs share)
+     C0589629  Bacterial dysentery  (1,770 CUIs share)
+     C0596773  Infective encephalitis  (1,733 CUIs share)
+     C0600041  Infection of bladder  (1,730 CUIs share)
+     C0684256  Bacterial sepsis  (661 CUIs share)
+     C0685926  Arthritis of temporomandibular joint  (613 CUIs share)
+     C0694552  Colitis caused by bacterium  (1,740 CUIs share)
+     C0701821  Onychia  (612 CUIs share)
+     C0729346  Juvenile osteochondritis (disorder)  (617 CUIs share)
+     C0729584  Infective meningitis  (1,733 CUIs share)
+     C0729586  Infective otitis media  (1,730 CUIs share)
+     C0729587  Infective blepharitis  (1,730 CUIs share)
+     C0729592  Infective orchitis  (1,730 CUIs share)
+     C0729593  Infective epididymitis  (1,730 CUIs share)
+     C0729608  Myocarditis due to infectious agent  (1,734 CUIs share)
+     C0729771  Infective pharyngitis  (1,730 CUIs share)
+     C0729772  Infective laryngitis  (1,730 CUIs share)
+     C0729942  Phlebitis of lower limb vein  (612 CUIs share)
+     C0741073  Osteomyelitis of ankle  (1,732 CUIs share)
+     C0742964  Bacterial cystitis  (1,740 CUIs share)
+     C0744595  Tenosynovitis of hand  (614 CUIs share)
+     C0748023  Bacterial prostatitis  (1,740 CUIs share)
+     C0748386  Toxoplasma retinitis  (1,411 CUIs share)
+     C0749165  Supraglottitis  (613 CUIs share)
+     C0749501  Osteomyelitis of tibia  (1,733 CUIs share)
+     C0751341  Infectious myelitis  (1,730 CUIs share)
+     C0751422  Hereditary periodic fever (disorder)  (924 CUIs share)
+     C0847226  Viral keratitis  (1,730 CUIs share)
+     C0851258  Prepatellar bursitis  (615 CUIs share)
+     C0854211  Bacterial keratitis  (1,740 CUIs share)
+     C0854215  Bacterial meningitis caused by Gram-negative bacteria  (1,730 CUIs share)
+     C0854248  Pneumonia caused by Gram-negative bacteria  (1,730 CUIs share)
+     C0856203  Inflammation of cervix uteri due to infection  (1,730 CUIs share)
+     C0869523  Carditis (disorder)  (612 CUIs share)
+     C0869528  Arthropathy associated with a mycosis  (1,730 CUIs share)
+     C0948039  Gastritis caused by bacterium  (1,740 CUIs share)
+     C0948780  Rhinosinusitis  (612 CUIs share)
+     C0949690  Inflammatory spondylopathy  (613 CUIs share)
+     C1142272  Neutrophilic dermatosis  (614 CUIs share)
+     C1262480  Allergic gastritis  (1,566 CUIs share)
+     C1262760  Drug-induced hepatitis  (732 CUIs share)
+     C1264604  Post-streptococcal disorder  (612 CUIs share)
+     C1264610  Infectious peritonitis  (1,730 CUIs share)
+     C1274148  Dermatitis of external ear  (613 CUIs share)
+     C1274157  Inflammatory dermatosis of female genitalia  (613 CUIs share)
+     C1274988  Drug-induced mucositis  (732 CUIs share)
+     C1275687  HZV (herpes zoster virus) keratitis  (1,742 CUIs share)
+     C1276098  Allergic contact dermatitis of hands  (614 CUIs share)
+     C1281942  Infective pleurisy  (1,730 CUIs share)
+     C1282227  Postoperative endophthalmitis  (695 CUIs share)
+     C1285330  Inflammation of skin and/or subcutaneous tissue  (613 CUIs share)
+     C1285334  Inflammatory disorder of cartilage  (612 CUIs share)
+     C1285338  Inflammatory disorder of immune system  (612 CUIs share)
+     C1285339  Inflammatory disorder of musculoskeletal system  (613 CUIs share)
+     C1285340  Inflammatory disorder of the respiratory tract  (612 CUIs share)
+     C1290067  Contact mucous membrane inflammation  (612 CUIs share)
+     C1290140  Post-streptococcal reactive arthritis  (612 CUIs share)
+     C1290161  Infected bursa  (1,760 CUIs share)
+     C1290167  Osteomyelitis of facial bone  (1,730 CUIs share)
+     C1290766  Infectious sialoadenitis of major salivary gland  (1,730 CUIs share)
+     C1290884  Inflammatory disorder  (656 CUIs share)
+     C1290887  Inflammatory disorder of upper respiratory tract  (612 CUIs share)
+     C1290889  Inflammatory disorder of the cardiovascular system  (621 CUIs share)
+     C1290890  Inflammatory disorder of lower respiratory tract  (612 CUIs share)
+     C1298756  Inflammatory disorder of the respiratory system  (612 CUIs share)
+     C1298757  Inflammatory disorder of genitourinary system  (612 CUIs share)
+     C1299512  Osteomyelitis of upper limb  (1,730 CUIs share)
+     C1299898  Cholangiohepatitis (disorder)  (612 CUIs share)
+     C1301260  Gastrointestinal Crohn's disease  (616 CUIs share)
+     C1301261  Crohn disease of intestine  (617 CUIs share)
+     C1302323  Bacterial folliculitis (disorder)  (1,746 CUIs share)
+     C1305984  Contact dermatitis caused by chemical  (613 CUIs share)
+     C1328843  Autoimmune vasculitis  (612 CUIs share)
+     C1384588  Bacterial myocarditis  (1,741 CUIs share)
+     C1443977  Pneumonia caused by aerobic bacteria  (1,730 CUIs share)
+     C1444598  Syphilitic retinitis  (1,733 CUIs share)
+     C1444604  Infective uveitis  (1,740 CUIs share)
+     C1444605  Ocular syphilis  (1,734 CUIs share)
+     C1444691  Infective scleritis  (1,730 CUIs share)
+     C1504526  Toxic conjunctivitis  (612 CUIs share)
+     C1527298  Bacillary dysentery  (1,762 CUIs share)
+     C1532322  Infectious endophthalmitis  (1,731 CUIs share)
+     C1532550  Immune-mediated conjunctivitis  (612 CUIs share)
+     C1532621  Pneumonitis caused by inhaled substance  (612 CUIs share)
+     C1532959  White dot syndrome  (612 CUIs share)
+     C1541923  IE - Infective endocarditis  (1,733 CUIs share)
+     C1621825  Calculus of bile duct with cholecystitis  (621 CUIs share)
+     C1636781  Encephalitis caused by protozoa  (1,409 CUIs share)
+     C1692886  Bacterial arthritis  (1,741 CUIs share)
+     C1696371  Bacterial tonsillitis  (1,740 CUIs share)
+     C1698510  Bacterial otitis media  (1,740 CUIs share)
+     C1699099  Bacterial otitis externa  (1,740 CUIs share)
+     C1761609  Aspiration pneumonitis (disorder)  (614 CUIs share)
+     C1827724  Post-infective arthritis of joint of hand  (630 CUIs share)
+     C1827849  IgE mediated allergic asthma  (640 CUIs share)
+     C1828190  Post-infective arthritis of joint of foot  (629 CUIs share)
+     C1868955  Synovitis of joint of wrist  (618 CUIs share)
+     C1960032  Dermatitis of external auditory canal  (622 CUIs share)
+     C1997307  Infective arthritis of joint of hand  (1,730 CUIs share)
+     C1997788  Bacterial urethritis  (1,740 CUIs share)
+     C1997893  Rheumatoid arthritis of foot  (612 CUIs share)
+     C1998075  Arthritis of midtarsal joint  (612 CUIs share)
+     C1998185  Arthritis of joint of toe  (612 CUIs share)
+     C2005679  Bursitis of left hip  (615 CUIs share)
+     C2005691  Bursitis of right hip  (615 CUIs share)
+     C2015821  Otitis externa of bilateral ears  (641 CUIs share)
+     C2015822  Otitis externa of left ear  (630 CUIs share)
+     C2015823  Otitis externa of right ear  (630 CUIs share)
+     C2015824  Otitis media of bilateral ears  (612 CUIs share)
+     C2015825  Otitis media of left ear  (612 CUIs share)
+     C2015830  Otitis media of right ear  (612 CUIs share)
+     C2064448  Conjunctivitis of right eye  (612 CUIs share)
+     C2064449  Conjunctivitis of left eye  (612 CUIs share)
+     C2064450  Bilateral conjunctivitis  (612 CUIs share)
+     C2064451  Blepharoconjunctivitis of right eye  (612 CUIs share)
+     C2064452  Blepharoconjunctivitis of left eye  (612 CUIs share)
+     C2069986  Iritis of right eye  (631 CUIs share)
+     C2069987  Iritis of left eye  (631 CUIs share)
+     C2069988  Iridocyclitis of right eye  (639 CUIs share)
+     C2069989  Iridocyclitis of left eye  (639 CUIs share)
+     C2070002  Choroiditis of right eye  (622 CUIs share)
+     C2070003  Choroiditis of left eye  (622 CUIs share)
+     C2070004  Uveitis of right eye  (612 CUIs share)
+     C2070005  Uveitis of left eye  (612 CUIs share)
+     C2074067  Bilateral chorioretinitis of eyes  (629 CUIs share)
+     C2074108  Chorioretinitis of left eye  (622 CUIs share)
+     C2074145  Chorioretinitis of right eye  (622 CUIs share)
+     C2074504  Choroiditis of bilateral eyes  (629 CUIs share)
+     C2079286  Iritis of bilateral eyes  (642 CUIs share)
+     C2103540  Scleritis of right eye  (612 CUIs share)
+     C2103541  Scleritis of left eye  (612 CUIs share)
+     C2107872  Contact dermatitis of face  (613 CUIs share)
+     C2107886  Contact dermatitis of skin of left hand  (613 CUIs share)
+     C2107910  Contact dermatitis of skin of right hand  (613 CUIs share)
+     C2109337  Keratoconjunctivitis of left eye  (612 CUIs share)
+     C2109338  Keratoconjunctivitis of right eye  (612 CUIs share)
+     C2174578  Bilateral uveitis of eyes  (612 CUIs share)
+     C2315629  Bacterial arthritis of hip  (1,740 CUIs share)
+     C2607914  AR - Allergic rhinitis  (644 CUIs share)
+     C2711086  Inflammation of skin due to parasite  (1,410 CUIs share)
+     C2711227  Steatohepatitis (disorder)  (615 CUIs share)
+     C2711441  Inflammatory disease of female genital structure  (612 CUIs share)
+     C2717865  Antineutrophil cytoplasmic antibody (ANCA) positive vas  (757 CUIs share)
+     C2732336  Inflammation of joint of shoulder region  (612 CUIs share)
+     C2888171  Occupational contact dermatitis  (613 CUIs share)
+     C2919248  Inflammation of bursa of patella  (612 CUIs share)
+     C2919504  Infective arthritis of pelvis  (1,730 CUIs share)
+     C2919518  Infective arthritis of ankle and/or foot  (1,730 CUIs share)
+     C2945564  Pneumococcal arthritis  (1,732 CUIs share)
+     C2960115  Enteritis caused by fungus  (1,730 CUIs share)
+     C3163829  Sepsis caused by Gram negative bacteria (disorder)  (633 CUIs share)
+     C3164125  Sepsis caused by Streptococcus (disorder)  (639 CUIs share)
+     C3203547  Axial spondyloarthritis  (612 CUIs share)
+     C3266964  Myelitis caused by virus  (1,730 CUIs share)
+     C3472698  Non-allergic rhinitis  (612 CUIs share)
+     C3495439  Inflammatory breast disease  (667 CUIs share)
+     C3509325  Inflammation of muscle of shoulder  (612 CUIs share)
+     C3509327  Inflammation of muscle of forearm  (612 CUIs share)
+     C3531900  Infective endocarditis of cardiac valve  (1,730 CUIs share)
+     C3532584  Inflammation associated with device  (702 CUIs share)
+     C3532586  Inflammation associated with implant  (621 CUIs share)
+     C3697389  Arthritis of pelvis  (612 CUIs share)
+     C3698228  Lumbar arthritis  (612 CUIs share)
+     C3698494  Periodontitis as manifestation of systemic disease  (614 CUIs share)
+     C3714636  Pneumonitis  (612 CUIs share)
+     C3864070  Arthritis of right knee joint  (612 CUIs share)
+     C3864071  Arthritis of right hip  (612 CUIs share)
+     C3864072  Arthritis of joint of right hand (disorder)  (612 CUIs share)
+     C3864075  Arthritis of left knee joint  (612 CUIs share)
+     C3864076  Arthritis of left hip  (612 CUIs share)
+     C3864077  Arthritis of joint of left hand (disorder)  (612 CUIs share)
+     C3864080  Bilateral arthritis of knees  (612 CUIs share)
+     C3864082  Arthritis of joint of bilateral hands  (612 CUIs share)
+     C3873533  Mycobacterial lymphadenitis  (1,731 CUIs share)
+     C3874980  Secondary tubulointerstitial nephritis  (614 CUIs share)
+     C3887596  Transient arthritis  (629 CUIs share)
+     C3887895  Bursitis of elbow  (612 CUIs share)
+     C3890737  Autoinflammatory syndrome  (612 CUIs share)
+     C3898765  Keratitis caused by infection  (1,730 CUIs share)
+     C4023113  Small vessel vasculitis  (612 CUIs share)
+     C4023559  Localised periodontitis  (612 CUIs share)
+     C4023560  Generalized periodontitis  (612 CUIs share)
+     C4025218  Vasculitis of large artery  (612 CUIs share)
+     C4038619  Allergic contact dermatitis caused by chemical  (613 CUIs share)
+     C4038857  Bursitis of lower limb  (612 CUIs share)
+     C4039406  Bursitis of upper limb  (612 CUIs share)
+     C4047543  Bilateral arthritis of hip  (612 CUIs share)
+     C4047594  Inflammation of joint of right shoulder region (finding  (612 CUIs share)
+     C4047597  Inflammation of joint of left shoulder region  (612 CUIs share)
+     C4047627  Bilateral inflammation of shoulder regions  (612 CUIs share)
+     C4047860  Bilateral blepharitis  (612 CUIs share)
+     C4049342  Osteomyelitis of foot  (1,730 CUIs share)
+     C4075068  Inflammatory disorder of jaw region  (612 CUIs share)
+     C4075133  Residual osteitis  (612 CUIs share)
+     C4081713  Conjunctivitis of left eye caused by virus  (1,730 CUIs share)
+     C4081714  Conjunctivitis of right eye caused by virus  (1,730 CUIs share)
+     C4081960  Capsulitis of ankle  (616 CUIs share)
+     C4280937  Blepharitis of right eyelid  (612 CUIs share)
+     C4281051  Dacryocystitis of left lacrimal sac  (617 CUIs share)
+     C4281052  Dacryocystitis of right lacrimal sac  (617 CUIs share)
+     C4281054  Infective otitis externa of left ear  (1,747 CUIs share)
+     C4281055  Infective otitis externa of right ear  (1,747 CUIs share)
+     C4283750  Colitis caused by protozoan  (1,409 CUIs share)
+     C4301996  Cranial neuropathy due to Herpes zoster  (1,736 CUIs share)
+     C4303013  Meibomianitis of right eyelid  (617 CUIs share)
+     C4303014  Meibomianitis of left eyelid  (616 CUIs share)
+     C4303077  Meningitis caused by Spirochaetes  (1,730 CUIs share)
+     C4303183  Parasitic infection causing colitis  (1,409 CUIs share)
+     C4303199  Parasitic infection causing inflammation of small intes  (1,409 CUIs share)
+     C4303468  Myelitis caused by bacterium  (1,740 CUIs share)
+     C4305062  Blepharitis of left eyelid  (612 CUIs share)
+     C4305491  Infective duodenitis  (1,730 CUIs share)
+     C4509648  Arthritis of left glenohumeral joint  (612 CUIs share)
+     C4509653  Arthritis of left wrist  (612 CUIs share)
+     C4509654  Arthritis of right ankle  (612 CUIs share)
+     C4509656  Arthritis of right elbow  (612 CUIs share)
+     C4509657  Arthritis of right foot  (612 CUIs share)
+     C4509658  Arthritis of right glenohumeral joint  (612 CUIs share)
+     C4509665  Arthritis of right wrist  (612 CUIs share)
+     C4510331  Bursitis of left knee  (617 CUIs share)
+     C4510332  Bursitis of right knee  (617 CUIs share)
+     C4510423  Bilateral arthritis of feet  (612 CUIs share)
+     C4510426  Bilateral arthritis of ankle  (612 CUIs share)
+     C4510435  Arthritis of left foot  (612 CUIs share)
+     C4510436  Arthritis of left elbow  (612 CUIs share)
+     C4510438  Arthritis of left ankle  (612 CUIs share)
+     C4510578  Infective arthritis of left knee  (1,730 CUIs share)
+     C4510613  Patellar bursitis of right knee  (613 CUIs share)
+     C4510635  Infective arthritis of right knee  (1,730 CUIs share)
+     C4510988  Monogenic autoinflammatory syndrome  (612 CUIs share)
+     C4511310  Dermatitis of anogenital region  (613 CUIs share)
+     C4518482  Extraintestinal Crohn's  (616 CUIs share)
+     C4543802  Infection of genitourinary system caused by Neisseria g  (1,735 CUIs share)
+     C4544398  Bilateral arthritis of elbows  (612 CUIs share)
+     C4544965  Dermatitis of male genitalia  (613 CUIs share)
+     C4544977  Allergic enteritis of small intestine  (1,564 CUIs share)
+     C4545168  Patellar bursitis of left knee  (613 CUIs share)
+     C4545242  Infective arthritis of left ankle  (1,730 CUIs share)
+     C4545243  Infective arthritis of right ankle  (1,730 CUIs share)
+     C4546431  Exacerbation of allergic asthma  (1,680 CUIs share)
+     C4703414  Inflammation of anterior lid margin  (612 CUIs share)
+     C4721555  Autoimmune hepatitis (disorder)  (623 CUIs share)
+     C4750967  Bursitis of bilateral knees  (620 CUIs share)
+     C5190909  Osteitis of pelvis  (612 CUIs share)
+     C5191348  Synovitis of ankle joint  (615 CUIs share)
+     C5192598  Inflammatory disorder of visual pathway  (612 CUIs share)
+     C5229738  Eczema of lower limb  (613 CUIs share)
+     C5230991  Exogenous dermatitis  (612 CUIs share)
+     C5394397  Type I interferonopathy  (612 CUIs share)
+     C5396143  Interstitial keratitis of left eye  (617 CUIs share)
+     C5396144  Interstitial keratitis of right eye  (617 CUIs share)
+     C5396323  Bilateral retinitis of eyes  (612 CUIs share)
+     C5396324  Retinitis of right eye  (612 CUIs share)
+     C5396325  Retinitis of left eye  (612 CUIs share)
+     C5437559  Contact dermatitis caused by urushiol  (614 CUIs share)
+     C5547262  Sepsis caused by coliform bacteria  (633 CUIs share)
+     C5566258  Mycobacterial arthritis  (1,734 CUIs share)
+     C5566927  Bunyaviridae encephalitis  (1,730 CUIs share)
+     C5566943  Flavivirus encephalitis  (1,730 CUIs share)
+     C5566988  Paramyxoviridae encephalitis  (1,730 CUIs share)
+     C5569080  Enteritis of intestine  (612 CUIs share)
+     C5569194  Mycobacterial enteritis of intestine  (1,734 CUIs share)
+     C5569221  Protozoal enteritis of intestine  (1,409 CUIs share)
+     C5671289  Autoimmune encephalitis  (614 CUIs share)
+     C5686180  Recurrent anterior uveitis  (626 CUIs share)
+     C5688167  Secondary conjunctivitis  (631 CUIs share)
+     C5688379  Infection of conjunctiva of left eye  (1,730 CUIs share)
+     C5688380  Infection of conjunctiva of right eye  (1,730 CUIs share)
+     C5688381  Bilateral infectious conjunctivitis  (1,730 CUIs share)
+     C5688885  Inflammation of intestine caused by Escherichia coli  (1,730 CUIs share)
+     C5688887  Inflammation of intestine caused by Shigella  (1,730 CUIs share)
+     C5703307  Inflammation of joint of bilateral hands (finding)  (612 CUIs share)
+     C5703473  Pruritus and inflammation of skin  (612 CUIs share)
+     C5768303  Allergic contact dermatitis of face  (613 CUIs share)
+     C5769579  Autoimmune neuritis  (612 CUIs share)
+     C5774132  Arthritis of joint of right shoulder region  (612 CUIs share)
+     C5774133  Arthritis of joint of left shoulder region  (612 CUIs share)
+     C5774146  Inflammation of joint of left hand (finding)  (612 CUIs share)
+     C5774148  Inflammation of joint of right hand  (612 CUIs share)
+     C5778607  Bilateral arthritis of shoulders  (612 CUIs share)
+     C5879956  Reactive arthritis of joint of foot  (629 CUIs share)
+     C5887497  Arthritis of shoulder region joint  (612 CUIs share)
+     C5920941  Infective arthritis of joint of vertebral column  (1,730 CUIs share)
+     C5922050  Arthritis of joint of bilateral wrist regions  (612 CUIs share)
+     C5922052  Arthritis of left radiocarpal joint  (621 CUIs share)
+     C5922053  Arthritis of right radiocarpal joint  (621 CUIs share)
+     C5922515  Arthritis of joint of hand  (612 CUIs share)
+     C5922517  Arthritis of joint of foot  (612 CUIs share)
+     C5922524  Arthritis of sacroiliac joint  (612 CUIs share)
+     C5923694  Contact dermatitis caused by medication  (733 CUIs share)
+     C5923831  Inflammation of peripheral nerve of upper limb  (612 CUIs share)
+     C5970502  Traumatic arthritis  (612 CUIs share)
+
+  Union (689 topics)
