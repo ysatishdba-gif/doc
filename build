@@ -5,22 +5,26 @@ Build CUI -> [topic_ids] lookup via nearest-canonical IS-A roll-up.
 
 ARCHITECTURE:
 
-  1. Organizing nodes (= topics) are detected by where their
-     children-count falls in the GRAPH'S OWN distribution of
-     children-counts. Specifically: between the LOWER_PERCENTILE and
-     UPPER_PERCENTILE of children-counts among non-leaf nodes.
+  1. Organizing nodes (= topics) are detected by their STY-DESCENDANT
+     COUNT — how many of their descendants carry any UMLS semantic
+     type. A node with many STY-bearing descendants organizes
+     clinically meaningful content. A node with few does not.
 
-  2. Each organizing node IS a topic. The organizing nodes themselves
-     are the canonicals — not their children. This is more stable than
-     using children as canonicals, because children of organizing
-     nodes include both real subcategories AND modeling artifacts.
+     We use a percentile cut (top 25% by default) on this distribution.
+     Plus a mega-root exclusion (top 1% by direct children count) to
+     prevent SNOMED roots from absorbing the whole ontology.
 
-  3. Each CUI's topics = NEAREST canonical ancestors (BFS up until
-     the first canonical is hit, stop there).
+     Earlier versions used raw children-count percentile, which
+     selected structurally bushy but clinically marginal nodes
+     (taxonomic, anatomical microstructure). STY-descendant count
+     better proxies for clinical centrality.
 
-     This avoids topic explosion: walking up to ALL canonical
-     ancestors produces 15-80 topics per CUI for deep concepts.
-     Nearest-only typically produces 1-3 topics per CUI.
+  2. Stacked canonicals are pruned by keep-HIGHEST: if A is an
+     ancestor of B and both are canonical, B is dropped. This keeps
+     broader organizing concepts as topics.
+
+  3. Each CUI's topics = NEAREST canonical ancestors via multi-source
+     downward BFS from all canonicals at once.
 
 USAGE (GCP notebook): paste the contents of this file into a cell.
 The call to main() at the bottom runs the build.
@@ -37,29 +41,49 @@ from collections import defaultdict, Counter, deque
 CACHE_PATH = "umls_cache.pkl"
 OUTPUT_PATH = "topic_lookup.pkl"
 
-# Percentile band within the graph's distribution of children-counts
-# (computed over non-leaf nodes).
+# Canonical selection — STY-coverage based with structural filter.
 #
-# Lower percentile excludes "barely-branching" nodes (1-2 children, very
-# common in SNOMED).
-# Upper percentile excludes mega-hubs (the top 1% of nodes that have
-# hundreds of children — these are near-root organizing concepts that
-# would pull in too much of the corpus).
+# Empirical finding from running on real SNOMED: pure children-count
+# percentile selection picks structurally bushy nodes that are NOT
+# clinically central. Common clinical concepts (Pneumonia, TB, MI) are
+# not necessarily bushy; they organize meaningful clinical regions
+# without having dozens of direct children.
 #
-# These are not magnitudes — they're cuts on the graph's own
-# distribution. They scale with whatever SNOMED looks like.
-LOWER_PERCENTILE = 75
-UPPER_PERCENTILE = 99
+# The fix: measure "how much clinical content does this node organize"
+# instead of "how locally bushy is this node." Specifically, count
+# how many descendants carry ANY UMLS semantic type — these are the
+# concepts that participate in clinical retrieval.
+#
+# A node becomes a candidate canonical if its STY-bearing descendant
+# count is in the top STY_PERCENTILE_BAND of the graph's distribution.
+# This naturally elevates clinically-central organizers (Pneumonia
+# has many Disease-typed descendants) over structurally-bushy noise
+# (Cypriniformes has many descendants but they're all organism CUIs,
+# which is fine, but it competes evenly with Disease).
+#
+# Secondary filter: exclude mega-roots (top MEGA_ROOT_PERCENTILE by
+# children count). These would absorb most of the ontology.
+STY_LOWER_PERCENTILE = 75
+STY_UPPER_PERCENTILE = 100   # no upper bound — let big organizers in
+MEGA_ROOT_PERCENTILE = 99    # exclude top 1% by direct children count
+
+# Whether to prune nested/stacked canonicals.
+#
+# When FALSE (default): keep all qualifying canonicals, even when one
+# is an IS-A ancestor of another. The nearest-canonical BFS naturally
+# picks the closest one for each CUI, so a CUI under both Pneumonia
+# (sub-canonical) and Disorder (super-canonical) gets Pneumonia as
+# its topic. CUIs under Disorder but NOT under any sub-canonical get
+# Disorder. Multiple levels of abstraction are preserved.
+#
+# When TRUE: drop canonicals that have other canonicals as ancestors
+# (keep highest). Forces broader topics but can collapse everything
+# to a few mega-roots if SNOMED roots qualify.
+PRUNE_STACKED_CANONICALS = False
 
 # When True: CUIs with no canonical ancestor become their OWN topic
 # (a single-member topic). Ensures every CUI is retrievable but inflates
 # the topic count by however many "orphan" CUIs there are.
-#
-# When False: CUIs without a canonical ancestor have no topic. Compact
-# but means some CUIs are not retrievable via this index.
-#
-# Default False for compactness. Turn on if retrieval coverage matters
-# more than index size.
 SINGLETON_FALLBACK = False
 
 
@@ -93,31 +117,80 @@ def hash_topic(cui):
 
 
 # ============================================================================
-# Subhierarchy parent detection (data-distribution-based)
+# Subhierarchy parent detection (STY-coverage based)
 # ============================================================================
 
-def find_subhierarchy_parents(cuis, children):
+def find_subhierarchy_parents(cuis, children, tags):
     """
-    A CUI qualifies as a subhierarchy parent if its children-count
-    falls within the percentile band of the graph's distribution of
-    non-leaf children-counts.
+    A CUI qualifies as a subhierarchy parent if BOTH:
+      (1) Its STY-bearing-descendant count is in the top
+          [STY_LOWER_PERCENTILE, STY_UPPER_PERCENTILE] of the graph's
+          distribution. This measures "how much typed content does
+          this node organize" — a better proxy for clinical centrality
+          than raw children-count.
+      (2) Its direct children-count is NOT in the top MEGA_ROOT_PERCENTILE
+          (excludes the few mega-roots that would absorb most of the
+          ontology).
+
+    Computing STY-descendant-count requires one reverse-topological
+    pass over the graph. We use memoized BFS on each non-leaf node.
 
     Returns:
-      found:        dict cui -> {n_children, percentile}
-      lower_bound:  the children-count at LOWER_PERCENTILE
-      upper_bound:  the children-count at UPPER_PERCENTILE
+      found:               dict cui -> structural metrics
+      sty_lower, sty_upper, mega_root_threshold:  the actual cutoffs
     """
-    # Children-count distribution for non-leaf nodes
-    cc = {c: len(children.get(c, ())) for c in cuis if children.get(c)}
-    sorted_counts = sorted(cc.values())
-    lower_bound = percentile_value(sorted_counts, LOWER_PERCENTILE)
-    upper_bound = percentile_value(sorted_counts, UPPER_PERCENTILE)
+    # Compute STY-descendant-count for every non-leaf node.
+    # A descendant "counts" if it has any UMLS semantic type.
+    sty_desc_count = {}
+    desc_cache = {}
+
+    def descendants(c):
+        if c in desc_cache:
+            return desc_cache[c]
+        visited = {c}
+        frontier = {c}
+        while frontier:
+            nxt = set()
+            for n in frontier:
+                for ch in children.get(n, ()):
+                    if ch not in visited:
+                        visited.add(ch)
+                        nxt.add(ch)
+            frontier = nxt
+        desc_cache[c] = visited
+        return visited
+
+    non_leaf = [c for c in cuis if children.get(c)]
+    for cui in non_leaf:
+        desc = descendants(cui)
+        n_sty_desc = sum(1 for d in desc if tags.get(d))
+        sty_desc_count[cui] = n_sty_desc
+
+    # Children-count distribution (for mega-root filter)
+    cc = {c: len(children.get(c, ())) for c in non_leaf}
+
+    # Percentile cuts on STY-descendant distribution
+    sorted_sty = sorted(sty_desc_count.values())
+    sty_lower = percentile_value(sorted_sty, STY_LOWER_PERCENTILE)
+    sty_upper = percentile_value(sorted_sty, STY_UPPER_PERCENTILE)
+
+    # Mega-root threshold on direct children-count
+    sorted_cc = sorted(cc.values())
+    mega_root_threshold = percentile_value(sorted_cc, MEGA_ROOT_PERCENTILE)
 
     found = {}
-    for cui, n in cc.items():
-        if lower_bound <= n <= upper_bound:
-            found[cui] = {"n_children": n}
-    return found, lower_bound, upper_bound
+    for cui in non_leaf:
+        n_sty_desc = sty_desc_count[cui]
+        n_children = cc[cui]
+        if not (sty_lower <= n_sty_desc <= sty_upper):
+            continue
+        if n_children > mega_root_threshold:
+            continue
+        found[cui] = {
+            "n_children": n_children,
+            "sty_descendant_count": n_sty_desc,
+        }
+    return found, sty_lower, sty_upper, mega_root_threshold
 
 
 # ============================================================================
@@ -126,18 +199,15 @@ def find_subhierarchy_parents(cuis, children):
 
 def extract_canonicals(subhier_parents, children):
     """
-    Canonicals = the subhierarchy parents themselves.
-
-    Previous design used children of subhier parents as canonicals.
-    That was unstable: a subhier parent's children include both
-    organizing concepts AND modeling artifacts, mixed by ontology
-    region. Using the subhier parents themselves filters out the
-    artifacts because they're only kept if they pass the structural
-    test (percentile band on children-count).
+    Canonicals = the subhierarchy parents themselves (now selected by
+    STY-descendant coverage rather than raw children-count).
     """
     canonicals = set(subhier_parents.keys())
     canonical_info = {
-        c: {"n_children": subhier_parents[c]["n_children"]}
+        c: {
+            "n_children": subhier_parents[c]["n_children"],
+            "sty_descendant_count": subhier_parents[c]["sty_descendant_count"],
+        }
         for c in canonicals
     }
     return canonicals, canonical_info
@@ -261,12 +331,13 @@ def compute_topics_per_cui(all_cuis, canonicals, parents, children):
 
 def main():
     print("=" * 60)
-    print("Topic builder (nearest-canonical, percentile-banded)")
+    print("Topic builder (STY-coverage based, nearest-canonical)")
     print("=" * 60)
     print(f"  cache         : {CACHE_PATH}")
     print(f"  output        : {OUTPUT_PATH}")
-    print(f"  percentile    : [{LOWER_PERCENTILE}, {UPPER_PERCENTILE}] of "
-          f"non-leaf children-counts")
+    print(f"  STY band      : [{STY_LOWER_PERCENTILE}, {STY_UPPER_PERCENTILE}] of "
+          f"STY-descendant counts")
+    print(f"  mega filter   : exclude top {100-MEGA_ROOT_PERCENTILE}% by direct children")
 
     print("\n[1/5] Loading cache ...")
     t0 = time.time()
@@ -281,25 +352,27 @@ def main():
     n_edges = sum(len(ps) for ps in parents.values())
     print(f"  {n_edges:,} IS-A edges in {time.time()-t0:.1f}s")
 
-    print(f"\n[3/5] Finding subhierarchy parents (percentile band) ...")
+    print(f"\n[3/5] Finding subhierarchy parents (STY-coverage based) ...")
     t0 = time.time()
-    subhier_parents, lower, upper = find_subhierarchy_parents(
-        cache["cuis"], children,
+    subhier_parents, sty_lower, sty_upper, mega_thresh = find_subhierarchy_parents(
+        cache["cuis"], children, cache["tags"],
     )
-    print(f"  Distribution of non-leaf children-counts:")
-    print(f"    {LOWER_PERCENTILE}th percentile = {lower} children")
-    print(f"    {UPPER_PERCENTILE}th percentile = {upper} children")
+    print(f"  STY-descendant count cutoffs:")
+    print(f"    {STY_LOWER_PERCENTILE}th percentile = {sty_lower:,} STY descendants")
+    print(f"    {STY_UPPER_PERCENTILE}th percentile = {sty_upper:,} STY descendants")
+    print(f"  Mega-root threshold (children-count): {mega_thresh}")
     print(f"  Found {len(subhier_parents):,} subhierarchy parents "
           f"in {time.time()-t0:.1f}s")
-    print(f"\n  Top 30 subhierarchy parents (by children count):")
+    print(f"\n  Top 30 subhierarchy parents (by STY-descendant count):")
     sorted_sp = sorted(
         subhier_parents.items(),
-        key=lambda kv: -kv[1]["n_children"],
+        key=lambda kv: -kv[1]["sty_descendant_count"],
     )
     for cui, info in sorted_sp[:30]:
         label = labels.get(cui, "?")
-        print(f"    children={info['n_children']:>4d}  "
-              f"{cui}  {label[:55]}")
+        print(f"    sty_desc={info['sty_descendant_count']:>6,d}  "
+              f"children={info['n_children']:>4d}  "
+              f"{cui}  {label[:50]}")
     if len(sorted_sp) > 30:
         print(f"    ... plus {len(sorted_sp) - 30} more subhier parents")
 
@@ -309,25 +382,30 @@ def main():
     print(f"  Found {len(canonicals):,} canonical CUIs in "
           f"{time.time()-t0:.1f}s")
 
-    print(f"\n  Pruning stacked canonicals (downward marking, keep HIGHEST) ...")
-    t0 = time.time()
-    n_before = len(canonicals)
-    canonicals = prune_stacked_canonicals(canonicals, children)
-    canonical_info = {c: canonical_info[c] for c in canonicals if c in canonical_info}
-    n_dropped = n_before - len(canonicals)
-    print(f"  Pruned {n_dropped:,} descendant canonicals "
-          f"in {time.time()-t0:.1f}s")
+    if PRUNE_STACKED_CANONICALS:
+        print(f"\n  Pruning stacked canonicals (keep HIGHEST) ...")
+        t0 = time.time()
+        n_before = len(canonicals)
+        canonicals = prune_stacked_canonicals(canonicals, children)
+        canonical_info = {c: canonical_info[c] for c in canonicals if c in canonical_info}
+        n_dropped = n_before - len(canonicals)
+        print(f"  Pruned {n_dropped:,} descendant canonicals "
+              f"in {time.time()-t0:.1f}s")
+    else:
+        print(f"\n  Skipping stacked-canonical pruning (allow nested canonicals)")
+        print(f"  Nearest-canonical BFS will naturally pick closest one")
     print(f"  Final canonicals: {len(canonicals):,}")
 
-    # Compute children-count for top canonicals (for display)
-    canon_kid_counts = {
-        c: len(children.get(c, ())) for c in canonicals
-    }
-    print(f"\n  Top 30 canonicals (by children count):")
-    sorted_canon = sorted(canon_kid_counts.items(), key=lambda kv: -kv[1])
-    for cui, n_kids in sorted_canon[:30]:
+    print(f"\n  Top 30 canonicals (by STY-descendant count):")
+    sorted_canon = sorted(
+        canonical_info.items(),
+        key=lambda kv: -kv[1]["sty_descendant_count"],
+    )
+    for cui, info in sorted_canon[:30]:
         cui_label = labels.get(cui, "?")
-        print(f"    children={n_kids:>4d}  {cui}  {cui_label[:55]}")
+        print(f"    sty_desc={info['sty_descendant_count']:>6,d}  "
+              f"children={info['n_children']:>4d}  "
+              f"{cui}  {cui_label[:50]}")
 
     print("\n[5/5] Computing nearest-canonical topics (multi-source downward BFS) ...")
     print(f"  (singleton fallback: {SINGLETON_FALLBACK})")
@@ -439,13 +517,15 @@ def main():
         "built_at": datetime.datetime.now().isoformat(),
         "cache_fetched_at": cache.get("fetched_at"),
         "config": {
-            "detection": "percentile-band on non-leaf children-counts",
-            "lower_percentile": LOWER_PERCENTILE,
-            "upper_percentile": UPPER_PERCENTILE,
-            "actual_lower_bound": lower,
-            "actual_upper_bound": upper,
+            "detection": "STY-descendant percentile + mega-root filter",
+            "sty_lower_percentile": STY_LOWER_PERCENTILE,
+            "sty_upper_percentile": STY_UPPER_PERCENTILE,
+            "mega_root_percentile": MEGA_ROOT_PERCENTILE,
+            "actual_sty_lower": sty_lower,
+            "actual_sty_upper": sty_upper,
+            "actual_mega_root_threshold": mega_thresh,
             "topic_assignment": "nearest canonical via multi-source downward BFS",
-            "stacked_canonical_pruning": "keep highest (drop descendant canonicals)",
+            "prune_stacked_canonicals": PRUNE_STACKED_CANONICALS,
             "singleton_fallback": SINGLETON_FALLBACK,
         },
         "subhierarchy_parents": subhier_parents,
