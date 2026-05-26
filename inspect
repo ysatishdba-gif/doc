@@ -3,47 +3,47 @@ lookup_topics.py
 ----------------
 Look up topics for CUIs in the DUAL system (IS-A + RELA).
 
-For each CUI, prints both:
-  - IS-A topics (via IS-A graph, nearest canonical)
-  - RELA topics (via undirected RELA graph, nearest canonical)
-
-Also shows overlap and union, since retrieval will likely use the union.
+For each CUI prints:
+  - Its preferred label from the cache
+  - IS-A topics (via IS-A graph)
+  - RELA topics (via undirected RELA graph)
+  - Union
 """
 
 import pickle
+import hashlib
 
 
 PICKLE_PATH = "topic_lookup.pkl"
 
-# CUIs to look up — focused on the allergy retrieval scenario
+
+# Just CUI codes. Edit this list.
 CUIS_TO_LOOKUP = [
-    # === Allergy core (THE PAIR YOU CARE ABOUT) ===
-    ("C1527304", "Allergic reaction (the query)"),
-    ("C0020517", "Hypersensitivity / Allergy (general)"),
-    ("C0002792", "Anaphylaxis (severe)"),
-    ("C0013182", "Allergy to drug"),
-    # Specific allergies — these are the document-side concepts
-    ("C0559470", "Peanut allergy (guess #1)"),
-    ("C0269811", "Peanut allergy (guess #2)"),
-    ("C1257794", "Food allergy (general)"),
-    ("C2939115", "Allergy to food (alternate)"),
-    ("C0157738", "Allergy to milk (guess)"),
-    ("C0264937", "Atopic eczema (allergy-adjacent)"),
-
-    # === Anchors (sanity check — unchanged from previous runs) ===
-    ("C0032285", "Pneumonia"),
-    ("C0027051", "Myocardial infarction"),
-    ("C0011849", "Diabetes mellitus"),
-    ("C0020538", "Hypertension"),
-
-    # === Cross-axis test cases ===
-    ("C0024109", "Lung structure (anatomy)"),
-    ("C0014834", "Escherichia coli (organism)"),
-    ("C0021368", "Inflammation (pathology)"),
+    "C1527304",   # Allergic reaction
+    "C0020517",
+    "C0002792",
+    "C0013182",
+    "C0559470",
+    "C0269811",
+    "C1257794",
+    "C2939115",
+    "C0157738",
+    "C0264937",
+    "C0032285",
+    "C0027051",
+    "C0011849",
+    "C0020538",
+    "C0024109",
+    "C0014834",
+    "C0021368",
 ]
 
 
-def lookup(cui, expected, payload):
+def hash_topic(cui):
+    return "tp_" + hashlib.sha1(cui.encode()).hexdigest()[:12]
+
+
+def lookup(cui, payload):
     labels = payload["labels"]
     tags = payload["tags"]
     isa_map = payload["isa_cui_topic_ids"]
@@ -57,27 +57,24 @@ def lookup(cui, expected, payload):
 
     print(f"\n{'='*78}")
     print(f"  {cui}  {cui_label}")
-    print(f"  [expected: {expected}]")
     print(f"{'='*78}")
     if cui_stys:
         print(f"  STY: {', '.join(cui_stys)}")
 
     if cui_label == "?":
-        print(f"  -> CUI not in cache (skipping)")
+        print(f"  -> CUI not in cache")
         return
 
     isa_tids = isa_map.get(cui, set())
     rela_tids = rela_map.get(cui, set())
-
-    # Convert to canonical sets for readability
     isa_canons = {topic_to_canon[t] for t in isa_tids}
     rela_canons = {topic_to_canon[t] for t in rela_tids}
 
     print(f"\n  IS-A topics  ({len(isa_canons)}):")
     if isa_canons:
         for c in sorted(isa_canons):
-            members = len(isa_topic_to_cuis.get(hash_for(c), set()))
-            print(f"     {c}  {labels.get(c, '?')[:50]}  "
+            members = len(isa_topic_to_cuis.get(hash_topic(c), set()))
+            print(f"     {c}  {labels.get(c, '?')[:55]}  "
                   f"({members:,} CUIs share)")
     else:
         print(f"     <none>")
@@ -85,66 +82,14 @@ def lookup(cui, expected, payload):
     print(f"\n  RELA topics  ({len(rela_canons)}):")
     if rela_canons:
         for c in sorted(rela_canons):
-            members = len(rela_topic_to_cuis.get(hash_for(c), set()))
-            print(f"     {c}  {labels.get(c, '?')[:50]}  "
+            members = len(rela_topic_to_cuis.get(hash_topic(c), set()))
+            print(f"     {c}  {labels.get(c, '?')[:55]}  "
                   f"({members:,} CUIs share)")
     else:
         print(f"     <none>")
 
-    # Combined
     union = isa_canons | rela_canons
-    both = isa_canons & rela_canons
-    if both:
-        print(f"\n  Shared between systems ({len(both)}): "
-              f"{sorted([labels.get(c, c)[:30] for c in both])}")
-    print(f"  Union ({len(union)} topics)")
-
-
-def hash_for(cui):
-    import hashlib
-    return "tp_" + hashlib.sha1(cui.encode()).hexdigest()[:12]
-
-
-def check_overlap(cui_a, cui_b, label_a, label_b, payload):
-    """
-    Check whether two CUIs share any topic — this is what retrieval needs.
-    """
-    isa_map = payload["isa_cui_topic_ids"]
-    rela_map = payload["rela_cui_topic_ids"]
-    topic_to_canon = payload["topic_to_canonical"]
-    labels = payload["labels"]
-
-    a_isa = isa_map.get(cui_a, set())
-    b_isa = isa_map.get(cui_b, set())
-    a_rela = rela_map.get(cui_a, set())
-    b_rela = rela_map.get(cui_b, set())
-
-    a_all = a_isa | a_rela
-    b_all = b_isa | b_rela
-
-    print(f"\n{'#'*78}")
-    print(f"# OVERLAP TEST: '{label_a}'  vs  '{label_b}'")
-    print(f"#   {cui_a}  '{labels.get(cui_a, '?')}'")
-    print(f"#   {cui_b}  '{labels.get(cui_b, '?')}'")
-    print(f"{'#'*78}")
-    isa_overlap = a_isa & b_isa
-    rela_overlap = a_rela & b_rela
-    cross1 = a_isa & b_rela
-    cross2 = a_rela & b_isa
-    any_overlap = (a_all & b_all)
-
-    def fmt(tids):
-        return sorted({labels.get(topic_to_canon[t], '?')[:40] for t in tids})
-
-    print(f"  IS-A ∩ IS-A: {len(isa_overlap)}  {fmt(isa_overlap)}")
-    print(f"  RELA ∩ RELA: {len(rela_overlap)}  {fmt(rela_overlap)}")
-    print(f"  A.IS-A ∩ B.RELA: {len(cross1)}  {fmt(cross1)}")
-    print(f"  A.RELA ∩ B.IS-A: {len(cross2)}  {fmt(cross2)}")
-    print(f"  TOTAL UNION ∩ UNION: {len(any_overlap)}")
-    if any_overlap:
-        print(f"  RESULT: RETRIEVAL POSSIBLE — shared topics: {fmt(any_overlap)}")
-    else:
-        print(f"  RESULT: NO RETRIEVAL — CUIs don't share any topic")
+    print(f"\n  Union ({len(union)} topics)")
 
 
 def main():
@@ -155,33 +100,9 @@ def main():
     print(f"  total canonicals: {len(payload['canonicals']):,}")
     print(f"  CUIs w/ IS-A    : {len(payload['isa_cui_topic_ids']):,}")
     print(f"  CUIs w/ RELA    : {len(payload['rela_cui_topic_ids']):,}")
-    cfg = payload.get("config", {})
-    print(f"  n RELAs (non-isa): {cfg.get('n_included_relas', '?')}")
 
-    print("\n" + "#"*78)
-    print("# PART 1: Individual CUI lookups")
-    print("#"*78)
-    for cui, expected in CUIS_TO_LOOKUP:
-        lookup(cui, expected, payload)
-
-    # Explicit pair-overlap tests — the allergy retrieval scenario
-    print("\n\n" + "#"*78)
-    print("# PART 2: Pair overlap tests")
-    print("#"*78)
-
-    # The pair you specifically asked about
-    pairs = [
-        ("C1527304", "Allergic reaction", "C0559470", "Peanut allergy #1"),
-        ("C1527304", "Allergic reaction", "C0269811", "Peanut allergy #2"),
-        ("C1527304", "Allergic reaction", "C2939115", "Food allergy"),
-        ("C1527304", "Allergic reaction", "C0157738", "Milk allergy"),
-        ("C1527304", "Allergic reaction", "C0002792", "Anaphylaxis"),
-        ("C1527304", "Allergic reaction", "C0013182", "Drug allergy"),
-        # Cross-domain check
-        ("C0032285", "Pneumonia", "C0024109", "Lung structure"),
-    ]
-    for cui_a, label_a, cui_b, label_b in pairs:
-        check_overlap(cui_a, cui_b, label_a, label_b, payload)
+    for cui in CUIS_TO_LOOKUP:
+        lookup(cui, payload)
 
 
 main()
