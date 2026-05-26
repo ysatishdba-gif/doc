@@ -1,101 +1,48 @@
 """
-build_topics_from_graph.py
---------------------------
-Build a topic system from the network graph pickle (data).
+compare_graph_vs_mrrel.py
+-------------------------
+Side-by-side comparison of:
+  - Graph-based CUI neighbors (1-hop from the suffix-bridge graph)
+  - MRREL-based topics (from existing topic_lookup.pkl)
 
-Data sources:
-  - `data` : pre-loaded NetworkX DiGraph (the suffix-bridge graph)
-  - BigQuery: SNOMED CUI list + STY tags (queried fresh)
+For each focal CUI, prints:
+  - Its graph neighbors (with labels)
+  - Its MRREL IS-A topics (with labels)
+  - Its MRREL RELA topics (with labels)
+  - Overlap analysis: which graph neighbors are also MRREL topics?
 
-Outputs (one pickle):
-  - cui_topic_ids_conservative
-  - cui_topic_ids_inclusive
-  - canonicals (shared)
-  - labels, tags
-  - per-rule canonical info, topic stats
-
-Run as a notebook script, NOT a standalone python file. It assumes
-`data` is already loaded.
+Run in notebook AFTER:
+  - `data` is loaded (the network graph)
+  - umls_cache.pkl is available
+  - topic_lookup.pkl is available (the dual MRREL build)
 """
 
 import pickle
-import datetime
-import hashlib
-import time
-from collections import defaultdict, Counter, deque
-import statistics
-
-# Optional: only needed if you run main() rather than pasting in cells
-# from google.cloud import bigquery
+from collections import defaultdict
 
 
 # ============================================================================
 # Config
 # ============================================================================
 
-OUTPUT_PATH = "topic_lookup_from_graph.pkl"
+CACHE_PATH = "umls_cache.pkl"
+MRREL_PICKLE_PATH = "topic_lookup.pkl"  # the dual IS-A + RELA build
 
-# Canonical detection thresholds — same as before
-STY_LOWER_PERCENTILE = 75
-MEGA_ROOT_PERCENTILE = 99
-CANONICAL_EXCLUDE = {"C2720507"}
-
-
-# ============================================================================
-# STEP 1: Fetch SNOMED CUIs + STY tags from BigQuery
-# ============================================================================
-# Fill in your BigQuery details. This is roughly what the original build used.
-# Modify table names / project IDs as needed.
-
-def fetch_snomed_cuis_and_tags():
-    """
-    Returns:
-        cuis: set of all SNOMED CUIs
-        tags: dict[cui] -> frozenset of STY codes
-        labels: dict[cui] -> preferred name
-    """
-    from google.cloud import bigquery
-    client = bigquery.Client()
-
-    # Get SNOMED CUI list + preferred labels
-    print("  Querying MRCONSO for SNOMED CUIs ...")
-    q_conso = """
-    SELECT CUI, STR
-    FROM `<YOUR_PROJECT>.<YOUR_DATASET>.MRCONSO`
-    WHERE SAB = 'SNOMEDCT_US'
-      AND ISPREF = 'Y'
-      AND TS = 'P'
-      AND STT = 'PF'
-    """
-    # ^^ ADJUST PROJECT/DATASET above. The filter picks the preferred string
-    # for each CUI.
-    labels = {}
-    cuis = set()
-    t0 = time.time()
-    for row in client.query(q_conso).result():
-        labels[row.CUI] = row.STR
-        cuis.add(row.CUI)
-    print(f"    {len(cuis):,} SNOMED CUIs in {time.time()-t0:.1f}s")
-
-    # Get STY tags
-    print("  Querying MRSTY for STY tags ...")
-    q_sty = """
-    SELECT CUI, TUI
-    FROM `<YOUR_PROJECT>.<YOUR_DATASET>.MRSTY`
-    """
-    tags = defaultdict(set)
-    t0 = time.time()
-    for row in client.query(q_sty).result():
-        if row.CUI in cuis:  # filter to SNOMED CUIs we already have
-            tags[row.CUI].add(row.TUI)
-    tags = {c: frozenset(v) for c, v in tags.items()}
-    print(f"    {len(tags):,} CUIs with STY tags in {time.time()-t0:.1f}s")
-
-    return cuis, tags, labels
+FOCAL_CUIS = [
+    "C0032285",  # Pneumonia
+    "C0021368",  # Inflammation
+    "C0024109",  # Lung
+    "C0011849",  # Diabetes
+    "C1527304",  # Allergic reaction
+    "C0559470",  # Peanut allergy  -- the key test case
+    "C0002792",  # Anaphylaxis
+    "C0013182",  # Drug allergy
+    "C0020517",  # Hypersensitivity
+]
 
 
 # ============================================================================
-# STEP 2: Flatten graph to direct CUI-CUI edges (two rules)
+# Helpers
 # ============================================================================
 
 def is_pure_cui(node):
@@ -108,282 +55,106 @@ def cui_of(suffix_node):
     return suffix_node.rsplit("-", 1)[0]
 
 
-def flatten_graph(g, snomed_cuis, rule):
-    """
-    For each SNOMED CUI A:
-      For each suffix child S of A:
-        rule='conservative': consider predecessors of S only
-        rule='inclusive':    consider predecessors + successors of S
-      For each connected suffix node, get its owner CUI B.
-      If B is SNOMED, emit edge (A, B).
-
-    Returns:
-        neighbors: dict[cui] -> set of neighbor CUIs (undirected)
-        parents:   dict[cui] -> set of "from" neighbors  (we treat all undirected)
-        children:  dict[cui] -> set of "to" neighbors
-    """
-    assert rule in ("conservative", "inclusive")
-    neighbors = defaultdict(set)
-    n_proc = 0
-    n_total = len(snomed_cuis)
-    print(f"  flattening ({rule}) over {n_total:,} SNOMED CUIs ...")
-    t0 = time.time()
-    for cui in snomed_cuis:
-        if cui not in g:
-            n_proc += 1
+def graph_neighbors(g, cui, snomed_cuis):
+    """1-hop conservative neighbors (SNOMED-only)."""
+    if cui not in g:
+        return set()
+    nbrs = set()
+    for suffix in g.successors(cui):
+        if "-" not in suffix:
             continue
-        for suffix in g.successors(cui):
-            if "-" not in suffix:
+        for pred in g.predecessors(suffix):
+            if pred == cui or pred == "CUI" or "-" not in pred:
                 continue
-            if rule == "conservative":
-                connected = set(g.predecessors(suffix))
-            else:  # inclusive
-                connected = set(g.predecessors(suffix)) | set(g.successors(suffix))
-            for cs in connected:
-                if cs == cui or cs == "CUI" or "-" not in cs:
-                    continue
-                other_cui = cui_of(cs)
-                if other_cui != cui and other_cui in snomed_cuis:
-                    neighbors[cui].add(other_cui)
-                    neighbors[other_cui].add(cui)
-        n_proc += 1
-        if n_proc % 50000 == 0:
-            elapsed = time.time() - t0
-            print(f"    {n_proc:,}/{n_total:,} ({elapsed:.0f}s)")
-    n_edges = sum(len(s) for s in neighbors.values()) // 2
-    print(f"  -> {n_edges:,} undirected CUI-CUI edges in {time.time()-t0:.0f}s")
-    return neighbors
-
-
-# ============================================================================
-# STEP 3: Canonical detection via STY-descendant count
-# ============================================================================
-# The flattened graph is UNDIRECTED. To compute "descendants" we treat
-# every neighbor as a child for purposes of subgraph size. This isn't
-# IS-A — it's just "size of the connected subgraph this CUI organizes."
-#
-# Alternative interpretation: do a BFS expansion from each CUI and count
-# the size of its reachable subgraph filtered by STY tags.
-
-def percentile_value(sorted_values, p):
-    if not sorted_values:
-        return 0
-    idx = min(int(len(sorted_values) * p / 100), len(sorted_values) - 1)
-    return sorted_values[idx]
-
-
-def find_canonicals(snomed_cuis, neighbors, tags):
-    """
-    For each CUI, count: how many CUIs are reachable via BFS that have
-    at least one STY tag.
-
-    A CUI qualifies as canonical if:
-      - reachable-STY-count in top (100 - STY_LOWER_PERCENTILE)% of distribution
-      - degree NOT in top (100 - MEGA_ROOT_PERCENTILE)% (mega-root filter)
-
-    Note: this is graph-based, not IS-A-based. "Reachable" replaces
-    "IS-A descendant" since we have no directed hierarchy.
-    """
-    print(f"  computing STY-reachable counts ...")
-    t0 = time.time()
-    sty_reach = {}
-    n_proc = 0
-    for cui in snomed_cuis:
-        if cui not in neighbors:
-            continue
-        # BFS over the undirected flattened graph
-        visited = {cui}
-        frontier = {cui}
-        while frontier:
-            nxt = set()
-            for n in frontier:
-                for nb in neighbors.get(n, ()):
-                    if nb not in visited:
-                        visited.add(nb)
-                        nxt.add(nb)
-            frontier = nxt
-        n_sty = sum(1 for v in visited if tags.get(v))
-        sty_reach[cui] = n_sty
-        n_proc += 1
-        if n_proc % 50000 == 0:
-            print(f"    {n_proc:,} CUIs ({time.time()-t0:.0f}s)")
-    print(f"  computed in {time.time()-t0:.0f}s")
-
-    # Distribution-based thresholds
-    sorted_sty = sorted(sty_reach.values())
-    sty_lower = percentile_value(sorted_sty, STY_LOWER_PERCENTILE)
-    degrees = sorted(len(s) for s in neighbors.values())
-    mega_thresh = percentile_value(degrees, MEGA_ROOT_PERCENTILE)
-    print(f"  STY-reach cutoff (≥): {sty_lower:,}")
-    print(f"  Mega-root degree threshold: {mega_thresh:,}")
-
-    canonicals = set()
-    canonical_info = {}
-    for cui, n_sty in sty_reach.items():
-        deg = len(neighbors.get(cui, set()))
-        if n_sty < sty_lower:
-            continue
-        if deg > mega_thresh:
-            continue
-        canonicals.add(cui)
-        canonical_info[cui] = {
-            "sty_reachable": n_sty,
-            "degree": deg,
-        }
-    canonicals -= CANONICAL_EXCLUDE
-    canonical_info = {c: v for c, v in canonical_info.items() if c in canonicals}
-    print(f"  found {len(canonicals):,} canonicals")
-    return canonicals, canonical_info
-
-
-# ============================================================================
-# STEP 4: Topic assignment via nearest-canonical BFS
-# ============================================================================
-
-def hash_topic(cui):
-    return "tp_" + hashlib.sha1(cui.encode()).hexdigest()[:12]
-
-
-def compute_topics(all_cuis, canonicals, neighbors, label):
-    """
-    Multi-source BFS from all canonicals over the undirected graph.
-    For each CUI, find nearest canonical(s).
-    """
-    print(f"  ({label}) computing topics via nearest-canonical BFS ...")
-    distance = {c: 0 for c in canonicals}
-    nearest = {c: {c} for c in canonicals}
-    frontier = set(canonicals)
-    level = 0
-    t0 = time.time()
-    while frontier:
-        level += 1
-        next_frontier = set()
-        for node in frontier:
-            cand_d = distance[node] + 1
-            for nb in neighbors.get(node, ()):
-                if nb not in distance:
-                    distance[nb] = cand_d
-                    nearest[nb] = set(nearest[node])
-                    next_frontier.add(nb)
-                elif distance[nb] == cand_d:
-                    if not nearest[node] <= nearest[nb]:
-                        nearest[nb] |= nearest[node]
-        frontier = next_frontier
-        if level % 3 == 0:
-            print(f"    level {level}: {len(distance):,} nodes reached "
-                  f"({time.time()-t0:.0f}s)")
-    cui_topics = {}
-    for cui in all_cuis:
-        t = nearest.get(cui)
-        if t:
-            cui_topics[cui] = t
-    return cui_topics
+            other_cui = cui_of(pred)
+            if other_cui != cui and other_cui in snomed_cuis:
+                nbrs.add(other_cui)
+    return nbrs
 
 
 # ============================================================================
 # Main
 # ============================================================================
 
-def main():
-    print("=" * 60)
-    print("Build topics from network graph (dual flatten rule)")
-    print("=" * 60)
+# Load MRREL-based pickle
+print(f"Loading {MRREL_PICKLE_PATH} ...")
+with open(MRREL_PICKLE_PATH, "rb") as f:
+    payload = pickle.load(f)
+labels = payload["labels"]
+tags = payload["tags"]
+isa_map = payload["isa_cui_topic_ids"]
+rela_map = payload["rela_cui_topic_ids"]
+topic_to_canon = payload["topic_to_canonical"]
+canonicals_set = payload["canonicals"]
 
-    # Step 1: Get SNOMED CUIs + tags + labels from BigQuery
-    print("\n[1] Loading SNOMED CUIs + STY tags from BigQuery ...")
-    snomed_cuis, tags, labels = fetch_snomed_cuis_and_tags()
-
-    # Step 2: Build BOTH flattened graphs
-    print(f"\n[2a] Flattening graph CONSERVATIVE ...")
-    neighbors_cons = flatten_graph(data, snomed_cuis, "conservative")
-
-    print(f"\n[2b] Flattening graph INCLUSIVE ...")
-    neighbors_incl = flatten_graph(data, snomed_cuis, "inclusive")
-
-    # Step 3 + 4 per rule
-    print(f"\n[3a] Detecting canonicals (CONSERVATIVE) ...")
-    canons_cons, canon_info_cons = find_canonicals(snomed_cuis, neighbors_cons, tags)
-    print(f"\n[3b] Detecting canonicals (INCLUSIVE) ...")
-    canons_incl, canon_info_incl = find_canonicals(snomed_cuis, neighbors_incl, tags)
-
-    print(f"\n[4a] Computing topics (CONSERVATIVE) ...")
-    topics_cons = compute_topics(sorted(snomed_cuis), canons_cons, neighbors_cons, "cons")
-    print(f"\n[4b] Computing topics (INCLUSIVE) ...")
-    topics_incl = compute_topics(sorted(snomed_cuis), canons_incl, neighbors_incl, "incl")
-
-    # Build topic_id mapping
-    all_canons = canons_cons | canons_incl
-    topic_to_canonical = {hash_topic(c): c for c in all_canons}
-
-    def to_topic_ids(cui_topics):
-        out = {}
-        for cui, canon_set in cui_topics.items():
-            out[cui] = {hash_topic(c) for c in canon_set}
-        return out
-
-    cons_topic_ids = to_topic_ids(topics_cons)
-    incl_topic_ids = to_topic_ids(topics_incl)
-
-    # Reverse index
-    def reverse_index(topic_ids):
-        inv = defaultdict(set)
-        for cui, tids in topic_ids.items():
-            for tid in tids:
-                inv[tid].add(cui)
-        return dict(inv)
-
-    cons_topic_to_cuis = reverse_index(cons_topic_ids)
-    incl_topic_to_cuis = reverse_index(incl_topic_ids)
-
-    # Report
-    print("\n" + "=" * 60)
-    print("RESULTS — COMPARISON")
-    print("=" * 60)
-    for name, n_cuis, n_canons, topic_ids in [
-        ("CONSERVATIVE", len(topics_cons), len(canons_cons), cons_topic_ids),
-        ("INCLUSIVE",    len(topics_incl), len(canons_incl), incl_topic_ids),
-    ]:
-        ntopics = [len(t) for t in topic_ids.values()]
-        avg = statistics.mean(ntopics) if ntopics else 0
-        med = statistics.median(ntopics) if ntopics else 0
-        print(f"  {name}:")
-        print(f"    canonicals             : {n_canons:,}")
-        print(f"    CUIs with topics       : {n_cuis:,}")
-        print(f"    avg topics per CUI     : {avg:.2f}")
-        print(f"    median topics per CUI  : {med:.0f}")
-
-    # Save
-    print("\n[Saving]")
-    payload = {
-        "built_at": datetime.datetime.now().isoformat(),
-        "source": "network_graph + BigQuery MRREL",
-        "snomed_cuis": snomed_cuis,
-        "tags": tags,
-        "labels": labels,
-        # Conservative rule outputs
-        "cons_canonicals":      canons_cons,
-        "cons_canonical_info":  canon_info_cons,
-        "cons_cui_topic_ids":   cons_topic_ids,
-        "cons_topic_to_cuis":   cons_topic_to_cuis,
-        # Inclusive rule outputs
-        "incl_canonicals":      canons_incl,
-        "incl_canonical_info":  canon_info_incl,
-        "incl_cui_topic_ids":   incl_topic_ids,
-        "incl_topic_to_cuis":   incl_topic_to_cuis,
-        # Shared
-        "topic_to_canonical":   topic_to_canonical,
-        "config": {
-            "sty_lower_percentile": STY_LOWER_PERCENTILE,
-            "mega_root_percentile": MEGA_ROOT_PERCENTILE,
-            "canonical_exclude":    sorted(CANONICAL_EXCLUDE),
-        },
-    }
-    with open(OUTPUT_PATH, "wb") as f:
-        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-    import os
-    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
-    print(f"  wrote {OUTPUT_PATH} ({size_mb:.1f} MB)")
-    print("\nDONE")
+# Load cache for SNOMED CUI set
+print(f"Loading {CACHE_PATH} ...")
+with open(CACHE_PATH, "rb") as f:
+    cache = pickle.load(f)
+SNOMED_CUIS = cache["cuis"]
 
 
-main()
+def lbl(c):
+    return labels.get(c, "?")[:40]
+
+
+for cui in FOCAL_CUIS:
+    print("\n" + "=" * 100)
+    print(f"  {cui}  '{lbl(cui)}'")
+    print("=" * 100)
+
+    # GRAPH neighbors
+    g_nbrs = graph_neighbors(data, cui, SNOMED_CUIS)
+    print(f"\n  GRAPH neighbors ({len(g_nbrs)} CUIs, 1-hop conservative):")
+    for n in sorted(g_nbrs)[:20]:
+        is_canon = " [CANONICAL]" if n in canonicals_set else ""
+        print(f"    {n}  {lbl(n)}{is_canon}")
+    if len(g_nbrs) > 20:
+        print(f"    ... +{len(g_nbrs) - 20} more")
+
+    # MRREL IS-A topics
+    isa_tids = isa_map.get(cui, set())
+    isa_canons = {topic_to_canon[t] for t in isa_tids}
+    print(f"\n  MRREL IS-A topics ({len(isa_canons)}):")
+    for c in sorted(isa_canons):
+        print(f"    {c}  {lbl(c)}")
+
+    # MRREL RELA topics
+    rela_tids = rela_map.get(cui, set())
+    rela_canons = {topic_to_canon[t] for t in rela_tids}
+    print(f"\n  MRREL RELA topics ({len(rela_canons)}):")
+    if len(rela_canons) <= 25:
+        for c in sorted(rela_canons):
+            print(f"    {c}  {lbl(c)}")
+    else:
+        for c in sorted(rela_canons)[:25]:
+            print(f"    {c}  {lbl(c)}")
+        print(f"    ... +{len(rela_canons) - 25} more")
+
+    # Overlap analysis
+    print(f"\n  OVERLAP:")
+    g_in_isa = g_nbrs & isa_canons
+    g_in_rela = g_nbrs & rela_canons
+    g_in_either = g_nbrs & (isa_canons | rela_canons)
+    g_canon = g_nbrs & canonicals_set
+    print(f"    Graph neighbors that are canonicals: {len(g_canon)}")
+    print(f"    Graph neighbors in MRREL IS-A topics: {len(g_in_isa)}")
+    print(f"    Graph neighbors in MRREL RELA topics: {len(g_in_rela)}")
+    print(f"    Graph neighbors in EITHER MRREL topic set: {len(g_in_either)}")
+    if g_in_either:
+        print(f"    Overlapping (graph ∩ MRREL):")
+        for c in sorted(g_in_either)[:10]:
+            print(f"      {c}  {lbl(c)}")
+
+# Summary line
+print("\n\n" + "=" * 100)
+print("  ONE-LINE SUMMARY PER CUI")
+print("=" * 100)
+print(f"  {'CUI':<12s}  {'Label':<35s}  {'GRAPH':>6s}  {'IS-A':>6s}  {'RELA':>6s}  {'G∩MRREL':>8s}")
+for cui in FOCAL_CUIS:
+    g_nbrs = graph_neighbors(data, cui, SNOMED_CUIS)
+    isa_canons = {topic_to_canon[t] for t in isa_map.get(cui, set())}
+    rela_canons = {topic_to_canon[t] for t in rela_map.get(cui, set())}
+    overlap = g_nbrs & (isa_canons | rela_canons)
+    print(f"  {cui:<12s}  {lbl(cui):<35s}  {len(g_nbrs):>6,d}  "
+          f"{len(isa_canons):>6,d}  {len(rela_canons):>6,d}  {len(overlap):>8,d}")
