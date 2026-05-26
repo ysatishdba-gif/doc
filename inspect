@@ -1,33 +1,36 @@
 """
-cuis_to_topics.py
------------------
-Look up the topic for one or more CUIs and show the details.
+lookup_topics.py
+----------------
+Look up the topic IDs for one or more CUIs.
 
-Use this to inspect what's in facet_index.pkl after the build:
-  - which topic ID a CUI maps to
-  - the normalized facets that produced that topic
-  - the human-readable labels for each facet value
+Use this to verify the topic assignments after running build_topics.py.
 
-Edit CUIS_TO_LOOKUP below and run:
-    python cuis_to_topics.py
+Each CUI has a set of topic IDs (potentially multiple). Each topic ID
+corresponds to a canonical CUI (an organizing concept in SNOMED).
+
+Edit CUIS_TO_LOOKUP below and run.
 """
 
 import pickle
 
 
-PICKLE_PATH = "facet_index.pkl"
+PICKLE_PATH = "topic_lookup.pkl"
 
 CUIS_TO_LOOKUP = [
-    "C0032285",   # Pneumonia (example — replace with your CUIs)
+    "C0032285",   # Pneumonia
+    # Add your test CUIs here
 ]
 
 
 def lookup(cui, payload):
     labels = payload["labels"]
-    tags   = payload["tags"]
+    tags = payload["tags"]
+    cui_topic_ids = payload["cui_topic_ids"]
+    topic_to_canonical = payload["topic_to_canonical"]
+    topic_to_cuis = payload["topic_to_cuis"]
 
     cui_label = labels.get(cui, "?")
-    cui_stys  = sorted(tags.get(cui, frozenset()))
+    cui_stys = sorted(tags.get(cui, frozenset()))
 
     print(f"\n{'='*60}")
     print(f"{cui}  {cui_label}")
@@ -35,32 +38,19 @@ def lookup(cui, payload):
     if cui_stys:
         print(f"  semantic type(s): {', '.join(cui_stys)}")
 
-    topic_id   = payload["cui_topic_id"].get(cui)
-    signature  = payload["cui_signature"].get(cui)
-    normalized = payload["cui_normalized"].get(cui)
-
-    if topic_id is None:
-        print(f"\n  No topic ID — this CUI has no facets in the index.")
+    tids = cui_topic_ids.get(cui)
+    if not tids:
+        print(f"\n  No topics. This CUI has no canonical ancestors.")
         return
 
-    print(f"\n  topic ID  : {topic_id}")
-    print(f"  signature : {signature}")
-    print(f"\n  Normalized facets:")
-    for facet in sorted(normalized):
-        values = sorted(normalized[facet])
-        print(f"    {facet}:")
-        for v in values:
-            v_label = labels.get(v, "?")
-            print(f"      {v}  ({v_label})")
-
-    # Also show other CUIs that map to this same topic ID
-    members = payload["topic_members"].get(topic_id, [])
-    if len(members) > 1:
-        others = [m for m in members if m != cui][:10]
-        print(f"\n  Other CUIs with this same topic ID ({len(members)-1} total"
-              f"{', showing 10' if len(members) > 11 else ''}):")
-        for m in others:
-            print(f"    {m}  ({labels.get(m, '?')})")
+    print(f"\n  Has {len(tids)} topic(s):")
+    for tid in sorted(tids):
+        canon_cui = topic_to_canonical.get(tid)
+        canon_label = labels.get(canon_cui, "?") if canon_cui else "?"
+        members = topic_to_cuis.get(tid, set())
+        print(f"    {tid}")
+        print(f"      canonical:    {canon_cui}  ({canon_label})")
+        print(f"      total CUIs:   {len(members):,} share this topic")
 
 
 def main():
@@ -68,12 +58,11 @@ def main():
         payload = pickle.load(f)
     print(f"Loaded {PICKLE_PATH}")
     print(f"  built_at        : {payload['built_at']}")
-    print(f"  total CUIs      : {len(payload['cui_topic_id']):,}")
-    print(f"  distinct topics : {len(payload['topic_metadata']):,}")
+    print(f"  total canonicals: {len(payload['canonicals']):,}")
+    print(f"  CUIs with topics: {len(payload['cui_topic_ids']):,}")
 
     for cui in CUIS_TO_LOOKUP:
         lookup(cui, payload)
 
 
-if __name__ == "__main__":
-    main()
+main()
