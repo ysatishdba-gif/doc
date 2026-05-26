@@ -1,160 +1,382 @@
-"""
-compare_graph_vs_mrrel.py
--------------------------
-Side-by-side comparison of:
-  - Graph-based CUI neighbors (1-hop from the suffix-bridge graph)
-  - MRREL-based topics (from existing topic_lookup.pkl)
+Loading topics_lookup.pkl ...
+Loading umls_cache.pkl ...
 
-For each focal CUI, prints:
-  - Its graph neighbors (with labels)
-  - Its MRREL IS-A topics (with labels)
-  - Its MRREL RELA topics (with labels)
-  - Overlap analysis: which graph neighbors are also MRREL topics?
+====================================================================================================
+  C0032285  'Pneumonia (disorder)'
+====================================================================================================
 
-Run in notebook AFTER:
-  - `data` is loaded (the network graph)
-  - umls_cache.pkl is available
-  - topic_lookup.pkl is available (the dual MRREL build)
-"""
+  GRAPH neighbors (4 CUIs, 1-hop conservative):
+    C0024115  Disorder of lung
+    C0035243  Respiratory tract infection [CANONICAL]
+    C0876973  Pulmonary infection [CANONICAL]
+    C3714636  Pneumonitis [CANONICAL]
 
-import pickle
-from collections import defaultdict
+  MRREL IS-A topics (1):
+    C0032285  Pneumonia (disorder)
+
+  MRREL RELA topics (1):
+    C0032285  Pneumonia (disorder)
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 3
+    Graph neighbors in MRREL IS-A topics: 0
+    Graph neighbors in MRREL RELA topics: 0
+    Graph neighbors in EITHER MRREL topic set: 0
+
+====================================================================================================
+  C0021368  'Inflammation'
+====================================================================================================
+
+  GRAPH neighbors (1 CUIs, 1-hop conservative):
+    C0030660  Pathological process (attribute) [CANONICAL]
+
+  MRREL IS-A topics (1):
+    C0030660  Pathological process (attribute)
+
+  MRREL RELA topics (688):
+    C0003509  Aortitis
+    C0003615  Appendicitis
+    C0003860  Inflammation of artery
+    C0003869  Pyogenic arthritis
+    C0003872  Psoriatic arthritis
+    C0003873  Rheumatoid arthritis
+    C0003875  Viral arthritis
+    C0004626  Bacterial pneumonia
+    C0004690  Inflammatory disorder of penis (disorder
+    C0004943  Behcet's syndrome
+    C0005741  Blepharitis (disorder)
+    C0005743  Blepharoconjunctivitis
+    C0006271  Bronchiolitis
+    C0006277  Bronchitis
+    C0006444  Bursitis (disorder)
+    C0006902  Capillaritis
+    C0007860  Inflammation of cervix (disorder)
+    C0007971  Cheilitis (disorder)
+    C0008311  Cholangitis (disorder)
+    C0008325  Inflamed gallbladder
+    C0008513  Retinochoroiditis
+    C0008526  Choroiditis
+    C0008690  Chronic iritis
+    C0009319  Colon inflammation
+    C0009763  Conjunctivitis (disorder)
+    ... +663 more
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 1
+    Graph neighbors in MRREL IS-A topics: 1
+    Graph neighbors in MRREL RELA topics: 0
+    Graph neighbors in EITHER MRREL topic set: 1
+    Overlapping (graph ∩ MRREL):
+      C0030660  Pathological process (attribute)
+
+====================================================================================================
+  C0024109  'Lung'
+====================================================================================================
+
+  GRAPH neighbors (7 CUIs, 1-hop conservative):
+    C0035237  Respiratory system [CANONICAL]
+    C0229962  Body part structure (body structure) [CANONICAL]
+    C0230130  Thoracic viscus [CANONICAL]
+    C0458579  Lower respiratory tract [CANONICAL]
+    C1285482  Pulmonary structure including vessels an [CANONICAL]
+    C3698225  Structure of pulmopleural compartment [CANONICAL]
+    C4075195  Structure of organ in respiratory system [CANONICAL]
+
+  MRREL IS-A topics (1):
+    C0024109  Lung
+
+  MRREL RELA topics (1):
+    C0024109  Lung
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 7
+    Graph neighbors in MRREL IS-A topics: 0
+    Graph neighbors in MRREL RELA topics: 0
+    Graph neighbors in EITHER MRREL topic set: 0
+
+====================================================================================================
+  C0011849  'Diabetes mellitus'
+====================================================================================================
+
+  GRAPH neighbors (6 CUIs, 1-hop conservative):
+    C0001792  Advanced age
+    C0014130  Endocrine system disease
+    C0014136  Endocrine structure [CANONICAL]
+    C0271650  Impaired glucose tolerance (disorder) [CANONICAL]
+    C0694452  Endocrine / nutritional / metabolic diso
+    C1257958  Disorder of glucose metabolism [CANONICAL]
+
+  MRREL IS-A topics (1):
+    C0011849  Diabetes mellitus
+
+  MRREL RELA topics (1):
+    C0011849  Diabetes mellitus
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 3
+    Graph neighbors in MRREL IS-A topics: 0
+    Graph neighbors in MRREL RELA topics: 0
+    Graph neighbors in EITHER MRREL topic set: 0
+
+====================================================================================================
+  C1527304  'Allergic reaction'
+====================================================================================================
+
+  GRAPH neighbors (3 CUIs, 1-hop conservative):
+    C0020517  Hypersensitivity reaction (disorder) [CANONICAL]
+    C0851444  Allergic condition [CANONICAL]
+    C1532237  Disorder of immune function
+
+  MRREL IS-A topics (1):
+    C1527304  Allergic reaction
+
+  MRREL RELA topics (1):
+    C1527304  Allergic reaction
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 2
+    Graph neighbors in MRREL IS-A topics: 0
+    Graph neighbors in MRREL RELA topics: 0
+    Graph neighbors in EITHER MRREL topic set: 0
+
+====================================================================================================
+  C0559470  'Allergy to peanut'
+====================================================================================================
+
+  GRAPH neighbors (1 CUIs, 1-hop conservative):
+    C1096735  Allergy to pulse vegetable
+
+  MRREL IS-A topics (1):
+    C2227759  Allergy to vegetable
+
+  MRREL RELA topics (61):
+    C0002390  EAA - Extrinsic allergic alveolitis
+    C0016470  Food allergy
+    C0018621  Seasonal allergic rhinitis (disorder)
+    C0030824  Penicillin allergy
+    C0038757  Sulfonamide allergy
+    C0155877  Allergic asthma
+    C0267422  Allergic enteritis of intestine
+    C0413234  Acute allergic reaction
+    C0559960  Allergic reaction to venom
+    C0559961  Allergic reaction to insect venom
+    C0570537  Allergy to non-steroidal anti-inflammato
+    C0570642  Allergy to local anaesthetic
+    C0570663  Allergy to alkylating agent
+    C0570881  Allergy to beta adrenergic receptor anta
+    C0570904  Allergy to alpha adrenergic receptor ant
+    C0570943  Allergy to alpha adrenergic receptor ago
+    C0570952  Allergy to beta-2 adrenergic receptor ag
+    C0571026  Allergy to histamine H1 receptor antagon
+    C0571141  Allergy to nondepolarising agent
+    C0571165  Prostaglandin allergy
+    C0571176  Allergy to terpene
+    C0571374  Aminoglycoside allergy
+    C0571444  Allergy to cephalosporin
+    C0571550  Vaccine allergy
+    C0571586  Allergy to corticosteroid and/or cortico
+    ... +36 more
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 0
+    Graph neighbors in MRREL IS-A topics: 0
+    Graph neighbors in MRREL RELA topics: 0
+    Graph neighbors in EITHER MRREL topic set: 0
+
+====================================================================================================
+  C0002792  'Anaphylaxis'
+====================================================================================================
+
+  GRAPH neighbors (5 CUIs, 1-hop conservative):
+    C0020517  Hypersensitivity reaction (disorder) [CANONICAL]
+    C0020523  IgE-mediated allergic disorder [CANONICAL]
+    C0020962  Structure of immune system [CANONICAL]
+    C0413234  Acute allergic reaction [CANONICAL]
+    C0442893  Systemic illness [CANONICAL]
+
+  MRREL IS-A topics (1):
+    C0002792  Anaphylaxis
+
+  MRREL RELA topics (1):
+    C0002792  Anaphylaxis
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 5
+    Graph neighbors in MRREL IS-A topics: 0
+    Graph neighbors in MRREL RELA topics: 0
+    Graph neighbors in EITHER MRREL topic set: 0
+
+====================================================================================================
+  C0013182  'Allergy to drug'
+====================================================================================================
+
+  GRAPH neighbors (6 CUIs, 1-hop conservative):
+    C0020517  Hypersensitivity reaction (disorder) [CANONICAL]
+    C0041755  Adverse drug reaction
+    C0237865  Propensity to adverse reactions to drug [CANONICAL]
+    C0277585  Drug intolerance
+    C1527304  Allergic reaction [CANONICAL]
+    C3539909  Allergic disposition
+
+  MRREL IS-A topics (2):
+    C0237865  Propensity to adverse reactions to drug
+    C1527304  Allergic reaction
+
+  MRREL RELA topics (3):
+    C0237865  Propensity to adverse reactions to drug
+    C0474189  Drug desensitisation therapy
+    C3662272  Drug pseudoallergy
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 3
+    Graph neighbors in MRREL IS-A topics: 2
+    Graph neighbors in MRREL RELA topics: 1
+    Graph neighbors in EITHER MRREL topic set: 2
+    Overlapping (graph ∩ MRREL):
+      C0237865  Propensity to adverse reactions to drug
+      C1527304  Allergic reaction
+
+====================================================================================================
+  C0020517  'Hypersensitivity reaction (disorder)'
+====================================================================================================
+
+  GRAPH neighbors (7 CUIs, 1-hop conservative):
+    C0020962  Structure of immune system [CANONICAL]
+    C0021053  Disorder of immune system
+    C0022877  Laboratory
+    C0150934  Structure of ear, nose, and/or throat (b [CANONICAL]
+    C0559546  Adverse reaction
+    C1744706  Intolerance to substance [CANONICAL]
+    C3532523  Hypersensitivity condition [CANONICAL]
+
+  MRREL IS-A topics (1):
+    C0020517  Hypersensitivity reaction (disorder)
+
+  MRREL RELA topics (1):
+    C0020517  Hypersensitivity reaction (disorder)
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 4
+    Graph neighbors in MRREL IS-A topics: 0
+    Graph neighbors in MRREL RELA topics: 0
+    Graph neighbors in EITHER MRREL topic set: 0
+
+====================================================================================================
+  C0024119  'Pulmonary function test'
+====================================================================================================
+
+  GRAPH neighbors (1 CUIs, 1-hop conservative):
+    C0436121  Examination of respiratory system [CANONICAL]
+
+  MRREL IS-A topics (0):
+
+  MRREL RELA topics (1):
+    C0035227  Measurement of respiratory function
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 1
+    Graph neighbors in MRREL IS-A topics: 0
+    Graph neighbors in MRREL RELA topics: 0
+    Graph neighbors in EITHER MRREL topic set: 0
+
+====================================================================================================
+  C0017636  '?'
+====================================================================================================
+
+  GRAPH neighbors (2 CUIs, 1-hop conservative):
+    C0004114  Astrocytoma
+    C1621958  Glioblastoma multiforme [CANONICAL]
+
+  MRREL IS-A topics (0):
+
+  MRREL RELA topics (0):
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 1
+    Graph neighbors in MRREL IS-A topics: 0
+    Graph neighbors in MRREL RELA topics: 0
+    Graph neighbors in EITHER MRREL topic set: 0
+
+====================================================================================================
+  C1621958  'Glioblastoma multiforme'
+====================================================================================================
+
+  GRAPH neighbors (4 CUIs, 1-hop conservative):
+    C0006826  Malignant neoplasm
+    C0017638  Glioma [CANONICAL]
+    C0334579  Astrocytoma, anaplastic
+    C4722099  High-grade glioma [CANONICAL]
+
+  MRREL IS-A topics (1):
+    C1621958  Glioblastoma multiforme
+
+  MRREL RELA topics (1):
+    C1621958  Glioblastoma multiforme
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 2
+    Graph neighbors in MRREL IS-A topics: 0
+    Graph neighbors in MRREL RELA topics: 0
+    Graph neighbors in EITHER MRREL topic set: 0
+
+====================================================================================================
+  C0002111  'Allergy specialty'
+====================================================================================================
+
+  GRAPH neighbors (1 CUIs, 1-hop conservative):
+    C0002112  Clinical immunology/allergy
+
+  MRREL IS-A topics (0):
+
+  MRREL RELA topics (0):
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 0
+    Graph neighbors in MRREL IS-A topics: 0
+    Graph neighbors in MRREL RELA topics: 0
+    Graph neighbors in EITHER MRREL topic set: 0
+
+====================================================================================================
+  C2142181  'Pain of left knee joint (finding)'
+====================================================================================================
+
+  GRAPH neighbors (2 CUIs, 1-hop conservative):
+    C0231749  Pain of knee region [CANONICAL]
+    C5442019  Pain of left knee [CANONICAL]
+
+  MRREL IS-A topics (2):
+    C0231749  Pain of knee region
+    C5442019  Pain of left knee
+
+  MRREL RELA topics (2):
+    C4304721  Structure of left knee joint
+    C5442019  Pain of left knee
+
+  OVERLAP:
+    Graph neighbors that are canonicals: 2
+    Graph neighbors in MRREL IS-A topics: 2
+    Graph neighbors in MRREL RELA topics: 1
+    Graph neighbors in EITHER MRREL topic set: 2
+    Overlapping (graph ∩ MRREL):
+      C0231749  Pain of knee region
+      C5442019  Pain of left knee
 
 
-# ============================================================================
-# Config
-# ============================================================================
-
-CACHE_PATH = "umls_cache.pkl"
-MRREL_PICKLE_PATH = "topic_lookup.pkl"  # the dual IS-A + RELA build
-
-FOCAL_CUIS = [
-    "C0032285",  # Pneumonia
-    "C0021368",  # Inflammation
-    "C0024109",  # Lung
-    "C0011849",  # Diabetes
-    "C1527304",  # Allergic reaction
-    "C0559470",  # Peanut allergy  -- the key test case
-    "C0002792",  # Anaphylaxis
-    "C0013182",  # Drug allergy
-    "C0020517",  # Hypersensitivity
-]
-
-
-# ============================================================================
-# Helpers
-# ============================================================================
-
-def is_pure_cui(node):
-    return isinstance(node, str) and node.startswith("C") and "-" not in node and node != "CUI"
-
-
-def cui_of(suffix_node):
-    if "-" not in suffix_node:
-        return suffix_node
-    return suffix_node.rsplit("-", 1)[0]
-
-
-def graph_neighbors(g, cui, snomed_cuis):
-    """1-hop conservative neighbors (SNOMED-only)."""
-    if cui not in g:
-        return set()
-    nbrs = set()
-    for suffix in g.successors(cui):
-        if "-" not in suffix:
-            continue
-        for pred in g.predecessors(suffix):
-            if pred == cui or pred == "CUI" or "-" not in pred:
-                continue
-            other_cui = cui_of(pred)
-            if other_cui != cui and other_cui in snomed_cuis:
-                nbrs.add(other_cui)
-    return nbrs
-
-
-# ============================================================================
-# Main
-# ============================================================================
-
-# Load MRREL-based pickle
-print(f"Loading {MRREL_PICKLE_PATH} ...")
-with open(MRREL_PICKLE_PATH, "rb") as f:
-    payload = pickle.load(f)
-labels = payload["labels"]
-tags = payload["tags"]
-isa_map = payload["isa_cui_topic_ids"]
-rela_map = payload["rela_cui_topic_ids"]
-topic_to_canon = payload["topic_to_canonical"]
-canonicals_set = payload["canonicals"]
-
-# Load cache for SNOMED CUI set
-print(f"Loading {CACHE_PATH} ...")
-with open(CACHE_PATH, "rb") as f:
-    cache = pickle.load(f)
-SNOMED_CUIS = cache["cuis"]
-
-
-def lbl(c):
-    return labels.get(c, "?")[:40]
-
-
-for cui in FOCAL_CUIS:
-    print("\n" + "=" * 100)
-    print(f"  {cui}  '{lbl(cui)}'")
-    print("=" * 100)
-
-    # GRAPH neighbors
-    g_nbrs = graph_neighbors(data, cui, SNOMED_CUIS)
-    print(f"\n  GRAPH neighbors ({len(g_nbrs)} CUIs, 1-hop conservative):")
-    for n in sorted(g_nbrs)[:20]:
-        is_canon = " [CANONICAL]" if n in canonicals_set else ""
-        print(f"    {n}  {lbl(n)}{is_canon}")
-    if len(g_nbrs) > 20:
-        print(f"    ... +{len(g_nbrs) - 20} more")
-
-    # MRREL IS-A topics
-    isa_tids = isa_map.get(cui, set())
-    isa_canons = {topic_to_canon[t] for t in isa_tids}
-    print(f"\n  MRREL IS-A topics ({len(isa_canons)}):")
-    for c in sorted(isa_canons):
-        print(f"    {c}  {lbl(c)}")
-
-    # MRREL RELA topics
-    rela_tids = rela_map.get(cui, set())
-    rela_canons = {topic_to_canon[t] for t in rela_tids}
-    print(f"\n  MRREL RELA topics ({len(rela_canons)}):")
-    if len(rela_canons) <= 25:
-        for c in sorted(rela_canons):
-            print(f"    {c}  {lbl(c)}")
-    else:
-        for c in sorted(rela_canons)[:25]:
-            print(f"    {c}  {lbl(c)}")
-        print(f"    ... +{len(rela_canons) - 25} more")
-
-    # Overlap analysis
-    print(f"\n  OVERLAP:")
-    g_in_isa = g_nbrs & isa_canons
-    g_in_rela = g_nbrs & rela_canons
-    g_in_either = g_nbrs & (isa_canons | rela_canons)
-    g_canon = g_nbrs & canonicals_set
-    print(f"    Graph neighbors that are canonicals: {len(g_canon)}")
-    print(f"    Graph neighbors in MRREL IS-A topics: {len(g_in_isa)}")
-    print(f"    Graph neighbors in MRREL RELA topics: {len(g_in_rela)}")
-    print(f"    Graph neighbors in EITHER MRREL topic set: {len(g_in_either)}")
-    if g_in_either:
-        print(f"    Overlapping (graph ∩ MRREL):")
-        for c in sorted(g_in_either)[:10]:
-            print(f"      {c}  {lbl(c)}")
-
-# Summary line
-print("\n\n" + "=" * 100)
-print("  ONE-LINE SUMMARY PER CUI")
-print("=" * 100)
-print(f"  {'CUI':<12s}  {'Label':<35s}  {'GRAPH':>6s}  {'IS-A':>6s}  {'RELA':>6s}  {'G∩MRREL':>8s}")
-for cui in FOCAL_CUIS:
-    g_nbrs = graph_neighbors(data, cui, SNOMED_CUIS)
-    isa_canons = {topic_to_canon[t] for t in isa_map.get(cui, set())}
-    rela_canons = {topic_to_canon[t] for t in rela_map.get(cui, set())}
-    overlap = g_nbrs & (isa_canons | rela_canons)
-    print(f"  {cui:<12s}  {lbl(cui):<35s}  {len(g_nbrs):>6,d}  "
-          f"{len(isa_canons):>6,d}  {len(rela_canons):>6,d}  {len(overlap):>8,d}")
+====================================================================================================
+  ONE-LINE SUMMARY PER CUI
+====================================================================================================
+  CUI           Label                                 GRAPH    IS-A    RELA   G∩MRREL
+  C0032285      Pneumonia (disorder)                      4       1       1         0
+  C0021368      Inflammation                              1       1     688         1
+  C0024109      Lung                                      7       1       1         0
+  C0011849      Diabetes mellitus                         6       1       1         0
+  C1527304      Allergic reaction                         3       1       1         0
+  C0559470      Allergy to peanut                         1       1      61         0
+  C0002792      Anaphylaxis                               5       1       1         0
+  C0013182      Allergy to drug                           6       2       3         2
+  C0020517      Hypersensitivity reaction (disorder)       7       1       1         0
+  C0024119      Pulmonary function test                   1       0       1         0
+  C0017636      ?                                         2       0       0         0
+  C1621958      Glioblastoma multiforme                   4       1       1         0
+  C0002111      Allergy specialty                         1       0       0         0
+  C2142181      Pain of left knee joint (finding)         2       2       2         2
