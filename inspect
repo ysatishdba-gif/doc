@@ -122,9 +122,6 @@ def main():
         cfg = payload["config"]
         print(f"  detection       : {cfg.get('detection', '?')}")
         print(f"  excluded CUIs   : {cfg.get('canonical_exclude', '?')}")
-        print(f"  pruning         : {cfg.get('prune_stacked_canonicals', '?')}")
-        print(f"  sibling exp.    : {cfg.get('sibling_expansion', '?')}")
-        print(f"  singleton fb    : {cfg.get('singleton_fallback', '?')}")
 
     for cui, expected in CUIS_TO_LOOKUP:
         lookup(cui, expected, payload)
