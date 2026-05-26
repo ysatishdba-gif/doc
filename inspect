@@ -1,24 +1,120 @@
-Loaded topic_lookup.pkl
-  built_at        : 2026-05-26T16:30:56.573590
-  total canonicals: 32,779
-  CUIs with topics: 367,787
+"""
+lookup_topics.py
+----------------
+Look up the topic IDs for a set of CUIs to characterize what the topic
+system produces for typical clinical/biomedical concepts.
 
-============================================================
-C0032285  Pneumonia (disorder)
-============================================================
-  semantic type(s): Disease or Syndrome
+Edit CUIS_TO_LOOKUP and run. For each CUI prints:
+  - Its preferred label and STY
+  - How many topics it has
+  - Each topic's canonical CUI, label, and member count
+"""
 
-  Has 1 topic(s):
-    tp_4385b55dfcd9
-      canonical:    C0032285  (Pneumonia (disorder))
-      total CUIs:   39 share this topic
+import pickle
 
-============================================================
-C0041296  Infection caused by Mycobacterium tuberculosis
-============================================================
-  semantic type(s): Disease or Syndrome
 
-  Has 1 topic(s):
-    tp_9109941743b9
-      canonical:    C0026918  (Mycobacteriosis (disorder))
-      total CUIs:   113 share this topic
+PICKLE_PATH = "topic_lookup.pkl"
+
+# Broad test set covering common clinical concepts across domains.
+# Each tuple is (CUI, expected_domain_label_for_human_reading).
+CUIS_TO_LOOKUP = [
+    # === Diseases (already tested — confirm) ===
+    ("C0032285", "Pneumonia"),
+    ("C0041296", "Tuberculosis"),
+    # === Common cardiovascular ===
+    ("C0027051", "Myocardial infarction"),
+    ("C0038454", "Stroke / Cerebrovascular accident"),
+    ("C0018802", "Congestive heart failure"),
+    ("C0020538", "Hypertension"),
+    # === Common metabolic / endocrine ===
+    ("C0011849", "Diabetes mellitus"),
+    ("C0020473", "Hyperlipidemia"),
+    # === Common pulmonary ===
+    ("C0024117", "COPD / Chronic obstructive pulmonary disease"),
+    ("C0004096", "Asthma"),
+    # === Common neoplasm ===
+    ("C0007282", "Carcinoma"),
+    ("C0006142", "Breast neoplasm / cancer"),
+    # === Infection / inflammation ===
+    ("C0009450", "Communicable disease"),
+    ("C0021400", "Influenza"),
+    ("C0019163", "Hepatitis B"),
+    ("C0021368", "Inflammation"),
+    # === Procedures ===
+    ("C0040405", "X-ray procedure / Radiography"),
+    ("C0010055", "Coronary artery bypass graft"),
+    ("C0021107", "Surgical procedure"),
+    ("C0011946", "Diagnostic imaging"),
+    # === Findings / symptoms ===
+    ("C0030193", "Pain"),
+    ("C0009326", "Cognitive impairment"),
+    ("C0015967", "Fever"),
+    ("C0042963", "Vomiting"),
+    # === Anatomy ===
+    ("C0024109", "Lung structure"),
+    ("C0018787", "Heart structure"),
+    ("C0024485", "Magnetic resonance imaging structure?"),
+    ("C0007855", "Cervix"),
+    # === Drugs / substances ===
+    ("C0042890", "Vitamin"),
+    ("C0003232", "Antibacterial agent"),
+    ("C0020156", "Hormone"),
+    # === Organisms ===
+    ("C0014834", "Escherichia coli"),
+    ("C0085548", "Staphylococcus aureus"),
+    ("C0011854", "Diabetes mellitus, NIDDM (sanity check 2)"),
+]
+
+
+def lookup(cui, expected_domain, payload):
+    labels = payload["labels"]
+    tags = payload["tags"]
+    cui_topic_ids = payload["cui_topic_ids"]
+    topic_to_canonical = payload["topic_to_canonical"]
+    topic_to_cuis = payload["topic_to_cuis"]
+
+    cui_label = labels.get(cui, "?")
+    cui_stys = sorted(tags.get(cui, frozenset()))
+
+    print(f"\n{'='*70}")
+    print(f"  {cui}  {cui_label}")
+    print(f"  [expected: {expected_domain}]")
+    print(f"{'='*70}")
+    if cui_stys:
+        print(f"  STY: {', '.join(cui_stys)}")
+
+    tids = cui_topic_ids.get(cui)
+    if not tids:
+        print(f"  -> NO TOPICS (orphan)")
+        return
+
+    print(f"  -> {len(tids)} topic(s):")
+    for tid in sorted(tids):
+        canon_cui = topic_to_canonical.get(tid)
+        canon_label = labels.get(canon_cui, "?") if canon_cui else "?"
+        members = topic_to_cuis.get(tid, set())
+        # Truncate canonical label
+        canon_label_short = canon_label[:55] + "..." if len(canon_label) > 55 else canon_label
+        print(f"     {canon_cui}  {canon_label_short}")
+        print(f"        ({len(members):,} CUIs share this topic)")
+
+
+def main():
+    with open(PICKLE_PATH, "rb") as f:
+        payload = pickle.load(f)
+    print(f"Loaded {PICKLE_PATH}")
+    print(f"  built_at        : {payload['built_at']}")
+    print(f"  total canonicals: {len(payload['canonicals']):,}")
+    print(f"  CUIs with topics: {len(payload['cui_topic_ids']):,}")
+    if "config" in payload:
+        cfg = payload["config"]
+        print(f"  detection       : {cfg.get('detection', '?')}")
+        print(f"  pruning         : {cfg.get('prune_stacked_canonicals', '?')}")
+        print(f"  sibling exp.    : {cfg.get('sibling_expansion', '?')}")
+        print(f"  singleton fb    : {cfg.get('singleton_fallback', '?')}")
+
+    for cui, expected in CUIS_TO_LOOKUP:
+        lookup(cui, expected, payload)
+
+
+main()
