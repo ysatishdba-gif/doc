@@ -1,68 +1,469 @@
 """
-lookup_topics.py
-----------------
-Look up the topic IDs for one or more CUIs.
+build_topics.py
+---------------
+Build CUI -> [topic_ids] lookup via nearest-canonical IS-A roll-up.
 
-Use this to verify the topic assignments after running build_topics.py.
+ARCHITECTURE:
 
-Each CUI has a set of topic IDs (potentially multiple). Each topic ID
-corresponds to a canonical CUI (an organizing concept in SNOMED).
+  1. Organizing nodes (= topics) are detected by where their
+     children-count falls in the GRAPH'S OWN distribution of
+     children-counts. Specifically: between the LOWER_PERCENTILE and
+     UPPER_PERCENTILE of children-counts among non-leaf nodes.
 
-Edit CUIS_TO_LOOKUP below and run.
+  2. Each organizing node IS a topic. The organizing nodes themselves
+     are the canonicals — not their children. This is more stable than
+     using children as canonicals, because children of organizing
+     nodes include both real subcategories AND modeling artifacts.
+
+  3. Each CUI's topics = NEAREST canonical ancestors (BFS up until
+     the first canonical is hit, stop there).
+
+     This avoids topic explosion: walking up to ALL canonical
+     ancestors produces 15-80 topics per CUI for deep concepts.
+     Nearest-only typically produces 1-3 topics per CUI.
+
+USAGE (GCP notebook): paste the contents of this file into a cell.
+The call to main() at the bottom runs the build.
 """
 
+import datetime
+import hashlib
 import pickle
+import os
+import time
+from collections import defaultdict, Counter, deque
 
 
-PICKLE_PATH = "topic_lookup.pkl"
+CACHE_PATH = "umls_cache.pkl"
+OUTPUT_PATH = "topic_lookup.pkl"
 
-CUIS_TO_LOOKUP = [
-    "C0032285",   # Pneumonia
-    # Add your test CUIs here
-]
+# Percentile band within the graph's distribution of children-counts
+# (computed over non-leaf nodes).
+#
+# Lower percentile excludes "barely-branching" nodes (1-2 children, very
+# common in SNOMED).
+# Upper percentile excludes mega-hubs (the top 1% of nodes that have
+# hundreds of children — these are near-root organizing concepts that
+# would pull in too much of the corpus).
+#
+# These are not magnitudes — they're cuts on the graph's own
+# distribution. They scale with whatever SNOMED looks like.
+LOWER_PERCENTILE = 75
+UPPER_PERCENTILE = 99
+
+# When True: CUIs with no canonical ancestor become their OWN topic
+# (a single-member topic). Ensures every CUI is retrievable but inflates
+# the topic count by however many "orphan" CUIs there are.
+#
+# When False: CUIs without a canonical ancestor have no topic. Compact
+# but means some CUIs are not retrievable via this index.
+#
+# Default False for compactness. Turn on if retrieval coverage matters
+# more than index size.
+SINGLETON_FALLBACK = False
 
 
-def lookup(cui, payload):
-    labels = payload["labels"]
-    tags = payload["tags"]
-    cui_topic_ids = payload["cui_topic_ids"]
-    topic_to_canonical = payload["topic_to_canonical"]
-    topic_to_cuis = payload["topic_to_cuis"]
+# ============================================================================
+# Helpers
+# ============================================================================
 
-    cui_label = labels.get(cui, "?")
-    cui_stys = sorted(tags.get(cui, frozenset()))
+def build_isa_graph(cache):
+    """parents[child] -> set of direct IS-A parents
+       children[parent] -> set of direct IS-A children"""
+    parents = defaultdict(set)
+    children = defaultdict(set)
+    for cui1, cui2, rel, rela in cache["mrrel_rows"]:
+        if rel == "CHD" and rela == "isa":
+            parents[cui2].add(cui1)
+            children[cui1].add(cui2)
+    return parents, children
 
-    print(f"\n{'='*60}")
-    print(f"{cui}  {cui_label}")
-    print(f"{'='*60}")
-    if cui_stys:
-        print(f"  semantic type(s): {', '.join(cui_stys)}")
 
-    tids = cui_topic_ids.get(cui)
-    if not tids:
-        print(f"\n  No topics. This CUI has no canonical ancestors.")
-        return
+def percentile_value(sorted_values, p):
+    """Get the value at percentile p (0-100) from a sorted list."""
+    if not sorted_values:
+        return 0
+    idx = min(int(len(sorted_values) * p / 100), len(sorted_values) - 1)
+    return sorted_values[idx]
 
-    print(f"\n  Has {len(tids)} topic(s):")
-    for tid in sorted(tids):
-        canon_cui = topic_to_canonical.get(tid)
-        canon_label = labels.get(canon_cui, "?") if canon_cui else "?"
-        members = topic_to_cuis.get(tid, set())
-        print(f"    {tid}")
-        print(f"      canonical:    {canon_cui}  ({canon_label})")
-        print(f"      total CUIs:   {len(members):,} share this topic")
 
+def hash_topic(cui):
+    """Stable hash for a canonical CUI -> topic ID."""
+    return "tp_" + hashlib.sha1(cui.encode()).hexdigest()[:12]
+
+
+# ============================================================================
+# Subhierarchy parent detection (data-distribution-based)
+# ============================================================================
+
+def find_subhierarchy_parents(cuis, children):
+    """
+    A CUI qualifies as a subhierarchy parent if its children-count
+    falls within the percentile band of the graph's distribution of
+    non-leaf children-counts.
+
+    Returns:
+      found:        dict cui -> {n_children, percentile}
+      lower_bound:  the children-count at LOWER_PERCENTILE
+      upper_bound:  the children-count at UPPER_PERCENTILE
+    """
+    # Children-count distribution for non-leaf nodes
+    cc = {c: len(children.get(c, ())) for c in cuis if children.get(c)}
+    sorted_counts = sorted(cc.values())
+    lower_bound = percentile_value(sorted_counts, LOWER_PERCENTILE)
+    upper_bound = percentile_value(sorted_counts, UPPER_PERCENTILE)
+
+    found = {}
+    for cui, n in cc.items():
+        if lower_bound <= n <= upper_bound:
+            found[cui] = {"n_children": n}
+    return found, lower_bound, upper_bound
+
+
+# ============================================================================
+# Canonical extraction
+# ============================================================================
+
+def extract_canonicals(subhier_parents, children):
+    """
+    Canonicals = the subhierarchy parents themselves.
+
+    Previous design used children of subhier parents as canonicals.
+    That was unstable: a subhier parent's children include both
+    organizing concepts AND modeling artifacts, mixed by ontology
+    region. Using the subhier parents themselves filters out the
+    artifacts because they're only kept if they pass the structural
+    test (percentile band on children-count).
+    """
+    canonicals = set(subhier_parents.keys())
+    canonical_info = {
+        c: {"n_children": subhier_parents[c]["n_children"]}
+        for c in canonicals
+    }
+    return canonicals, canonical_info
+
+
+# ============================================================================
+# Topic assignment per CUI: NEAREST canonical(s) only
+# ============================================================================
+
+def prune_stacked_canonicals(canonicals, children):
+    """
+    Drop canonicals that have another canonical as an IS-A ANCESTOR.
+    Keeps the HIGHEST canonicals only.
+
+    Algorithm: for each canonical, walk DOWNWARD through descendants.
+    Any descendant that is also in the canonical set is "shadowed" —
+    there's a higher canonical (us) above it, so the descendant is
+    redundant.
+
+    Why keep HIGHEST: empirical evidence from running on real SNOMED
+    showed that keeping LOWEST canonicals caused common clinical
+    concepts (Pneumonia, TB, MI) to lose topic assignments. Mid-level
+    clinical organizers were getting pruned in favor of niche
+    sub-branches deeper in the tree. Keeping highest pushes broad
+    clinical concepts to the top of the topic space, which is what
+    retrieval actually wants.
+
+    Trade-off: more specific CUIs that satisfy structural criteria
+    (like "Bacterial pneumonia") no longer get their own topic —
+    they roll up to "Pneumonia" instead. This loses granularity but
+    dramatically improves clinical coverage.
+
+    Each canonical's downward walk only touches its own subtree.
+    """
+    canon_set = set(canonicals)
+    shadowed = set()
+    for c in canon_set:
+        # Walk DOWN from c, mark any canonical descendant as shadowed
+        visited = {c}
+        frontier = set(children.get(c, ()))
+        while frontier:
+            shadowed |= (frontier & canon_set)
+            next_frontier = set()
+            for ch in frontier:
+                if ch in visited:
+                    continue
+                visited.add(ch)
+                for gc in children.get(ch, ()):
+                    if gc not in visited:
+                        next_frontier.add(gc)
+            frontier = next_frontier
+    return canon_set - shadowed
+
+
+def compute_topics_per_cui(all_cuis, canonicals, parents, children):
+    """
+    Multi-source downward BFS from all canonicals at once.
+
+    Equivalent in result to running per-CUI upward BFS, but each edge is
+    touched at most once across the whole computation. Total work is
+    O(|V| + |E|) instead of O(|V| × avg_upward_radius).
+
+    Algorithm:
+      Initialize: distance[c] = 0 and nearest[c] = {c} for each canonical
+      BFS forward over child edges. For each child visited via parent:
+        - candidate_distance = distance[parent] + 1
+        - If child has no distance yet: record candidate_distance and
+          copy parent's nearest canonicals
+        - If child's existing distance == candidate_distance (DAG tie):
+          union parent's nearest canonicals into child's set
+        - If child's existing distance < candidate_distance: skip
+          (already assigned a closer canonical via another path)
+
+    Note: distance is computed explicitly from parent's distance, not
+    from an external "level" counter. This makes the BFS layering
+    invariant explicit and robust to future refactors (e.g., switching
+    to a deque-based BFS).
+
+    Returns cui_topics: dict[cui] -> set of nearest canonical CUIs.
+    """
+    distance = {c: 0 for c in canonicals}
+    nearest = {c: {c} for c in canonicals}
+
+    # BFS frontier — only nodes newly assigned at each level
+    frontier = set(canonicals)
+    level = 0
+    t0 = time.time()
+    while frontier:
+        level += 1
+        next_frontier = set()
+        for node in frontier:
+            candidate_distance = distance[node] + 1
+            for child in children.get(node, ()):
+                if child not in distance:
+                    # First time reaching this child
+                    distance[child] = candidate_distance
+                    nearest[child] = set(nearest[node])
+                    next_frontier.add(child)
+                elif distance[child] == candidate_distance:
+                    # DAG tie at same depth — union additional canonicals
+                    nearest[child] |= nearest[node]
+                # else: distance[child] < candidate_distance, already closer; skip
+        frontier = next_frontier
+        if level % 5 == 0:
+            print(f"    BFS level {level}: {len(distance):,} nodes reached "
+                  f"({time.time()-t0:.0f}s elapsed)")
+
+    cui_topics = {}
+    for cui in all_cuis:
+        topics = nearest.get(cui, set())
+        if topics:
+            cui_topics[cui] = topics
+        elif SINGLETON_FALLBACK:
+            cui_topics[cui] = {cui}
+    return cui_topics
+
+
+# ============================================================================
+# Main
+# ============================================================================
 
 def main():
-    with open(PICKLE_PATH, "rb") as f:
-        payload = pickle.load(f)
-    print(f"Loaded {PICKLE_PATH}")
-    print(f"  built_at        : {payload['built_at']}")
-    print(f"  total canonicals: {len(payload['canonicals']):,}")
-    print(f"  CUIs with topics: {len(payload['cui_topic_ids']):,}")
+    print("=" * 60)
+    print("Topic builder (nearest-canonical, percentile-banded)")
+    print("=" * 60)
+    print(f"  cache         : {CACHE_PATH}")
+    print(f"  output        : {OUTPUT_PATH}")
+    print(f"  percentile    : [{LOWER_PERCENTILE}, {UPPER_PERCENTILE}] of "
+          f"non-leaf children-counts")
 
-    for cui in CUIS_TO_LOOKUP:
-        lookup(cui, payload)
+    print("\n[1/5] Loading cache ...")
+    t0 = time.time()
+    with open(CACHE_PATH, "rb") as f:
+        cache = pickle.load(f)
+    print(f"  {len(cache['cuis']):,} CUIs in {time.time()-t0:.1f}s")
+    labels = cache["labels"]
+
+    print("\n[2/5] Building IS-A graph ...")
+    t0 = time.time()
+    parents, children = build_isa_graph(cache)
+    n_edges = sum(len(ps) for ps in parents.values())
+    print(f"  {n_edges:,} IS-A edges in {time.time()-t0:.1f}s")
+
+    print(f"\n[3/5] Finding subhierarchy parents (percentile band) ...")
+    t0 = time.time()
+    subhier_parents, lower, upper = find_subhierarchy_parents(
+        cache["cuis"], children,
+    )
+    print(f"  Distribution of non-leaf children-counts:")
+    print(f"    {LOWER_PERCENTILE}th percentile = {lower} children")
+    print(f"    {UPPER_PERCENTILE}th percentile = {upper} children")
+    print(f"  Found {len(subhier_parents):,} subhierarchy parents "
+          f"in {time.time()-t0:.1f}s")
+    print(f"\n  Top 30 subhierarchy parents (by children count):")
+    sorted_sp = sorted(
+        subhier_parents.items(),
+        key=lambda kv: -kv[1]["n_children"],
+    )
+    for cui, info in sorted_sp[:30]:
+        label = labels.get(cui, "?")
+        print(f"    children={info['n_children']:>4d}  "
+              f"{cui}  {label[:55]}")
+    if len(sorted_sp) > 30:
+        print(f"    ... plus {len(sorted_sp) - 30} more subhier parents")
+
+    print("\n[4/5] Extracting canonical CUIs ...")
+    t0 = time.time()
+    canonicals, canonical_info = extract_canonicals(subhier_parents, children)
+    print(f"  Found {len(canonicals):,} canonical CUIs in "
+          f"{time.time()-t0:.1f}s")
+
+    print(f"\n  Pruning stacked canonicals (downward marking, keep HIGHEST) ...")
+    t0 = time.time()
+    n_before = len(canonicals)
+    canonicals = prune_stacked_canonicals(canonicals, children)
+    canonical_info = {c: canonical_info[c] for c in canonicals if c in canonical_info}
+    n_dropped = n_before - len(canonicals)
+    print(f"  Pruned {n_dropped:,} descendant canonicals "
+          f"in {time.time()-t0:.1f}s")
+    print(f"  Final canonicals: {len(canonicals):,}")
+
+    # Compute children-count for top canonicals (for display)
+    canon_kid_counts = {
+        c: len(children.get(c, ())) for c in canonicals
+    }
+    print(f"\n  Top 30 canonicals (by children count):")
+    sorted_canon = sorted(canon_kid_counts.items(), key=lambda kv: -kv[1])
+    for cui, n_kids in sorted_canon[:30]:
+        cui_label = labels.get(cui, "?")
+        print(f"    children={n_kids:>4d}  {cui}  {cui_label[:55]}")
+
+    print("\n[5/5] Computing nearest-canonical topics (multi-source downward BFS) ...")
+    print(f"  (singleton fallback: {SINGLETON_FALLBACK})")
+    t0 = time.time()
+    cui_topics = compute_topics_per_cui(
+        sorted(cache["cuis"]), canonicals, parents, children,
+    )
+    print(f"  {len(cui_topics):,} CUIs have at least one topic "
+          f"in {time.time()-t0:.1f}s")
+
+    topic_to_cuis = defaultdict(set)
+    cui_topic_ids = {}
+    for cui, canon_set in cui_topics.items():
+        tids = {hash_topic(c) for c in canon_set}
+        cui_topic_ids[cui] = tids
+        for tid in tids:
+            topic_to_cuis[tid].add(cui)
+
+    topic_to_canonical = {hash_topic(c): c for c in canonicals}
+
+    print("\n" + "=" * 60)
+    print("RESULTS")
+    print("=" * 60)
+    n_topics_per_cui = [len(ts) for ts in cui_topic_ids.values()]
+    n_topics_distribution = Counter(n_topics_per_cui)
+    avg_topics = sum(n_topics_per_cui) / len(n_topics_per_cui) if n_topics_per_cui else 0
+    print(f"  Total CUIs                  : {len(cache['cuis']):,}")
+    print(f"  CUIs with at least 1 topic  : {len(cui_topic_ids):,} "
+          f"({100*len(cui_topic_ids)/len(cache['cuis']):.1f}%)")
+    print(f"  Total canonical CUIs        : {len(canonicals):,}")
+    print(f"  Average topics per CUI      : {avg_topics:.2f}")
+    print(f"\n  Distribution: topics per CUI:")
+    for n_topics in sorted(n_topics_distribution.keys()):
+        n_cuis = n_topics_distribution[n_topics]
+        pct = 100 * n_cuis / len(cui_topic_ids)
+        if n_topics <= 10 or n_topics % 5 == 0:
+            print(f"    {n_topics:>3d} topics : {n_cuis:>7,d} CUIs ({pct:5.1f}%)")
+
+    print(f"\n  Top 30 topics by CUI membership:")
+    sorted_topics = sorted(
+        topic_to_cuis.items(),
+        key=lambda kv: -len(kv[1]),
+    )
+    for tid, cuis_in_topic in sorted_topics[:30]:
+        canon_cui = topic_to_canonical[tid]
+        canon_label = labels.get(canon_cui, "?")
+        print(f"    {len(cuis_in_topic):>7,d} CUIs  {tid}  -> {canon_cui}  "
+              f"({canon_label[:50]})")
+
+    # ------------------------------------------------------------------
+    # Additional diagnostics
+    # ------------------------------------------------------------------
+
+    # 1. Canonical depth from roots
+    print(f"\n  Diagnostic: canonical depth from roots")
+    roots = {c for c in cache["cuis"] if not parents.get(c)}
+    depth_from_root = {}
+    dq = deque((r, 0) for r in roots)
+    while dq:
+        cui, d = dq.popleft()
+        if cui in depth_from_root and depth_from_root[cui] <= d:
+            continue
+        depth_from_root[cui] = d
+        for ch in children.get(cui, ()):
+            dq.append((ch, d + 1))
+    canon_depths = [depth_from_root.get(c, -1) for c in canonicals]
+    depth_counter = Counter(canon_depths)
+    for d in sorted(depth_counter.keys()):
+        if d == -1:
+            print(f"    depth=unknown : {depth_counter[d]:>5,d}")
+        else:
+            print(f"    depth={d:>3d}     : {depth_counter[d]:>5,d}")
+
+    # 2. Multi-parent multiplicity (CUIs with multiple IS-A parents)
+    multi_parent_cuis = [c for c in cache["cuis"] if len(parents.get(c, ())) > 1]
+    multi_parent_topic_counts = Counter()
+    for c in multi_parent_cuis:
+        n = len(cui_topic_ids.get(c, set()))
+        multi_parent_topic_counts[n] += 1
+    print(f"\n  Diagnostic: multi-parent CUIs (DAG nodes)")
+    print(f"    total multi-parent CUIs   : {len(multi_parent_cuis):,}")
+    print(f"    topic-count distribution among them:")
+    for n in sorted(multi_parent_topic_counts.keys()):
+        pct = 100 * multi_parent_topic_counts[n] / max(len(multi_parent_cuis), 1)
+        print(f"      {n:>3d} topics : {multi_parent_topic_counts[n]:>6,d} "
+              f"CUIs ({pct:5.1f}%)")
+
+    # 3. Orphan coverage by STY
+    cuis_without_topic = set(cache["cuis"]) - set(cui_topic_ids.keys())
+    print(f"\n  Diagnostic: orphan coverage by semantic type")
+    print(f"    total orphans (no topic) : {len(cuis_without_topic):,}")
+    sty_orphan_counts = Counter()
+    sty_total_counts = Counter()
+    for c in cache["cuis"]:
+        for sty in cache["tags"].get(c, frozenset()):
+            sty_total_counts[sty] += 1
+            if c in cuis_without_topic:
+                sty_orphan_counts[sty] += 1
+    print(f"    top 20 STYs by orphan count:")
+    for sty, n_orphan in sty_orphan_counts.most_common(20):
+        n_total = sty_total_counts[sty]
+        pct = 100 * n_orphan / n_total if n_total else 0
+        print(f"      {n_orphan:>6,d} / {n_total:>7,d}  "
+              f"({pct:5.1f}%)  {sty}")
+
+    print("\n[Saving]")
+    t0 = time.time()
+    payload = {
+        "built_at": datetime.datetime.now().isoformat(),
+        "cache_fetched_at": cache.get("fetched_at"),
+        "config": {
+            "detection": "percentile-band on non-leaf children-counts",
+            "lower_percentile": LOWER_PERCENTILE,
+            "upper_percentile": UPPER_PERCENTILE,
+            "actual_lower_bound": lower,
+            "actual_upper_bound": upper,
+            "topic_assignment": "nearest canonical via multi-source downward BFS",
+            "stacked_canonical_pruning": "keep highest (drop descendant canonicals)",
+            "singleton_fallback": SINGLETON_FALLBACK,
+        },
+        "subhierarchy_parents": subhier_parents,
+        "canonicals":          canonicals,
+        "canonical_info":      canonical_info,
+        "cui_topic_ids":       cui_topic_ids,
+        "topic_to_canonical":  topic_to_canonical,
+        "topic_to_cuis":       dict(topic_to_cuis),
+        "labels":              cache["labels"],
+        "tags":                cache["tags"],
+    }
+    with open(OUTPUT_PATH, "wb") as f:
+        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
+    print(f"  wrote {size_mb:.1f} MB in {time.time()-t0:.1f}s")
+    print("\n" + "=" * 60)
+    print(f"DONE — {OUTPUT_PATH}")
+    print("=" * 60)
 
 
 main()
