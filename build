@@ -1,366 +1,183 @@
-"""
-build_topics_graph_fast.py
---------------------------
-Fast topic build using the implication graph.
+============================================================
+Build topics from implication graph (fast dual method)
+============================================================
+Graph     : data (24,055,828 nodes)
+SNOMED    : 374,538 CUIs
 
-Pipeline:
-  1. Flatten the suffix-bridge graph (data) to CUI-CUI edges (SNOMED-only)
-  2. Pick canonicals from degree distribution (medium-high degree, but
-     exclude mega-hubs)
-  3. Multi-source nearest-canonical BFS from all canonicals
-  4. ALSO run Louvain community detection for comparison
-  5. Save both topic mappings in one pickle
+[1] Flattening suffix-bridge -> CUI-CUI ...
+  flattening for 374,538 SNOMED CUIs ...
+    50,000/374,538 (4s)
+    100,000/374,538 (8s)
+    150,000/374,538 (12s)
+    200,000/374,538 (16s)
+    250,000/374,538 (20s)
+    300,000/374,538 (25s)
+    350,000/374,538 (29s)
+  -> 674,090 undirected edges in 31s
 
-Both methods now run in minutes, not hours.
+[2] Selecting canonicals from degree distribution ...
+  degree band: [4, 26] (percentiles 75 to 99)
+  96,735 canonicals selected
 
-Inputs (must be loaded in notebook):
-  - data        : NetworkX DiGraph (suffix-bridge graph)
-  - SNOMED_CUIS : set of SNOMED CUIs
-  - LABELS      : optional, dict cui -> name
-  - TAGS        : optional, dict cui -> frozenset of STY codes
-"""
+[3] METHOD 1: Multi-source nearest-canonical BFS ...
+    level 3: 373,001 reached (2s)
+    level 6: 373,602 reached (2s)
+  BFS done in 2s, 8 levels
 
-import pickle
-import datetime
-import hashlib
-import time
-import os
-from collections import defaultdict, Counter
-import statistics
+[4] METHOD 2: Louvain community detection ...
+  building undirected nx graph ...
+  graph: 374,538 nodes, 674,090 edges
+  running Louvain ...
+  Louvain done in 190s, found 1,283 communities
 
+==============================================================================
+  METHOD 1: Multi-source nearest-canonical BFS
+==============================================================================
+  Canonicals             : 96,735
+  CUIs with topics       : 373,605
+  Avg topics per CUI     : 8.33
+  Median topics per CUI  : 1
+  Max topics per CUI     : 1,953
 
-OUTPUT_PATH = "topic_lookup_graph.pkl"
+==============================================================================
+  METHOD 2: Louvain communities
+==============================================================================
+  Total communities      : 1,283
+  Avg community size     : 292
+  Median community size  : 1
+  Largest                : 37,324
 
-# Canonical detection knobs
-MIN_DEGREE_PERCENTILE = 75     # canonicals must be in top 25% by degree
-MEGA_HUB_PERCENTILE   = 99     # but NOT in top 1% (those are mega-hubs)
+==============================================================================
+  FOCAL CUI lookups
+==============================================================================
 
-# Louvain knob
-LOUVAIN_RESOLUTION = 1.0
+  C0032285  'C0032285'
+    M1 nearest canonicals (27):
+      C0004626  C0004626
+      C0006285  C0006285
+      C0032241  C0032241
+      C0032290  C0032290
+      C0032300  C0032300
+      C0032310  C0032310
+    M2 community 823 (size 27425, showing sample):
+      C0000727  C0000727
+      C0000734  C0000734
+      C0000735  C0000735
+      C0000737  C0000737
+      C0000809  C0000809
+      C0000810  C0000810
 
-CANONICAL_EXCLUDE = {
-    "C2720507",   # SNOMED admin pseudo-root
-    "CTN_RXNORM",  # graph-level metadata hub
-}
+  C0021368  'C0021368'
+    M1 nearest canonicals (1):
+      C0021368  C0021368
+    M2 community 1257 (size 2143, showing sample):
+      C0000846  C0000846
+      C0001280  C0001280
+      C0002098  C0002098
+      C0002793  C0002793
+      C0003148  C0003148
+      C0003782  C0003782
 
+  C0024109  'C0024109'
+    M1 nearest canonicals (1):
+      C0024109  C0024109
+    M2 community 163 (size 29509, showing sample):
+      C0000726  C0000726
+      C0000741  C0000741
+      C0000781  C0000781
+      C0000905  C0000905
+      C0000962  C0000962
+      C0001074  C0001074
 
-# ============================================================================
-# Helpers
-# ============================================================================
+  C0011849  'C0011849'
+    M1 nearest canonicals (26):
+      C0011859  C0011859
+      C0011860  C0011860
+      C0011871  C0011871
+      C0011878  C0011878
+      C0011880  C0011880
+      C0011881  C0011881
+    M2 community 1000 (size 27066, showing sample):
+      C0000744  C0000744
+      C0000768  C0000768
+      C0000889  C0000889
+      C0001079  C0001079
+      C0001080  C0001080
+      C0001118  C0001118
 
-def is_pure_cui(node):
-    return isinstance(node, str) and node.startswith("C") and "-" not in node and node != "CUI"
+  C1527304  'C1527304'
+    M1 nearest canonicals (9):
+      C0343029  C0343029
+      C0392707  C0392707
+      C0851444  C0851444
+      C1304076  C1304076
+      C1626923  C1626923
+      C1630647  C1630647
+    M2 community 137 (size 2585, showing sample):
+      C0001940  C0001940
+      C0001956  C0001956
+      C0001973  C0001973
+      C0002792  C0002792
+      C0006234  C0006234
+      C0006646  C0006646
 
+  C0559470  'C0559470'
+    M1 nearest canonicals (1):
+      C1096735  C1096735
+    M2 community 1282 (size 1625, showing sample):
+      C0004058  C0004058
+      C0008127  C0008127
+      C0009215  C0009215
+      C0011616  C0011616
+      C0013182  C0013182
+      C0014808  C0014808
 
-def cui_of(suffix_node):
-    return suffix_node.rsplit("-", 1)[0] if "-" in suffix_node else suffix_node
+  C0002792  'C0002792'
+    M1 nearest canonicals (1):
+      C0002792  C0002792
+    M2 community 137 (size 2585, showing sample):
+      C0001940  C0001940
+      C0001956  C0001956
+      C0001973  C0001973
+      C0002792  C0002792 <-- self
+      C0006234  C0006234
+      C0006646  C0006646
 
+  C0013182  'C0013182'
+    M1 nearest canonicals (57):
+      C0030824  C0030824
+      C0237865  C0237865
+      C0277585  C0277585
+      C0344168  C0344168
+      C0570514  C0570514
+      C0570573  C0570573
+    M2 community 1282 (size 1625, showing sample):
+      C0004058  C0004058
+      C0008127  C0008127
+      C0009215  C0009215
+      C0011616  C0011616
+      C0013182  C0013182 <-- self
+      C0014808  C0014808
 
-def hash_topic(cui):
-    return "tp_" + hashlib.sha1(cui.encode()).hexdigest()[:12]
+  C2142181  'C2142181'
+    M1 nearest canonicals (1):
+      C2142181  C2142181
+    M2 community 489 (size 23530, showing sample):
+      C0000833  C0000833
+      C0001342  C0001342
+      C0001510  C0001510
+      C0001511  C0001511
+      C0001860  C0001860
+      C0002382  C0002382
 
+==============================================================================
+  PAIR RETRIEVAL TEST: do these CUIs share topic?
+==============================================================================
+  'Allergic reaction' <-> 'Peanut allergy'  M1:NO  M2:NO
+  'Allergic reaction' <-> 'Anaphylaxis'  M1:NO  M2:YES
+  'Pain left knee jt' <-> 'Pain knee region'  M1:NO  M2:YES
 
-def percentile_value(sorted_values, p):
-    if not sorted_values:
-        return 0
-    idx = min(int(len(sorted_values) * p / 100), len(sorted_values) - 1)
-    return sorted_values[idx]
+[Saving] topic_lookup_graph.pkl
+  wrote 96.9 MB
 
-
-def lbl(c):
-    return LABELS.get(c, "?")[:45] if "LABELS" in globals() else c
-
-
-# ============================================================================
-# Flatten graph to CUI-CUI edges
-# ============================================================================
-
-def flatten_graph(g, snomed_cuis):
-    print(f"  flattening for {len(snomed_cuis):,} SNOMED CUIs ...")
-    neighbors = defaultdict(set)
-    n_proc = 0
-    t0 = time.time()
-    for cui in snomed_cuis:
-        if cui not in g:
-            n_proc += 1
-            continue
-        for suffix in g.successors(cui):
-            if "-" not in suffix:
-                continue
-            for pred in g.predecessors(suffix):
-                if pred == cui or pred == "CUI" or "-" not in pred:
-                    continue
-                other_cui = cui_of(pred)
-                if other_cui != cui and other_cui in snomed_cuis:
-                    neighbors[cui].add(other_cui)
-                    neighbors[other_cui].add(cui)
-        n_proc += 1
-        if n_proc % 50000 == 0:
-            print(f"    {n_proc:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
-    n_edges = sum(len(s) for s in neighbors.values()) // 2
-    print(f"  -> {n_edges:,} undirected edges in {time.time()-t0:.0f}s")
-    return dict(neighbors)
-
-
-# ============================================================================
-# Canonical selection from degree distribution
-# ============================================================================
-
-def select_canonicals(neighbors):
-    """
-    Pick CUIs whose degree is in [MIN_DEGREE_PERCENTILE, MEGA_HUB_PERCENTILE].
-
-    The lower bound ensures canonicals actually organize something.
-    The upper bound excludes mega-hubs that would absorb the graph.
-    """
-    degrees = sorted(len(s) for s in neighbors.values())
-    if not degrees:
-        return set(), 0, 0
-    min_deg = percentile_value(degrees, MIN_DEGREE_PERCENTILE)
-    max_deg = percentile_value(degrees, MEGA_HUB_PERCENTILE)
-    print(f"  degree band: [{min_deg}, {max_deg}] "
-          f"(percentiles {MIN_DEGREE_PERCENTILE} to {MEGA_HUB_PERCENTILE})")
-
-    canonicals = set()
-    for cui, nbrs in neighbors.items():
-        d = len(nbrs)
-        if min_deg <= d <= max_deg:
-            canonicals.add(cui)
-    canonicals -= CANONICAL_EXCLUDE
-    print(f"  {len(canonicals):,} canonicals selected")
-    return canonicals, min_deg, max_deg
-
-
-# ============================================================================
-# Multi-source nearest-canonical BFS — same algorithm as the IS-A build
-# ============================================================================
-
-def compute_topics_per_cui(all_cuis, canonicals, neighbors):
-    """
-    Multi-source BFS from all canonicals at once over the undirected
-    flattened graph. Each non-canonical CUI gets the canonical(s) at
-    its shortest distance from a canonical.
-
-    Each canonical is its own topic at distance 0.
-
-    Total work: O(|V| + |E|).
-    """
-    distance = {c: 0 for c in canonicals}
-    nearest = {c: {c} for c in canonicals}
-    frontier = set(canonicals)
-    level = 0
-    t0 = time.time()
-    while frontier:
-        level += 1
-        next_frontier = set()
-        for node in frontier:
-            cand_d = distance[node] + 1
-            for nb in neighbors.get(node, ()):
-                if nb not in distance:
-                    distance[nb] = cand_d
-                    nearest[nb] = set(nearest[node])
-                    next_frontier.add(nb)
-                elif distance[nb] == cand_d:
-                    if not nearest[node] <= nearest[nb]:
-                        nearest[nb] |= nearest[node]
-        frontier = next_frontier
-        if level % 3 == 0:
-            print(f"    level {level}: {len(distance):,} reached ({time.time()-t0:.0f}s)")
-    print(f"  BFS done in {time.time()-t0:.0f}s, {level} levels")
-
-    cui_topics = {}
-    for cui in all_cuis:
-        t = nearest.get(cui)
-        if t:
-            cui_topics[cui] = t
-    return cui_topics
-
-
-# ============================================================================
-# Method 2: Louvain communities
-# ============================================================================
-
-def louvain_communities(neighbors, snomed_cuis):
-    import networkx as nx
-    print(f"  building undirected nx graph ...")
-    G = nx.Graph()
-    G.add_nodes_from(snomed_cuis)
-    for u, nbrs in neighbors.items():
-        for v in nbrs:
-            if u < v:
-                G.add_edge(u, v)
-    print(f"  graph: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
-
-    print(f"  running Louvain ...")
-    t0 = time.time()
-    try:
-        from networkx.algorithms.community import louvain_communities as nx_louvain
-        comms = nx_louvain(G, resolution=LOUVAIN_RESOLUTION, seed=42)
-    except ImportError:
-        import community as community_louvain
-        partition = community_louvain.best_partition(
-            G, resolution=LOUVAIN_RESOLUTION, random_state=42,
-        )
-        comm_dict = defaultdict(set)
-        for cui, cid in partition.items():
-            comm_dict[cid].add(cui)
-        comms = list(comm_dict.values())
-    print(f"  Louvain done in {time.time()-t0:.0f}s, found {len(comms):,} communities")
-    cui_to_community = {}
-    for i, c in enumerate(comms):
-        for cui in c:
-            cui_to_community[cui] = i
-    return cui_to_community, comms
-
-
-# ============================================================================
-# Reporting
-# ============================================================================
-
-FOCAL_CUIS = [
-    "C0032285",  # Pneumonia
-    "C0021368",  # Inflammation
-    "C0024109",  # Lung
-    "C0011849",  # Diabetes
-    "C1527304",  # Allergic reaction
-    "C0559470",  # Peanut allergy
-    "C0002792",  # Anaphylaxis
-    "C0013182",  # Drug allergy
-    "C2142181",  # Pain of left knee joint
-]
-
-
-def report(cui_topics, cui_to_community, communities, canonicals):
-    # Method 1 stats
-    print(f"\n{'='*78}")
-    print(f"  METHOD 1: Multi-source nearest-canonical BFS")
-    print(f"{'='*78}")
-    sizes = [len(t) for t in cui_topics.values()]
-    print(f"  Canonicals             : {len(canonicals):,}")
-    print(f"  CUIs with topics       : {len(cui_topics):,}")
-    print(f"  Avg topics per CUI     : {statistics.mean(sizes):.2f}")
-    print(f"  Median topics per CUI  : {statistics.median(sizes):.0f}")
-    print(f"  Max topics per CUI     : {max(sizes):,}")
-
-    # Method 2 stats
-    print(f"\n{'='*78}")
-    print(f"  METHOD 2: Louvain communities")
-    print(f"{'='*78}")
-    csizes = [len(c) for c in communities]
-    print(f"  Total communities      : {len(communities):,}")
-    print(f"  Avg community size     : {statistics.mean(csizes):.0f}")
-    print(f"  Median community size  : {statistics.median(csizes):.0f}")
-    print(f"  Largest                : {max(csizes):,}")
-
-    # Focal CUI side by side
-    print(f"\n{'='*78}")
-    print(f"  FOCAL CUI lookups")
-    print(f"{'='*78}")
-    for cui in FOCAL_CUIS:
-        print(f"\n  {cui}  '{lbl(cui)}'")
-        # Method 1
-        m1 = cui_topics.get(cui, set())
-        print(f"    M1 nearest canonicals ({len(m1)}):")
-        for c in sorted(m1)[:6]:
-            print(f"      {c}  {lbl(c)}")
-        # Method 2
-        cid = cui_to_community.get(cui)
-        if cid is not None:
-            comm = communities[cid]
-            print(f"    M2 community {cid} (size {len(comm)}, showing sample):")
-            for c in sorted(comm)[:6]:
-                marker = " <-- self" if c == cui else ""
-                print(f"      {c}  {lbl(c)}{marker}")
-
-    # Pair-retrieval test
-    pairs = [
-        ("C1527304", "Allergic reaction", "C0559470", "Peanut allergy"),
-        ("C1527304", "Allergic reaction", "C0002792", "Anaphylaxis"),
-        ("C2142181", "Pain left knee jt", "C0231749", "Pain knee region"),
-    ]
-    print(f"\n{'='*78}")
-    print(f"  PAIR RETRIEVAL TEST: do these CUIs share topic?")
-    print(f"{'='*78}")
-    for ca, la, cb, lb_ in pairs:
-        ta, tb = cui_topics.get(ca, set()), cui_topics.get(cb, set())
-        m1_share = bool(ta & tb)
-        cida, cidb = cui_to_community.get(ca), cui_to_community.get(cb)
-        m2_share = (cida is not None and cida == cidb)
-        print(f"  '{la}' <-> '{lb_}'  M1:{('YES' if m1_share else 'NO')}  "
-              f"M2:{('YES' if m2_share else 'NO')}")
-        if m1_share:
-            shared = ta & tb
-            print(f"     M1 shared: {sorted({lbl(c) for c in shared})}")
-
-
-# ============================================================================
-# Main
-# ============================================================================
-
-def main():
-    print("=" * 60)
-    print("Build topics from implication graph (fast dual method)")
-    print("=" * 60)
-    print(f"Graph     : data ({data.number_of_nodes():,} nodes)")
-    print(f"SNOMED    : {len(SNOMED_CUIS):,} CUIs")
-
-    print(f"\n[1] Flattening suffix-bridge -> CUI-CUI ...")
-    neighbors = flatten_graph(data, SNOMED_CUIS)
-
-    print(f"\n[2] Selecting canonicals from degree distribution ...")
-    canonicals, min_deg, max_deg = select_canonicals(neighbors)
-
-    print(f"\n[3] METHOD 1: Multi-source nearest-canonical BFS ...")
-    cui_topics = compute_topics_per_cui(sorted(SNOMED_CUIS), canonicals, neighbors)
-
-    print(f"\n[4] METHOD 2: Louvain community detection ...")
-    cui_to_community, communities = louvain_communities(neighbors, SNOMED_CUIS)
-
-    # Build topic id mapping for method 1
-    topic_to_canonical = {hash_topic(c): c for c in canonicals}
-    cui_topic_ids = {}
-    topic_to_cuis = defaultdict(set)
-    for cui, canon_set in cui_topics.items():
-        tids = {hash_topic(c) for c in canon_set}
-        cui_topic_ids[cui] = tids
-        for tid in tids:
-            topic_to_cuis[tid].add(cui)
-
-    report(cui_topics, cui_to_community, communities, canonicals)
-
-    # Save
-    print(f"\n[Saving] {OUTPUT_PATH}")
-    payload = {
-        "built_at": datetime.datetime.now().isoformat(),
-        "config": {
-            "min_degree_percentile": MIN_DEGREE_PERCENTILE,
-            "mega_hub_percentile":   MEGA_HUB_PERCENTILE,
-            "actual_min_degree":     min_deg,
-            "actual_max_degree":     max_deg,
-            "canonical_exclude":     sorted(CANONICAL_EXCLUDE),
-            "louvain_resolution":    LOUVAIN_RESOLUTION,
-        },
-        "snomed_cuis":         SNOMED_CUIS,
-        "flattened_neighbors": neighbors,
-        # Method 1
-        "canonicals":          canonicals,
-        "cui_topic_ids":       cui_topic_ids,
-        "topic_to_cuis":       dict(topic_to_cuis),
-        "topic_to_canonical":  topic_to_canonical,
-        # Method 2
-        "cui_to_community":    cui_to_community,
-        "communities":         communities,
-    }
-    if "LABELS" in globals():
-        payload["labels"] = LABELS
-    if "TAGS" in globals():
-        payload["tags"] = TAGS
-
-    with open(OUTPUT_PATH, "wb") as f:
-        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
-    print(f"  wrote {size_mb:.1f} MB")
-    print("\nDONE")
-
-
-main()
+DONE
