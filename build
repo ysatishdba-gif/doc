@@ -1,252 +1,402 @@
-Graph: 24,055,828 nodes
-SNOMED universe: 374,538 CUIs
-TAGS: 370,670 entries
+"""
+evaluate_per_sty_v2.py
+----------------------
+Per-STY evaluation with FORCED COVERAGE across STYs.
 
-[1] Flattening graph ...
-  flattening for 374,538 SNOMED CUIs ...
-  674,090 edges in 32s
+Instead of generating 200 random should-match pairs (which cluster in
+1-2 STYs), we generate pairs PER STY:
+  - For each STY with at least 100 CUIs, generate up to 50 should-match
+    pairs by taking CUIs of that STY and finding their 2-hop neighbors
+    that ALSO have that STY.
+  - Generate 50 should-not-match pairs that touch this STY (1 endpoint
+    in STY, other endpoint in different STY, neither in 2-hop neighborhood).
 
-[2] Generating eval pairs (200 each) ...
-   200 should-match, 200 should-not-match
+Also fixes the STY name display by handling both TUI codes and full names.
 
-[3] Louvain (res=1.0) ...
-  Louvain (res=1.0) ...
-  1,283 communities in 193s
+Inputs (notebook globals):
+  data, SNOMED_CUIS, TAGS  (TAGS values may be tuple/list/set/frozenset)
+"""
 
-[4] Per-STY evaluation ...
+import statistics
+import random
+import time
+from collections import defaultdict, Counter
 
-====================================================================================================
-  Per-STY evaluation at Louvain resolution = 1.0
-====================================================================================================
-  STY    Name                                  #CUIs  #Comm  Disp  Concen   #SM  Recall  #SNM    FPR
-  ------ ----------------------------------- ------- ------ ----- ------- ----- ------- ----- ------
-  Disease or Syndrome ?                                    43,374    275  0.01    39%   122     91%    43     9%
-  Finding ?                                    40,312    126  0.00    15%     0     n/a    40     2%
-  Therapeutic or Preventive Procedure ?                                    34,114    163  0.00    84%     0     n/a    39     5%
-  Body Part, Organ, or Organ Component ?                                    25,716    138  0.01    82%     0     n/a    28     0%
-  Injury or Poisoning ?                                    20,979     51  0.00    46%     0     n/a    18     6%
-  Pharmacologic Substance ?                                    16,823    108  0.01    88%     0     n/a    18     6%
-  Bacterium ?                                    14,827     41  0.00    34%     0     n/a    22     0%
-  Medical Device ?                                    12,107     32  0.00    97%     0     n/a    14     0%
-  Neoplastic Process ?                                    12,024     64  0.01    75%     0     n/a    14    21%
-  Clinical Drug ?                                    11,406     11  0.00    96%     0     n/a    10     0%
-  Amino Acid, Peptide, or Protein ?                                    10,936     99  0.01    45%     0     n/a    15     0%
-  Laboratory Procedure ?                                     9,795     30  0.00    92%     0     n/a    12     0%
-  Diagnostic Procedure ?                                     9,289     41  0.00    77%     0     n/a     8     0%
-  Organic Chemical ?                                     9,260    151  0.02    93%     0     n/a    12     8%
-  Pathologic Function ?                                     8,345     53  0.01    21%     0     n/a     5     0%
-  Health Care Activity ?                                     7,568     45  0.01    30%     0     n/a     8     0%
-  Congenital Abnormality ?                                     6,257     49  0.01    62%     0     n/a     6     0%
-  Immunologic Factor ?                                     6,136     48  0.01    39%     0     n/a    10     0%
-  Eukaryote ?                                     5,297     17  0.00    27%     0     n/a     4     0%
-  Body Location or Region ?                                     4,744     57  0.01    61%     0     n/a     3    33%
-  Intellectual Product ?                                     4,623     64  0.01    35%     0     n/a     2     0%
-  Enzyme ?                                     3,835     32  0.01    99%     0     n/a     4     0%
-  Professional or Occupational Group ?                                     3,459      6  0.00    99%     0     n/a     4     0%
-  Body Space or Junction ?                                     3,138     35  0.01    83%     0     n/a     4     0%
-  Fungus ?                                     2,887     14  0.00    98%     0     n/a     2     0%
-  Mental or Behavioral Dysfunction ?                                     2,691     33  0.01    43%     0     n/a     4     0%
-  Biologically Active Substance ?                                     2,557     47  0.02    30%     0     n/a     6     0%
-  Fish   ?                                     2,537      4  0.00   100%     0     n/a     4     0%
-  Sign or Symptom ?                                     2,457     50  0.02    39%     0     n/a     0    n/a
-  Bird   ?                                     2,431      4  0.00    62%     0     n/a     3     0%
-  Tissue ?                                     2,377     20  0.01    60%     0     n/a     2     0%
-  Food   ?                                     2,374     11  0.00    87%     0     n/a     2     0%
-  Manufactured Object ?                                     2,335     18  0.01    48%     0     n/a     0    n/a
-  Quantitative Concept ?                                     2,281     29  0.01    50%     0     n/a     4     0%
-  Laboratory or Test Result ?                                     2,228     29  0.01    43%     0     n/a     2     0%
-  Clinical Attribute ?                                     2,209     30  0.01    50%     0     n/a     3     0%
-  Plant  ?                                     2,204      9  0.00    88%     0     n/a     1     0%
-  Anatomical Abnormality ?                                     2,074     26  0.01    31%     0     n/a     2     0%
-  Virus  ?                                     2,027     13  0.01    99%     0     n/a     4     0%
-  Spatial Concept ?                                     1,972     33  0.02    60%     0     n/a     0    n/a
-  Acquired Abnormality ?                                     1,958     23  0.01    37%     0     n/a     2    50%
-  Indicator, Reagent, or Diagnostic Aid ?                                     1,936     31  0.02    36%     0     n/a     1     0%
-  Mammal ?                                     1,627      9  0.01    86%     0     n/a     4     0%
-  Qualitative Concept ?                                     1,601     31  0.02    55%     0     n/a     0    n/a
-  Classification ?                                     1,493     21  0.01    40%     0     n/a     0    n/a
-  Body Substance ?                                     1,375     18  0.01    82%     0     n/a     1     0%
-  Functional Concept ?                                     1,122     41  0.04    62%     0     n/a     2     0%
-  Biomedical or Dental Material ?                                     1,062     33  0.03    56%     0     n/a     0    n/a
-  Hazardous or Poisonous Substance ?                                     1,021     27  0.03    75%     0     n/a     1     0%
-  Organ or Tissue Function ?                                       941     24  0.03    62%     0     n/a     1     0%
-  Temporal Concept ?                                       939     14  0.01    83%     0     n/a     0    n/a
-  Embryonic Structure ?                                       900     12  0.01    71%     0     n/a     0    n/a
-  Geographic Area ?                                       870      3  0.00    95%     0     n/a     0    n/a
-  Cell   ?                                       869     13  0.01    47%     0     n/a     3     0%
-  Element, Ion, or Isotope ?                                       868      4  0.00    87%     0     n/a     2     0%
-  Language ?                                       836      2  0.00   100%     0     n/a     1     0%
-  Educational Activity ?                                       815     11  0.01    93%     0     n/a     3     0%
-  Inorganic Chemical ?                                       812     20  0.02    52%     0     n/a     0    n/a
-  Health Care Related Organization ?                                       738      3  0.00    99%     0     n/a     1     0%
-  Nucleic Acid, Nucleoside, or Nucleotide ?                                       675     20  0.03    54%     0     n/a     0    n/a
-  Reptile ?                                       600      3  0.01   100%     0     n/a     0    n/a
-  Cell or Molecular Dysfunction ?                                       571     12  0.02    42%     0     n/a     2     0%
-  Antibiotic ?                                       553     24  0.04    96%     0     n/a     0    n/a
-  Cell Component ?                                       552     13  0.02    80%     0     n/a     0    n/a
-  Hormone ?                                       524      7  0.01    96%     0     n/a     1     0%
-  Substance ?                                       437     17  0.04    53%     0     n/a     1     0%
-  Archaeon ?                                       371      3  0.01    96%     0     n/a     0    n/a
-  Gene or Genome ?                                       348     17  0.05    93%     0     n/a     0    n/a
-  Mental Process ?                                       345     10  0.03    54%     0     n/a     0    n/a
-  Organism Function ?                                       336     17  0.05    49%     0     n/a     0    n/a
-  Biomedical Occupation or Discipline ?                                       299      4  0.01    88%     0     n/a     0    n/a
-  Individual Behavior ?                                       280     16  0.06    39%     0     n/a     1     0%
-  Occupational Activity ?                                       279     15  0.05    38%     0     n/a     0    n/a
-  Organism Attribute ?                                       279     22  0.08    29%     0     n/a     0    n/a
-  Body System ?                                       268      9  0.03    85%     0     n/a     1     0%
-  Population Group ?                                       261     10  0.04    56%     0     n/a     1     0%
-  Idea or Concept ?                                       255     11  0.04    70%     0     n/a     0    n/a
-  Natural Phenomenon or Process ?                                       237     14  0.06    56%     0     n/a     0    n/a
-  Physiologic Function ?                                       227     15  0.07    59%     0     n/a     0    n/a
-  Family Group ?                                       209      4  0.02    96%     0     n/a     0    n/a
-  Phenomenon or Process ?                                       197     12  0.06    38%     0     n/a     1     0%
-  Social Behavior ?                                       171     15  0.09    67%     0     n/a     1     0%
-  Event  ?                                       164      4  0.02    83%     0     n/a     0    n/a
-  Daily or Recreational Activity ?                                       161      8  0.05    76%     0     n/a     0    n/a
-  Vitamin ?                                       156      2  0.01    98%     0     n/a     0    n/a
-  Human-caused Phenomenon or Process ?                                       152     10  0.07    64%     0     n/a     0    n/a
-  Amphibian ?                                       146      2  0.01    99%     0     n/a     0    n/a
-  Cell Function ?                                       144     12  0.08    65%     0     n/a     0    n/a
-  Receptor ?                                       137      8  0.06    88%     0     n/a     0    n/a
-  Chemical Viewed Structurally ?                                       120      4  0.03    52%     0     n/a     0    n/a
-  Molecular Function ?                                        99      8  0.08    63%     0     n/a     0    n/a
-  Anatomical Structure ?                                        77      7  0.09    39%     0     n/a     0    n/a
-  Genetic Function ?                                        61      5  0.08    87%     0     n/a     0    n/a
-  Chemical Viewed Functionally ?                                        60      9  0.15    53%     0     n/a     0    n/a
-  Organization ?                                        47      3  0.06    91%     0     n/a     0    n/a
-  Molecular Biology Research Technique ?                                        40      3  0.07    95%     0     n/a     0    n/a
-  Occupation or Discipline ?                                        37      4  0.11    92%     0     n/a     0    n/a
-  Activity ?                                        36     11  0.31    47%     0     n/a     0    n/a
-  Patient or Disabled Group ?                                        31      9  0.29    45%     0     n/a     1     0%
-  Biologic Function ?                                        26      8  0.31    54%     0     n/a     0    n/a
-  Age Group ?                                        25      6  0.24    44%     0     n/a     0    n/a
-  Behavior ?                                        24      6  0.25    50%     0     n/a     0    n/a
-  Research Activity ?                                        21      6  0.29    38%     0     n/a     0    n/a
 
-  Quality summary (within-STY recall, only STYs with >=5 should-match pairs):
-    Recall >=80%: 1 STYs
-      ?                                   (n=43,374, recall=91%)
-    Recall 50-79%: 0 STYs
-    Recall <50%: 0 STYs
+# ============================================================================
+# STY code -> human-readable name (TUI -> name)
+# ============================================================================
 
-[3] Louvain (res=2.0) ...
-  Louvain (res=2.0) ...
-  1,469 communities in 157s
+STY_NAMES_BUILTIN = {
+    "T001": "Organism", "T002": "Plant", "T004": "Fungus", "T005": "Virus",
+    "T007": "Bacterium", "T008": "Animal", "T017": "Anatomical Structure",
+    "T018": "Embryonic Structure", "T019": "Congenital Abnormality",
+    "T020": "Acquired Abnormality", "T021": "Fully Formed Anatomical Structure",
+    "T022": "Body System", "T023": "Body Part, Organ, or Organ Component",
+    "T024": "Tissue", "T025": "Cell", "T026": "Cell Component",
+    "T028": "Gene or Genome", "T029": "Body Location or Region",
+    "T030": "Body Space or Junction", "T031": "Body Substance",
+    "T032": "Organism Attribute", "T033": "Finding",
+    "T034": "Laboratory or Test Result", "T037": "Injury or Poisoning",
+    "T038": "Biologic Function", "T039": "Physiologic Function",
+    "T040": "Organism Function", "T041": "Mental Process",
+    "T042": "Organ or Tissue Function", "T043": "Cell Function",
+    "T044": "Molecular Function", "T045": "Genetic Function",
+    "T046": "Pathologic Function", "T047": "Disease or Syndrome",
+    "T048": "Mental or Behavioral Dysfunction",
+    "T049": "Cell or Molecular Dysfunction",
+    "T050": "Experimental Model of Disease", "T051": "Event",
+    "T052": "Activity", "T053": "Behavior", "T054": "Social Behavior",
+    "T055": "Individual Behavior", "T056": "Daily or Recreational Activity",
+    "T057": "Occupational Activity", "T058": "Health Care Activity",
+    "T059": "Laboratory Procedure", "T060": "Diagnostic Procedure",
+    "T061": "Therapeutic or Preventive Procedure", "T062": "Research Activity",
+    "T063": "Molecular Biology Research Technique",
+    "T064": "Governmental or Regulatory Activity", "T065": "Educational Activity",
+    "T066": "Machine Activity", "T067": "Phenomenon or Process",
+    "T068": "Human-caused Phenomenon or Process",
+    "T069": "Environmental Effect of Humans",
+    "T070": "Natural Phenomenon or Process", "T071": "Entity",
+    "T072": "Physical Object", "T073": "Manufactured Object",
+    "T074": "Medical Device", "T075": "Research Device",
+    "T077": "Conceptual Entity", "T078": "Idea or Concept",
+    "T079": "Temporal Concept", "T080": "Qualitative Concept",
+    "T081": "Quantitative Concept", "T082": "Spatial Concept",
+    "T083": "Geographic Area", "T085": "Molecular Sequence",
+    "T086": "Nucleotide Sequence", "T087": "Amino Acid Sequence",
+    "T088": "Carbohydrate Sequence", "T089": "Regulation or Law",
+    "T090": "Occupation or Discipline",
+    "T091": "Biomedical Occupation or Discipline",
+    "T092": "Organization", "T093": "Health Care Related Organization",
+    "T094": "Professional Society", "T095": "Self-help or Relief Organization",
+    "T096": "Group", "T097": "Professional or Occupational Group",
+    "T098": "Population Group", "T099": "Family Group",
+    "T100": "Age Group", "T101": "Patient or Disabled Group",
+    "T102": "Group Attribute", "T103": "Chemical",
+    "T104": "Chemical Viewed Structurally", "T109": "Organic Chemical",
+    "T114": "Nucleic Acid, Nucleoside, or Nucleotide",
+    "T116": "Amino Acid, Peptide, or Protein",
+    "T120": "Chemical Viewed Functionally", "T121": "Pharmacologic Substance",
+    "T122": "Biomedical or Dental Material",
+    "T123": "Biologically Active Substance", "T125": "Hormone",
+    "T126": "Enzyme", "T127": "Vitamin", "T129": "Immunologic Factor",
+    "T130": "Indicator, Reagent, or Diagnostic Aid",
+    "T131": "Hazardous or Poisonous Substance", "T167": "Substance",
+    "T168": "Food", "T169": "Functional Concept", "T170": "Intellectual Product",
+    "T171": "Language", "T184": "Sign or Symptom", "T185": "Classification",
+    "T190": "Anatomical Abnormality", "T191": "Neoplastic Process",
+    "T192": "Receptor", "T194": "Archaeon", "T195": "Antibiotic",
+    "T196": "Element, Ion, or Isotope", "T197": "Inorganic Chemical",
+    "T200": "Clinical Drug", "T201": "Clinical Attribute",
+    "T203": "Drug Delivery Device", "T204": "Eukaryote",
+}
 
-[4] Per-STY evaluation ...
 
-====================================================================================================
-  Per-STY evaluation at Louvain resolution = 2.0
-====================================================================================================
-  STY    Name                                  #CUIs  #Comm  Disp  Concen   #SM  Recall  #SNM    FPR
-  ------ ----------------------------------- ------- ------ ----- ------- ----- ------- ----- ------
-  Disease or Syndrome ?                                    43,374    294  0.01    23%   122     71%    43     5%
-  Finding ?                                    40,312    161  0.00    12%     0     n/a    40     0%
-  Therapeutic or Preventive Procedure ?                                    34,114    171  0.01    35%     0     n/a    39     0%
-  Body Part, Organ, or Organ Component ?                                    25,716    253  0.01    68%     0     n/a    28     0%
-  Injury or Poisoning ?                                    20,979     69  0.00    20%     0     n/a    18     0%
-  Pharmacologic Substance ?                                    16,823    113  0.01    52%     0     n/a    18     6%
-  Bacterium ?                                    14,827     46  0.00    30%     0     n/a    22     0%
-  Medical Device ?                                    12,107     50  0.00    87%     0     n/a    14     0%
-  Neoplastic Process ?                                    12,024     74  0.01    66%     0     n/a    14    14%
-  Clinical Drug ?                                    11,406     18  0.00    50%     0     n/a    10     0%
-  Amino Acid, Peptide, or Protein ?                                    10,936    108  0.01    39%     0     n/a    15     0%
-  Laboratory Procedure ?                                     9,795     39  0.00    87%     0     n/a    12     0%
-  Diagnostic Procedure ?                                     9,289     55  0.01    51%     0     n/a     8     0%
-  Organic Chemical ?                                     9,260    155  0.02    66%     0     n/a    12     8%
-  Pathologic Function ?                                     8,345     71  0.01    21%     0     n/a     5     0%
-  Health Care Activity ?                                     7,568     64  0.01    20%     0     n/a     8     0%
-  Congenital Abnormality ?                                     6,257     58  0.01    43%     0     n/a     6     0%
-  Immunologic Factor ?                                     6,136     56  0.01    38%     0     n/a    10     0%
-  Eukaryote ?                                     5,297     19  0.00    19%     0     n/a     4     0%
-  Body Location or Region ?                                     4,744    105  0.02    46%     0     n/a     3    33%
-  Intellectual Product ?                                     4,623     76  0.02    32%     0     n/a     2     0%
-  Enzyme ?                                     3,835     36  0.01    94%     0     n/a     4     0%
-  Professional or Occupational Group ?                                     3,459      5  0.00    99%     0     n/a     4     0%
-  Body Space or Junction ?                                     3,138     62  0.02    67%     0     n/a     4     0%
-  Fungus ?                                     2,887     16  0.01    97%     0     n/a     2     0%
-  Mental or Behavioral Dysfunction ?                                     2,691     44  0.02    38%     0     n/a     4     0%
-  Biologically Active Substance ?                                     2,557     57  0.02    20%     0     n/a     6     0%
-  Fish   ?                                     2,537      6  0.00    91%     0     n/a     4     0%
-  Sign or Symptom ?                                     2,457     63  0.03    35%     0     n/a     0    n/a
-  Bird   ?                                     2,431      7  0.00    37%     0     n/a     3     0%
-  Tissue ?                                     2,377     34  0.01    56%     0     n/a     2     0%
-  Food   ?                                     2,374     17  0.01    90%     0     n/a     2     0%
-  Manufactured Object ?                                     2,335     28  0.01    43%     0     n/a     0    n/a
-  Quantitative Concept ?                                     2,281     42  0.02    50%     0     n/a     4     0%
-  Laboratory or Test Result ?                                     2,228     52  0.02    28%     0     n/a     2     0%
-  Clinical Attribute ?                                     2,209     43  0.02    35%     0     n/a     3     0%
-  Plant  ?                                     2,204      9  0.00    88%     0     n/a     1     0%
-  Anatomical Abnormality ?                                     2,074     46  0.02    15%     0     n/a     2     0%
-  Virus  ?                                     2,027     15  0.01    91%     0     n/a     4     0%
-  Spatial Concept ?                                     1,972     40  0.02    45%     0     n/a     0    n/a
-  Acquired Abnormality ?                                     1,958     39  0.02    15%     0     n/a     2     0%
-  Indicator, Reagent, or Diagnostic Aid ?                                     1,936     39  0.02    43%     0     n/a     1     0%
-  Mammal ?                                     1,627     11  0.01    59%     0     n/a     4     0%
-  Qualitative Concept ?                                     1,601     43  0.03    50%     0     n/a     0    n/a
-  Classification ?                                     1,493     24  0.02    40%     0     n/a     0    n/a
-  Body Substance ?                                     1,375     23  0.02    69%     0     n/a     1     0%
-  Functional Concept ?                                     1,122     52  0.05    48%     0     n/a     2     0%
-  Biomedical or Dental Material ?                                     1,062     37  0.03    36%     0     n/a     0    n/a
-  Hazardous or Poisonous Substance ?                                     1,021     37  0.04    65%     0     n/a     1     0%
-  Organ or Tissue Function ?                                       941     39  0.04    28%     0     n/a     1     0%
-  Temporal Concept ?                                       939     19  0.02    68%     0     n/a     0    n/a
-  Embryonic Structure ?                                       900     12  0.01    45%     0     n/a     0    n/a
-  Geographic Area ?                                       870      5  0.01    76%     0     n/a     0    n/a
-  Cell   ?                                       869     15  0.02    81%     0     n/a     3     0%
-  Element, Ion, or Isotope ?                                       868      6  0.01    95%     0     n/a     2     0%
-  Language ?                                       836      2  0.00   100%     0     n/a     1     0%
-  Educational Activity ?                                       815     13  0.02    90%     0     n/a     3     0%
-  Inorganic Chemical ?                                       812     24  0.03    67%     0     n/a     0    n/a
-  Health Care Related Organization ?                                       738      4  0.01    64%     0     n/a     1     0%
-  Nucleic Acid, Nucleoside, or Nucleotide ?                                       675     29  0.04    49%     0     n/a     0    n/a
-  Reptile ?                                       600      3  0.01   100%     0     n/a     0    n/a
-  Cell or Molecular Dysfunction ?                                       571     17  0.03    36%     0     n/a     2     0%
-  Antibiotic ?                                       553     30  0.05    52%     0     n/a     0    n/a
-  Cell Component ?                                       552     15  0.03    77%     0     n/a     0    n/a
-  Hormone ?                                       524     10  0.02    54%     0     n/a     1     0%
-  Substance ?                                       437     23  0.05    33%     0     n/a     1     0%
-  Archaeon ?                                       371      5  0.01    73%     0     n/a     0    n/a
-  Gene or Genome ?                                       348     18  0.05    93%     0     n/a     0    n/a
-  Mental Process ?                                       345     13  0.04    44%     0     n/a     0    n/a
-  Organism Function ?                                       336     26  0.08    27%     0     n/a     0    n/a
-  Biomedical Occupation or Discipline ?                                       299      7  0.02    92%     0     n/a     0    n/a
-  Individual Behavior ?                                       280     25  0.09    38%     0     n/a     1     0%
-  Occupational Activity ?                                       279     16  0.06    32%     0     n/a     0    n/a
-  Organism Attribute ?                                       279     34  0.12    26%     0     n/a     0    n/a
-  Body System ?                                       268     10  0.04    80%     0     n/a     1     0%
-  Population Group ?                                       261     11  0.04    87%     0     n/a     1     0%
-  Idea or Concept ?                                       255     14  0.05    70%     0     n/a     0    n/a
-  Natural Phenomenon or Process ?                                       237     18  0.08    57%     0     n/a     0    n/a
-  Physiologic Function ?                                       227     25  0.11    27%     0     n/a     0    n/a
-  Family Group ?                                       209      4  0.02    97%     0     n/a     0    n/a
-  Phenomenon or Process ?                                       197     14  0.07    38%     0     n/a     1     0%
-  Social Behavior ?                                       171     19  0.11    65%     0     n/a     1     0%
-  Event  ?                                       164      5  0.03    80%     0     n/a     0    n/a
-  Daily or Recreational Activity ?                                       161     10  0.06    76%     0     n/a     0    n/a
-  Vitamin ?                                       156      7  0.04    37%     0     n/a     0    n/a
-  Human-caused Phenomenon or Process ?                                       152     11  0.07    66%     0     n/a     0    n/a
-  Amphibian ?                                       146      2  0.01    99%     0     n/a     0    n/a
-  Cell Function ?                                       144     16  0.11    42%     0     n/a     0    n/a
-  Receptor ?                                       137      9  0.07    80%     0     n/a     0    n/a
-  Chemical Viewed Structurally ?                                       120      8  0.07    65%     0     n/a     0    n/a
-  Molecular Function ?                                        99     13  0.13    74%     0     n/a     0    n/a
-  Anatomical Structure ?                                        77      8  0.10    36%     0     n/a     0    n/a
-  Genetic Function ?                                        61      4  0.07    89%     0     n/a     0    n/a
-  Chemical Viewed Functionally ?                                        60     11  0.18    23%     0     n/a     0    n/a
-  Organization ?                                        47      4  0.09    83%     0     n/a     0    n/a
-  Molecular Biology Research Technique ?                                        40      4  0.10    92%     0     n/a     0    n/a
-  Occupation or Discipline ?                                        37      4  0.11    89%     0     n/a     0    n/a
-  Activity ?                                        36     12  0.33    36%     0     n/a     0    n/a
-  Patient or Disabled Group ?                                        31      9  0.29    39%     0     n/a     1     0%
-  Biologic Function ?                                        26     11  0.42    35%     0     n/a     0    n/a
-  Age Group ?                                        25      6  0.24    32%     0     n/a     0    n/a
-  Behavior ?                                        24      6  0.25    50%     0     n/a     0    n/a
-  Research Activity ?                                        21      6  0.29    38%     0     n/a     0    n/a
+# ============================================================================
+# Helpers
+# ============================================================================
 
-  Quality summary (within-STY recall, only STYs with >=5 should-match pairs):
-    Recall >=80%: 0 STYs
-    Recall 50-79%: 1 STYs
-      ?                                   (recall=71%)
-    Recall <50%: 0 STYs
+def cui_of(s):
+    return s.rsplit("-", 1)[0] if "-" in s else s
+
+
+def normalize_tags(tags):
+    """Ensure all values are frozensets."""
+    out = {}
+    for cui, stys in tags.items():
+        if isinstance(stys, frozenset):
+            out[cui] = stys
+        else:
+            out[cui] = frozenset(stys)
+    return out
+
+
+def display_sty(sty):
+    """Get a display name for a STY value. Handles TUI codes or pre-resolved
+    names."""
+    if sty in STY_NAMES_BUILTIN:
+        return STY_NAMES_BUILTIN[sty]
+    # Maybe TAGS stores names directly?
+    if isinstance(sty, str) and not sty.startswith("T"):
+        return sty[:35]
+    return f"{sty}?"
+
+
+# ============================================================================
+# Graph flatten + Louvain
+# ============================================================================
+
+def flatten_graph(g, snomed_cuis):
+    print(f"  flattening for {len(snomed_cuis):,} SNOMED CUIs ...")
+    neighbors = defaultdict(set)
+    t0 = time.time()
+    for cui in snomed_cuis:
+        if cui not in g:
+            continue
+        for suffix in g.successors(cui):
+            if "-" not in suffix:
+                continue
+            for pred in g.predecessors(suffix):
+                if pred == cui or pred == "CUI" or "-" not in pred:
+                    continue
+                oc = cui_of(pred)
+                if oc != cui and oc in snomed_cuis:
+                    neighbors[cui].add(oc)
+                    neighbors[oc].add(cui)
+    print(f"  {sum(len(v) for v in neighbors.values())//2:,} edges in {time.time()-t0:.0f}s")
+    return dict(neighbors)
+
+
+def louvain(neighbors, snomed_cuis, resolution):
+    import networkx as nx
+    G = nx.Graph()
+    G.add_nodes_from(snomed_cuis)
+    for u, nbrs in neighbors.items():
+        for v in nbrs:
+            if u < v:
+                G.add_edge(u, v)
+    from networkx.algorithms.community import louvain_communities
+    t0 = time.time()
+    print(f"  Louvain (res={resolution}) ...")
+    comms = louvain_communities(G, resolution=resolution, seed=42)
+    print(f"  {len(comms):,} communities in {time.time()-t0:.0f}s")
+    cui2comm = {}
+    for i, c in enumerate(comms):
+        for cui in c:
+            cui2comm[cui] = i
+    return cui2comm, comms
+
+
+# ============================================================================
+# Per-STY pair generation (FORCED COVERAGE)
+# ============================================================================
+
+def generate_per_sty_pairs(neighbors, tags, snomed_cuis,
+                            n_match_per_sty=50,
+                            n_nonmatch_per_sty=50,
+                            min_cuis_per_sty=100,
+                            seed=42):
+    """
+    For each STY with >= min_cuis_per_sty CUIs:
+      - should-match: pairs (A, B) where both have this STY, both in
+        graph, B is a 2-hop neighbor of A but not a direct neighbor
+      - should-not-match: pairs (A, B) where A has this STY, B doesn't,
+        and B is NOT within 2 hops of A
+
+    Returns:
+      sm_by_sty: dict[sty] -> list of (a, b) pairs
+      snm_by_sty: dict[sty] -> list of (a, b) pairs
+    """
+    rng = random.Random(seed)
+
+    # Index: STY -> CUIs (in our universe AND in the graph)
+    print(f"  indexing CUIs by STY ...")
+    sty_to_cuis = defaultdict(set)
+    for cui in snomed_cuis:
+        if cui not in neighbors:
+            continue
+        for sty in tags.get(cui, frozenset()):
+            sty_to_cuis[sty].add(cui)
+    print(f"  {len(sty_to_cuis)} STYs found in graph")
+
+    sm_by_sty = {}
+    snm_by_sty = {}
+    n_processed = 0
+    for sty, sty_cuis in sty_to_cuis.items():
+        if len(sty_cuis) < min_cuis_per_sty:
+            continue
+        n_processed += 1
+
+        sm_pairs = []
+        snm_pairs = []
+        sty_cui_list = list(sty_cuis)
+        rng.shuffle(sty_cui_list)
+
+        # Build 2-hop neighbor set per anchor (lazy)
+        for a in sty_cui_list:
+            if len(sm_pairs) >= n_match_per_sty and len(snm_pairs) >= n_nonmatch_per_sty:
+                break
+            n1 = neighbors.get(a, set())
+            n2 = set()
+            for nb in n1:
+                n2 |= neighbors.get(nb, set())
+            two_hop = (n1 | n2 | {a})
+
+            # Should-match: 2-hop neighbors that share this STY but aren't direct
+            if len(sm_pairs) < n_match_per_sty:
+                for b in (n2 - n1 - {a}):
+                    if b in sty_cuis:
+                        sm_pairs.append((a, b))
+                        if len(sm_pairs) >= n_match_per_sty:
+                            break
+
+            # Should-not-match: random CUIs not in 2-hop and not in same STY
+            if len(snm_pairs) < n_nonmatch_per_sty:
+                tries = 0
+                while len(snm_pairs) < n_nonmatch_per_sty and tries < 50:
+                    b = rng.choice(list(snomed_cuis))
+                    if b == a or b in two_hop:
+                        tries += 1
+                        continue
+                    # Different STY check
+                    b_stys = tags.get(b, frozenset())
+                    if sty in b_stys:
+                        tries += 1
+                        continue
+                    snm_pairs.append((a, b))
+                    tries += 1
+
+        sm_by_sty[sty] = sm_pairs
+        snm_by_sty[sty] = snm_pairs
+
+        if n_processed % 10 == 0:
+            print(f"    processed {n_processed} STYs")
+    print(f"  -> generated pairs for {len(sm_by_sty)} STYs")
+    return sm_by_sty, snm_by_sty
+
+
+# ============================================================================
+# Per-STY metrics
+# ============================================================================
+
+def per_sty_metrics(cui2comm, snomed_cuis, tags, sm_by_sty, snm_by_sty,
+                    min_pairs=5):
+    """Compute metrics per STY."""
+    sty_to_cuis = defaultdict(set)
+    for cui in snomed_cuis:
+        for sty in tags.get(cui, frozenset()):
+            sty_to_cuis[sty].add(cui)
+
+    results = []
+    for sty in sm_by_sty.keys():
+        cuis = sty_to_cuis[sty]
+        n_cuis = len(cuis)
+
+        comm_counts = Counter()
+        for c in cuis:
+            cid = cui2comm.get(c)
+            if cid is not None:
+                comm_counts[cid] += 1
+        n_communities = len(comm_counts)
+        dispersion = n_communities / max(n_cuis, 1)
+        if comm_counts:
+            top_count = comm_counts.most_common(1)[0][1]
+            top_concentration = top_count / n_cuis
+        else:
+            top_concentration = 0
+
+        sm = sm_by_sty.get(sty, [])
+        if len(sm) >= min_pairs:
+            n_share = sum(1 for a, b in sm
+                          if cui2comm.get(a) is not None
+                          and cui2comm.get(a) == cui2comm.get(b))
+            recall = n_share / len(sm)
+        else:
+            recall = None
+
+        snm = snm_by_sty.get(sty, [])
+        if len(snm) >= min_pairs:
+            n_share = sum(1 for a, b in snm
+                          if cui2comm.get(a) is not None
+                          and cui2comm.get(a) == cui2comm.get(b))
+            fpr = n_share / len(snm)
+        else:
+            fpr = None
+
+        results.append({
+            "sty": sty,
+            "name": display_sty(sty),
+            "n_cuis": n_cuis,
+            "n_communities": n_communities,
+            "dispersion": dispersion,
+            "top_concentration": top_concentration,
+            "n_sm": len(sm),
+            "recall": recall,
+            "n_snm": len(snm),
+            "fpr": fpr,
+        })
+    return sorted(results, key=lambda r: -r["n_cuis"])
+
+
+def report(results, resolution):
+    print(f"\n{'='*110}")
+    print(f"  Per-STY @ Louvain res={resolution}")
+    print(f"{'='*110}")
+    print(f"  {'STY':<6s} {'Name':<40s} {'#CUIs':>7s} {'#Comm':>6s} "
+          f"{'Disp':>5s} {'Concen':>7s} {'#SM':>5s} {'Recall':>7s} "
+          f"{'#SNM':>5s} {'FPR':>6s}")
+    print(f"  {'-'*6:<6s} {'-'*40:<40s} {'-'*7:>7s} {'-'*6:>6s} "
+          f"{'-'*5:>5s} {'-'*7:>7s} {'-'*5:>5s} {'-'*7:>7s} "
+          f"{'-'*5:>5s} {'-'*6:>6s}")
+    for r in results:
+        rec_s = f"{100*r['recall']:.0f}%" if r['recall'] is not None else "  n/a"
+        fpr_s = f"{100*r['fpr']:.0f}%" if r['fpr'] is not None else "  n/a"
+        sty_disp = r['sty'][:6] if isinstance(r['sty'], str) else str(r['sty'])[:6]
+        print(f"  {sty_disp:<6s} {r['name'][:40]:<40s} {r['n_cuis']:>7,d} "
+              f"{r['n_communities']:>6,d} {r['dispersion']:>5.2f} "
+              f"{r['top_concentration']:>6.0%} "
+              f"{r['n_sm']:>5d} {rec_s:>7s} "
+              f"{r['n_snm']:>5d} {fpr_s:>6s}")
+
+    # Quality buckets — only STYs where we have meaningful recall numbers
+    print(f"\n  Recall quality buckets (only STYs with >=5 should-match pairs):")
+    good, okmid, bad = [], [], []
+    for r in results:
+        if r['recall'] is None:
+            continue
+        if r['recall'] >= 0.80:
+            good.append(r)
+        elif r['recall'] >= 0.50:
+            okmid.append(r)
+        else:
+            bad.append(r)
+    print(f"    Recall >=80%: {len(good)} STYs")
+    for r in good[:15]:
+        fpr_s = f"{100*r['fpr']:.0f}%" if r['fpr'] is not None else "n/a"
+        print(f"      {r['name']:<40s}  recall={100*r['recall']:.0f}%  fpr={fpr_s}")
+    print(f"    Recall 50-79%: {len(okmid)} STYs")
+    for r in okmid[:15]:
+        fpr_s = f"{100*r['fpr']:.0f}%" if r['fpr'] is not None else "n/a"
+        print(f"      {r['name']:<40s}  recall={100*r['recall']:.0f}%  fpr={fpr_s}")
+    print(f"    Recall <50%: {len(bad)} STYs")
+    for r in bad[:20]:
+        fpr_s = f"{100*r['fpr']:.0f}%" if r['fpr'] is not None else "n/a"
+        print(f"      {r['name']:<40s}  recall={100*r['recall']:.0f}%  fpr={fpr_s}")
+
+
+# ============================================================================
+# Main
+# ============================================================================
+
+def main():
+    for g in ["data", "SNOMED_CUIS", "TAGS"]:
+        if g not in globals():
+            raise RuntimeError(f"Set '{g}' first")
+
+    tags = normalize_tags(TAGS)
+    print(f"Graph         : {data.number_of_nodes():,} nodes")
+    print(f"SNOMED        : {len(SNOMED_CUIS):,}")
+    print(f"TAGS          : {len(tags):,} entries (normalized to frozensets)")
+
+    print("\n[1] Flattening graph ...")
+    neighbors = flatten_graph(data, SNOMED_CUIS)
+
+    print("\n[2] Generating per-STY pairs (forced coverage) ...")
+    sm_by_sty, snm_by_sty = generate_per_sty_pairs(
+        neighbors, tags, SNOMED_CUIS,
+        n_match_per_sty=50, n_nonmatch_per_sty=50, min_cuis_per_sty=100,
+    )
+    total_sm = sum(len(v) for v in sm_by_sty.values())
+    total_snm = sum(len(v) for v in snm_by_sty.values())
+    print(f"  Total: {total_sm} should-match pairs, {total_snm} should-not-match pairs")
+
+    for res in [1.0, 2.0]:
+        print(f"\n[3] Louvain (res={res}) ...")
+        cui2comm, _ = louvain(neighbors, SNOMED_CUIS, res)
+        print(f"\n[4] Per-STY metrics ...")
+        results = per_sty_metrics(cui2comm, SNOMED_CUIS, tags,
+                                   sm_by_sty, snm_by_sty)
+        report(results, res)
+
+
+main()
