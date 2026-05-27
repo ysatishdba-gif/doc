@@ -1,75 +1,363 @@
-Computing closure at hops 1..6 for each focal CUI
-Graph: 24,055,828 nodes
-SNOMED universe: 374,538 CUIs
+"""
+build_topics_dual_method.py
+---------------------------
+Build topic systems from the implication graph using TWO methods:
 
-==============================================================================
-  C0032285  Pneumonia
-==============================================================================
-  hop 0:        1 new CUIs   (cumulative:        1)
-  hop 1:        4 new CUIs   (cumulative:        5)
-  hop 2:        8 new CUIs   (cumulative:       13)
-  hop 3:       12 new CUIs   (cumulative:       25)
-  hop 4:        7 new CUIs   (cumulative:       32)
-  hop 5:        7 new CUIs   (cumulative:       39)
-  hop 6:        7 new CUIs   (cumulative:       46)
+  Method 1: Adaptive expansion (no global K). For each CUI, BFS over the
+            flattened CUI graph, but DON'T expand through high-degree
+            nodes (general concepts). Each CUI gets a topic-set of all
+            CUIs reached within this bounded closure.
 
-==============================================================================
-  C0021368  Inflammation
-==============================================================================
-  hop 0:        1 new CUIs   (cumulative:        1)
-  hop 1:        1 new CUIs   (cumulative:        2)
-  hop 2:        3 new CUIs   (cumulative:        5)
-  hop 3:        3 new CUIs   (cumulative:        8)
-  hop 4:        2 new CUIs   (cumulative:       10)
-  hop 5:        1 new CUIs   (cumulative:       11)
-  hop 6:        1 new CUIs   (cumulative:       12)
+  Method 2: Community detection (Louvain). Cluster the flattened CUI
+            graph into communities. Each CUI's topic = its community ID.
 
-==============================================================================
-  C0024109  Lung
-==============================================================================
-  hop 0:        1 new CUIs   (cumulative:        1)
-  hop 1:        7 new CUIs   (cumulative:        8)
-  hop 2:       12 new CUIs   (cumulative:       20)
-  hop 3:        5 new CUIs   (cumulative:       25)
-  hop 4:       12 new CUIs   (cumulative:       37)
-  hop 5:        8 new CUIs   (cumulative:       45)
-  hop 6:        3 new CUIs   (cumulative:       48)
+Inputs:
+  - data (the suffix-bridge graph), already loaded in notebook
+  - SNOMED_CUIS (set of SNOMED CUIs from MRREL)
+  - LABELS (dict cui -> name from MRREL)  -- optional but helpful
+  - TAGS (dict cui -> frozenset of STY codes from MRREL) -- optional
 
-==============================================================================
-  C1527304  Allergic reaction
-==============================================================================
-  hop 0:        1 new CUIs   (cumulative:        1)
-  hop 1:        3 new CUIs   (cumulative:        4)
-  hop 2:        8 new CUIs   (cumulative:       12)
-  hop 3:        8 new CUIs   (cumulative:       20)
-  hop 4:       10 new CUIs   (cumulative:       30)
-  hop 5:        9 new CUIs   (cumulative:       39)
-  hop 6:        5 new CUIs   (cumulative:       44)
+Outputs:
+  - One pickle with both topic mappings + comparison stats
+  - Lookup for a focal set of CUIs showing both methods side by side
+"""
 
-==============================================================================
-  C0559470  Allergy to peanut
-==============================================================================
-  hop 0:        1 new CUIs   (cumulative:        1)
-  hop 1:        1 new CUIs   (cumulative:        2)
-  hop 2:        1 new CUIs   (cumulative:        3)
-  hop 3:        1 new CUIs   (cumulative:        4)
-  hop 4:        7 new CUIs   (cumulative:       11)
-  hop 5:       13 new CUIs   (cumulative:       24)
-  hop 6:        7 new CUIs   (cumulative:       31)
+import pickle
+import datetime
+import time
+from collections import defaultdict, Counter
+import statistics
+import os
 
-  Allergy retrieval check — at which hop does Peanut allergy reach:
-    Allergic reaction        : reached at hop 4
-    Hypersensitivity         : reached at hop 4
-    Anaphylaxis              : NOT REACHED within 6 hops
-    Food allergy             : reached at hop 3
 
-==============================================================================
-  C0002792  Anaphylaxis
-==============================================================================
-  hop 0:        1 new CUIs   (cumulative:        1)
-  hop 1:        5 new CUIs   (cumulative:        6)
-  hop 2:       13 new CUIs   (cumulative:       19)
-  hop 3:       12 new CUIs   (cumulative:       31)
-  hop 4:       16 new CUIs   (cumulative:       47)
-  hop 5:       12 new CUIs   (cumulative:       59)
-  hop 6:        8 new CUIs   (cumulative:       67)
+OUTPUT_PATH = "topic_lookup_dual_method.pkl"
+
+# Method 1 knob: degree percentile above which we don't expand
+# (high-degree concepts are general; include but don't propagate through)
+ADAPTIVE_DEGREE_PERCENTILE = 95
+
+# Method 2 knob: Louvain resolution. Higher = smaller communities.
+LOUVAIN_RESOLUTION = 1.0
+
+
+# ============================================================================
+# Helpers
+# ============================================================================
+
+def is_pure_cui(node):
+    return isinstance(node, str) and node.startswith("C") and "-" not in node and node != "CUI"
+
+
+def cui_of(suffix_node):
+    return suffix_node.rsplit("-", 1)[0] if "-" in suffix_node else suffix_node
+
+
+def lbl(c):
+    return LABELS.get(c, "?")[:40] if "LABELS" in globals() else "?"
+
+
+# ============================================================================
+# Step 1: Flatten suffix-bridge graph to direct CUI-CUI edges
+# ============================================================================
+
+def flatten_graph(g, snomed_cuis):
+    """
+    1-hop conservative: for each suffix child S of CUI A, look at
+    predecessors of S (other than A); if predecessor is owned by another
+    SNOMED CUI B, emit undirected edge (A, B).
+    """
+    print(f"  flattening for {len(snomed_cuis):,} SNOMED CUIs ...")
+    neighbors = defaultdict(set)
+    n_proc = 0
+    t0 = time.time()
+    for cui in snomed_cuis:
+        if cui not in g:
+            n_proc += 1
+            continue
+        for suffix in g.successors(cui):
+            if "-" not in suffix:
+                continue
+            for pred in g.predecessors(suffix):
+                if pred == cui or pred == "CUI" or "-" not in pred:
+                    continue
+                other_cui = cui_of(pred)
+                if other_cui != cui and other_cui in snomed_cuis:
+                    neighbors[cui].add(other_cui)
+                    neighbors[other_cui].add(cui)
+        n_proc += 1
+        if n_proc % 50000 == 0:
+            print(f"    {n_proc:,}/{len(snomed_cuis):,} "
+                  f"({time.time()-t0:.0f}s)")
+    n_edges = sum(len(s) for s in neighbors.values()) // 2
+    print(f"  -> {n_edges:,} edges in {time.time()-t0:.0f}s")
+    return dict(neighbors)
+
+
+# ============================================================================
+# Method 1: Adaptive expansion
+# ============================================================================
+
+def compute_degree_threshold(neighbors, percentile):
+    """Find the degree value at the given percentile."""
+    degrees = sorted(len(s) for s in neighbors.values())
+    if not degrees:
+        return 0
+    idx = min(int(len(degrees) * percentile / 100), len(degrees) - 1)
+    return degrees[idx]
+
+
+def method1_adaptive(neighbors, snomed_cuis, degree_thresh):
+    """
+    For each CUI, BFS but only propagate through nodes with
+    degree <= degree_thresh. Include high-degree nodes in topic-set
+    but don't expand through them.
+
+    Returns dict[cui] -> set of reachable CUIs (the topic-set).
+    """
+    print(f"  adaptive expansion with degree_thresh={degree_thresh}")
+    topics = {}
+    n_proc = 0
+    t0 = time.time()
+    for source in snomed_cuis:
+        if source not in neighbors:
+            n_proc += 1
+            continue
+        visited = {source}
+        frontier = {source}
+        while frontier:
+            next_frontier = set()
+            for u in frontier:
+                for v in neighbors.get(u, ()):
+                    if v in visited:
+                        continue
+                    visited.add(v)
+                    # Only continue expanding through v if it's low-degree
+                    if len(neighbors.get(v, ())) <= degree_thresh:
+                        next_frontier.add(v)
+            frontier = next_frontier
+        topics[source] = visited - {source}  # exclude self
+        n_proc += 1
+        if n_proc % 25000 == 0:
+            print(f"    {n_proc:,}/{len(snomed_cuis):,} "
+                  f"({time.time()-t0:.0f}s)")
+    print(f"  done in {time.time()-t0:.0f}s")
+    return topics
+
+
+# ============================================================================
+# Method 2: Community detection (Louvain)
+# ============================================================================
+
+def method2_louvain(neighbors, snomed_cuis):
+    """
+    Build an undirected networkx graph from the flattened neighbors,
+    run Louvain, return dict[cui] -> community_id (integer).
+    """
+    import networkx as nx
+    print(f"  building undirected nx graph ...")
+    G = nx.Graph()
+    G.add_nodes_from(snomed_cuis)
+    for u, nbrs in neighbors.items():
+        for v in nbrs:
+            if u < v:  # avoid duplicating edges
+                G.add_edge(u, v)
+    print(f"  graph: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
+
+    print(f"  running Louvain community detection ...")
+    t0 = time.time()
+    try:
+        # NetworkX >= 2.7 has louvain_communities natively
+        from networkx.algorithms.community import louvain_communities
+        communities = louvain_communities(
+            G, resolution=LOUVAIN_RESOLUTION, seed=42,
+        )
+    except ImportError:
+        # Fall back to python-louvain
+        import community as community_louvain
+        partition = community_louvain.best_partition(
+            G, resolution=LOUVAIN_RESOLUTION, random_state=42,
+        )
+        # Convert partition (cui -> community_id) to list of sets
+        comm_dict = defaultdict(set)
+        for cui, comm_id in partition.items():
+            comm_dict[comm_id].add(cui)
+        communities = list(comm_dict.values())
+    print(f"  Louvain done in {time.time()-t0:.0f}s")
+    print(f"  found {len(communities):,} communities")
+
+    # cui -> community_id
+    cui_to_community = {}
+    for i, comm in enumerate(communities):
+        for cui in comm:
+            cui_to_community[cui] = i
+
+    return cui_to_community, communities
+
+
+# ============================================================================
+# Reporting
+# ============================================================================
+
+def report_method1(topics, focal_cuis):
+    print(f"\n{'='*78}")
+    print(f"  METHOD 1: Adaptive expansion")
+    print(f"{'='*78}")
+    sizes = [len(t) for t in topics.values()]
+    print(f"  CUIs with topics       : {len(topics):,}")
+    print(f"  Avg topics per CUI     : {statistics.mean(sizes):.1f}")
+    print(f"  Median topics per CUI  : {statistics.median(sizes):.0f}")
+    print(f"  Max topics per CUI     : {max(sizes):,}")
+    print(f"  Min topics per CUI     : {min(sizes):,}")
+
+    print(f"\n  Focal CUI topic-sets:")
+    for cui in focal_cuis:
+        t = topics.get(cui, set())
+        sample = sorted(t)[:6]
+        print(f"    {cui} '{lbl(cui)}': {len(t)} topics")
+        for s in sample:
+            print(f"       {s}  {lbl(s)}")
+
+
+def report_method2(cui_to_community, communities, focal_cuis):
+    print(f"\n{'='*78}")
+    print(f"  METHOD 2: Louvain community detection")
+    print(f"{'='*78}")
+    sizes = [len(c) for c in communities]
+    print(f"  Total communities      : {len(communities):,}")
+    print(f"  Avg community size     : {statistics.mean(sizes):.1f}")
+    print(f"  Median community size  : {statistics.median(sizes):.0f}")
+    print(f"  Largest community      : {max(sizes):,}")
+    print(f"  Smallest community     : {min(sizes):,}")
+
+    # Size distribution
+    print(f"\n  Community size distribution:")
+    size_buckets = Counter()
+    for s in sizes:
+        if s < 5:    bucket = "<5"
+        elif s < 20:  bucket = "5-19"
+        elif s < 100: bucket = "20-99"
+        elif s < 500: bucket = "100-499"
+        elif s < 2000: bucket = "500-1999"
+        else: bucket = ">=2000"
+        size_buckets[bucket] += 1
+    for b in ["<5", "5-19", "20-99", "100-499", "500-1999", ">=2000"]:
+        print(f"    {b:>10s}: {size_buckets.get(b, 0):,}")
+
+    print(f"\n  Focal CUI communities:")
+    for cui in focal_cuis:
+        comm_id = cui_to_community.get(cui)
+        if comm_id is None:
+            print(f"    {cui} '{lbl(cui)}': NOT in any community")
+            continue
+        comm = communities[comm_id]
+        sample = sorted(comm)[:8]
+        print(f"    {cui} '{lbl(cui)}': community {comm_id} "
+              f"(size {len(comm)})")
+        for s in sample:
+            marker = " <-- self" if s == cui else ""
+            print(f"       {s}  {lbl(s)}{marker}")
+
+
+def report_comparison(topics_m1, cui_to_community, communities, focal_cuis):
+    print(f"\n{'='*78}")
+    print(f"  SIDE-BY-SIDE")
+    print(f"{'='*78}")
+    print(f"  {'CUI':<12s}  {'label':<30s}  {'M1 size':>8s}  {'M2 size':>8s}")
+    for cui in focal_cuis:
+        m1 = len(topics_m1.get(cui, set()))
+        cid = cui_to_community.get(cui)
+        m2 = len(communities[cid]) if cid is not None else 0
+        print(f"  {cui:<12s}  {lbl(cui):<30s}  {m1:>8,d}  {m2:>8,d}")
+
+    # Pair retrieval test
+    pairs = [
+        ("C1527304", "Allergic reaction", "C0559470", "Peanut allergy"),
+        ("C0032285", "Pneumonia",          "C0024109", "Lung"),
+        ("C2142181", "Pain left knee",     "C0231749", "Pain knee region"),
+    ]
+    print(f"\n  Pair-retrieval test: does query CUI share topic with doc CUI?")
+    for ca, la, cb, lb_ in pairs:
+        # M1: do their topic-sets overlap?
+        m1_a = topics_m1.get(ca, set())
+        m1_b = topics_m1.get(cb, set())
+        m1_overlap = bool(m1_a & m1_b) or (cb in m1_a) or (ca in m1_b)
+        # M2: are they in the same community?
+        cid_a = cui_to_community.get(ca)
+        cid_b = cui_to_community.get(cb)
+        m2_match = (cid_a is not None and cid_a == cid_b)
+        print(f"    '{la}' <-> '{lb_}'")
+        print(f"       M1 overlap: {'YES' if m1_overlap else 'NO'}")
+        print(f"       M2 same community: {'YES' if m2_match else 'NO'}")
+
+
+# ============================================================================
+# Main
+# ============================================================================
+
+FOCAL_CUIS = [
+    "C0032285",  # Pneumonia
+    "C0021368",  # Inflammation
+    "C0024109",  # Lung
+    "C0011849",  # Diabetes
+    "C1527304",  # Allergic reaction
+    "C0559470",  # Peanut allergy
+    "C0002792",  # Anaphylaxis
+    "C0013182",  # Drug allergy
+    "C2142181",  # Pain of left knee joint
+]
+
+
+def main():
+    print("=" * 60)
+    print("Build topics: dual method (Adaptive expansion + Louvain)")
+    print("=" * 60)
+    print(f"Graph     : data ({data.number_of_nodes():,} nodes)")
+    print(f"SNOMED    : {len(SNOMED_CUIS):,} CUIs")
+    print(f"M1 percentile : top {100 - ADAPTIVE_DEGREE_PERCENTILE}%")
+    print(f"M2 resolution : {LOUVAIN_RESOLUTION}")
+
+    print(f"\n[1] Flatten suffix-bridge graph to CUI-CUI ...")
+    neighbors = flatten_graph(data, SNOMED_CUIS)
+
+    print(f"\n[2] Compute adaptive degree threshold ...")
+    degree_thresh = compute_degree_threshold(neighbors, ADAPTIVE_DEGREE_PERCENTILE)
+    print(f"  threshold ({ADAPTIVE_DEGREE_PERCENTILE}th percentile) = {degree_thresh}")
+
+    print(f"\n[3] METHOD 1: Adaptive expansion ...")
+    topics_m1 = method1_adaptive(neighbors, SNOMED_CUIS, degree_thresh)
+
+    print(f"\n[4] METHOD 2: Louvain community detection ...")
+    cui_to_community, communities = method2_louvain(neighbors, SNOMED_CUIS)
+
+    report_method1(topics_m1, FOCAL_CUIS)
+    report_method2(cui_to_community, communities, FOCAL_CUIS)
+    report_comparison(topics_m1, cui_to_community, communities, FOCAL_CUIS)
+
+    print(f"\n[Saving] {OUTPUT_PATH}")
+    payload = {
+        "built_at": datetime.datetime.now().isoformat(),
+        "config": {
+            "adaptive_degree_percentile": ADAPTIVE_DEGREE_PERCENTILE,
+            "adaptive_degree_threshold":  degree_thresh,
+            "louvain_resolution":         LOUVAIN_RESOLUTION,
+        },
+        "snomed_cuis": SNOMED_CUIS,
+        "flattened_neighbors": neighbors,
+        "method1_topics":   topics_m1,
+        "method2_cui_to_community": cui_to_community,
+        "method2_communities":       communities,
+    }
+    # Optional metadata if present
+    if "LABELS" in globals():
+        payload["labels"] = LABELS
+    if "TAGS" in globals():
+        payload["tags"] = TAGS
+
+    with open(OUTPUT_PATH, "wb") as f:
+        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
+    print(f"  wrote {size_mb:.1f} MB")
+    print("\nDONE")
+
+
+main()
