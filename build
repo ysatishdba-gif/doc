@@ -1,158 +1,405 @@
-============================================================
-Topic method evaluation (data-driven, multi-method)
-============================================================
+"""
+evaluate_per_sty.py
+-------------------
+Break down topic-quality metrics per semantic type (STY/TUI), to find
+where Louvain works well vs where it fails.
 
-[1] Flattening graph ...
-  flattening for 374,538 SNOMED CUIs ...
-    100,000 (9s)
-    200,000 (18s)
-    300,000 (28s)
-  -> 674,090 edges in 35s
+Pipeline:
+  1. Build the flattened CUI graph (same as before)
+  2. Run Louvain at res=1.0 (best balanced from prior eval) — but we
+     can sweep too
+  3. For each STY, compute:
+       - n_cuis_with_this_sty
+       - n_communities_containing_them
+       - "dispersion" = n_communities / n_cuis (1.0 = each in own, 0 = all together)
+       - within-STY recall: of should-match pairs where BOTH CUIs have
+         this STY, what fraction share a community?
+       - within-STY FPR: same on should-not-match pairs
+       - mean purity of communities containing >=5 of this STY's CUIs
 
-[2] Generating evaluation pairs ...
-  generating 100 should-match + 100 should-not-match pairs ...
-  -> 100 should-match, 100 should-not-match
+Inputs from notebook globals:
+  data, SNOMED_CUIS, TAGS  (TAGS = dict cui -> frozenset of TUI strings)
+  optional: LABELS, STY_NAMES (dict TUI -> human readable name)
+"""
 
-[3] Building topic methods ...
+import statistics
+import random
+import time
+from collections import defaultdict, Counter
 
-  Method 1 (nearest-canonical BFS)
-  selecting canonicals ...
-  96,735 canonicals (degree band [4, 26])
-  multi-source BFS ...
-  BFS done in 2s
 
-  Method 2 (Louvain, res=0.3)
-  Louvain (resolution=0.3) ...
-  done in 126s, 1,139 communities
+# ============================================================================
+# STY code -> human-readable name (built-in fallback, ~127 entries)
+# Only for nice output; not needed for computation.
+# ============================================================================
 
-  Method 2 (Louvain, res=0.5)
-  Louvain (resolution=0.5) ...
-  done in 131s, 1,265 communities
+STY_NAMES_BUILTIN = {
+    "T001": "Organism",
+    "T002": "Plant",
+    "T004": "Fungus",
+    "T005": "Virus",
+    "T007": "Bacterium",
+    "T008": "Animal",
+    "T017": "Anatomical Structure",
+    "T018": "Embryonic Structure",
+    "T019": "Congenital Abnormality",
+    "T020": "Acquired Abnormality",
+    "T021": "Fully Formed Anatomical Structure",
+    "T022": "Body System",
+    "T023": "Body Part, Organ, or Organ Component",
+    "T024": "Tissue",
+    "T025": "Cell",
+    "T026": "Cell Component",
+    "T028": "Gene or Genome",
+    "T029": "Body Location or Region",
+    "T030": "Body Space or Junction",
+    "T031": "Body Substance",
+    "T032": "Organism Attribute",
+    "T033": "Finding",
+    "T034": "Laboratory or Test Result",
+    "T037": "Injury or Poisoning",
+    "T038": "Biologic Function",
+    "T039": "Physiologic Function",
+    "T040": "Organism Function",
+    "T041": "Mental Process",
+    "T042": "Organ or Tissue Function",
+    "T043": "Cell Function",
+    "T044": "Molecular Function",
+    "T045": "Genetic Function",
+    "T046": "Pathologic Function",
+    "T047": "Disease or Syndrome",
+    "T048": "Mental or Behavioral Dysfunction",
+    "T049": "Cell or Molecular Dysfunction",
+    "T050": "Experimental Model of Disease",
+    "T051": "Event",
+    "T052": "Activity",
+    "T053": "Behavior",
+    "T054": "Social Behavior",
+    "T055": "Individual Behavior",
+    "T056": "Daily or Recreational Activity",
+    "T057": "Occupational Activity",
+    "T058": "Health Care Activity",
+    "T059": "Laboratory Procedure",
+    "T060": "Diagnostic Procedure",
+    "T061": "Therapeutic or Preventive Procedure",
+    "T062": "Research Activity",
+    "T063": "Molecular Biology Research Technique",
+    "T064": "Governmental or Regulatory Activity",
+    "T065": "Educational Activity",
+    "T066": "Machine Activity",
+    "T067": "Phenomenon or Process",
+    "T068": "Human-caused Phenomenon or Process",
+    "T069": "Environmental Effect of Humans",
+    "T070": "Natural Phenomenon or Process",
+    "T071": "Entity",
+    "T072": "Physical Object",
+    "T073": "Manufactured Object",
+    "T074": "Medical Device",
+    "T075": "Research Device",
+    "T077": "Conceptual Entity",
+    "T078": "Idea or Concept",
+    "T079": "Temporal Concept",
+    "T080": "Qualitative Concept",
+    "T081": "Quantitative Concept",
+    "T082": "Spatial Concept",
+    "T083": "Geographic Area",
+    "T085": "Molecular Sequence",
+    "T086": "Nucleotide Sequence",
+    "T087": "Amino Acid Sequence",
+    "T088": "Carbohydrate Sequence",
+    "T089": "Regulation or Law",
+    "T090": "Occupation or Discipline",
+    "T091": "Biomedical Occupation or Discipline",
+    "T092": "Organization",
+    "T093": "Health Care Related Organization",
+    "T094": "Professional Society",
+    "T095": "Self-help or Relief Organization",
+    "T096": "Group",
+    "T097": "Professional or Occupational Group",
+    "T098": "Population Group",
+    "T099": "Family Group",
+    "T100": "Age Group",
+    "T101": "Patient or Disabled Group",
+    "T102": "Group Attribute",
+    "T103": "Chemical",
+    "T104": "Chemical Viewed Structurally",
+    "T109": "Organic Chemical",
+    "T114": "Nucleic Acid, Nucleoside, or Nucleotide",
+    "T116": "Amino Acid, Peptide, or Protein",
+    "T120": "Chemical Viewed Functionally",
+    "T121": "Pharmacologic Substance",
+    "T122": "Biomedical or Dental Material",
+    "T123": "Biologically Active Substance",
+    "T125": "Hormone",
+    "T126": "Enzyme",
+    "T127": "Vitamin",
+    "T129": "Immunologic Factor",
+    "T130": "Indicator, Reagent, or Diagnostic Aid",
+    "T131": "Hazardous or Poisonous Substance",
+    "T167": "Substance",
+    "T168": "Food",
+    "T169": "Functional Concept",
+    "T170": "Intellectual Product",
+    "T171": "Language",
+    "T184": "Sign or Symptom",
+    "T185": "Classification",
+    "T190": "Anatomical Abnormality",
+    "T191": "Neoplastic Process",
+    "T192": "Receptor",
+    "T194": "Archaeon",
+    "T195": "Antibiotic",
+    "T196": "Element, Ion, or Isotope",
+    "T197": "Inorganic Chemical",
+    "T200": "Clinical Drug",
+    "T201": "Clinical Attribute",
+    "T203": "Drug Delivery Device",
+    "T204": "Eukaryote",
+}
 
-  Method 2 (Louvain, res=1.0)
-  Louvain (resolution=1.0) ...
-  done in 189s, 1,283 communities
 
-  Method 2 (Louvain, res=2.0)
-  Louvain (resolution=2.0) ...
-  done in 152s, 1,469 communities
+def cui_of(s):
+    return s.rsplit("-", 1)[0] if "-" in s else s
 
-[4] Computing metrics ...
 
-==============================================================================
-  EVALUATING: Method 1 (BFS)
-==============================================================================
-  topics                       : 96,735
-  CUIs with topics             : 373,605
-  size distribution:
-    min                        : 1
-    median                     : 7
-    mean                       : 32.2
-    p90                        : 54
-    p99                        : 269
-    max                        : 2,938
-  singleton rate (size=1)      : 6.6%
-  mass in top-10 topics        : 0.9%
-  STY purity mean              : 0.81
-  STY purity median            : 0.88
-    (evaluated on 63,437 topics with >=5 members)
-  recall on should-match pairs  : 3.0%
-  false-positive rate (should-not-match): 0.0%
+def percentile_value(sorted_values, p):
+    if not sorted_values:
+        return 0
+    idx = min(int(len(sorted_values) * p / 100), len(sorted_values) - 1)
+    return sorted_values[idx]
 
-==============================================================================
-  EVALUATING: Louvain res=0.3
-==============================================================================
-  topics                       : 1,139
-  CUIs with topics             : 374,538
-  size distribution:
-    min                        : 1
-    median                     : 1
-    mean                       : 328.8
-    p90                        : 23
-    p99                        : 6,511
-    max                        : 82,993
-  singleton rate (size=1)      : 81.9%
-  mass in top-10 topics        : 74.0%
-  STY purity mean              : 0.86
-  STY purity median            : 0.96
-    (evaluated on 204 topics with >=5 members)
-  recall on should-match pairs  : 100.0%
-  false-positive rate (should-not-match): 15.0%
 
-==============================================================================
-  EVALUATING: Louvain res=0.5
-==============================================================================
-  topics                       : 1,265
-  CUIs with topics             : 374,538
-  size distribution:
-    min                        : 1
-    median                     : 1
-    mean                       : 296.1
-    p90                        : 36
-    p99                        : 7,043
-    max                        : 72,810
-  singleton rate (size=1)      : 73.8%
-  mass in top-10 topics        : 67.3%
-  STY purity mean              : 0.87
-  STY purity median            : 0.98
-    (evaluated on 326 topics with >=5 members)
-  recall on should-match pairs  : 100.0%
-  false-positive rate (should-not-match): 13.0%
+def flatten_graph(g, snomed_cuis):
+    print(f"  flattening for {len(snomed_cuis):,} SNOMED CUIs ...")
+    neighbors = defaultdict(set)
+    t0 = time.time()
+    n = 0
+    for cui in snomed_cuis:
+        if cui not in g:
+            n += 1
+            continue
+        for suffix in g.successors(cui):
+            if "-" not in suffix:
+                continue
+            for pred in g.predecessors(suffix):
+                if pred == cui or pred == "CUI" or "-" not in pred:
+                    continue
+                oc = cui_of(pred)
+                if oc != cui and oc in snomed_cuis:
+                    neighbors[cui].add(oc)
+                    neighbors[oc].add(cui)
+        n += 1
+    print(f"  {sum(len(v) for v in neighbors.values())//2:,} edges in {time.time()-t0:.0f}s")
+    return dict(neighbors)
 
-==============================================================================
-  EVALUATING: Louvain res=1.0
-==============================================================================
-  topics                       : 1,283
-  CUIs with topics             : 374,538
-  size distribution:
-    min                        : 1
-    median                     : 1
-    mean                       : 291.9
-    p90                        : 75
-    p99                        : 6,561
-    max                        : 37,324
-  singleton rate (size=1)      : 72.7%
-  mass in top-10 topics        : 57.5%
-  STY purity mean              : 0.87
-  STY purity median            : 0.99
-    (evaluated on 349 topics with >=5 members)
-  recall on should-match pairs  : 93.0%
-  false-positive rate (should-not-match): 7.0%
 
-==============================================================================
-  EVALUATING: Louvain res=2.0
-==============================================================================
-  topics                       : 1,469
-  CUIs with topics             : 374,538
-  size distribution:
-    min                        : 1
-    median                     : 1
-    mean                       : 255.0
-    p90                        : 274
-    p99                        : 6,588
-    max                        : 24,058
-  singleton rate (size=1)      : 63.5%
-  mass in top-10 topics        : 35.7%
-  STY purity mean              : 0.86
-  STY purity median            : 0.99
-    (evaluated on 535 topics with >=5 members)
-  recall on should-match pairs  : 68.0%
-  false-positive rate (should-not-match): 3.0%
+def louvain(neighbors, snomed_cuis, resolution):
+    import networkx as nx
+    G = nx.Graph()
+    G.add_nodes_from(snomed_cuis)
+    for u, nbrs in neighbors.items():
+        for v in nbrs:
+            if u < v:
+                G.add_edge(u, v)
+    from networkx.algorithms.community import louvain_communities
+    print(f"  Louvain (res={resolution}) ...")
+    t0 = time.time()
+    comms = louvain_communities(G, resolution=resolution, seed=42)
+    print(f"  {len(comms):,} communities in {time.time()-t0:.0f}s")
+    cui2comm = {}
+    for i, c in enumerate(comms):
+        for cui in c:
+            cui2comm[cui] = i
+    return cui2comm, comms
 
-====================================================================================================
-  SUMMARY TABLE
-====================================================================================================
-  Method                   Topics  Median sz   p99 sz  Single%   Top10%   Purity   Recall    FPR
-  Method 1 (BFS)           96,735          7      269     6.6%     0.9%    0.81    3.0%   0.0%
-  Louvain res=0.3           1,139          1    6,511    81.9%    74.0%    0.86  100.0%  15.0%
-  Louvain res=0.5           1,265          1    7,043    73.8%    67.3%    0.87  100.0%  13.0%
-  Louvain res=1.0           1,283          1    6,561    72.7%    57.5%    0.87   93.0%   7.0%
-  Louvain res=2.0           1,469          1    6,588    63.5%    35.7%    0.86   68.0%   3.0%
 
-Decision criteria suggestions:
-  - Higher RECALL on should-match = better at finding related concepts
-  - Lower FPR on should-not-match = fewer spurious matches
-  - Higher PURITY = topics have semantic coherence
-  - Lower Top10% = no mega-cluster problem
-  - Reasonable median size = useful granularity (not all size-1, not all huge)
-​
+def generate_pairs(neighbors, snomed_cuis, n_pairs=200, seed=42):
+    rng = random.Random(seed)
+    cui_list = list(snomed_cuis & set(neighbors.keys()))
+    rng.shuffle(cui_list)
+    should_match, should_not_match = [], []
+
+    for cui in cui_list:
+        if len(should_match) >= n_pairs:
+            break
+        for shared in neighbors.get(cui, ()):
+            for sib in neighbors.get(shared, ()):
+                if sib == cui or sib in neighbors.get(cui, set()):
+                    continue
+                should_match.append((cui, sib))
+                if len(should_match) >= n_pairs:
+                    break
+            if len(should_match) >= n_pairs:
+                break
+
+    neigh_2hop = {}
+    for cui in rng.sample(cui_list, min(2000, len(cui_list))):
+        n1 = neighbors.get(cui, set())
+        n2 = set()
+        for nb in n1:
+            n2 |= neighbors.get(nb, set())
+        neigh_2hop[cui] = n1 | n2 | {cui}
+    distant = list(neigh_2hop.keys())
+    while len(should_not_match) < n_pairs and distant:
+        a = rng.choice(distant)
+        b = rng.choice(cui_list)
+        if b == a or b in neigh_2hop[a]:
+            continue
+        should_not_match.append((a, b))
+    return should_match, should_not_match
+
+
+def per_sty_evaluation(cui2comm, snomed_cuis, tags,
+                        should_match, should_not_match,
+                        min_cuis_per_sty=20):
+    """
+    For each STY, compute metrics.
+    Only evaluate STYs that have at least min_cuis_per_sty CUIs in the universe.
+    """
+    # Index: STY -> set of CUIs with that STY (and in our universe)
+    sty_to_cuis = defaultdict(set)
+    for cui in snomed_cuis:
+        for sty in tags.get(cui, ()):
+            sty_to_cuis[sty].add(cui)
+
+    # For pair-based metrics: bucket pairs by STY intersection of the two CUIs
+    sm_by_sty = defaultdict(list)
+    snm_by_sty = defaultdict(list)
+    for a, b in should_match:
+        common = tags.get(a, frozenset()) & tags.get(b, frozenset())
+        for sty in common:
+            sm_by_sty[sty].append((a, b))
+    for a, b in should_not_match:
+        # For FPR, attribute to either CUI's STYs
+        for sty in tags.get(a, ()) | tags.get(b, ()):
+            snm_by_sty[sty].append((a, b))
+
+    results = []
+    for sty, cuis in sty_to_cuis.items():
+        if len(cuis) < min_cuis_per_sty:
+            continue
+
+        # How many communities do these CUIs spread across?
+        comm_ids = set()
+        for c in cuis:
+            cid = cui2comm.get(c)
+            if cid is not None:
+                comm_ids.add(cid)
+        dispersion = len(comm_ids) / len(cuis)
+
+        # Largest community containing CUIs of this STY: what fraction of this STY is in it?
+        comm_counts = Counter()
+        for c in cuis:
+            cid = cui2comm.get(c)
+            if cid is not None:
+                comm_counts[cid] += 1
+        if comm_counts:
+            top_comm_id, top_count = comm_counts.most_common(1)[0]
+            top_comm_concentration = top_count / len(cuis)
+        else:
+            top_comm_concentration = 0
+
+        # Within-STY recall: of should-match pairs where BOTH CUIs carry this STY,
+        # what fraction share a community?
+        sm = sm_by_sty.get(sty, [])
+        if sm:
+            n_share = sum(1 for a, b in sm
+                          if cui2comm.get(a) is not None
+                          and cui2comm.get(a) == cui2comm.get(b))
+            within_recall = n_share / len(sm)
+        else:
+            within_recall = None
+
+        # Within-STY FPR: should-not-match pairs touching this STY, fraction sharing
+        snm = snm_by_sty.get(sty, [])
+        if snm:
+            n_share = sum(1 for a, b in snm
+                          if cui2comm.get(a) is not None
+                          and cui2comm.get(a) == cui2comm.get(b))
+            within_fpr = n_share / len(snm)
+        else:
+            within_fpr = None
+
+        results.append({
+            "sty": sty,
+            "name": STY_NAMES_BUILTIN.get(sty, "?"),
+            "n_cuis": len(cuis),
+            "n_communities": len(comm_ids),
+            "dispersion": dispersion,
+            "top_comm_concentration": top_comm_concentration,
+            "n_should_match_pairs": len(sm),
+            "within_recall": within_recall,
+            "n_should_not_match_pairs": len(snm),
+            "within_fpr": within_fpr,
+        })
+
+    return sorted(results, key=lambda r: -r["n_cuis"])
+
+
+def report(results, resolution):
+    print(f"\n{'='*100}")
+    print(f"  Per-STY evaluation at Louvain resolution = {resolution}")
+    print(f"{'='*100}")
+    print(f"  {'STY':<6s} {'Name':<35s} {'#CUIs':>7s} {'#Comm':>6s} "
+          f"{'Disp':>5s} {'Concen':>7s} {'#SM':>5s} {'Recall':>7s} "
+          f"{'#SNM':>5s} {'FPR':>6s}")
+    print(f"  {'-'*6:<6s} {'-'*35:<35s} {'-'*7:>7s} {'-'*6:>6s} "
+          f"{'-'*5:>5s} {'-'*7:>7s} {'-'*5:>5s} {'-'*7:>7s} "
+          f"{'-'*5:>5s} {'-'*6:>6s}")
+    for r in results:
+        rec_s = f"{100*r['within_recall']:.0f}%" if r['within_recall'] is not None else "  n/a"
+        fpr_s = f"{100*r['within_fpr']:.0f}%" if r['within_fpr'] is not None else "  n/a"
+        print(f"  {r['sty']:<6s} {r['name'][:35]:<35s} {r['n_cuis']:>7,d} "
+              f"{r['n_communities']:>6,d} {r['dispersion']:>5.2f} "
+              f"{r['top_comm_concentration']:>6.0%} "
+              f"{r['n_should_match_pairs']:>5d} {rec_s:>7s} "
+              f"{r['n_should_not_match_pairs']:>5d} {fpr_s:>6s}")
+
+    # Bucket by quality
+    print(f"\n  Quality summary (within-STY recall, only STYs with >=5 should-match pairs):")
+    good, ok, bad = [], [], []
+    for r in results:
+        if r['within_recall'] is None or r['n_should_match_pairs'] < 5:
+            continue
+        if r['within_recall'] >= 0.80:
+            good.append(r)
+        elif r['within_recall'] >= 0.50:
+            ok.append(r)
+        else:
+            bad.append(r)
+    print(f"    Recall >=80%: {len(good)} STYs")
+    for r in good[:10]:
+        print(f"      {r['name']:<35s} (n={r['n_cuis']:,}, recall={100*r['within_recall']:.0f}%)")
+    print(f"    Recall 50-79%: {len(ok)} STYs")
+    for r in ok[:5]:
+        print(f"      {r['name']:<35s} (recall={100*r['within_recall']:.0f}%)")
+    print(f"    Recall <50%: {len(bad)} STYs")
+    for r in bad[:10]:
+        print(f"      {r['name']:<35s} (recall={100*r['within_recall']:.0f}%)")
+
+
+def main():
+    for g in ["data", "SNOMED_CUIS", "TAGS"]:
+        if g not in globals():
+            raise RuntimeError(f"Set '{g}' first")
+
+    print(f"Graph: {data.number_of_nodes():,} nodes")
+    print(f"SNOMED universe: {len(SNOMED_CUIS):,} CUIs")
+    print(f"TAGS: {len(TAGS):,} entries")
+
+    print("\n[1] Flattening graph ...")
+    neighbors = flatten_graph(data, SNOMED_CUIS)
+
+    print("\n[2] Generating eval pairs (200 each) ...")
+    sm, snm = generate_pairs(neighbors, SNOMED_CUIS, n_pairs=200)
+    print(f"   {len(sm)} should-match, {len(snm)} should-not-match")
+
+    # Run Louvain at the two most defensible resolutions
+    for res in [1.0, 2.0]:
+        print(f"\n[3] Louvain (res={res}) ...")
+        cui2comm, comms = louvain(neighbors, SNOMED_CUIS, res)
+        print(f"\n[4] Per-STY evaluation ...")
+        results = per_sty_evaluation(cui2comm, SNOMED_CUIS, TAGS, sm, snm)
+        report(results, res)
+
+
+main()
