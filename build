@@ -1,1 +1,9 @@
-RuntimeError: Required variable 'TAGS' not set in notebook
+import pickle
+
+# Load from your cache
+cache = pickle.load(open('umls_cache.pkl', 'rb'))
+TAGS = cache['tags']
+
+# Sanity check
+print(f"TAGS loaded: {len(TAGS):,} CUIs with STY codes")
+print(f"Sample: {list(TAGS.items())[:3]}")
