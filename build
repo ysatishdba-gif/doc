@@ -1,1 +1,3 @@
-TypeError: unsupported operand type(s) for |: 'tuple' and 'frozenset'
+# Normalize TAGS to frozensets
+TAGS = {cui: frozenset(stys) for cui, stys in TAGS.items()}
+print(f"TAGS normalized. Sample: {list(TAGS.items())[:2]}")
