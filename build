@@ -1,10 +1,80 @@
-# Force-normalize TAGS to frozensets and verify
-TAGS = {cui: frozenset(stys) if not isinstance(stys, frozenset) else stys
-        for cui, stys in TAGS.items()}
+def per_sty_evaluation(cui2comm, snomed_cuis, tags,
+                        should_match, should_not_match,
+                        min_cuis_per_sty=20):
+    from collections import defaultdict, Counter
 
-# Verify
-sample_types = set()
-for v in list(TAGS.values())[:1000]:
-    sample_types.add(type(v).__name__)
-print(f"TAGS value types after normalization: {sample_types}")
-print(f"Sample: {list(TAGS.items())[:2]}")
+    EMPTY = frozenset()
+
+    sty_to_cuis = defaultdict(set)
+    for cui in snomed_cuis:
+        for sty in tags.get(cui, EMPTY):
+            sty_to_cuis[sty].add(cui)
+
+    sm_by_sty = defaultdict(list)
+    snm_by_sty = defaultdict(list)
+    for a, b in should_match:
+        ta = frozenset(tags.get(a, EMPTY))
+        tb = frozenset(tags.get(b, EMPTY))
+        for sty in (ta & tb):
+            sm_by_sty[sty].append((a, b))
+    for a, b in should_not_match:
+        ta = frozenset(tags.get(a, EMPTY))
+        tb = frozenset(tags.get(b, EMPTY))
+        for sty in (ta | tb):
+            snm_by_sty[sty].append((a, b))
+
+    results = []
+    for sty, cuis in sty_to_cuis.items():
+        if len(cuis) < min_cuis_per_sty:
+            continue
+
+        comm_ids = set()
+        for c in cuis:
+            cid = cui2comm.get(c)
+            if cid is not None:
+                comm_ids.add(cid)
+        dispersion = len(comm_ids) / len(cuis)
+
+        comm_counts = Counter()
+        for c in cuis:
+            cid = cui2comm.get(c)
+            if cid is not None:
+                comm_counts[cid] += 1
+        if comm_counts:
+            top_comm_id, top_count = comm_counts.most_common(1)[0]
+            top_comm_concentration = top_count / len(cuis)
+        else:
+            top_comm_concentration = 0
+
+        sm = sm_by_sty.get(sty, [])
+        if sm:
+            n_share = sum(1 for a, b in sm
+                          if cui2comm.get(a) is not None
+                          and cui2comm.get(a) == cui2comm.get(b))
+            within_recall = n_share / len(sm)
+        else:
+            within_recall = None
+
+        snm = snm_by_sty.get(sty, [])
+        if snm:
+            n_share = sum(1 for a, b in snm
+                          if cui2comm.get(a) is not None
+                          and cui2comm.get(a) == cui2comm.get(b))
+            within_fpr = n_share / len(snm)
+        else:
+            within_fpr = None
+
+        results.append({
+            "sty": sty,
+            "name": STY_NAMES_BUILTIN.get(sty, "?"),
+            "n_cuis": len(cuis),
+            "n_communities": len(comm_ids),
+            "dispersion": dispersion,
+            "top_comm_concentration": top_comm_concentration,
+            "n_should_match_pairs": len(sm),
+            "within_recall": within_recall,
+            "n_should_not_match_pairs": len(snm),
+            "within_fpr": within_fpr,
+        })
+
+    return sorted(results, key=lambda r: -r["n_cuis"])
