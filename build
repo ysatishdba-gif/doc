@@ -1,9 +1,158 @@
-import pickle
+============================================================
+Topic method evaluation (data-driven, multi-method)
+============================================================
 
-# Load from your cache
-cache = pickle.load(open('umls_cache.pkl', 'rb'))
-TAGS = cache['tags']
+[1] Flattening graph ...
+  flattening for 374,538 SNOMED CUIs ...
+    100,000 (9s)
+    200,000 (18s)
+    300,000 (28s)
+  -> 674,090 edges in 35s
 
-# Sanity check
-print(f"TAGS loaded: {len(TAGS):,} CUIs with STY codes")
-print(f"Sample: {list(TAGS.items())[:3]}")
+[2] Generating evaluation pairs ...
+  generating 100 should-match + 100 should-not-match pairs ...
+  -> 100 should-match, 100 should-not-match
+
+[3] Building topic methods ...
+
+  Method 1 (nearest-canonical BFS)
+  selecting canonicals ...
+  96,735 canonicals (degree band [4, 26])
+  multi-source BFS ...
+  BFS done in 2s
+
+  Method 2 (Louvain, res=0.3)
+  Louvain (resolution=0.3) ...
+  done in 126s, 1,139 communities
+
+  Method 2 (Louvain, res=0.5)
+  Louvain (resolution=0.5) ...
+  done in 131s, 1,265 communities
+
+  Method 2 (Louvain, res=1.0)
+  Louvain (resolution=1.0) ...
+  done in 189s, 1,283 communities
+
+  Method 2 (Louvain, res=2.0)
+  Louvain (resolution=2.0) ...
+  done in 152s, 1,469 communities
+
+[4] Computing metrics ...
+
+==============================================================================
+  EVALUATING: Method 1 (BFS)
+==============================================================================
+  topics                       : 96,735
+  CUIs with topics             : 373,605
+  size distribution:
+    min                        : 1
+    median                     : 7
+    mean                       : 32.2
+    p90                        : 54
+    p99                        : 269
+    max                        : 2,938
+  singleton rate (size=1)      : 6.6%
+  mass in top-10 topics        : 0.9%
+  STY purity mean              : 0.81
+  STY purity median            : 0.88
+    (evaluated on 63,437 topics with >=5 members)
+  recall on should-match pairs  : 3.0%
+  false-positive rate (should-not-match): 0.0%
+
+==============================================================================
+  EVALUATING: Louvain res=0.3
+==============================================================================
+  topics                       : 1,139
+  CUIs with topics             : 374,538
+  size distribution:
+    min                        : 1
+    median                     : 1
+    mean                       : 328.8
+    p90                        : 23
+    p99                        : 6,511
+    max                        : 82,993
+  singleton rate (size=1)      : 81.9%
+  mass in top-10 topics        : 74.0%
+  STY purity mean              : 0.86
+  STY purity median            : 0.96
+    (evaluated on 204 topics with >=5 members)
+  recall on should-match pairs  : 100.0%
+  false-positive rate (should-not-match): 15.0%
+
+==============================================================================
+  EVALUATING: Louvain res=0.5
+==============================================================================
+  topics                       : 1,265
+  CUIs with topics             : 374,538
+  size distribution:
+    min                        : 1
+    median                     : 1
+    mean                       : 296.1
+    p90                        : 36
+    p99                        : 7,043
+    max                        : 72,810
+  singleton rate (size=1)      : 73.8%
+  mass in top-10 topics        : 67.3%
+  STY purity mean              : 0.87
+  STY purity median            : 0.98
+    (evaluated on 326 topics with >=5 members)
+  recall on should-match pairs  : 100.0%
+  false-positive rate (should-not-match): 13.0%
+
+==============================================================================
+  EVALUATING: Louvain res=1.0
+==============================================================================
+  topics                       : 1,283
+  CUIs with topics             : 374,538
+  size distribution:
+    min                        : 1
+    median                     : 1
+    mean                       : 291.9
+    p90                        : 75
+    p99                        : 6,561
+    max                        : 37,324
+  singleton rate (size=1)      : 72.7%
+  mass in top-10 topics        : 57.5%
+  STY purity mean              : 0.87
+  STY purity median            : 0.99
+    (evaluated on 349 topics with >=5 members)
+  recall on should-match pairs  : 93.0%
+  false-positive rate (should-not-match): 7.0%
+
+==============================================================================
+  EVALUATING: Louvain res=2.0
+==============================================================================
+  topics                       : 1,469
+  CUIs with topics             : 374,538
+  size distribution:
+    min                        : 1
+    median                     : 1
+    mean                       : 255.0
+    p90                        : 274
+    p99                        : 6,588
+    max                        : 24,058
+  singleton rate (size=1)      : 63.5%
+  mass in top-10 topics        : 35.7%
+  STY purity mean              : 0.86
+  STY purity median            : 0.99
+    (evaluated on 535 topics with >=5 members)
+  recall on should-match pairs  : 68.0%
+  false-positive rate (should-not-match): 3.0%
+
+====================================================================================================
+  SUMMARY TABLE
+====================================================================================================
+  Method                   Topics  Median sz   p99 sz  Single%   Top10%   Purity   Recall    FPR
+  Method 1 (BFS)           96,735          7      269     6.6%     0.9%    0.81    3.0%   0.0%
+  Louvain res=0.3           1,139          1    6,511    81.9%    74.0%    0.86  100.0%  15.0%
+  Louvain res=0.5           1,265          1    7,043    73.8%    67.3%    0.87  100.0%  13.0%
+  Louvain res=1.0           1,283          1    6,561    72.7%    57.5%    0.87   93.0%   7.0%
+  Louvain res=2.0           1,469          1    6,588    63.5%    35.7%    0.86   68.0%   3.0%
+
+Decision criteria suggestions:
+  - Higher RECALL on should-match = better at finding related concepts
+  - Lower FPR on should-not-match = fewer spurious matches
+  - Higher PURITY = topics have semantic coherence
+  - Lower Top10% = no mega-cluster problem
+  - Reasonable median size = useful granularity (not all size-1, not all huge)
+​
