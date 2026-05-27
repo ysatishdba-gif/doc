@@ -1,22 +1,10 @@
----------------------------------------------------------------------------
-TypeError                                 Traceback (most recent call last)
-Cell In[16], line 405
-    401         results = per_sty_evaluation(cui2comm, SNOMED_CUIS, TAGS, sm, snm)
-    402         report(results, res)
---> 405 main()
+# Force-normalize TAGS to frozensets and verify
+TAGS = {cui: frozenset(stys) if not isinstance(stys, frozenset) else stys
+        for cui, stys in TAGS.items()}
 
-Cell In[16], line 401, in main()
-    399 cui2comm, comms = louvain(neighbors, SNOMED_CUIS, res)
-    400 print(f"\n[4] Per-STY evaluation ...")
---> 401 results = per_sty_evaluation(cui2comm, SNOMED_CUIS, TAGS, sm, snm)
-    402 report(results, res)
-
-Cell In[16], line 273, in per_sty_evaluation(cui2comm, snomed_cuis, tags, should_match, should_not_match, min_cuis_per_sty)
-    270         sm_by_sty[sty].append((a, b))
-    271 for a, b in should_not_match:
-    272     # For FPR, attribute to either CUI's STYs
---> 273     for sty in tags.get(a, ()) | tags.get(b, ()):
-    274         snm_by_sty[sty].append((a, b))
-    276 results = []
-
-TypeError: unsupported operand type(s) for |: 'tuple' and 'frozenset'
+# Verify
+sample_types = set()
+for v in list(TAGS.values())[:1000]:
+    sample_types.add(type(v).__name__)
+print(f"TAGS value types after normalization: {sample_types}")
+print(f"Sample: {list(TAGS.items())[:2]}")
