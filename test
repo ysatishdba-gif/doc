@@ -1203,6 +1203,29 @@ def _collect_temporal_signals(pr: Dict[str, Any]) -> List[str]:
     return signals
 
 
+def _collect_record_types(pr: Dict[str, Any]) -> List[str]:
+    """Union of record_types across all intents/candidates, deduped,
+    order-preserving. Unlike temporal there is no placeholder backstop —
+    record_types is legitimately empty when there is no context."""
+    records, seen = [], set()
+    for intent in pr.get("intents") or []:
+        rsig = (intent.get("retrieval_signals") or {}).get("record_types") or []
+        for r in rsig:
+            if isinstance(r, str):
+                k = r.strip().lower()
+                if k and k not in seen:
+                    seen.add(k)
+                    records.append(r.strip())
+        for fc in intent.get("final_candidates") or []:
+            for r in (fc.get("retrieval_signals") or {}).get("record_types") or []:
+                if isinstance(r, str):
+                    k = r.strip().lower()
+                    if k and k not in seen:
+                        seen.add(k)
+                        records.append(r.strip())
+    return records
+
+
 class ContextualIntentPipeline:
 
     def __init__(
@@ -1230,16 +1253,22 @@ class ContextualIntentPipeline:
     # helpers
 
     def _extract_json(self, response) -> Any:
-       
-        if hasattr(response, "text"):
+        # Prefer .text only when it is actually populated; an empty .text
+        # attribute (present but "") would otherwise skip the candidates
+        # fallback and try to parse "".
+        if hasattr(response, "text") and response.text:
             text = response.text
         elif hasattr(response, "candidates") and response.candidates:
             text = response.candidates[0].content.parts[0].text
         else:
             text = str(response)
-        
+
         text = re.sub(r"^```(?:json)?\s*", "", text.strip())
         text = re.sub(r"\s*```$", "", text)
+        if not text.strip():
+            # Empty / blocked response — raise so the caller falls back
+            # cleanly instead of hitting a confusing JSONDecodeError on "".
+            raise ValueError("empty response text")
         return json.loads(text)
 
     def _call_model(
@@ -1249,39 +1278,45 @@ class ContextualIntentPipeline:
         fallback=None,
         max_tokens: int = 8192,
     ):
-        
-        try:
-            config = types.GenerateContentConfig(
-                temperature=0.0,
-                top_p=0.2,
-                seed=23,
-                max_output_tokens=max_tokens,
-                response_mime_type="application/json",
-                response_schema=schema,
-            )
-            response = self.client.models.generate_content(
-                model=self.model_name, contents=prompt, config=config
-            )
-            data = self._extract_json(response)
-            if isinstance(data, list):
-                fields = schema.model_fields
-                list_field = next(
-                    (k for k, v in fields.items() if "List" in str(v.annotation)),
-                    None,
+        # One retry before falling back — the failures here are intermittent
+        # (empty / truncated responses), so a second attempt usually recovers.
+        last_exc = None
+        for attempt in range(2):
+            try:
+                config = types.GenerateContentConfig(
+                    temperature=0.0,
+                    top_p=0.2,
+                    seed=23,
+                    max_output_tokens=max_tokens,
+                    response_mime_type="application/json",
+                    response_schema=schema,
                 )
-                data = {list_field: data} if list_field else data
-            return schema.model_validate(data)
-        except Exception as e:
-            # Surface the failure so a blank/empty result isn't silently
-            # mistaken for a legitimately empty model response.
-            if fallback is not None:
-                logging.warning(
-                    "LLM call failed for %s (%s); using fallback",
-                    getattr(schema, "__name__", schema),
-                    type(e).__name__,
+                response = self.client.models.generate_content(
+                    model=self.model_name, contents=prompt, config=config
                 )
-                return fallback
-            raise
+                data = self._extract_json(response)
+                if isinstance(data, list):
+                    fields = schema.model_fields
+                    list_field = next(
+                        (k for k, v in fields.items() if "List" in str(v.annotation)),
+                        None,
+                    )
+                    data = {list_field: data} if list_field else data
+                return schema.model_validate(data)
+            except Exception as e:
+                last_exc = e
+
+        # Both attempts failed. Surface it so a blank/empty result isn't
+        # silently mistaken for a legitimately empty model response.
+        if fallback is not None:
+            logging.warning(
+                "LLM call failed for %s (%s) after retry; using fallback: %s",
+                getattr(schema, "__name__", schema),
+                type(last_exc).__name__,
+                str(last_exc)[:200],
+            )
+            return fallback
+        raise last_exc
 
     # -- pipeline steps --
 
@@ -1294,7 +1329,7 @@ class ContextualIntentPipeline:
                 actions=["information_retrieval"],
                 is_processable=True,
             ),
-            max_tokens=512,
+            max_tokens=1024,
         )
 
     def extract_representative_terms(
@@ -1704,6 +1739,7 @@ if __name__ == "__main__":
 #             "is_processable": bool(pr.get("is_processable")),
 #             "representative_terms": list(pr.get("representative_terms") or []),
 #             "temporal_signals": _collect_temporal_signals(pr),
+#             "record_types": _collect_record_types(pr),
 #         }
 
 #     data = load_json_from_gcs(BUCKET_NAME, FILE_PATH)
@@ -1730,6 +1766,7 @@ if __name__ == "__main__":
 #                     "is_processable": False,
 #                     "representative_terms": [],
 #                     "temporal_signals": [],
+#                     "record_types": [],
 #                     "error": str(e),
 #                 }
 
@@ -1741,6 +1778,7 @@ if __name__ == "__main__":
 #         print(f"  processable: {s['is_processable']}")
 #         print(f"  rep terms  : {s['representative_terms']}")
 #         print(f"  temporal   : {s['temporal_signals']}")
+#         print(f"  records    : {s['record_types']}")
 
 #     with open(OUTPUT_FILE, "w") as f:
 #         json.dump(summaries, f, indent=2)
@@ -1766,12 +1804,14 @@ if __name__ == "__main__":
                 "is_processable": pr.get("is_processable", False),
                 "representative_terms": pr.get("representative_terms", []),
                 "temporal_signals": _collect_temporal_signals(pr),
+                "record_types": _collect_record_types(pr),
             }
         except Exception as e:
             print(f"Failed: {q} ({e})")
             return {
                 "query": q, "action_finder": [], "is_processable": False,
-                "representative_terms": [], "temporal_signals": [], "error": str(e),
+                "representative_terms": [], "temporal_signals": [],
+                "record_types": [], "error": str(e),
             }
 
     # Preserve input order in the output
