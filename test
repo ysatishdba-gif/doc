@@ -52,7 +52,7 @@ ACTION CATEGORIES
 
 5. "out_of_scope"
    Instruction: Block or redirect unsafe medical requests; politely redirect non-medical or unrelated requests.
-   When applies: Unsafe medical instructions, self-harm, restricted clinical actions, prohibited content; entirely non-medical or off-topic queries.
+   When applies: Unsafe medical instructions, self-harm, restricted clinical actions, prohibited content; entirely non-medical or off-topic requests.
    Examples: "How do I overdose safely?", "Tell me how to get controlled substances without a prescription", "Can you write me a fake prescription?", "What's on the moon?", "Recommend a restaurant in Chicago", "Tell me a joke", "What's the weather tomorrow?"
 
 ====================================================
@@ -966,7 +966,11 @@ class ExtractionResult:
 
     def _representative_terms(self) -> List[str]:
         """Dedupe and return the representative terms from the dedicated
-        REPRESENTATIVE_TERMS_PROMPT call. This is the single source of truth."""
+        REPRESENTATIVE_TERMS_PROMPT call. This is the single source of truth.
+
+        Backstop: if that call returned nothing but the query is clinical with
+        intents, derive terms from the intent titles so the field is never
+        blank for a processable clinical query."""
         terms: List[str] = []
         seen: set = set()
         for t in self.representative_terms_list:
@@ -978,6 +982,21 @@ class ExtractionResult:
                 continue
             seen.add(key)
             terms.append(t_clean)
+
+        # Backstop: never blank for a clinical query with intents.
+        if not terms and self.intents.is_clinical and self.intents.intents:
+            for i in self.intents.intents:
+                t_clean = i.intent_title.strip()
+                if not t_clean:
+                    continue
+                key = t_clean.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                terms.append(t_clean)
+                if len(terms) >= 3:  # mirror the prompt's "never more than 3"
+                    break
+
         return terms
 
     def to_intent_extraction(self) -> Dict[str, Any]:
@@ -1159,6 +1178,31 @@ def _fmt_action_label(action: Optional[str]) -> str:
     return action.replace("_", " ").capitalize()
 
 
+def _collect_temporal_signals(pr: Dict[str, Any]) -> List[str]:
+    """Union of temporal_signal across all intents, deduped, order-preserving.
+    Lifts the per-intent / per-candidate temporal signals up to the top level
+    so the summary's temporal_signals field is never blank for a clinical
+    query (every candidate carries at least the 'current' placeholder)."""
+    signals, seen = [], set()
+    for intent in pr.get("intents") or []:
+        rsig = (intent.get("retrieval_signals") or {}).get("temporal_signal") or []
+        for s in rsig:
+            if isinstance(s, str):
+                k = s.strip().lower()
+                if k and k not in seen:
+                    seen.add(k)
+                    signals.append(s.strip())
+        # Belt-and-suspenders: also walk candidates.
+        for fc in intent.get("final_candidates") or []:
+            for s in (fc.get("retrieval_signals") or {}).get("temporal_signal") or []:
+                if isinstance(s, str):
+                    k = s.strip().lower()
+                    if k and k not in seen:
+                        seen.add(k)
+                        signals.append(s.strip())
+    return signals
+
+
 class ContextualIntentPipeline:
 
     def __init__(
@@ -1227,8 +1271,15 @@ class ContextualIntentPipeline:
                 )
                 data = {list_field: data} if list_field else data
             return schema.model_validate(data)
-        except Exception:
+        except Exception as e:
+            # Surface the failure so a blank/empty result isn't silently
+            # mistaken for a legitimately empty model response.
             if fallback is not None:
+                logging.warning(
+                    "LLM call failed for %s (%s); using fallback",
+                    getattr(schema, "__name__", schema),
+                    type(e).__name__,
+                )
                 return fallback
             raise
 
@@ -1646,27 +1697,6 @@ if __name__ == "__main__":
 #         data = blob.download_as_text()
 #         return json.loads(data)
 
-#     def _collect_temporal_signals(pr: Dict[str, Any]) -> List[str]:
-#         """Union of temporal_signal across all intents, deduped, order-preserving."""
-#         signals, seen = [], set()
-#         for intent in pr.get("intents") or []:
-#             rsig = (intent.get("retrieval_signals") or {}).get("temporal_signal") or []
-#             for s in rsig:
-#                 if isinstance(s, str):
-#                     k = s.strip().lower()
-#                     if k and k not in seen:
-#                         seen.add(k)
-#                         signals.append(s.strip())
-#             # Belt-and-suspenders: also walk candidates.
-#             for fc in intent.get("final_candidates") or []:
-#                 for s in (fc.get("retrieval_signals") or {}).get("temporal_signal") or []:
-#                     if isinstance(s, str):
-#                         k = s.strip().lower()
-#                         if k and k not in seen:
-#                             seen.add(k)
-#                             signals.append(s.strip())
-#         return signals
-
 #     def _summarize(pr: Dict[str, Any]) -> Dict[str, Any]:
 #         return {
 #             "query": pr.get("question", ""),
@@ -1735,7 +1765,7 @@ if __name__ == "__main__":
                 "action_finder": pr.get("action_finder", []),
                 "is_processable": pr.get("is_processable", False),
                 "representative_terms": pr.get("representative_terms", []),
-                "temporal_signals": pr.get("temporal_signals", []),
+                "temporal_signals": _collect_temporal_signals(pr),
             }
         except Exception as e:
             print(f"Failed: {q} ({e})")
