@@ -1,63 +1,20 @@
-======================================================================
-Pickle: topics.pkl
-  built_at         : 2026-05-21T17:56:21.469468
-  total CUIs       : 374,538
-  unique anchors   : 227,416
-  self-only        : 227,369
-  multi-topic CUIs : 25,489
-======================================================================
-
---- Sample CUIs with ONE topic (different from self) [121680 total in pickle] ---
-  C3164461  (Atresia of systemic vein                ) -> C3165169  (Congenital abnormality of systemic vein)
-  C0524148  (Heptaminol measurement                  ) -> C2316799  (Measurement of substance)
-  C5547446  (Serum testosterone above reference range) -> C2711908  (Measurement finding outside reference range)
-  C1444384  (Skin care education                     ) -> C0557043  (Teaching how to perform procedure)
-  C0337354  (Quadrantectomy of breast                ) -> C1293182  (Trunk excision)
-
---- Sample CUIs with MULTIPLE topics [25489 total in pickle] ---
-  C0751161  (UDP (uridine diphosphate) galactose-4-epimerase deficiency)
-      -> C0016952  (Galactosaemia)
-      -> C0019247  (Hereditary disease)
-  C4076030  (Injection of normal human immunoglobulin)
-      -> C0150150  (Administration of blood product)
-      -> C3469597  (Medication administration)
-  C0230989  (Structure of amniotic villi)
-      -> C0460005  (Torso)
-      -> C0700276  (Anatomical structure)
-  C5687821  (Structure of periosteum of shoulder)
-      -> C1720025  (Structure of shoulder and/or upper arm)
-      -> C2316804  (Structure of soft tissue of limb)
-  C0203958  (Chiropractic adjustment of coccyx subluxation)
-      -> C0185482  (Musculoskeletal system manipulation)
-      -> C1293202  (Trunk manipulation)
-
---- Sample CUIs that anchor to themselves [227369 total in pickle] ---
-  C4517381  (Discharge specimen from penis)
-  C1275033  (PUVA therapy-associated squamous cell carcinoma)
-  C1290900  (Condition AND/OR status of human remains)
-  C2960444  (Mixed serous and mucinous cystadenoma of borderline malignancy)
-  C4302701  (Wedge pressure technique)
-
---- Top 10 largest topic groups ---
-  4760 members  C4707809  (Substance categorized by disposition)
-  3697 members  C2316799  (Measurement of substance)
-  2299 members  C1292784  (Procedure by method)
-  2157 members  C2711906  (Evaluation finding)
-  2119 members  C2317510  (Measurement of substance in specimen)
-  1914 members  C0700276  (Anatomical structure)
-  1705 members  C1287110  (Social and personal history finding)
-  1651 members  C0015385  (Limb structure (body structure))
-  1611 members  C0574125  (Functional finding)
-  1553 members  C0519671  (Immunology laboratory test (procedure))
-
-======================================================================
-Copy/paste any of these into CUIS_TO_LOOKUP in lookup_topics.py
-======================================================================
-
-CUIS_TO_LOOKUP = [
-    "C3164461",   # Atresia of systemic vein
-    "C0524148",   # Heptaminol measurement
-    "C0751161",   # UDP (uridine diphosphate) galactose-4-epimerase deficiency
-    "C4076030",   # Injection of normal human immunoglobulin
-    "C4517381",   # Discharge specimen from penis
-]
+def _collect_record_types(pr: Dict[str, Any]) -> List[str]:
+    """Union of record_types across all intents/candidates, deduped,
+    order-preserving."""
+    records, seen = [], set()
+    for intent in pr.get("intents") or []:
+        rsig = (intent.get("retrieval_signals") or {}).get("record_types") or []
+        for r in rsig:
+            if isinstance(r, str):
+                k = r.strip().lower()
+                if k and k not in seen:
+                    seen.add(k)
+                    records.append(r.strip())
+        for fc in intent.get("final_candidates") or []:
+            for r in (fc.get("retrieval_signals") or {}).get("record_types") or []:
+                if isinstance(r, str):
+                    k = r.strip().lower()
+                    if k and k not in seen:
+                        seen.add(k)
+                        records.append(r.strip())
+    return records
