@@ -1,20 +1,2 @@
-def _collect_record_types(pr: Dict[str, Any]) -> List[str]:
-    """Union of record_types across all intents/candidates, deduped,
-    order-preserving."""
-    records, seen = [], set()
-    for intent in pr.get("intents") or []:
-        rsig = (intent.get("retrieval_signals") or {}).get("record_types") or []
-        for r in rsig:
-            if isinstance(r, str):
-                k = r.strip().lower()
-                if k and k not in seen:
-                    seen.add(k)
-                    records.append(r.strip())
-        for fc in intent.get("final_candidates") or []:
-            for r in (fc.get("retrieval_signals") or {}).get("record_types") or []:
-                if isinstance(r, str):
-                    k = r.strip().lower()
-                    if k and k not in seen:
-                        seen.add(k)
-                        records.append(r.strip())
-    return records
+query:"History Physical (H) — Formal document from referring provider including comorbidities, performance status, surgical history, family cancer history"
+0:"knowledge_fact_search"
