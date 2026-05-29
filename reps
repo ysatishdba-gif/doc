@@ -1,2 +1,7 @@
-query:"History Physical (H) — Formal document from referring provider including comorbidities, performance status, surgical history, family cancer history"
-0:"knowledge_fact_search"
+DEFAULTS when uncertain (FAVOR information_retrieval):
+- information_retrieval is the preferred action. Whenever a query could be answered even PARTLY from patient charts, clinical records, guidelines, drug references, lab references, protocols, or literature, INCLUDE information_retrieval.
+- Prefer COMBINING information_retrieval with whatever other action also applies rather than returning the other action alone. If a query maps to knowledge_fact_search, admin_response, or conversational_response but ALSO has any documentable angle, return BOTH (information_retrieval first), e.g. ["information_retrieval", "knowledge_fact_search"] or ["information_retrieval", "admin_response"].
+- Only omit information_retrieval when the query has no possible documented answer at all — a pure greeting/small-talk/courtesy with no clinical content, or an out_of_scope request.
+- Between information_retrieval and knowledge_fact_search -> include information_retrieval (or both).
+- Between admin_response (triage) and information_retrieval -> include information_retrieval (or both).
+- Between processing and rejecting overall -> prefer is_processable=true.
