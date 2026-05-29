@@ -1,1 +1,2 @@
-WARNING:root:LLM call failed for RepresentativeTermsOutput (JSONDecodeError) after retry; using fallback: Expecting ',' delimiter: line 5 column 4 (char 84)
+import logging
+logging.getLogger().setLevel(logging.ERROR)
