@@ -6,6 +6,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, Tuple
+import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Dict, List, Optional
+import pandas as pd
 
 from google import genai
 from google.cloud import storage
@@ -416,58 +420,113 @@ TASK 2: LIFECYCLE QUALIFIER
 
 Produce `temporal_by_intent`.
 
-For each intent:
-- Include intent_title (unchanged)
-- Include candidates (one per candidate)
-- Each candidate must include a `temporal_signal` (LIST of short lifecycle qualifiers)
+Each candidate must include:
+- temporal_signal: LIST of short lifecycle qualifiers
 
-ALLOWED VALUES — STRICT:
+====================================================
+CORE OBJECTIVE
+====================================================
 
-Each entry in temporal_signal MUST be a short single-word (occasionally two-word) lifecycle qualifier. Pick from common clinical-state vocabulary such as:
+Extract ONLY temporal meaning from clinical text and normalize it into UMLS/CUI-friendly lifecycle concepts.
 
-- "current"
-- "active"
-- "ongoing"
-- "recent"
-- "resolved"
-- "past"
-- "historical"
-- "prior"
-- "chronic"
-- "acute"
-- "new onset"
+====================================================
+STRICT SCOPE
+====================================================
 
-You may use a synonym that fits the same family if the query clearly calls for it, but it MUST stay in the form of a short state/lifecycle word — never a sentence, never a phrase describing a time window.
+temporal_signal MUST represent ONLY time/lifecycle meaning.
 
-HARD PROHIBITIONS — DO NOT emit any of the following:
+DO NOT include:
+- workflow states (referral, proposal, outcome, decision, approval)
+- administrative or documentation states
 
-- Sentences or explanatory phrases ("the most recent CT scan", "documented within the past year")
-- Duration windows ("last 12 months", "past 6 weeks", "since 2020")
-- ISO date ranges ("2024-05-15 to 2025-05-15")
-- Ranking phrases ("most recent", "latest", "first") → if the query implies recency, use "recent" or "current" instead
-- Type prefixes ("STATE: active", "Status - current")
-- Empty strings or null values
+====================================================
+ALLOWED TEMPORAL CONCEPT SPACE
+====================================================
 
-Even if the query's wording contains a duration like "in the last 12 months", DO NOT echo that wording. Map it to the closest lifecycle qualifier ("recent" or "current").
+Use ONLY UMLS-style temporal concepts:
+- past
+- current
+- recent
+- onset
+- ongoing
+- chronic
+- acute
+- planned (only if explicitly temporal future intent)
 
-INFERENCE RULES:
+====================================================
+UMLS COMPATIBILITY RULE
+====================================================
 
-1. Read the query's verb tense, framing, and the clinical nature of the concept.
-2. Pick the lifecycle qualifier that best matches how the query frames the concept:
-   - Present-tense / "do you have" / "current X" → "current" or "active"
-   - "History of" / "prior" / past-tense / "ever had" → "past" or "historical"
-   - "Latest" / "most recent" / "within the last [N]" → "recent"
-   - Long-running condition framing → "chronic" or "ongoing"
-   - Short-term symptom framing → "acute" or "new onset"
-3. If the query carries no clear state framing AND the concept is not inherently state-bound, emit ["current"] as a safe default.
-4. Each candidate's temporal_signal must be a LIST, even when it has only one value.
-5. Typically emit ONE value per candidate. Two values are acceptable only when both clearly apply (e.g. "active" + "chronic" for a long-standing ongoing condition). Never emit more than two.
+All outputs MUST be:
+- 1–2 words max
+- concept-like (UMLS-compatible)
+- highly standardized
 
-OUTPUT RULES:
+====================================================
+TIME EXPRESSION NORMALIZATION (EXPLICIT INPUT TIME)
+====================================================
 
-- temporal_signal is a list of plain short strings
-- Each string is 1-2 words, lowercase
-- No sentences, no explanations, no dates, no durations, no ranking words
+If explicit time appears in the query/text:
+- days/weeks → recent or onset
+- months → recent or ongoing
+- >6 months / years → chronic
+- "since YYYY" → chronic or past
+- "X days ago / X weeks ago" → onset or recent
+- ongoing + duration → chronic + ongoing
+- sudden event → acute
+
+NEVER output raw time values or units.
+
+====================================================
+IMPLICIT TEMPORAL INFERENCE (LANGUAGE-BASED)
+====================================================
+
+Infer temporal meaning from grammar and clinical phrasing:
+
+A. VERB TENSE:
+- past tense → past
+- present tense → current
+- progressive → ongoing
+
+B. CLINICAL PHRASES:
+- "history of", "previously had" → past
+- "presents with", "currently reports" → current
+- "new onset", "began", "started" → onset
+- "still having", "persistent" → ongoing
+- "long-standing", "years of" → chronic
+- "sudden", "acute presentation" → acute
+
+C. IMPLICIT CUES:
+- "no longer experiencing" → past
+- "resolved symptoms" → past
+- "denies current symptoms" → current (state context)
+- "worsening over time" → ongoing
+
+====================================================
+HARD FILTER RULE
+====================================================
+
+DO NOT include:
+- referral
+- proposal
+- outcome
+- decision
+- approval
+- report status
+- administrative workflow
+
+These are NOT temporal signals.
+
+====================================================
+INFERENCE RULES
+====================================================
+
+1. Extract ONLY temporal meaning.
+2. Use explicit time in query + language cues + verb tense.
+3. Ignore workflow/administrative content completely.
+4. Normalize everything into lifecycle concepts.
+5. If no temporal signal exists → return empty list [].
+6. temporal_signal MUST always be a LIST.
 
 ====================================================
 INPUTS
@@ -1535,48 +1594,48 @@ if __name__ == "__main__":
 
     #  Single query test 
 
-    test_queries = [
-        "Latest oncology / referring provider note — Including clinical staging, treatment recommendations, rationale for referral, and any multidisciplinary team discussions"
-    ]
+#     test_queries = [
+#         "Latest oncology / referring provider note — Including clinical staging, treatment recommendations, rationale for referral, and any multidisciplinary team discussions"
+#     ]
     
-    results = []
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {
-            executor.submit(minimal_pipeline, pipeline, query): query
-            for query in test_queries
-        }
-        for idx, future in enumerate(as_completed(futures), 2):
-            res = future.result()
-            results.append(res)
+#     results = []
+#     with ThreadPoolExecutor(max_workers=4) as executor:
+#         futures = {
+#             executor.submit(minimal_pipeline, pipeline, query): query
+#             for query in test_queries
+#         }
+#         for idx, future in enumerate(as_completed(futures), 2):
+#             res = future.result()
+#             results.append(res)
     
-            valid, err = validate_schema(res, "minimal_pipeline")
-            filename = f"query{idx}_pipeline.json"
-            save_json(res, filename)
+#             valid, err = validate_schema(res, "minimal_pipeline")
+#             filename = f"query{idx}_pipeline.json"
+#             save_json(res, filename)
     
-            # Compact highlights — not the full payload.
-            print(f"Query     : {res.get('question', '')[:80]}")
-            print(f"Actions   : {', '.join(res.get('action_finder') or [])}")
-            if not res.get("is_processable"):
-                print("Status    : Not processable")
-            else:
-                rep = res.get("representative_terms") or []
-                print(
-                    f"Status    : Processable | "
-                    f"clinical: {res.get('is_clinical')} | "
-                    f"intents: {res.get('total_intents_detected')}"
-                )
-                print(f"Rep terms : {', '.join(rep) if rep else '—'}")
-            if not valid:
-                print(f"Schema    : FAILED — {err}")
-            print("-" * 60)
+#             # Compact highlights — not the full payload.
+#             print(f"Query     : {res.get('question', '')[:80]}")
+#             print(f"Actions   : {', '.join(res.get('action_finder') or [])}")
+#             if not res.get("is_processable"):
+#                 print("Status    : Not processable")
+#             else:
+#                 rep = res.get("representative_terms") or []
+#                 print(
+#                     f"Status    : Processable | "
+#                     f"clinical: {res.get('is_clinical')} | "
+#                     f"intents: {res.get('total_intents_detected')}"
+#                 )
+#                 print(f"Rep terms : {', '.join(rep) if rep else '—'}")
+#             if not valid:
+#                 print(f"Schema    : FAILED — {err}")
+#             print("-" * 60)
 
   
      # From GCS
    
 
-    # UPDATE THESE
-#     BUCKET_NAME = "shared-aif-bucket-0767"
-#     FILE_PATH = "adi_concept_exploration/rst_crs_eoam_quest_doctypes_temps.json"
+    
+#     BUCKET_NAME = BUCKET_NAME
+#     FILE_PATH = FILE_PATH
 #     BATCH_WORKERS = 4
 #     OUTPUT_FILE = "rep-term.json"
 
@@ -1656,3 +1715,54 @@ if __name__ == "__main__":
 #     with open(OUTPUT_FILE, "w") as f:
 #         json.dump(summaries, f, indent=2)
 #     print(f"Saved {len(summaries)} -> {OUTPUT_FILE}")
+
+
+     # From csv
+
+    CSV_FILE_PATH = "shopping_list.csv"
+    OUTPUT_FILE = "rep-term1.json"
+
+    # Read CSV
+    df = pd.read_csv(CSV_FILE_PATH, encoding="cp1252")
+
+    # Get values from column
+    questions = (
+        df["Shopping List Item"]
+        .dropna()
+        .astype(str)
+        .tolist()
+    )
+
+    results = []
+
+    for q in questions:
+        try:
+            pr = minimal_pipeline(pipeline, q)
+
+            results.append({
+                "query": q,
+                "action_finder": pr.get("action_finder", []),
+                "is_processable": pr.get("is_processable", False),
+                "representative_terms": pr.get("representative_terms", []),
+                "temporal_signals": pr.get("temporal_signals", [])
+            })
+
+            # print(f"Done: {q}")
+
+        except Exception as e:
+            results.append({
+                "query": q,
+                "action_finder": [],
+                "is_processable": False,
+                "representative_terms": [],
+                "temporal_signals": [],
+                "error": str(e),
+            })
+
+            print(f"Failed: {q}")
+
+    # Save JSON
+    with open(OUTPUT_FILE, "w") as f:
+        json.dump(results, f, indent=2)
+
+    print(f"Saved -> {OUTPUT_FILE}")
