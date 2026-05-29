@@ -1,31 +1,6 @@
-OUTPUT RULES:
-
-- Each temporal_signal entry is ONE of exactly two forms:
-
-  (A) A TIME WINDOW — a duration or recency span ("last 3 months",
-      "previous 2 years") or an ISO date range (YYYY-MM-DD to YYYY-MM-DD).
-      Emit these EXACTLY as the query expresses them. Do NOT normalize,
-      relabel, or convert a time window into a concept word. Dates and
-      durations stay verbatim.
-
-  (B) A LIFECYCLE QUALIFIER — when the signal is a state/lifecycle concept
-      rather than a window, emit it as a SINGLE canonical clinical concept
-      string that resolves to a UMLS concept (a CUI-alignable term). It must
-      be the bare qualifier alone — not a sentence, not a phrase, not wrapped
-      in quantifiers or articles, and never glued to the concept it modifies.
-
-- Form (B) must be UMLS-alignable. Emit the canonical clinical term a
-  terminology lookup would resolve, NOT the query's surface wording:
-    * "all historical encounters" -> "historical" (or "past")
-    * "currently taking"          -> "current"
-    * "current stage"             -> "current"
-    * "history of"                -> "past"
-  The clinical noun the qualifier modifies NEVER appears in temporal_signal —
-  that noun is the candidate, documented elsewhere. temporal_signal carries
-  only the time window or the lifecycle qualifier.
-
-- Do not emit quantifiers ("all", "any", "every"), articles, or full
-  sentences as temporal_signal entries.
-- temporal_signal must be a list of plain strings usable directly for UMLS
-  CUI extraction.
-- Empty list is valid when no meaningful temporal dimension applies.
+- temporal_signal is about WHEN (time window, or position in time: past,
+  current, recent, onset, ongoing, planned, first, most-recent). It is NOT
+  about the disease's STATE, COURSE, OUTCOME, or SEVERITY — words like
+  remission, exacerbation, recurrence, relapse, progression, successful,
+  stable describe the condition, not a time, so they belong to the candidate,
+  not here.
