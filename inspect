@@ -1,108 +1,18 @@
-"""
-lookup_topics.py
-----------------
-Look up topics for CUIs in the DUAL system (IS-A + RELA).
-
-For each CUI prints:
-  - Its preferred label from the cache
-  - IS-A topics (via IS-A graph)
-  - RELA topics (via undirected RELA graph)
-  - Union
-"""
-
-import pickle
-import hashlib
-
-
-PICKLE_PATH = "topic_lookup.pkl"
-
-
-# Just CUI codes. Edit this list.
-CUIS_TO_LOOKUP = [
-    "C1527304",   # Allergic reaction
-    "C0020517",
-    "C0002792",
-    "C0013182",
-    "C0559470",
-    "C0269811",
-    "C1257794",
-    "C2939115",
-    "C0157738",
-    "C0264937",
-    "C0032285",
-    "C0027051",
-    "C0011849",
-    "C0020538",
-    "C0024109",
-    "C0014834",
-    "C0021368",
-]
-
-
-def hash_topic(cui):
-    return "tp_" + hashlib.sha1(cui.encode()).hexdigest()[:12]
-
-
-def lookup(cui, payload):
-    labels = payload["labels"]
-    tags = payload["tags"]
-    isa_map = payload["isa_cui_topic_ids"]
-    rela_map = payload["rela_cui_topic_ids"]
-    topic_to_canon = payload["topic_to_canonical"]
-    isa_topic_to_cuis = payload["isa_topic_to_cuis"]
-    rela_topic_to_cuis = payload["rela_topic_to_cuis"]
-
-    cui_label = labels.get(cui, "?")
-    cui_stys = sorted(tags.get(cui, frozenset()))
-
-    print(f"\n{'='*78}")
-    print(f"  {cui}  {cui_label}")
-    print(f"{'='*78}")
-    if cui_stys:
-        print(f"  STY: {', '.join(cui_stys)}")
-
-    if cui_label == "?":
-        print(f"  -> CUI not in cache")
-        return
-
-    isa_tids = isa_map.get(cui, set())
-    rela_tids = rela_map.get(cui, set())
-    isa_canons = {topic_to_canon[t] for t in isa_tids}
-    rela_canons = {topic_to_canon[t] for t in rela_tids}
-
-    print(f"\n  IS-A topics  ({len(isa_canons)}):")
-    if isa_canons:
-        for c in sorted(isa_canons):
-            members = len(isa_topic_to_cuis.get(hash_topic(c), set()))
-            print(f"     {c}  {labels.get(c, '?')[:55]}  "
-                  f"({members:,} CUIs share)")
-    else:
-        print(f"     <none>")
-
-    print(f"\n  RELA topics  ({len(rela_canons)}):")
-    if rela_canons:
-        for c in sorted(rela_canons):
-            members = len(rela_topic_to_cuis.get(hash_topic(c), set()))
-            print(f"     {c}  {labels.get(c, '?')[:55]}  "
-                  f"({members:,} CUIs share)")
-    else:
-        print(f"     <none>")
-
-    union = isa_canons | rela_canons
-    print(f"\n  Union ({len(union)} topics)")
-
-
-def main():
-    with open(PICKLE_PATH, "rb") as f:
-        payload = pickle.load(f)
-    print(f"Loaded {PICKLE_PATH}")
-    print(f"  built_at        : {payload['built_at']}")
-    print(f"  total canonicals: {len(payload['canonicals']):,}")
-    print(f"  CUIs w/ IS-A    : {len(payload['isa_cui_topic_ids']):,}")
-    print(f"  CUIs w/ RELA    : {len(payload['rela_cui_topic_ids']):,}")
-
-    for cui in CUIS_TO_LOOKUP:
-        lookup(cui, payload)
-
-
-main()
+def _process_one(q: str) -> Dict[str, Any]:
+        try:
+            pr = minimal_pipeline(pipeline, q)
+            return {
+                "query": q,
+                "action_finder": pr.get("action_finder", []),
+                "is_processable": pr.get("is_processable", False),
+                "representative_terms": pr.get("representative_terms", []),
+                "temporal_signals": _collect_temporal_signals(pr),
+                "record_types": _collect_record_types(pr),
+            }
+        except Exception as e:
+            print(f"Failed: {q} ({e})")
+            return {
+                "query": q, "action_finder": [], "is_processable": False,
+                "representative_terms": [], "temporal_signals": [],
+                "record_types": [], "error": str(e),
+            }
