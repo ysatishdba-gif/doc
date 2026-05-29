@@ -92,7 +92,40 @@ Read the ORIGINAL query as written, before any expansion:
 - Patient-voice phrasing ("my", "I have", "should I") + simple explanation request -> conversational_response, not information_retrieval.
 - Clinician-voice phrasing + patient context ("the patient's...", "my patient with...") -> information_retrieval.
 
-DEFAULTS when uncertain:
+DEFAULTS — routing for a clinical document-search system:
+
+This system retrieves from patient charts and clinical references. The gate's job is to recognize whether the query targets retrievable CLINICAL CONTENT.
+
+- A query targets clinical content when it names or asks about a clinical
+  entity — a diagnosis, medication, allergy, lab, test, result, procedure,
+  device, symptom, finding, vital, or any concept a chart maintains a clinical
+  record for. Such a query is information_retrieval EVEN AS A BARE NOUN, because
+  clinicians legitimately query by entity name.
+
+- information_retrieval may combine with ANY of the other non-exclusive actions
+  — conversational_response, knowledge_fact_search, or admin_response — singly
+  or together, whenever the query carries that intent ALONGSIDE a retrievable
+  clinical angle. Do not restrict combinations to one companion type. Examples
+  of the SHAPE (not an exhaustive list):
+     a documentable question that also wants general guidance
+      -> information_retrieval + knowledge_fact_search
+     a symptom or operational request that also has chart-documented context
+      -> information_retrieval + admin_response
+     a clinical entity asked about in a way that also needs explanation or
+      clarification -> information_retrieval + conversational_response
+  When information_retrieval is present in any combination, list it FIRST.
+
+- out_of_scope is the ONE exception: it NEVER combines. If any part of the query
+  is unsafe or prohibited, return ["out_of_scope"] alone.
+
+- A query that names ONLY a demographic or administrative identifier field,
+  with no clinical content and no surrounding request, does not target clinical
+  content on its own; treat it as conversational_response (needs context).
+
+- When genuinely uncertain whether a noun is clinical, INCLUDE
+  information_retrieval. In this system a missed clinical query is worse than an
+  extra retrieval that returns nothing. Resolve ties toward is_processable=true.
+  
 - Between information_retrieval and knowledge_fact_search -> include information_retrieval (or both if both genuinely apply).
 - Between admin_response (triage) and information_retrieval -> prefer information_retrieval.
 - Between processing and rejecting overall -> prefer is_processable=true.
@@ -475,7 +508,7 @@ INFERENCE PRINCIPLES:
 
 OUTPUT RULES:
 
-- temporal_signal must be a list of plain strings
+- temporal_signal must be a list of plain strings which can be used to extract CUI codes from UMLS
 - Values come from the query's wording or are normalized via concept cadence — never from a fixed dictionary
 - Use ISO format for absolute date ranges: YYYY-MM-DD to YYYY-MM-DD
 - No explanations or prose
@@ -918,12 +951,7 @@ class ExtractionResult:
     # format methods
 
     def _representative_terms(self) -> List[str]:
-        """Dedupe and return the representative terms from the dedicated
-        REPRESENTATIVE_TERMS_PROMPT call. This is the single source of truth.
-
-        Backstop: if that call returned nothing but the query is clinical with
-        intents, derive terms from the intent titles so the field is never
-        blank for a processable clinical query."""
+        
         terms: List[str] = []
         seen: set = set()
         for t in self.representative_terms_list:
@@ -1641,40 +1669,40 @@ if __name__ == "__main__":
 
     #  Single query test 
 
-    test_queries = [
-"History Physical (H) — Formal document from referring provider including comorbidities, performance status, surgical history, family cancer history"
-    ]
+#     test_queries = [
+# "Somatic tumor genomic profiling (FoundationOne, Tempus, Caris, Guardant, or other NGS platforms) — Including KRAS (exons 2–4), NRAS (exons 2–4), BRAF V600E, HER2 (ERBB2) amplification, NTRK 1/2/3 fusions, RET fusions, POLE/POLD1, TMB; PI3K pathway alterations (PIK3CA, PTEN) for stage II–III","First Name"  
+#     ]
     
-    results = []
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {
-            executor.submit(minimal_pipeline, pipeline, query): query
-            for query in test_queries
-        }
-        for idx, future in enumerate(as_completed(futures), 2):
-            res = future.result()
-            results.append(res)
+#     results = []
+#     with ThreadPoolExecutor(max_workers=4) as executor:
+#         futures = {
+#             executor.submit(minimal_pipeline, pipeline, query): query
+#             for query in test_queries
+#         }
+#         for idx, future in enumerate(as_completed(futures), 2):
+#             res = future.result()
+#             results.append(res)
     
-            valid, err = validate_schema(res, "minimal_pipeline")
-            filename = f"query{idx}_pipeline.json"
-            save_json(res, filename)
+#             valid, err = validate_schema(res, "minimal_pipeline")
+#             filename = f"query{idx}_pipeline.json"
+#             save_json(res, filename)
     
-            # Compact highlights — not the full payload.
-            print(f"Query     : {res.get('question', '')[:80]}")
-            print(f"Actions   : {', '.join(res.get('action_finder') or [])}")
-            if not res.get("is_processable"):
-                print("Status    : Not processable")
-            else:
-                rep = res.get("representative_terms") or []
-                print(
-                    f"Status    : Processable | "
-                    f"clinical: {res.get('is_clinical')} | "
-                    f"intents: {res.get('total_intents_detected')}"
-                )
-                print(f"Rep terms : {', '.join(rep) if rep else '—'}")
-            if not valid:
-                print(f"Schema    : FAILED — {err}")
-            print("-" * 60)
+#             # Compact highlights — not the full payload.
+#             print(f"Query     : {res.get('question', '')[:80]}")
+#             print(f"Actions   : {', '.join(res.get('action_finder') or [])}")
+#             if not res.get("is_processable"):
+#                 print("Status    : Not processable")
+#             else:
+#                 rep = res.get("representative_terms") or []
+#                 print(
+#                     f"Status    : Processable | "
+#                     f"clinical: {res.get('is_clinical')} | "
+#                     f"intents: {res.get('total_intents_detected')}"
+#                 )
+#                 print(f"Rep terms : {', '.join(rep) if rep else '—'}")
+#             if not valid:
+#                 print(f"Schema    : FAILED — {err}")
+#             print("-" * 60)
 
   
      # From GCS
@@ -1748,44 +1776,44 @@ if __name__ == "__main__":
 
      # From csv
 
-#     CSV_FILE_PATH = "shopping_list.csv"
-#     OUTPUT_FILE = "rep-term1.json"
-#     BATCH_WORKERS = 16  
+    CSV_FILE_PATH = "shopping_list1.csv"
+    OUTPUT_FILE = "decision-tree-derived.json"
+    BATCH_WORKERS = 16  
 
-#     df = pd.read_csv(CSV_FILE_PATH, encoding="cp1252")
-#     questions = df["Shopping List Item"].dropna().astype(str).tolist()
-#     print(f"Total questions: {len(questions)}")
+    df = pd.read_csv(CSV_FILE_PATH, encoding="cp1252")
+    questions = df["Shopping List Item"].dropna().astype(str).tolist()
+    print(f"Total questions: {len(questions)}")
 
-#     def _process_one(q: str) -> Dict[str, Any]:
-#         try:
-#             pr = minimal_pipeline(pipeline, q)
-#             return {
-#                 "query": q,
-#                 "action_finder": pr.get("action_finder", []),
-#                 "is_processable": pr.get("is_processable", False),
-#                 "representative_terms": pr.get("representative_terms", []),
-#                 "temporal_signals": _collect_temporal_signals(pr),
-#                 "record_types": _collect_record_types(pr),
-#             }
-#         except Exception as e:
-#             print(f"Failed: {q} ({e})")
-#             return {
-#                 "query": q, "action_finder": [], "is_processable": False,
-#                 "representative_terms": [], "temporal_signals": [],
-#                 "record_types": [], "error": str(e),
-#             }
+    def _process_one(q: str) -> Dict[str, Any]:
+        try:
+            pr = minimal_pipeline(pipeline, q)
+            return {
+                "query": q,
+                "action_finder": pr.get("action_finder", []),
+                "is_processable": pr.get("is_processable", False),
+                "representative_terms": pr.get("representative_terms", []),
+                "temporal_signals": _collect_temporal_signals(pr),
+                "record_types": _collect_record_types(pr),
+            }
+        except Exception as e:
+            print(f"Failed: {q} ({e})")
+            return {
+                "query": q, "action_finder": [], "is_processable": False,
+                "representative_terms": [], "temporal_signals": [],
+                "record_types": [], "error": str(e),
+            }
 
-#     # Preserve input order in the output
-#     results: List[Optional[Dict[str, Any]]] = [None] * len(questions)
-#     with ThreadPoolExecutor(max_workers=BATCH_WORKERS) as executor:
-#         future_to_idx = {
-#             executor.submit(_process_one, q): i for i, q in enumerate(questions)
-#         }
-#         for fut in as_completed(future_to_idx):
-#             results[future_to_idx[fut]] = fut.result()
+    # Preserve input order in the output
+    results: List[Optional[Dict[str, Any]]] = [None] * len(questions)
+    with ThreadPoolExecutor(max_workers=BATCH_WORKERS) as executor:
+        future_to_idx = {
+            executor.submit(_process_one, q): i for i, q in enumerate(questions)
+        }
+        for fut in as_completed(future_to_idx):
+            results[future_to_idx[fut]] = fut.result()
 
-#     results = [r for r in results if r is not None]
+    results = [r for r in results if r is not None]
 
-#     with open(OUTPUT_FILE, "w") as f:
-#         json.dump(results, f, indent=2)
-#     print(f"Saved {len(results)} -> {OUTPUT_FILE}")
+    with open(OUTPUT_FILE, "w") as f:
+        json.dump(results, f, indent=2)
+    print(f"Saved {len(results)} -> {OUTPUT_FILE}")
