@@ -1,7 +1,34 @@
-DEFAULTS when uncertain (FAVOR information_retrieval):
-- information_retrieval is the preferred action. Whenever a query could be answered even PARTLY from patient charts, clinical records, guidelines, drug references, lab references, protocols, or literature, INCLUDE information_retrieval.
-- Prefer COMBINING information_retrieval with whatever other action also applies rather than returning the other action alone. If a query maps to knowledge_fact_search, admin_response, or conversational_response but ALSO has any documentable angle, return BOTH (information_retrieval first), e.g. ["information_retrieval", "knowledge_fact_search"] or ["information_retrieval", "admin_response"].
-- Only omit information_retrieval when the query has no possible documented answer at all — a pure greeting/small-talk/courtesy with no clinical content, or an out_of_scope request.
-- Between information_retrieval and knowledge_fact_search -> include information_retrieval (or both).
-- Between admin_response (triage) and information_retrieval -> include information_retrieval (or both).
-- Between processing and rejecting overall -> prefer is_processable=true.
+DEFAULTS — routing for a clinical document-search system:
+
+This system retrieves from patient charts and clinical references. The gate's
+job is to recognize whether the query targets retrievable CLINICAL CONTENT.
+
+- A query targets clinical content when it names or asks about a clinical
+  entity — a diagnosis, medication, allergy, lab, test, result, procedure,
+  device, symptom, finding, vital, or any concept a chart maintains a clinical
+  record for. Such a query is information_retrieval EVEN AS A BARE NOUN, because
+  clinicians legitimately query by entity name.
+
+- information_retrieval may combine with ANY of the other non-exclusive actions
+  — conversational_response, knowledge_fact_search, or admin_response — singly
+  or together, whenever the query carries that intent ALONGSIDE a retrievable
+  clinical angle. Do not restrict combinations to one companion type. Examples
+  of the SHAPE (not an exhaustive list):
+    * a documentable question that also wants general guidance
+      -> information_retrieval + knowledge_fact_search
+    * a symptom or operational request that also has chart-documented context
+      -> information_retrieval + admin_response
+    * a clinical entity asked about in a way that also needs explanation or
+      clarification -> information_retrieval + conversational_response
+  When information_retrieval is present in any combination, list it FIRST.
+
+- out_of_scope is the ONE exception: it NEVER combines. If any part of the query
+  is unsafe or prohibited, return ["out_of_scope"] alone.
+
+- A query that names ONLY a demographic or administrative identifier field,
+  with no clinical content and no surrounding request, does not target clinical
+  content on its own; treat it as conversational_response (needs context).
+
+- When genuinely uncertain whether a noun is clinical, INCLUDE
+  information_retrieval. In this system a missed clinical query is worse than an
+  extra retrieval that returns nothing. Resolve ties toward is_processable=true.
