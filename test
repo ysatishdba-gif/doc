@@ -1,17 +1,18 @@
-WARNING:root:LLM call failed for RepresentativeTermsOutput (JSONDecodeError) after retry; using fallback: Expecting value: line 1 column 1 (char 0)
-WARNING:root:LLM call failed for RepresentativeTermsOutput (TypeError) after retry; using fallback: 'NoneType' object is not subscriptable
-WARNING:root:LLM call failed for RepresentativeTermsOutput (JSONDecodeError) after retry; using fallback: Expecting value: line 1 column 1 (char 0)
-WARNING:root:LLM call failed for RepresentativeTermsOutput (JSONDecodeError) after retry; using fallback: Expecting value: line 1 column 1 (char 0)
-WARNING:root:LLM call failed for RepresentativeTermsOutput (JSONDecodeError) after retry; using fallback: Expecting value: line 1 column 1 (char 0)
-WARNING:root:LLM call failed for RepresentativeTermsOutput (JSONDecodeError) after retry; using fallback: Expecting value: line 1 column 1 (char 0)
-WARNING:root:LLM call failed for RepresentativeTermsOutput (JSONDecodeError) after retry; using fallback: Expecting value: line 1 column 1 (char 0)
-WARNING:root:LLM call failed for RepresentativeTermsOutput (JSONDecodeError) after retry; using fallback: Expecting value: line 1 column 1 (char 0)
-WARNING:root:LLM call failed for RepresentativeTermsOutput (JSONDecodeError) after retry; using fallback: Expecting value: line 1 column 1 (char 0)
-WARNING:root:LLM call failed for RelevanceCheckOutput (JSONDecodeError) after retry; using fallback: Expecting ',' delimiter: line 5 column 25 (char 74)
-WARNING:root:LLM call failed for RepresentativeTermsOutput (JSONDecodeError) after retry; using fallback: Expecting value: line 1 column 1 (char 0)
-WARNING:root:LLM call failed for RelevanceCheckOutput (JSONDecodeError) after retry; using fallback: Expecting ',' delimiter: line 4 column 28 (char 73)
-WARNING:root:LLM call failed for RelevanceCheckOutput (JSONDecodeError) after retry; using fallback: Unterminated string starting at: line 5 column 3 (char 52)
-WARNING:root:LLM call failed for RepresentativeTermsOutput (JSONDecodeError) after retry; using fallback: Expecting value: line 1 column 1 (char 0)
-WARNING:root:LLM call failed for RepresentativeTermsOutput (JSONDecodeError) after retry; using fallback: Expecting value: line 1 column 1 (char 0)
-WARNING:root:LLM call failed for RepresentativeTermsOutput (TypeError) after retry; using fallback: 'NoneType' object is not subscriptable
-WARNING:root:LLM call failed for RepresentativeTermsOutput (JSONDecodeError) after retry; using fallback: Expecting value: line 1 column 1 (char 0)
+def _extract_json(self, response) -> Any:
+        text = None
+        if hasattr(response, "text") and response.text:
+            text = response.text
+        elif hasattr(response, "candidates") and response.candidates:
+            cand = response.candidates[0]
+            content = getattr(cand, "content", None)
+            parts = getattr(content, "parts", None) if content else None
+            if parts:
+                text = getattr(parts[0], "text", None)
+        if not text:
+            text = ""
+
+        text = re.sub(r"^```(?:json)?\s*", "", text.strip())
+        text = re.sub(r"\s*```$", "", text)
+        if not text.strip():
+            raise ValueError("empty response text")
+        return json.loads(text)
