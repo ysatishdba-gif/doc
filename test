@@ -1,130 +1,1619 @@
-"""
-test_subtopics_v2.py
---------------------
-Test the bidirectional sub-topic build.
-
-Demonstrates both directions:
-  - Forward: given a main topic CUI, list its sub-topics
-  - Reverse: given a sub-topic, list which main topics it belongs to
-  - Per CUI: which sub-topics does this CUI appear in?
-"""
-
-import pickle
-from collections import Counter
+Loading topic_lookup_subtopics_v2.pkl ...
+  Main topics             : 374,538
+  Unique sub-topics       : 857,665
 
 
-PICKLE_PATH = "topic_lookup_subtopics_v2.pkl"
+================================================================================
+  C0032285  'Pneumonia (disorder)'
+================================================================================
 
-CUIS_TO_TEST = [
-    "C0032285",  # Pneumonia
-    "C0021368",  # Inflammation
-    "C0024109",  # Lung
-    "C0011849",  # Diabetes
-    "C1527304",  # Allergic reaction
-    "C0559470",  # Allergy to peanut
-    "C0002792",  # Anaphylaxis
-    "C0013182",  # Allergy to drug
-    "C2142181",  # Pain of left knee joint
-    "C1621958",  # Glioblastoma multiforme
-]
+  MAIN TOPIC (size 42)
 
+  This CUI appears in 81 sub-topics total
+  By size:
+    size   2: 25 sub-topics
+    size   3: 18 sub-topics
+    size   4: 6 sub-topics
+    size   5: 7 sub-topics
+    size   6: 8 sub-topics
+    size   7: 3 sub-topics
+    size   9: 1 sub-topics
+    size  10: 3 sub-topics
+    size  11: 1 sub-topics
+    size  12: 1 sub-topics
+    size  17: 1 sub-topics
+    size  22: 1 sub-topics
+    size  23: 1 sub-topics
+    size  31: 1 sub-topics
+    size  37: 1 sub-topics
+    size  39: 1 sub-topics
+    size  42: 1 sub-topics
+    size  86: 1 sub-topics
 
-print(f"Loading {PICKLE_PATH} ...")
-with open(PICKLE_PATH, "rb") as f:
-    p = pickle.load(f)
-
-topic_to_cuis              = p["topic_to_cuis"]
-main_topic_to_subtopic_ids = p["main_topic_to_subtopic_ids"]
-subtopic_id_to_cuis        = p["subtopic_id_to_cuis"]
-subtopic_id_to_main_topics = p["subtopic_id_to_main_topics"]
-cui_to_subtopic_ids        = p["cui_to_subtopic_ids"]
-subtopic_metadata          = p["subtopic_metadata"]
-labels                     = p.get("labels", {})
-
-
-def lbl(c):
-    return labels.get(c, "?")[:40] if labels else "?"
-
-
-print(f"  Main topics             : {len(topic_to_cuis):,}")
-print(f"  Unique sub-topics       : {len(subtopic_id_to_cuis):,}")
-
-
-# ============================================================================
-# Per-CUI inspection
-# ============================================================================
-
-for cui in CUIS_TO_TEST:
-    print(f"\n\n{'='*80}")
-    print(f"  {cui}  '{lbl(cui)}'")
-    print(f"{'='*80}")
-
-    main_members = topic_to_cuis.get(cui, set())
-    print(f"\n  MAIN TOPIC (size {len(main_members)})")
-
-    # All sub-topics this CUI belongs to
-    sids = cui_to_subtopic_ids.get(cui, set())
-    print(f"\n  This CUI appears in {len(sids)} sub-topics total")
-
-    # Group by size for readability
-    by_size = Counter()
-    for sid in sids:
-        size = subtopic_metadata.get(sid, {}).get("size", 0)
-        by_size[size] += 1
-    print(f"  By size:")
-    for size in sorted(by_size):
-        print(f"    size {size:>3}: {by_size[size]} sub-topics")
-
-    # Forward: sub-topics within THIS CUI's main topic
-    own_subtopics = main_topic_to_subtopic_ids.get(cui, [])
-    # Deduplicate (same subtopic_id can appear multiple times in list)
-    unique_own_subtopics = list(dict.fromkeys(own_subtopics))
-    print(f"\n  SUB-TOPICS within this main topic ({len(unique_own_subtopics)}):")
-
-    # Sort by size descending, show interesting ones
-    sorted_subs = sorted(
-        unique_own_subtopics,
-        key=lambda s: -subtopic_metadata.get(s, {}).get("size", 0),
-    )
-    for sid in sorted_subs[:10]:
-        meta = subtopic_metadata.get(sid, {})
-        members = subtopic_id_to_cuis.get(sid, frozenset())
-        n_main_topics = len(subtopic_id_to_main_topics.get(sid, set()))
-        print(f"    {sid}  size={meta.get('size')} "
-              f"method={meta.get('method')} "
-              f"appears_in_main_topics={n_main_topics}")
-        for m in sorted(members):
-            marker = " <-- self" if m == cui else ""
-            print(f"      {m}  '{lbl(m)}'{marker}")
-    if len(sorted_subs) > 10:
-        print(f"    ... +{len(sorted_subs)-10} more sub-topics")
-
-
-# ============================================================================
-# Reverse lookup demo: pick a few sub-topics, show which main topics they're in
-# ============================================================================
-
-print(f"\n\n{'#'*80}")
-print(f"#  REVERSE LOOKUP DEMO")
-print(f"#  (For a few sub-topics, show which main topics they appear in)")
-print(f"{'#'*80}")
-
-# Find some sub-topics of size >= 3 to demonstrate
-demo_sids = [
-    sid for sid, meta in subtopic_metadata.items()
-    if meta.get("size", 0) >= 3 and meta.get("method") == "clique"
-][:5]
-
-for sid in demo_sids:
-    members = subtopic_id_to_cuis[sid]
-    main_topics = subtopic_id_to_main_topics[sid]
-    print(f"\n  Sub-topic {sid} (size {len(members)}):")
-    print(f"    Members:")
-    for m in sorted(members):
-        print(f"      {m}  '{lbl(m)}'")
-    print(f"    Appears in {len(main_topics)} main topic(s):")
-    for mt in sorted(main_topics):
-        print(f"      {mt}  '{lbl(mt)}'")
+  SUB-TOPICS within this main topic (40):
+    st_0a9fa61899ef4e  size=42 method=component appears_in_main_topics=1
+      C0004626  'Bacterial pneumonia'
+      C0006285  'Lobular pneumonia'
+      C0024115  'Disorder of lung'
+      C0032241  'Pleurobronchopneumonia (disorder)'
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0032290  'Aspiration pneumonia'
+      C0032300  'Lobar pneumonia'
+      C0032310  'Viral pneumonia'
+      C0035243  'Respiratory tract infection'
+      C0152413  'Pneumonia caused by respiratory syncytia'
+      C0155870  'Pneumonia and influenza'
+      C0158935  'Congenital pneumonia'
+      C0206061  'Interstitial pneumonia'
+      C0264377  'Peribronchial pneumonia'
+      C0264381  'Unresolved pneumonia'
+      C0264386  'Foreign body pneumonia'
+      C0264515  'Necrotizing pneumonia'
+      C0264522  'Hypostatic pneumonia'
+      C0276253  'Cytomegaloviral pneumonia'
+      C0276527  'Pneumonia with AIDS (acquired immunodefi'
+      C0276688  'Pulmonary cryptococcosis'
+      C0339961  'Fungal pneumonia'
+      C0339965  'Haemorrhagic pneumonia'
+      C0339968  'Neonatal pneumonia'
+      C0339969  'Pneumonia due to parasitic infestation'
+      C0348806  'Abscess of lung with pneumonia'
+      C0694549  'Community acquired pneumonia'
+      C0694550  'Recurrent pneumonia (disorder)'
+      C0747674  'Cavitary pneumonia'
+      C0747690  'Postobstructive pneumonia'
+      C0876973  'Pulmonary infection'
+      C0949083  'Nosocomial pneumonia (disorder)'
+      C1112452  'Post measles pneumonia'
+      C1142578  'Bilateral pneumonia'
+      C1279386  'Postoperative pneumonia'
+      C1290339  'Focal pneumonia'
+      C1290340  'Confluent pneumonia'
+      C1535939  'Pulmonary pneumocystosis'
+      C1701940  'Ventilator-associated pneumonia'
+      C3495445  'Toxoplasma pneumonia'
+      C3714636  'Pneumonitis'
+      C4039254  'Chronic pneumonia'
+    st_e88dab374989f2  size=3 method=clique appears_in_main_topics=3
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0876973  'Pulmonary infection'
+      C1535939  'Pulmonary pneumocystosis'
+    st_5a9eb227a11b2a  size=3 method=clique appears_in_main_topics=3
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0876973  'Pulmonary infection'
+      C0949083  'Nosocomial pneumonia (disorder)'
+    st_e5bce8498006fc  size=3 method=clique appears_in_main_topics=3
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0276688  'Pulmonary cryptococcosis'
+      C0876973  'Pulmonary infection'
+    st_a0c8a367e971fe  size=3 method=clique appears_in_main_topics=3
+      C0004626  'Bacterial pneumonia'
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0876973  'Pulmonary infection'
+    st_eb576a8b3c3711  size=3 method=clique appears_in_main_topics=3
+      C0024115  'Disorder of lung'
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0876973  'Pulmonary infection'
+    st_6fa7d6ff9a5b24  size=3 method=clique appears_in_main_topics=3
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0876973  'Pulmonary infection'
+      C3495445  'Toxoplasma pneumonia'
+    st_3fc95adc8b70eb  size=3 method=clique appears_in_main_topics=3
+      C0024115  'Disorder of lung'
+      C0032285  'Pneumonia (disorder)' <-- self
+      C3714636  'Pneumonitis'
+    st_011c53c15689ff  size=3 method=clique appears_in_main_topics=3
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0032310  'Viral pneumonia'
+      C0155870  'Pneumonia and influenza'
+    st_247d83b6701ece  size=3 method=clique appears_in_main_topics=3
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0032310  'Viral pneumonia'
+      C0276253  'Cytomegaloviral pneumonia'
+    ... +30 more sub-topics
 
 
-print("\n\nDONE")
+================================================================================
+  C0021368  'Inflammation'
+================================================================================
+
+  MAIN TOPIC (size 9)
+
+  This CUI appears in 17 sub-topics total
+  By size:
+    size   2: 8 sub-topics
+    size   4: 3 sub-topics
+    size   6: 1 sub-topics
+    size   9: 2 sub-topics
+    size  12: 1 sub-topics
+    size  15: 1 sub-topics
+    size  76: 1 sub-topics
+
+  SUB-TOPICS within this main topic (9):
+    st_1aa57ae882f933  size=9 method=component appears_in_main_topics=1
+      C0016549  'Foreign body reaction'
+      C0021368  'Inflammation' <-- self
+      C0030660  'Pathological process (attribute)'
+      C0036749  'Serositis (disorder)'
+      C0242966  'Systemic inflammatory response syndrome'
+      C0262627  'Seroma (disorder)'
+      C0333383  'Acute and chronic inflammation'
+      C1260958  'Serofibrinous inflammation'
+      C1265832  'Focal acute inflammation'
+    st_a0272a9be845e9  size=2 method=clique appears_in_main_topics=2
+      C0021368  'Inflammation' <-- self
+      C1260958  'Serofibrinous inflammation'
+    st_3cd83f6cd52d26  size=2 method=clique appears_in_main_topics=2
+      C0021368  'Inflammation' <-- self
+      C0036749  'Serositis (disorder)'
+    st_ecca8ae744625f  size=2 method=clique appears_in_main_topics=2
+      C0021368  'Inflammation' <-- self
+      C1265832  'Focal acute inflammation'
+    st_aba41c66b46ad5  size=2 method=clique appears_in_main_topics=2
+      C0021368  'Inflammation' <-- self
+      C0262627  'Seroma (disorder)'
+    st_1aca4f85a1a6cb  size=2 method=clique appears_in_main_topics=2
+      C0021368  'Inflammation' <-- self
+      C0030660  'Pathological process (attribute)'
+    st_daef110cbb2a8d  size=2 method=clique appears_in_main_topics=2
+      C0021368  'Inflammation' <-- self
+      C0333383  'Acute and chronic inflammation'
+    st_ec59a5cf8552e4  size=2 method=clique appears_in_main_topics=2
+      C0016549  'Foreign body reaction'
+      C0021368  'Inflammation' <-- self
+    st_e5b7dddf657f9f  size=2 method=clique appears_in_main_topics=2
+      C0021368  'Inflammation' <-- self
+      C0242966  'Systemic inflammatory response syndrome'
+
+
+================================================================================
+  C0024109  'Lung'
+================================================================================
+
+  MAIN TOPIC (size 16)
+
+  This CUI appears in 29 sub-topics total
+  By size:
+    size   2: 11 sub-topics
+    size   3: 2 sub-topics
+    size   6: 2 sub-topics
+    size   7: 1 sub-topics
+    size   8: 5 sub-topics
+    size   9: 1 sub-topics
+    size  13: 1 sub-topics
+    size  14: 1 sub-topics
+    size  16: 1 sub-topics
+    size  18: 1 sub-topics
+    size  23: 1 sub-topics
+    size  24: 1 sub-topics
+    size 291: 1 sub-topics
+
+  SUB-TOPICS within this main topic (14):
+    st_f58d64255458e0  size=16 method=component appears_in_main_topics=1
+      C0006255  'Bronchus'
+      C0024109  'Lung' <-- self
+      C0034051  'Pulmonary alveolar structure (body struc'
+      C0035237  'Respiratory system'
+      C0225698  'Pneumocyte (cell)'
+      C0225706  'Right lung structure (body structure)'
+      C0225730  'Left lung structure'
+      C0229962  'Body part structure (body structure)'
+      C0230130  'Thoracic viscus'
+      C0278427  'Structure of transplanted lung (body str'
+      C0458579  'Lower respiratory tract'
+      C1268107  'Lung part'
+      C1278908  'Entire lung'
+      C1285482  'Pulmonary structure including vessels an'
+      C3698225  'Structure of pulmopleural compartment'
+      C4075195  'Structure of organ in respiratory system'
+    st_7711c852f399c0  size=3 method=clique appears_in_main_topics=3
+      C0024109  'Lung' <-- self
+      C0034051  'Pulmonary alveolar structure (body struc'
+      C0225698  'Pneumocyte (cell)'
+    st_f31044fd844a10  size=3 method=clique appears_in_main_topics=3
+      C0006255  'Bronchus'
+      C0024109  'Lung' <-- self
+      C0229962  'Body part structure (body structure)'
+    st_dfe196b7e8fb86  size=2 method=clique appears_in_main_topics=2
+      C0024109  'Lung' <-- self
+      C1278908  'Entire lung'
+    st_c5ae41fc219900  size=2 method=clique appears_in_main_topics=2
+      C0024109  'Lung' <-- self
+      C0230130  'Thoracic viscus'
+    st_0acca213e309c4  size=2 method=clique appears_in_main_topics=2
+      C0024109  'Lung' <-- self
+      C0278427  'Structure of transplanted lung (body str'
+    st_2c0d28b501b132  size=2 method=clique appears_in_main_topics=2
+      C0024109  'Lung' <-- self
+      C4075195  'Structure of organ in respiratory system'
+    st_0912206ed0cb74  size=2 method=clique appears_in_main_topics=2
+      C0024109  'Lung' <-- self
+      C1285482  'Pulmonary structure including vessels an'
+    st_979634eaec7d89  size=2 method=clique appears_in_main_topics=2
+      C0024109  'Lung' <-- self
+      C0035237  'Respiratory system'
+    st_9fed329b28a643  size=2 method=clique appears_in_main_topics=2
+      C0024109  'Lung' <-- self
+      C0225730  'Left lung structure'
+    ... +4 more sub-topics
+
+
+================================================================================
+  C0011849  'Diabetes mellitus'
+================================================================================
+
+  MAIN TOPIC (size 41)
+
+  This CUI appears in 76 sub-topics total
+  By size:
+    size   2: 14 sub-topics
+    size   3: 20 sub-topics
+    size   4: 9 sub-topics
+    size   5: 3 sub-topics
+    size   6: 2 sub-topics
+    size   7: 2 sub-topics
+    size   8: 2 sub-topics
+    size   9: 2 sub-topics
+    size  10: 3 sub-topics
+    size  11: 1 sub-topics
+    size  12: 2 sub-topics
+    size  13: 1 sub-topics
+    size  14: 1 sub-topics
+    size  15: 3 sub-topics
+    size  18: 1 sub-topics
+    size  20: 1 sub-topics
+    size  21: 1 sub-topics
+    size  25: 1 sub-topics
+    size  28: 1 sub-topics
+    size  29: 1 sub-topics
+    size  32: 1 sub-topics
+    size  36: 1 sub-topics
+    size  41: 1 sub-topics
+    size  61: 1 sub-topics
+    size  80: 1 sub-topics
+
+  SUB-TOPICS within this main topic (38):
+    st_9bf48398b472f2  size=41 method=component appears_in_main_topics=1
+      C0001792  'Advanced age'
+      C0011849  'Diabetes mellitus' <-- self
+      C0011854  'Diabetes mellitus type 1'
+      C0011859  'Lipodystrophic diabetes'
+      C0011860  'Type II diabetes mellitus'
+      C0011871  'Peripheral angiopathy due to diabetes me'
+      C0011878  'Diabetic diet'
+      C0011880  'Diabetic ketoacidosis'
+      C0011881  'Diabetic nephropathy'
+      C0011882  'Diabetic neuropathy'
+      C0014130  'Endocrine system disease'
+      C0014136  'Endocrine structure'
+      C0020456  'Hyperglycaemia'
+      C0085207  'Gestational diabetes'
+      C0206172  'Diabetic foot'
+      C0265344  'Donohue's syndrome'
+      C0271640  'Secondary diabetes mellitus'
+      C0271641  'Malnutrition related diabetes mellitus'
+      C0271650  'Impaired glucose tolerance (disorder)'
+      C0341893  'Diabetes mellitus in mother complicating'
+      C0342245  'Disorder of eye due to diabetes mellitus'
+      C0342257  'Disorder associated with diabetes mellit'
+      C0342276  'Maturity-onset diabetes of the young'
+      C0342302  'Brittle diabetes mellitus (disorder)'
+      C0362046  'Prediabetes (finding)'
+      C0392201  'Glucose measurement, blood'
+      C0474680  'Haemoglobin A1c measurement'
+      C0524620  'Metabolic syndrome X'
+      C0694452  'Endocrine / nutritional / metabolic diso'
+      C1257958  'Disorder of glucose metabolism'
+      C1263962  'Houssay syndrome'
+      C1320655  'Newly diagnosed diabetes'
+      C1859965  'Alaninuria, microcephaly, dwarfism, enam'
+      C2874124  'Diabetes mellitus due to genetic defect '
+      C2874125  'Diabetes mellitus due to genetic defect '
+      C2931296  'Pancreatic hypoplasia, diabetes mellitus'
+      C3837958  'Ketosis-prone diabetes mellitus'
+      C3839440  'Diabetes mellitus in remission'
+      C3875503  'Diabetes mellitus due to pancreatic inju'
+      C4274674  'Gingival disease co-occurrent with diabe'
+      C4302120  'Atypical diabetes mellitus'
+    st_4347449a129f48  size=4 method=clique appears_in_main_topics=4
+      C0011849  'Diabetes mellitus' <-- self
+      C0014136  'Endocrine structure'
+      C0342245  'Disorder of eye due to diabetes mellitus'
+      C0342257  'Disorder associated with diabetes mellit'
+    st_9bdf5f7fd8da2a  size=4 method=clique appears_in_main_topics=4
+      C0011849  'Diabetes mellitus' <-- self
+      C0011881  'Diabetic nephropathy'
+      C0014136  'Endocrine structure'
+      C0342257  'Disorder associated with diabetes mellit'
+    st_4d7bfd94c651c4  size=4 method=clique appears_in_main_topics=4
+      C0011849  'Diabetes mellitus' <-- self
+      C0014130  'Endocrine system disease'
+      C0014136  'Endocrine structure'
+      C0020456  'Hyperglycaemia'
+    st_1e90dd281e95af  size=4 method=clique appears_in_main_topics=4
+      C0011849  'Diabetes mellitus' <-- self
+      C0014130  'Endocrine system disease'
+      C0020456  'Hyperglycaemia'
+      C0271650  'Impaired glucose tolerance (disorder)'
+    st_214e5b05f24db2  size=4 method=clique appears_in_main_topics=4
+      C0011849  'Diabetes mellitus' <-- self
+      C0020456  'Hyperglycaemia'
+      C0271650  'Impaired glucose tolerance (disorder)'
+      C1257958  'Disorder of glucose metabolism'
+    st_5f05944f6350b1  size=3 method=clique appears_in_main_topics=3
+      C0011849  'Diabetes mellitus' <-- self
+      C0014136  'Endocrine structure'
+      C0392201  'Glucose measurement, blood'
+    st_cc6db661ccae30  size=3 method=clique appears_in_main_topics=3
+      C0011849  'Diabetes mellitus' <-- self
+      C0271640  'Secondary diabetes mellitus'
+      C0271641  'Malnutrition related diabetes mellitus'
+    st_ca821e73f52f58  size=3 method=clique appears_in_main_topics=3
+      C0011849  'Diabetes mellitus' <-- self
+      C0085207  'Gestational diabetes'
+      C0341893  'Diabetes mellitus in mother complicating'
+    st_b622bb702e74e9  size=3 method=clique appears_in_main_topics=3
+      C0011849  'Diabetes mellitus' <-- self
+      C0014136  'Endocrine structure'
+      C0085207  'Gestational diabetes'
+    ... +28 more sub-topics
+
+
+================================================================================
+  C1527304  'Allergic reaction'
+================================================================================
+
+  MAIN TOPIC (size 31)
+
+  This CUI appears in 55 sub-topics total
+  By size:
+    size   2: 26 sub-topics
+    size   3: 10 sub-topics
+    size   4: 5 sub-topics
+    size   5: 1 sub-topics
+    size   6: 3 sub-topics
+    size   7: 1 sub-topics
+    size  12: 1 sub-topics
+    size  14: 2 sub-topics
+    size  17: 1 sub-topics
+    size  31: 1 sub-topics
+    size  38: 2 sub-topics
+    size  53: 1 sub-topics
+    size 567: 1 sub-topics
+
+  SUB-TOPICS within this main topic (30):
+    st_b6246e2e15d7d5  size=31 method=component appears_in_main_topics=1
+      C0013182  'Allergy to drug'
+      C0016470  'Food allergy'
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0259756  'Jarisch Herxheimer reaction'
+      C0271157  'Phacoanaphylaxis'
+      C0343029  'Tuberculids'
+      C0392707  'Atopic diathesis'
+      C0413234  'Acute allergic reaction'
+      C0429892  'Type 1 hypersensitivity response'
+      C0851444  'Allergic condition'
+      C1283787  'Allergic transfusion reaction'
+      C1304076  'Angry back syndrome'
+      C1527304  'Allergic reaction' <-- self
+      C1532237  'Disorder of immune function'
+      C1626923  'Allergic reaction to chemical'
+      C1630647  'Allergic reaction to animal'
+      C1631062  'Allergic reaction to detergent'
+      C1633733  'Allergic reaction to cosmetics'
+      C1633749  'Allergic reaction to adhesive'
+      C1635270  'Allergic reaction to pollen'
+      C1636155  'Allergic reaction to plant, except food'
+      C1690580  'Allergic reaction to food'
+      C1690975  'Allergic reaction to flour dust'
+      C2317062  'Allergic reaction to tattoo ink'
+      C3532600  'Allergic reaction to hair dye'
+      C3662037  'Allergic reaction to radiocontrast media'
+      C4082933  'Animal allergy'
+      C4749634  'Allergic reaction caused by vaccine prod'
+      C5192382  'Allergic reaction due to allergy skin te'
+      C5397549  'Allergic reaction caused by insect bite '
+      C5397552  'Allergic reaction after allergen immunot'
+    st_f5ffa371fe9ad5  size=3 method=clique appears_in_main_topics=3
+      C0016470  'Food allergy'
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C1527304  'Allergic reaction' <-- self
+    st_231361dc77a525  size=3 method=clique appears_in_main_topics=2
+      C0013182  'Allergy to drug'
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C1527304  'Allergic reaction' <-- self
+    st_1d4410a293f695  size=3 method=clique appears_in_main_topics=3
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C1527304  'Allergic reaction' <-- self
+      C4082933  'Animal allergy'
+    st_6131933dd9a029  size=2 method=clique appears_in_main_topics=2
+      C0343029  'Tuberculids'
+      C1527304  'Allergic reaction' <-- self
+    st_2cf53a29924359  size=2 method=clique appears_in_main_topics=2
+      C1527304  'Allergic reaction' <-- self
+      C1690975  'Allergic reaction to flour dust'
+    st_7738204d812898  size=2 method=clique appears_in_main_topics=2
+      C1527304  'Allergic reaction' <-- self
+      C1630647  'Allergic reaction to animal'
+    st_0471dc704dc8f4  size=2 method=clique appears_in_main_topics=2
+      C0392707  'Atopic diathesis'
+      C1527304  'Allergic reaction' <-- self
+    st_67a8501e764c11  size=2 method=clique appears_in_main_topics=2
+      C1527304  'Allergic reaction' <-- self
+      C5192382  'Allergic reaction due to allergy skin te'
+    st_af1ffa0fffb412  size=2 method=clique appears_in_main_topics=2
+      C1527304  'Allergic reaction' <-- self
+      C1633733  'Allergic reaction to cosmetics'
+    ... +20 more sub-topics
+
+
+================================================================================
+  C0559470  'Allergy to peanut'
+================================================================================
+
+  MAIN TOPIC (size 2)
+
+  This CUI appears in 2 sub-topics total
+  By size:
+    size   2: 1 sub-topics
+    size   7: 1 sub-topics
+
+  SUB-TOPICS within this main topic (1):
+    st_819e94786728b3  size=2 method=component appears_in_main_topics=2
+      C0559470  'Allergy to peanut' <-- self
+      C1096735  'Allergy to pulse vegetable'
+
+
+================================================================================
+  C0002792  'Anaphylaxis'
+================================================================================
+
+  MAIN TOPIC (size 26)
+
+  This CUI appears in 46 sub-topics total
+  By size:
+    size   2: 16 sub-topics
+    size   3: 14 sub-topics
+    size   4: 4 sub-topics
+    size   5: 3 sub-topics
+    size   9: 1 sub-topics
+    size  10: 1 sub-topics
+    size  14: 1 sub-topics
+    size  15: 1 sub-topics
+    size  17: 1 sub-topics
+    size  26: 1 sub-topics
+    size  33: 1 sub-topics
+    size  38: 1 sub-topics
+    size  55: 1 sub-topics
+
+  SUB-TOPICS within this main topic (24):
+    st_d375baf5b5b345  size=26 method=component appears_in_main_topics=1
+      C0002792  'Anaphylaxis' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0020523  'IgE-mediated allergic disorder'
+      C0020962  'Structure of immune system'
+      C0161840  'Anaphylactic transfusion reaction'
+      C0274305  'Localized anaphylaxis'
+      C0344159  'Anaphylaxis caused by venom'
+      C0344168  'Drug-induced anaphylaxis'
+      C0344172  'Seminal fluid-induced anaphylaxis'
+      C0344183  'Exercise-induced anaphylaxis'
+      C0413234  'Acute allergic reaction'
+      C0413235  'Idiopathic anaphylaxis'
+      C0442893  'Systemic illness'
+      C0685898  'Food anaphylaxis'
+      C4316895  'Shock due to anaphylaxis'
+      C4543745  'Anaphylaxis due to mast cell disorder'
+      C4546212  'Anaphylaxis caused by low temperature'
+      C5192386  'Anaphylaxis after allergen immunotherapy'
+      C5397548  'Anaphylaxis caused by insect bite and/or'
+      C5438739  'Anaphylaxis caused by Hevea brasiliensis'
+      C5549840  'Anaphylaxis caused by component of vacci'
+      C5687621  'Anaphylaxis caused by allergy skin test'
+      C5788565  'Postoperative anaphylaxis'
+      C5817050  'Anaphylaxis caused by radiographic contr'
+      C5817051  'Anaphylaxis caused by sulfonamide'
+      C5817053  'Anaphylaxis caused by food additive'
+    st_10454e36b534e9  size=3 method=clique appears_in_main_topics=3
+      C0002792  'Anaphylaxis' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0020523  'IgE-mediated allergic disorder'
+    st_ab6c470be6ada4  size=3 method=clique appears_in_main_topics=3
+      C0002792  'Anaphylaxis' <-- self
+      C0344183  'Exercise-induced anaphylaxis'
+      C4316895  'Shock due to anaphylaxis'
+    st_1f52c458a0fea6  size=3 method=clique appears_in_main_topics=3
+      C0002792  'Anaphylaxis' <-- self
+      C0685898  'Food anaphylaxis'
+      C4316895  'Shock due to anaphylaxis'
+    st_d40ffe30db5051  size=3 method=clique appears_in_main_topics=3
+      C0002792  'Anaphylaxis' <-- self
+      C0344168  'Drug-induced anaphylaxis'
+      C4316895  'Shock due to anaphylaxis'
+    st_c92b467733838a  size=3 method=clique appears_in_main_topics=3
+      C0002792  'Anaphylaxis' <-- self
+      C0413235  'Idiopathic anaphylaxis'
+      C4316895  'Shock due to anaphylaxis'
+    st_0170430e4decfd  size=3 method=clique appears_in_main_topics=3
+      C0002792  'Anaphylaxis' <-- self
+      C0344159  'Anaphylaxis caused by venom'
+      C4316895  'Shock due to anaphylaxis'
+    st_fd53433c94fa06  size=3 method=clique appears_in_main_topics=3
+      C0002792  'Anaphylaxis' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0020962  'Structure of immune system'
+    st_e2e3bdeb63d6d6  size=2 method=clique appears_in_main_topics=2
+      C0002792  'Anaphylaxis' <-- self
+      C5192386  'Anaphylaxis after allergen immunotherapy'
+    st_f43b4a9ddd64ea  size=2 method=clique appears_in_main_topics=2
+      C0002792  'Anaphylaxis' <-- self
+      C0442893  'Systemic illness'
+    ... +14 more sub-topics
+
+
+================================================================================
+  C0013182  'Allergy to drug'
+================================================================================
+
+  MAIN TOPIC (size 567)
+
+  This CUI appears in 796 sub-topics total
+  By size:
+    size   2: 560 sub-topics
+    size   3: 156 sub-topics
+    size   4: 15 sub-topics
+    size   5: 10 sub-topics
+    size   6: 8 sub-topics
+    size   7: 7 sub-topics
+    size   8: 7 sub-topics
+    size   9: 4 sub-topics
+    size  10: 4 sub-topics
+    size  11: 3 sub-topics
+    size  12: 1 sub-topics
+    size  13: 2 sub-topics
+    size  15: 5 sub-topics
+    size  16: 1 sub-topics
+    size  17: 1 sub-topics
+    size  20: 1 sub-topics
+    size  22: 2 sub-topics
+    size  23: 1 sub-topics
+    size  31: 1 sub-topics
+    size  32: 1 sub-topics
+    size  33: 1 sub-topics
+    size  38: 1 sub-topics
+    size  81: 1 sub-topics
+    size 122: 1 sub-topics
+    size 169: 1 sub-topics
+    size 567: 1 sub-topics
+
+  SUB-TOPICS within this main topic (201):
+    st_4c8954f3c6342b  size=567 method=component appears_in_main_topics=1
+      C0011609  'Drug eruption'
+      C0013182  'Allergy to drug' <-- self
+      C0014808  'Allergy to erythromycin'
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0030824  'Penicillin allergy'
+      C0039645  'Tetracycline allergy'
+      C0041755  'Adverse drug reaction'
+      C0237865  'Propensity to adverse reactions to drug'
+      C0277585  'Drug intolerance'
+      C0344168  'Drug-induced anaphylaxis'
+      C0570513  'Acetaminophen allergy'
+      C0570514  'Salicylate allergy'
+      C0570537  'Allergy to non-steroidal anti-inflammato'
+      C0570569  'Allergy to tripotassium dicitratobismuth'
+      C0570570  'Sucralfate allergy'
+      C0570573  'Allergy to histamine H2 receptor antagon'
+      C0570578  'Allergy to H+/K+-exchanging ATPase inhib'
+      C0570581  'Carbenoxolone allergy'
+      C0570582  'Allergy to pirenzepine'
+      C0570583  'Pancreatin allergy'
+      C0570589  'Allergy to magnesium trisilicate'
+      C0570590  'Allergy to aluminum hydroxide'
+      C0570592  'Allergy to loperamide'
+      C0570595  'Cisapride allergy'
+      C0570597  'Nabilone allergy'
+      C0570598  'Allergy to domperidone'
+      C0570599  'Metoclopramide allergy'
+      C0570600  'Allergy to 5-hydroxytryptamine-3-recepto'
+      C0570602  'Bisacodyl allergy'
+      C0570603  'Allergy to danthron'
+      C0570604  'Sodium picosulphate allergy'
+      C0570605  'Allergy to lactulose'
+      C0570606  'Magnesium sulphate allergy'
+      C0570609  'Cascara allergy'
+      C0570610  'Allergy to senna'
+      C0570611  'Allergy to docusate'
+      C0570614  'Peppermint oil allergy'
+      C0570615  'Allergy to alverine'
+      C0570616  'Allergy to mebeverine'
+      C0570617  'Allergy to dicyclomine'
+      C0570618  'Mepenzolate allergy'
+      C0570619  'Pipenzolate allergy'
+      C0570620  'Allergy to poldine'
+      C0570621  'Propantheline allergy'
+      C0570624  'Dehydrocholic acid allergy'
+      C0570630  'Etomidate allergy'
+      C0570631  'Ketamine allergy'
+      C0570632  'Propofol allergy'
+      C0570636  'Enflurane allergy'
+      C0570638  'Halothane allergy'
+      C0570639  'Isoflurane allergy'
+      C0570640  'Trichloroethylene allergy'
+      C0570641  'Desflurane allergy'
+      C0570642  'Allergy to local anaesthetic'
+      C0570655  'Allergy to amifostine'
+      C0570656  'Allergy to aldesleukin'
+      C0570658  'Molgramostim allergy'
+      C0570659  'Allergy to lenograstim'
+      C0570660  'Allergy to filgrastim'
+      C0570661  'Levamisole allergy'
+      C0570663  'Allergy to alkylating agent'
+      C0570666  'Treosulfan allergy'
+      C0570682  'Dactinomycin allergy'
+      C0570683  'Bleomycin allergy'
+      C0570684  'Allergy to mitomycin'
+      C0570685  'Plicamycin allergy'
+      C0570686  'Allergy to aclarubicin'
+      C0570688  'Doxorubicin allergy'
+      C0570689  'Allergy to epirubicin'
+      C0570690  'Idarubicin allergy'
+      C0570692  'Allergy to mercuric oxide'
+      C0570693  'Methotrexate allergy'
+      C0570694  'Allergy to mercaptopurine'
+      C0570695  'Allergy to thioguanine'
+      C0570696  'Allergy to pentostatin'
+      C0570697  'Cytarabine allergy'
+      C0570698  'Allergy to fluorouracil'
+      C0570699  'Allergy to etoposide'
+      C0570700  'Allergy to amsacrine'
+      C0570701  'Carboplatin allergy'
+      C0570702  'Cisplatin allergy'
+      C0570703  'Hydroxyurea allergy'
+      C0570704  'Allergy to procarbazine'
+      C0570705  'Razoxane allergy'
+      C0570706  'Crisantaspase allergy'
+      C0570707  'Paclitaxel allergy'
+      C0570708  'Allergy to fludarabine'
+      C0570709  'Allergy to aminoglutethimide'
+      C0570710  'Allergy to estrogen receptor antagonist'
+      C0570714  'Vinca alkaloid allergy'
+      C0570718  'Allergy to dimethyl sulfoxide'
+      C0570720  'Allergy to cyclosporine'
+      C0570721  'Allergy to azathioprine'
+      C0570724  'Allergy to mazindol'
+      C0570727  'Allergy to diethylpropion'
+      C0570733  'Amantadine allergy'
+      C0570734  'Apomorphine allergy'
+      C0570743  'Butriptyline allergy'
+      C0570744  'Doxepin allergy'
+      C0570745  'Iprindole allergy'
+      C0570746  'Lofepramine allergy'
+      C0570747  'Nortriptyline allergy'
+      C0570748  'Allergy to trimipramine'
+      C0570749  'Amoxapine allergy'
+      C0570750  'Amitriptyline allergy'
+      C0570751  'Clomipramine allergy'
+      C0570752  'Allergy to desipramine'
+      C0570753  'Allergy to dothiepin'
+      C0570754  'Imipramine allergy'
+      C0570755  'Allergy to protriptyline'
+      C0570756  'Allergy to monoamine oxidase inhibitor'
+      C0570765  'Allergy to selective serotonin re-uptake'
+      C0570773  'Allergy to maprotiline'
+      C0570775  'Allergy to trazodone'
+      C0570776  'Allergy to viloxazine'
+      C0570778  'Allergy to beclamide'
+      C0570779  'Lamotrigine allergy'
+      C0570780  'Piracetam allergy'
+      C0570781  'Allergy to gabapentin'
+      C0570787  'Allergy to carbamazepine'
+      C0570788  'Allergy to vigabatrin'
+      C0570789  'Phenytoin allergy'
+      C0570790  'Ethosuximide allergy'
+      C0570794  'Zopiclone allergy'
+      C0570795  'Allergy to zolpidem'
+      C0570796  'Allergy to chlormezanone'
+      C0570797  'Allergy to methyprylon'
+      C0570798  'Allergy to paraldehyde'
+      C0570826  'Meprobamate allergy'
+      C0570831  'Buspirone allergy'
+      C0570832  'Chlormethiazole allergy'
+      C0570834  'Allergy to sulpiride'
+      C0570835  'Loxapine allergy'
+      C0570836  'Allergy to clozapine'
+      C0570837  'Risperidone allergy'
+      C0570838  'Tetrabenazine allergy'
+      C0570839  'Allergy to butyrophenone derivative'
+      C0570845  'Diphenylbutylpiperidine allergy'
+      C0570848  'Allergy to phenothiazine'
+      C0570853  'Allergy to thiethylperazine'
+      C0570862  'Allergy to thioxanthene'
+      C0570868  'Allergy to oxypertine'
+      C0570869  'Allergy to remoxipride'
+      C0570873  'Allergy to pemoline'
+      C0570874  'Allergy to methylphenidate'
+      C0570876  'Allergy to amfetamine and/or amfetamine '
+      C0570881  'Allergy to beta adrenergic receptor anta'
+      C0570904  'Allergy to alpha adrenergic receptor ant'
+      C0570912  'Allergy to nicotine'
+      C0570914  'Allergy to lidoflazine'
+      C0570915  'Nifedipine allergy'
+      C0570916  'Prenylamine allergy'
+      C0570917  'Isradipine allergy'
+      C0570918  'Allergy to felodipine'
+      C0570919  'Allergy to lacidipine'
+      C0570920  'Nimodipine allergy'
+      C0570921  'Amlodipine allergy'
+      C0570922  'Diltiazem allergy'
+      C0570923  'Nicardipine allergy'
+      C0570924  'Allergy to verapamil'
+      C0570926  'Pilocarpine allergy'
+      C0570928  'Allergy to methacholine'
+      C0570929  'Allergy to acetylcholinesterase inhibito'
+      C0570937  'Bethanechol allergy'
+      C0570938  'Allergy to carbachol'
+      C0570943  'Allergy to alpha adrenergic receptor ago'
+      C0570952  'Allergy to beta-2 adrenergic receptor ag'
+      C0570958  'Allergy to metaproterenol'
+      C0570961  'Allergy to ritodrine'
+      C0570963  'Allergy to tulobuterol'
+      C0570965  'Allergy to dobutamine'
+      C0570966  'Allergy to dopexamine'
+      C0570967  'Allergy to isoproterenol'
+      C0570977  'Allergy to dipivefrin'
+      C0570978  'Allergy to dopamine'
+      C0570981  'Allergy to xamoterol'
+      C0570984  'Allergy to belladonna alkaloid'
+      C0570986  'Biperiden allergy'
+      C0570990  'Tropicamide allergy'
+      C0570991  'Allergy to scopolamine'
+      C0570993  'Atropine allergy'
+      C0570994  'Trihexyphenidyl allergy'
+      C0570995  'Allergy to benztropine'
+      C0570996  'Cyclopentolate allergy'
+      C0570997  'Glycopyrronium allergy'
+      C0570998  'Allergy to homatropine'
+      C0570999  'Allergy to ipratropium'
+      C0571000  'Allergy to methixene'
+      C0571001  'Allergy to orphenadrine'
+      C0571004  'Oxitropium allergy'
+      C0571005  'Allergy to oxybutynin'
+      C0571006  'Allergy to procyclidine'
+      C0571008  'Allergy to dornase alfa'
+      C0571010  'Tyloxapol allergy'
+      C0571012  'Allergy to carbocisteine'
+      C0571013  'Methylcysteine allergy'
+      C0571014  'Acetylcysteine allergy'
+      C0571018  'Allergy to doxapram'
+      C0571020  'Allergy to beractant'
+      C0571022  'Allergy to pumactant'
+      C0571023  'Colfosceril allergy'
+      C0571031  'Loratadine allergy'
+      C0571032  'Allergy to azelastine'
+      C0571033  'Cetirizine allergy'
+      C0571035  'Allergy to clemastine'
+      C0571040  'Allergy to dimenhydrinate'
+      C0571042  'Antazoline allergy'
+      C0571043  'Promethazine allergy'
+      C0571044  'Azatadine allergy'
+      C0571046  'Allergy to chlorpheniramine'
+      C0571048  'Cyproheptadine allergy'
+      C0571050  'Diphenhydramine allergy'
+      C0571051  'Diphenylpyraline allergy'
+      C0571052  'Hydroxyzine allergy'
+      C0571055  'Pheniramine allergy'
+      C0571061  'Ketotifen allergy'
+      C0571062  'Allergy to lodoxamide'
+      C0571065  'Allergy to isoaminile'
+      C0571074  'Aminophylline allergy'
+      C0571076  'Theophylline allergy'
+      C0571085  'Allergy to coal tar'
+      C0571099  'Allergy to podophyllotoxin'
+      C0571123  'Retinoid allergy'
+      C0571133  'Probenecid allergy'
+      C0571134  'Sulfinpyrazone allergy'
+      C0571136  'Allopurinol allergy'
+      C0571140  'Allergy to succinylcholine'
+      C0571141  'Allergy to nondepolarising agent'
+      C0571147  'Allergy to tubocurarine'
+      C0571150  'Baclofen allergy'
+      C0571151  'Carisoprodol allergy'
+      C0571152  'Allergy to methocarbamol'
+      C0571153  'Allergy to dantrolene'
+      C0571156  'Allergy to auranofin'
+      C0571158  'Allergy to papaverine'
+      C0571159  'Flavoxate allergy'
+      C0571161  'Mifepristone allergy'
+      C0571165  'Prostaglandin allergy'
+      C0571179  'Allergy to ipecacuanha'
+      C0571180  'Charcoal-activated allergy'
+      C0571181  'Allergy to sodium nitrite'
+      C0571183  'Allergy to digoxin immune fab'
+      C0571184  'Mesna allergy'
+      C0571185  'Allergy to benzodiazepine receptor antag'
+      C0571188  'Allergy to pralidoxime'
+      C0571191  'Allergy to naltrexone'
+      C0571192  'Allergy to naloxone'
+      C0571193  'Protamine allergy'
+      C0571195  'Allergy to Fuller's earth'
+      C0571196  'Allergy to bentonite'
+      C0571198  'Allergy to dimercaprol'
+      C0571199  'Allergy to deferoxamine'
+      C0571206  'Allergy to penicillamine'
+      C0571232  'Allergy to castor oil'
+      C0571234  'Allergy to glycerin'
+      C0571241  'Allergy to mineral oil'
+      C0571256  'Flucytosine allergy'
+      C0571257  'Terbinafine allergy'
+      C0571258  'Nitrophenol allergy'
+      C0571259  'Tolnaftate allergy'
+      C0571260  'Allergy to amorolfine'
+      C0571262  'Allergy to griseofulvin'
+      C0571263  'Allergy to amphotericin'
+      C0571264  'Natamycin allergy'
+      C0571265  'Allergy to nystatin'
+      C0571269  'Allergy to clotrimazole'
+      C0571270  'Allergy to fenticonazole'
+      C0571271  'Tioconazole allergy'
+      C0571272  'Allergy to econazole'
+      C0571273  'Isoconazole allergy'
+      C0571274  'Allergy to sulconazole'
+      C0571275  'Allergy to ketoconazole'
+      C0571276  'Allergy to miconazole'
+      C0571278  'Fluconazole allergy'
+      C0571279  'Itraconazole allergy'
+      C0571281  'Allergy to inosine pranobex'
+      C0571283  'Ganciclovir allergy'
+      C0571284  'Famciclovir allergy'
+      C0571287  'Valaciclovir allergy'
+      C0571288  'Interferons allergy'
+      C0571293  'Allergy to ribavirin'
+      C0571294  'Allergy to trifluridine'
+      C0571295  'Foscarnet allergy'
+      C0571296  'Vidarabine allergy'
+      C0571297  'Allergy to aciclovir'
+      C0571298  'Idoxuridine allergy'
+      C0571301  'Pyrimethamine allergy'
+      C0571309  'Allergy to proguanil'
+      C0571311  'Quinine allergy'
+      C0571312  'Allergy to halofantrine'
+      C0571313  'Allergy to quinacrine'
+      C0571317  'Acetic acid allergy'
+      C0571318  'Hydrargaphen allergy'
+      C0571319  'Allergy to polynoxylin'
+      C0571320  'Allergy to hexetidine'
+      C0571321  'Allergy to sodium perborate'
+      C0571328  'Allergy to chloroxylenol'
+      C0571330  'Allergy to triclosan'
+      C0571336  'Glutaraldehyde allergy'
+      C0571338  'Noxythiolin allergy'
+      C0571339  'Allergy to formaldehyde'
+      C0571344  'Allergy to chlorhexidine'
+      C0571347  'Boric acid allergy'
+      C0571349  'Quaternary ammonium surfactant allergy'
+      C0571353  'Allergy to quaternary pyridinium surfact'
+      C0571354  'Allergy to cetylpyridinium'
+      C0571355  'Allergy to quaternary quinolinium surfac'
+      C0571360  'Allergy to gentian violet'
+      C0571361  'Allergy to brilliant green'
+      C0571362  'Hydrogen peroxide allergy'
+      C0571364  'Piperazine allergy'
+      C0571365  'Pyrantel allergy'
+      C0571366  'Allergy to niclosamide'
+      C0571367  'Bephenium allergy'
+      C0571368  'Allergy to diethylcarbamazine'
+      C0571370  'Mebendazole allergy'
+      C0571371  'Allergy to albendazole'
+      C0571372  'Thiabendazole allergy'
+      C0571375  'Amikacin allergy'
+      C0571376  'Allergy to kanamycin'
+      C0571377  'Netilmicin allergy'
+      C0571378  'Allergy to streptomycin'
+      C0571379  'Framycetin allergy'
+      C0571380  'Neomycin allergy'
+      C0571381  'Allergy to gentamicin'
+      C0571382  'Tobramycin allergy'
+      C0571384  'Allergy to clarithromycin'
+      C0571385  'Allergy to azithromycin'
+      C0571387  'Spectinomycin allergy'
+      C0571388  'Vancomycin allergy'
+      C0571389  'Teicoplanin allergy'
+      C0571390  'Allergy to trimethoprim'
+      C0571391  'Nitrofurantoin allergy'
+      C0571393  'Allergy to mupirocin'
+      C0571394  'Nitrofurazone allergy'
+      C0571395  'Allergy to fusidic acid'
+      C0571397  'Allergy to rosoxacin'
+      C0571398  'Cinoxacin allergy'
+      C0571399  'Allergy to nalidixic acid'
+      C0571440  'Polymyxins allergy'
+      C0571444  'Allergy to cephalosporin'
+      C0571470  'Fosfomycin allergy'
+      C0571472  'Clindamycin allergy'
+      C0571473  'Allergy to lincomycin'
+      C0571474  'Mandelic acid allergy'
+      C0571476  'Allergy to aztreonam'
+      C0571477  'Nitroimidazole allergy'
+      C0571495  'Allergy to clomocycline'
+      C0571496  'Allergy to doxycycline'
+      C0571497  'Lymecycline allergy'
+      C0571498  'Allergy to minocycline'
+      C0571499  'Allergy to oxytetracycline'
+      C0571501  'Allergy to chlortetracycline'
+      C0571502  'Allergy to demeclocycline'
+      C0571503  'Chloramphenicol allergy'
+      C0571506  'Atovaquone allergy'
+      C0571508  'Sodium stibogluconate allergy'
+      C0571510  'Pentamidine allergy'
+      C0571512  'Allergy to diloxanide'
+      C0571517  'Pyrazinamide allergy'
+      C0571519  'Allergy to capreomycin'
+      C0571520  'Cycloserine allergy'
+      C0571521  'Allergy to rifampin'
+      C0571522  'Allergy to rifabutin'
+      C0571524  'Allergy to isoniazid'
+      C0571525  'Allergy to ethambutol'
+      C0571527  'Allergy to dapsone'
+      C0571528  'Allergy to clofazimine'
+      C0571530  'Allergy to benzyl benzoate'
+      C0571531  'Allergy to monosulfiram'
+      C0571543  'Allergy to human immunoglobulin'
+      C0571548  'Allergy to tetanus immunoglobulin'
+      C0571549  'Allergy to Varicella-zoster virus antibo'
+      C0571577  'Allergy to botulinum antitoxin'
+      C0571578  'Diphtheria antitoxin allergy'
+      C0571580  'Glucagon allergy'
+      C0571585  'Allergy to propylthiouracil'
+      C0571586  'Allergy to corticosteroid and/or cortico'
+      C0571622  'Insulin allergy'
+      C0571637  'Allergy to acetohexamide'
+      C0571638  'Chlorpropamide allergy'
+      C0571639  'Allergy to glyburide'
+      C0571640  'Allergy to glibornuride'
+      C0571641  'Allergy to gliclazide'
+      C0571642  'Allergy to glipizide'
+      C0571643  'Allergy to gliquidone'
+      C0571645  'Tolazamide allergy'
+      C0571646  'Tolbutamide allergy'
+      C0571648  'Metformin allergy'
+      C0571650  'Allergy to acarbose'
+      C0571652  'Allergy to progestational hormone'
+      C0571669  'Cyclofenil allergy'
+      C0571673  'Allergy to finasteride'
+      C0571674  'Allergy to flutamide'
+      C0571675  'Allergy to bicalutamide'
+      C0571677  'Allergy to cyproterone'
+      C0571679  'Androgen allergy'
+      C0571687  'Allergy to estrogen'
+      C0571705  'Allergy to ergoline derivative'
+      C0571713  'Desmopressin allergy'
+      C0571720  'Allergy to gonad regulating hormone agen'
+      C0571732  'Octreotide allergy'
+      C0571734  'Allergy to thyrotropin releasing factor'
+      C0571735  'Protirelin allergy'
+      C0571738  'Allergy to bisphosphonate'
+      C0571743  'Calcium regulating hormone allergy'
+      C0571752  'Allergy to gelatin'
+      C0571760  'Antithrombin III allergy'
+      C0571769  'Allergy to anti-inhibitor coagulant comp'
+      C0571775  'Ancrod allergy'
+      C0571776  'Allergy to heparin'
+      C0571777  'Allergy to enoxaparin'
+      C0571778  'Allergy to dalteparin'
+      C0571779  'Allergy to tinzaparin'
+      C0571780  'Allergy to heparinoid'
+      C0571784  'Allergy to acenocoumarol'
+      C0571785  'Warfarin allergy'
+      C0571789  'Allergy to etamsylate'
+      C0571791  'Tranexamic acid allergy'
+      C0571792  'Collagen allergy'
+      C0571793  'Aprotinin allergy'
+      C0571816  'Allergy to levocarnitine'
+      C0571828  'Allergy to vitamin D and/or vitamin D de'
+      C0571829  'Allergy to vitamin K and/or vitamin K de'
+      C0571830  'Allergy to alpha-tocopherol'
+      C0571833  'Allergy to niacin'
+      C0571834  'Allergy to folic acid'
+      C0571835  'Allergy to folinic acid'
+      C0571841  'Inositol allergy'
+      C0571844  'Ascorbic acid allergy'
+      C0571861  'Probucol allergy'
+      C0571862  'Allergy to acipimox'
+      C0571864  'Allergy to colestipol'
+      C0571865  'Cholestyramine allergy'
+      C0571868  'Allergy to clofibrate'
+      C0571869  'Allergy to fenofibrate'
+      C0571873  'Allergy to 3-hydroxy-3-methylglutaryl-co'
+      C0571878  'Allergy to adenosine'
+      C0571880  'Disopyramide allergy'
+      C0571881  'Quinidine allergy'
+      C0571882  'Allergy to flecainide'
+      C0571883  'Allergy to mexiletine'
+      C0571884  'Allergy to moricizine'
+      C0571885  'Allergy to procainamide'
+      C0571886  'Propafenone allergy'
+      C0571887  'Tocainide allergy'
+      C0571889  'Bretylium allergy'
+      C0571891  'Amiodarone allergy'
+      C0571895  'Allergy to bendroflumethiazide'
+      C0571896  'Allergy to chlorothiazide'
+      C0571897  'Cyclopenthiazide allergy'
+      C0571898  'Allergy to hydrochlorothiazide'
+      C0571899  'Hydroflumethiazide allergy'
+      C0571900  'Allergy to methyclothiazide'
+      C0571901  'Allergy to polythiazide'
+      C0571905  'Allergy to ethacrynic acid'
+      C0571906  'Allergy to piretanide'
+      C0571907  'Allergy to torsemide'
+      C0571909  'Triamterene allergy'
+      C0571910  'Allergy to aldosterone receptor antagoni'
+      C0571913  'Allergy to amiloride'
+      C0571922  'Mannitol allergy'
+      C0571924  'Mersalyl allergy'
+      C0571933  'Allergy to acetazolamide'
+      C0571936  'Bethanidine allergy'
+      C0571937  'Debrisoquine allergy'
+      C0571938  'Guanethidine allergy'
+      C0571950  'Allergy to trimetaphan'
+      C0571951  'Allergy to metyrosine'
+      C0571962  'Enoximone allergy'
+      C0571963  'Allergy to milrinone'
+      C0571967  'Ergot alkaloid allergy'
+      C0571972  'Allergy to minoxidil'
+      C0571974  'Flosequinan allergy'
+      C0571975  'Diazoxide allergy'
+      C0571976  'Allergy to hydralazine'
+      C0571977  'Allergy to nicorandil'
+      C0571978  'Dipyridamole allergy'
+      C0571980  'Allergy to nitroglycerin'
+      C0571992  'Allergy to pentaerythritol tetranitrate'
+      C0571995  'Pentoxifylline allergy'
+      C0571996  'Cyclandelate allergy'
+      C0571997  'Allergy to nicofuranose'
+      C0571999  'Isoxsuprine allergy'
+      C0572000  'Allergy to nafronyl'
+      C0572001  'Nicotinyl alcohol allergy'
+      C0572004  'Betahistine allergy'
+      C0572009  'Streptokinase allergy'
+      C0572010  'Allergy to urokinase'
+      C0572011  'Allergy to alteplase'
+      C0572012  'Anistreplase allergy'
+      C0740909  'Allergy to ethanol'
+      C0741440  'Barbiturate allergy'
+      C0741856  'Allergy to caffeine'
+      C0746910  'Allergy to nitroprusside'
+      C1319853  'Aspirin-induced asthma'
+      C1320835  'Drug fever'
+      C1527304  'Allergic reaction'
+      C1629019  'Allergy to phenothiazine derivative'
+      C1640722  'Allergic reaction to colophony'
+      C1640727  'Sulphonamide diuretic allergy'
+      C1998306  'Allergy to sulphonamide antibiotic'
+      C2584599  'Allergy to thiazolidinedione'
+      C2711220  'Allergy to meropenem'
+      C2711572  'Sevoflurane allergy'
+      C2711594  'Allergy to imipenem'
+      C2711902  'Allergy to ertapenem'
+      C3539909  'Allergic disposition'
+      C4076266  'Allergy to protease inhibitor'
+      C4076278  'Allergy to reverse transcriptase inhibit'
+      C4303914  'Allergy to bile acid'
+      C4316577  'Allergy to opiate agonist'
+      C4545176  'Allergy to denosumab'
+      C4707910  'Hypothalamic hormone allergy'
+      C4707911  'Pituitary hormone allergy'
+      C4707986  'Allergy to diethyl ether (finding)'
+      C4707989  'Allergy to cromolyn'
+      C4708096  'Allergy to urea'
+      C4708098  'Vitamin B12 and/or vitamin B12 derivativ'
+      C4708099  'Thiamine allergy'
+      C4708100  'Allergy to pyridoxine'
+      C4708163  'Allergy to benzodiazepine'
+      C4749576  'Allergy to coagulation protein'
+      C4750836  'Allergy to acetylcholine'
+      C4750852  'Bamethan allergy'
+      C4750860  'Allergy to isosorbide'
+      C4750901  'Hyaluronic acid allergy'
+      C4750903  'Allergy to valproic acid'
+      C4750905  'Allergy to dibromopropamidine'
+      C4750916  'Allergy to emepronium'
+      C4750919  'Propamidine allergy'
+      C4750932  'Allergy to phenylpropanolamine'
+      C4758633  'Allergy to Digitalis glycoside'
+      C4758634  'Allergy to chloral derivative'
+      C4758641  'Allergy to indanedione'
+      C4758644  'Allergy to lithium compound'
+      C4758652  'Allergy to acridine derivative azo'
+      C4758658  'Allergy to rauwolfia alkaloid'
+      C4758661  'Allergy to thiouracil'
+      C4758662  'Allergy to thiourea'
+      C4758663  'Allergy to thyroid hormone'
+      C4758664  'Allergy to triphenylmethane triisocyanat'
+      C5240002  'Meclizine allergy'
+      C5394741  'Allergy to bromhexine'
+      C5394788  'Polystyrene sulfonate allergy'
+      C5394792  'Lachesine allergy'
+      C5394793  'Metamizole allergy'
+      C5394794  'Allergy to methenamine'
+      C5394796  'Allergy to piperidolate'
+      C5394798  'Sodium sulfate allergy'
+      C5394799  'Allergy to terodiline'
+      C5394818  'Balsam of Peru allergy'
+      C5394838  'Aldehyde dehydrogenase inhibitor allergy'
+      C5395046  'Fluoroquinolone allergy'
+      C5395879  'Allergy to oxyquinoline'
+      C5395979  'Aminoquinoline allergy'
+      C5397081  'Carbidopa and/or levodopa allergy'
+      C5548169  'Allergy to erythropoietin receptor agoni'
+      C5566590  'Allergic reaction caused by analgesic'
+      C5566611  'Allergic reaction caused by anaesthetic'
+      C5687061  'Allergy to dapagliflozin'
+      C5687062  'Allergy to ertugliflozin'
+      C5687063  'Allergy to canagliflozin'
+      C5817138  'Allergic reaction caused by antiinfectiv'
+      C5921987  'Allergy to reteplase'
+      C5921988  'Allergy to tenecteplase'
+      C5923088  'Allergy to cetuximab due to alpha-gal sy'
+    st_0e4a3b68d10635  size=3 method=clique appears_in_main_topics=3
+      C0013182  'Allergy to drug' <-- self
+      C0237865  'Propensity to adverse reactions to drug'
+      C0277585  'Drug intolerance'
+    st_1ef27b35fae029  size=3 method=clique appears_in_main_topics=3
+      C0011609  'Drug eruption'
+      C0013182  'Allergy to drug' <-- self
+      C0041755  'Adverse drug reaction'
+    st_22a57e36c12b0c  size=2 method=clique appears_in_main_topics=2
+      C0013182  'Allergy to drug' <-- self
+      C0571996  'Cyclandelate allergy'
+    st_85b6a53203fd54  size=2 method=clique appears_in_main_topics=2
+      C0013182  'Allergy to drug' <-- self
+      C0571743  'Calcium regulating hormone allergy'
+    st_ac462066fdd58a  size=2 method=component appears_in_main_topics=2
+      C0013182  'Allergy to drug' <-- self
+      C4750901  'Hyaluronic acid allergy'
+    st_1df521fe299af6  size=2 method=clique appears_in_main_topics=2
+      C0013182  'Allergy to drug' <-- self
+      C0571880  'Disopyramide allergy'
+    st_fbb469da205f7b  size=2 method=component appears_in_main_topics=2
+      C0013182  'Allergy to drug' <-- self
+      C0571999  'Isoxsuprine allergy'
+    st_9c263d888107e4  size=2 method=clique appears_in_main_topics=2
+      C0013182  'Allergy to drug' <-- self
+      C0570998  'Allergy to homatropine'
+    st_31fb68546218a5  size=2 method=component appears_in_main_topics=2
+      C0013182  'Allergy to drug' <-- self
+      C4758664  'Allergy to triphenylmethane triisocyanat'
+    ... +191 more sub-topics
+
+
+================================================================================
+  C2142181  'Pain of left knee joint (finding)'
+================================================================================
+
+  MAIN TOPIC (size 6)
+
+  This CUI appears in 10 sub-topics total
+  By size:
+    size   2: 3 sub-topics
+    size   3: 1 sub-topics
+    size   5: 1 sub-topics
+    size   6: 4 sub-topics
+    size  16: 1 sub-topics
+
+  SUB-TOPICS within this main topic (5):
+    st_ee935ffaaf5503  size=6 method=component appears_in_main_topics=1
+      C0231749  'Pain of knee region'
+      C2051306  'Patellofemoral syndrome of left knee'
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C2220048  'Pain of bilateral knee joints'
+      C4509797  'Chronic pain following left total knee a'
+      C5442019  'Pain of left knee'
+    st_fdeef2e1130a13  size=3 method=clique appears_in_main_topics=3
+      C0231749  'Pain of knee region'
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C5442019  'Pain of left knee'
+    st_ad553a447ff300  size=2 method=clique appears_in_main_topics=2
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C4509797  'Chronic pain following left total knee a'
+    st_91655c7a808231  size=2 method=clique appears_in_main_topics=2
+      C2051306  'Patellofemoral syndrome of left knee'
+      C2142181  'Pain of left knee joint (finding)' <-- self
+    st_55de55c3cb6e29  size=2 method=clique appears_in_main_topics=2
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C2220048  'Pain of bilateral knee joints'
+
+
+================================================================================
+  C1621958  'Glioblastoma multiforme'
+================================================================================
+
+  MAIN TOPIC (size 13)
+
+  This CUI appears in 17 sub-topics total
+  By size:
+    size   2: 6 sub-topics
+    size   3: 3 sub-topics
+    size   5: 1 sub-topics
+    size   6: 2 sub-topics
+    size   7: 1 sub-topics
+    size   8: 1 sub-topics
+    size  13: 1 sub-topics
+    size  30: 1 sub-topics
+    size 244: 1 sub-topics
+
+  SUB-TOPICS within this main topic (10):
+    st_4272826730ec1f  size=13 method=component appears_in_main_topics=1
+      C0006826  'Malignant neoplasm'
+      C0017638  'Glioma'
+      C0206726  'Gliosarcoma (morphologic abnormality)'
+      C0334579  'Astrocytoma, anaplastic'
+      C0334588  'Giant cell glioblastoma'
+      C0349543  'Glioblastoma multiforme of brain'
+      C1272516  'Small-cell glioblastoma'
+      C1621958  'Glioblastoma multiforme' <-- self
+      C4076507  'Glioblastoma multiforme of central nervo'
+      C4289580  'Epithelioid glioblastoma'
+      C4518227  'Glioblastoma isocitrate dehydrogenase wi'
+      C4518228  'Glioblastoma isocitrate dehydrogenase 1 '
+      C4722099  'High-grade glioma'
+    st_889d5a7a4e174f  size=3 method=clique appears_in_main_topics=3
+      C0349543  'Glioblastoma multiforme of brain'
+      C1621958  'Glioblastoma multiforme' <-- self
+      C4076507  'Glioblastoma multiforme of central nervo'
+    st_3539b1d6ebfe48  size=3 method=clique appears_in_main_topics=3
+      C0017638  'Glioma'
+      C0206726  'Gliosarcoma (morphologic abnormality)'
+      C1621958  'Glioblastoma multiforme' <-- self
+    st_0f0e6b6e1a1c4a  size=3 method=clique appears_in_main_topics=3
+      C0334579  'Astrocytoma, anaplastic'
+      C1621958  'Glioblastoma multiforme' <-- self
+      C4722099  'High-grade glioma'
+    st_0d1f451d9aa85f  size=2 method=clique appears_in_main_topics=2
+      C1621958  'Glioblastoma multiforme' <-- self
+      C4289580  'Epithelioid glioblastoma'
+    st_746308aec3a0c3  size=2 method=clique appears_in_main_topics=2
+      C1621958  'Glioblastoma multiforme' <-- self
+      C4518228  'Glioblastoma isocitrate dehydrogenase 1 '
+    st_846a45c6f77531  size=2 method=clique appears_in_main_topics=2
+      C1272516  'Small-cell glioblastoma'
+      C1621958  'Glioblastoma multiforme' <-- self
+    st_f2025c17a2df43  size=2 method=component appears_in_main_topics=2
+      C0334588  'Giant cell glioblastoma'
+      C1621958  'Glioblastoma multiforme' <-- self
+    st_501c94cf4197bb  size=2 method=clique appears_in_main_topics=2
+      C1621958  'Glioblastoma multiforme' <-- self
+      C4518227  'Glioblastoma isocitrate dehydrogenase wi'
+    st_5c5246e2225b5e  size=2 method=clique appears_in_main_topics=1
+      C0006826  'Malignant neoplasm'
+      C1621958  'Glioblastoma multiforme' <-- self
+
+
+================================================================================
+  C4281599  'Structure of left knee region'
+================================================================================
+
+  MAIN TOPIC (size 9)
+
+  This CUI appears in 17 sub-topics total
+  By size:
+    size   2: 8 sub-topics
+    size   3: 2 sub-topics
+    size   4: 1 sub-topics
+    size   7: 1 sub-topics
+    size   9: 2 sub-topics
+    size  13: 2 sub-topics
+    size  21: 1 sub-topics
+
+  SUB-TOPICS within this main topic (9):
+    st_bc87925c794bc4  size=9 method=component appears_in_main_topics=1
+      C0230416  'Structure of left lower limb (body struc'
+      C0815870  'Structure of left popliteal fossa'
+      C1279572  'Entire left knee (body structure)'
+      C1963703  'Knee region structure (body structure)'
+      C4281599  'Structure of left knee region' <-- self
+      C4304721  'Structure of left knee joint'
+      C4544265  'Structure of soft tissue of left knee re'
+      C4755303  'Bone structure of left knee joint region'
+      C5788810  'Structure of iliotibial tract within lef'
+    st_2a99280b079e5d  size=2 method=clique appears_in_main_topics=2
+      C4281599  'Structure of left knee region' <-- self
+      C4304721  'Structure of left knee joint'
+    st_755e36c33c8631  size=2 method=clique appears_in_main_topics=2
+      C0815870  'Structure of left popliteal fossa'
+      C4281599  'Structure of left knee region' <-- self
+    st_495f997ad37ffa  size=2 method=clique appears_in_main_topics=2
+      C4281599  'Structure of left knee region' <-- self
+      C4544265  'Structure of soft tissue of left knee re'
+    st_9b9bbc961140d8  size=2 method=clique appears_in_main_topics=2
+      C0230416  'Structure of left lower limb (body struc'
+      C4281599  'Structure of left knee region' <-- self
+    st_80fe2cf137cc72  size=2 method=clique appears_in_main_topics=2
+      C1963703  'Knee region structure (body structure)'
+      C4281599  'Structure of left knee region' <-- self
+    st_b34f475d661a13  size=2 method=clique appears_in_main_topics=2
+      C1279572  'Entire left knee (body structure)'
+      C4281599  'Structure of left knee region' <-- self
+    st_295e30610454d0  size=2 method=clique appears_in_main_topics=2
+      C4281599  'Structure of left knee region' <-- self
+      C4755303  'Bone structure of left knee joint region'
+    st_a01eb3706791ed  size=2 method=clique appears_in_main_topics=2
+      C4281599  'Structure of left knee region' <-- self
+      C5788810  'Structure of iliotibial tract within lef'
+
+
+================================================================================
+  C1963703  'Knee region structure (body structure)'
+================================================================================
+
+  MAIN TOPIC (size 13)
+
+  This CUI appears in 25 sub-topics total
+  By size:
+    size   2: 12 sub-topics
+    size   6: 4 sub-topics
+    size   7: 1 sub-topics
+    size   8: 1 sub-topics
+    size   9: 2 sub-topics
+    size  10: 2 sub-topics
+    size  13: 2 sub-topics
+    size  20: 1 sub-topics
+
+  SUB-TOPICS within this main topic (13):
+    st_4b50485d55d591  size=13 method=component appears_in_main_topics=1
+      C0022742  'Bone structure of knee joint region (bod'
+      C0022745  'Knee joint'
+      C0230435  'Poples'
+      C0446565  'Aspect of knee region'
+      C0457906  'Structure of surface region of knee'
+      C1283838  'Entire knee region (body structure)'
+      C1963703  'Knee region structure (body structure)' <-- self
+      C3697294  'Structure of free lower limb'
+      C4281598  'Structure of right knee region'
+      C4281599  'Structure of left knee region'
+      C4544263  'Structure of soft tissue of knee region'
+      C5192380  'Structure of joint region of lower limb'
+      C5788808  'Structure of iliotibial tract within kne'
+    st_f9ad70df4e793a  size=2 method=clique appears_in_main_topics=2
+      C0022745  'Knee joint'
+      C1963703  'Knee region structure (body structure)' <-- self
+    st_9c6b1b952b06eb  size=2 method=clique appears_in_main_topics=2
+      C1963703  'Knee region structure (body structure)' <-- self
+      C3697294  'Structure of free lower limb'
+    st_96eac23e5d983f  size=2 method=clique appears_in_main_topics=2
+      C0446565  'Aspect of knee region'
+      C1963703  'Knee region structure (body structure)' <-- self
+    st_ae49ccfa703bb1  size=2 method=clique appears_in_main_topics=2
+      C1963703  'Knee region structure (body structure)' <-- self
+      C4544263  'Structure of soft tissue of knee region'
+    st_80fe2cf137cc72  size=2 method=clique appears_in_main_topics=2
+      C1963703  'Knee region structure (body structure)' <-- self
+      C4281599  'Structure of left knee region'
+    st_f0bdc3b3be38be  size=2 method=clique appears_in_main_topics=2
+      C1963703  'Knee region structure (body structure)' <-- self
+      C4281598  'Structure of right knee region'
+    st_4f708db421bc95  size=2 method=clique appears_in_main_topics=2
+      C1963703  'Knee region structure (body structure)' <-- self
+      C5788808  'Structure of iliotibial tract within kne'
+    st_90daa0447bfb35  size=2 method=clique appears_in_main_topics=2
+      C0230435  'Poples'
+      C1963703  'Knee region structure (body structure)' <-- self
+    st_85f1c101e2aece  size=2 method=clique appears_in_main_topics=2
+      C0457906  'Structure of surface region of knee'
+      C1963703  'Knee region structure (body structure)' <-- self
+    ... +3 more sub-topics
+
+
+================================================================================
+  C2142181  'Pain of left knee joint (finding)'
+================================================================================
+
+  MAIN TOPIC (size 6)
+
+  This CUI appears in 10 sub-topics total
+  By size:
+    size   2: 3 sub-topics
+    size   3: 1 sub-topics
+    size   5: 1 sub-topics
+    size   6: 4 sub-topics
+    size  16: 1 sub-topics
+
+  SUB-TOPICS within this main topic (5):
+    st_ee935ffaaf5503  size=6 method=component appears_in_main_topics=1
+      C0231749  'Pain of knee region'
+      C2051306  'Patellofemoral syndrome of left knee'
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C2220048  'Pain of bilateral knee joints'
+      C4509797  'Chronic pain following left total knee a'
+      C5442019  'Pain of left knee'
+    st_fdeef2e1130a13  size=3 method=clique appears_in_main_topics=3
+      C0231749  'Pain of knee region'
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C5442019  'Pain of left knee'
+    st_ad553a447ff300  size=2 method=clique appears_in_main_topics=2
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C4509797  'Chronic pain following left total knee a'
+    st_91655c7a808231  size=2 method=clique appears_in_main_topics=2
+      C2051306  'Patellofemoral syndrome of left knee'
+      C2142181  'Pain of left knee joint (finding)' <-- self
+    st_55de55c3cb6e29  size=2 method=clique appears_in_main_topics=2
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C2220048  'Pain of bilateral knee joints'
+
+
+================================================================================
+  C0559470  'Allergy to peanut'
+================================================================================
+
+  MAIN TOPIC (size 2)
+
+  This CUI appears in 2 sub-topics total
+  By size:
+    size   2: 1 sub-topics
+    size   7: 1 sub-topics
+
+  SUB-TOPICS within this main topic (1):
+    st_819e94786728b3  size=2 method=component appears_in_main_topics=2
+      C0559470  'Allergy to peanut' <-- self
+      C1096735  'Allergy to pulse vegetable'
+
+
+================================================================================
+  C0016470  'Food allergy'
+================================================================================
+
+  MAIN TOPIC (size 38)
+
+  This CUI appears in 54 sub-topics total
+  By size:
+    size   2: 29 sub-topics
+    size   3: 11 sub-topics
+    size   4: 2 sub-topics
+    size   5: 1 sub-topics
+    size   6: 1 sub-topics
+    size   8: 1 sub-topics
+    size   9: 1 sub-topics
+    size  10: 1 sub-topics
+    size  11: 1 sub-topics
+    size  15: 1 sub-topics
+    size  31: 1 sub-topics
+    size  38: 2 sub-topics
+    size  55: 1 sub-topics
+    size 122: 1 sub-topics
+
+  SUB-TOPICS within this main topic (35):
+    st_763be6d0ae96c9  size=38 method=component appears_in_main_topics=1
+      C0016470  'Food allergy' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0020523  'IgE-mediated allergic disorder'
+      C0020962  'Structure of immune system'
+      C0149696  'Food intolerance'
+      C0567447  'Allergy to egg protein'
+      C0570763  'Tryptophan allergy'
+      C0571213  'Glycine allergy'
+      C0571230  'Olive oil allergy'
+      C0571231  'Arachis oil allergy'
+      C0571649  'Guar gum allergy'
+      C0577620  'Allergy to nut'
+      C0577624  'Allergy to chocolate'
+      C0577625  'Allergy to shellfish'
+      C0577626  'Allergy to cheese'
+      C0685900  'Seafood allergy'
+      C0685901  'Allergy to fruit'
+      C0859949  'Allergy to meat'
+      C0949570  'Allergy to wheat'
+      C1527304  'Allergic reaction'
+      C1623734  'Allergy to oat'
+      C1630648  'Food sensitivity'
+      C1636156  'Allergy to rye'
+      C1638314  'Allergy to coconut oil'
+      C1639524  'Allergy to cinnamon'
+      C1641255  'Allergy to almond oil'
+      C1642837  'Allergy to seed'
+      C2227759  'Allergy to vegetable'
+      C2316159  'Oral allergy syndrome'
+      C2321305  'Allergy to barley'
+      C3163684  'Allergy to dietary mushroom'
+      C3539909  'Allergic disposition'
+      C4076680  'Allergy to mollusk'
+      C4274651  'Allergy to mustard seasoning'
+      C4274653  'Casein allergy'
+      C4543671  'Allergy to food additive'
+      C4758639  'Allergy to cow's milk protein'
+      C5139492  'Allergy to gluten'
+    st_94f1c8b99d457e  size=3 method=clique appears_in_main_topics=3
+      C0016470  'Food allergy' <-- self
+      C0577625  'Allergy to shellfish'
+      C0685900  'Seafood allergy'
+    st_b76b5249e60e3c  size=3 method=clique appears_in_main_topics=3
+      C0016470  'Food allergy' <-- self
+      C0149696  'Food intolerance'
+      C1630648  'Food sensitivity'
+    st_9173ce0623e6cd  size=3 method=clique appears_in_main_topics=3
+      C0016470  'Food allergy' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0020523  'IgE-mediated allergic disorder'
+    st_f5ffa371fe9ad5  size=3 method=clique appears_in_main_topics=3
+      C0016470  'Food allergy' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C1527304  'Allergic reaction'
+    st_d32615e50ca637  size=3 method=clique appears_in_main_topics=3
+      C0016470  'Food allergy' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0020962  'Structure of immune system'
+    st_fbabfae8d248a2  size=2 method=clique appears_in_main_topics=2
+      C0016470  'Food allergy' <-- self
+      C2227759  'Allergy to vegetable'
+    st_5447992667e911  size=2 method=clique appears_in_main_topics=2
+      C0016470  'Food allergy' <-- self
+      C0859949  'Allergy to meat'
+    st_714abfe2bdfdb4  size=2 method=clique appears_in_main_topics=2
+      C0016470  'Food allergy' <-- self
+      C1639524  'Allergy to cinnamon'
+    st_1c8d9a91ed7d8e  size=2 method=clique appears_in_main_topics=2
+      C0016470  'Food allergy' <-- self
+      C0571231  'Arachis oil allergy'
+    ... +25 more sub-topics
+
+
+################################################################################
+#  REVERSE LOOKUP DEMO
+#  (For a few sub-topics, show which main topics they appear in)
+################################################################################
+
+  Sub-topic st_fa4a0247c8b464 (size 4):
+    Members:
+      C0006280  'Bronchodilator'
+      C0053817  'Bitolterol'
+      C0106575  'Bitolterol mesylate'
+      C0354671  'Selective beta-2 agonist'
+    Appears in 4 main topic(s):
+      C0006280  'Bronchodilator'
+      C0053817  'Bitolterol'
+      C0106575  'Bitolterol mesylate'
+      C0354671  'Selective beta-2 agonist'
+
+  Sub-topic st_a6700e26f4caad (size 4):
+    Members:
+      C0001644  'Substance with beta adrenergic receptor '
+      C0053817  'Bitolterol'
+      C0106575  'Bitolterol mesylate'
+      C0354671  'Selective beta-2 agonist'
+    Appears in 4 main topic(s):
+      C0001644  'Substance with beta adrenergic receptor '
+      C0053817  'Bitolterol'
+      C0106575  'Bitolterol mesylate'
+      C0354671  'Selective beta-2 agonist'
+
+  Sub-topic st_2986d7b394938e (size 3):
+    Members:
+      C0005859  'Bloom syndrome'
+      C0398686  'Primary immune deficiency disorder (diso'
+      C0398787  'Immunodeficiency associated with chromos'
+    Appears in 3 main topic(s):
+      C0005859  'Bloom syndrome'
+      C0398686  'Primary immune deficiency disorder (diso'
+      C0398787  'Immunodeficiency associated with chromos'
+
+  Sub-topic st_d9c8184dac7b4e (size 3):
+    Members:
+      C0004135  'Ataxia telangiectasia'
+      C0398686  'Primary immune deficiency disorder (diso'
+      C0398787  'Immunodeficiency associated with chromos'
+    Appears in 3 main topic(s):
+      C0004135  'Ataxia telangiectasia'
+      C0398686  'Primary immune deficiency disorder (diso'
+      C0398787  'Immunodeficiency associated with chromos'
+
+  Sub-topic st_c4a4c3d306ee67 (size 3):
+    Members:
+      C3534992  'Alogliptin (as alogliptin benzoate) 12.5'
+      C3536525  'Product containing alogliptin and piogli'
+      C5687282  'Alogliptin and pioglitazone only product'
+    Appears in 3 main topic(s):
+      C3534992  'Alogliptin (as alogliptin benzoate) 12.5'
+      C3536525  'Product containing alogliptin and piogli'
+      C5687282  'Alogliptin and pioglitazone only product'
+
+
+DONE
