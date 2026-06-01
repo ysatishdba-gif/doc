@@ -1,171 +1,170 @@
 """
-build_topics_neighborhoods.py
------------------------------
-Simplest possible topic build: each CUI's topic = {itself + its direct
-graph neighbors}.
+test_neighborhood_topics.py
+---------------------------
+Load topic_lookup_neighborhoods.pkl and run lookups + retrieval tests.
 
-No algorithm beyond:
-  1. Flatten suffix-bridge graph to direct CUI-CUI edges (SNOMED-only)
-  2. For each CUI, topic = {cui} ∪ neighbors[cui]
-
-That's it. Edges ARE the relations. Each neighborhood IS a topic.
-
-Inputs (notebook globals):
-  data, SNOMED_CUIS, TAGS (optional), LABELS (optional)
+Paste in a notebook cell after the neighborhood build has finished.
+No globals required — pickle is self-contained.
 """
 
 import pickle
-import datetime
-import time
-import os
-import statistics
-from collections import defaultdict, Counter
 
 
-OUTPUT_PATH = "topic_lookup_neighborhoods.pkl"
+PICKLE_PATH = "topic_lookup_neighborhoods.pkl"
 
 
-def cui_of(s):
-    return s.rsplit("-", 1)[0] if "-" in s else s
+# ============================================================================
+# Load
+# ============================================================================
+
+print(f"Loading {PICKLE_PATH} ...")
+with open(PICKLE_PATH, "rb") as f:
+    payload = pickle.load(f)
+
+cui_topic_id        = payload["cui_topic_id"]        # cui -> topic_id (= cui itself)
+topic_to_cuis       = payload["topic_to_cuis"]       # cui -> set of members (self + neighbors)
+flattened_neighbors = payload["flattened_neighbors"]  # cui -> set of direct neighbors only
+labels              = payload.get("labels", {})
+tags                = payload.get("tags", {})
+
+print(f"  Total CUIs with topic     : {len(cui_topic_id):,}")
+print(f"  Total topics (= CUI count): {len(topic_to_cuis):,}")
+print(f"  CUIs in flattened graph   : {len(flattened_neighbors):,}")
+print(f"  Labels available          : {len(labels):,}")
 
 
-def flatten_graph(g, snomed_cuis):
-    print(f"[1/3] Flattening suffix-bridge -> CUI-CUI edges (SNOMED-only) ...")
-    neighbors = defaultdict(set)
-    t0 = time.time()
-    n_proc = 0
-    for cui in snomed_cuis:
-        if cui not in g:
-            n_proc += 1
-            continue
-        for suffix in g.successors(cui):
-            if "-" not in suffix:
-                continue
-            for pred in g.predecessors(suffix):
-                if pred == cui or pred == "CUI" or "-" not in pred:
-                    continue
-                oc = cui_of(pred)
-                if oc != cui and oc in snomed_cuis:
-                    neighbors[cui].add(oc)
-                    neighbors[oc].add(cui)
-        n_proc += 1
-        if n_proc % 100000 == 0:
-            print(f"  {n_proc:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
-    n_edges = sum(len(s) for s in neighbors.values()) // 2
-    print(f"  -> {n_edges:,} undirected edges in {time.time()-t0:.0f}s")
-    return dict(neighbors)
+def lbl(c):
+    return labels.get(c, "?")[:35] if labels else "?"
 
 
-def build_neighborhood_topics(neighbors, snomed_cuis):
-    """
-    Each CUI's topic = {cui} ∪ neighbors[cui].
-    The topic_id is the CUI itself (no hashing — each CUI defines its own
-    topic). This means there are exactly as many topics as there are CUIs
-    with at least one neighbor (others get a singleton topic = {self}).
-    """
-    print(f"[2/3] Building neighborhood topics ...")
-    cui_topic_id = {}     # cui -> its own topic_id
-    topic_to_cuis = {}    # topic_id -> set of member CUIs
-    for cui in snomed_cuis:
-        members = neighbors.get(cui, set()) | {cui}
-        # Topic ID is just the CUI itself
-        topic_to_cuis[cui] = members
-        cui_topic_id[cui] = cui
-    print(f"  -> {len(topic_to_cuis):,} topics (one per CUI)")
-    return cui_topic_id, topic_to_cuis
+# ============================================================================
+# Lookup 1: print a CUI's topic
+# ============================================================================
+
+def lookup(cui):
+    print(f"\n{'='*80}")
+    print(f"  CUI: {cui}  '{lbl(cui)}'")
+    print(f"{'='*80}")
+
+    members = topic_to_cuis.get(cui, set())
+    if not members:
+        print(f"  CUI not in any topic")
+        return
+
+    print(f"  Topic ID     : {cui}  (each CUI is its own topic)")
+    print(f"  Topic size   : {len(members)}")
+    print(f"  Members:")
+    for m in sorted(members):
+        mlbl = lbl(m)
+        marker = " <-- self" if m == cui else ""
+        print(f"    {m}  '{mlbl}'{marker}")
 
 
-def report(cui_topic_id, topic_to_cuis, snomed_cuis, neighbors, tags=None, labels=None):
-    print(f"\n{'='*78}")
-    print(f"  RESULTS")
-    print(f"{'='*78}")
-    n_total = len(snomed_cuis)
-    n_topics = len(topic_to_cuis)
-    sizes = sorted(len(cuis) for cuis in topic_to_cuis.values())
-    print(f"  SNOMED CUIs                : {n_total:,}")
-    print(f"  Topics (one per CUI)       : {n_topics:,}")
-    print(f"  Topic size = 1 (no neighbors): {sum(1 for s in sizes if s == 1):,}")
-    print(f"  Topic size distribution:")
-    print(f"    min     : {sizes[0]}")
-    print(f"    median  : {sizes[len(sizes)//2]}")
-    print(f"    mean    : {statistics.mean(sizes):.1f}")
-    print(f"    p90     : {sizes[int(0.9*len(sizes))]}")
-    print(f"    p99     : {sizes[int(0.99*len(sizes))]}")
-    print(f"    max     : {sizes[-1]:,}")
+# ============================================================================
+# Lookup 2: retrieval test (topic overlap == 2-hop reachability)
+# ============================================================================
 
-    # Focal CUIs
-    focal = [
-        "C0032285", "C0021368", "C0024109", "C1527304", "C0559470",
-        "C0002792", "C2142181", "C0011849",
-    ]
-    print(f"\n  Focal CUI lookups:")
-    for cui in focal:
-        members = topic_to_cuis.get(cui, set())
-        lbl = (labels or {}).get(cui, "?")[:30] if labels else "?"
-        print(f"\n    {cui} '{lbl}': {len(members)} members")
-        for m in sorted(members)[:6]:
-            mlbl = (labels or {}).get(m, "?")[:35] if labels else "?"
-            marker = " <-- self" if m == cui else ""
-            print(f"      {m} '{mlbl}'{marker}")
-        if len(members) > 6:
-            print(f"      ... +{len(members)-6} more")
+def retrieval_test(cui_a, cui_b):
+    ta = topic_to_cuis.get(cui_a, set())
+    tb = topic_to_cuis.get(cui_b, set())
+    overlap = ta & tb
 
-    # Pair-retrieval test (overlap of neighborhoods)
-    pairs = [
-        ("C1527304", "Allergic reaction", "C0559470", "Peanut allergy"),
-        ("C1527304", "Allergic reaction", "C0002792", "Anaphylaxis"),
-        ("C2142181", "Pain left knee jt", "C0231749", "Pain knee region"),
-    ]
-    print(f"\n  Retrieval test — overlap of neighborhoods:")
-    for ca, la, cb, lb_ in pairs:
-        ta = topic_to_cuis.get(ca, set())
-        tb = topic_to_cuis.get(cb, set())
-        overlap = ta & tb
-        result = "MATCH" if overlap else "no match"
-        print(f"    '{la}' <-> '{lb_}': {result}")
-        if overlap:
-            for c in sorted(overlap)[:3]:
-                clbl = (labels or {}).get(c, "?")[:30] if labels else "?"
-                print(f"        shared: {c} '{clbl}'")
+    print(f"\n  '{lbl(cui_a)}' ({cui_a}) <-> '{lbl(cui_b)}' ({cui_b})")
+    if overlap:
+        print(f"    MATCH via {len(overlap)} shared CUI(s):")
+        for c in sorted(overlap)[:5]:
+            print(f"      {c}  '{lbl(c)}'")
+    else:
+        print(f"    no match")
+        # Diagnostic — how close are they?
+        if cui_a in tb:
+            print(f"    (Note: {cui_a} is in {cui_b}'s neighborhood — shouldn't happen)")
+        if cui_b in ta:
+            print(f"    (Note: {cui_b} is in {cui_a}'s neighborhood — shouldn't happen)")
 
 
-def main():
-    for v in ["data", "SNOMED_CUIS"]:
-        if v not in globals():
-            raise RuntimeError(f"Set '{v}' in notebook first")
-    tags = TAGS if "TAGS" in globals() else None
-    labels = LABELS if "LABELS" in globals() else None
+# ============================================================================
+# Run tests
+# ============================================================================
 
-    print("=" * 60)
-    print("Neighborhood-based topic build (each CUI = its own topic)")
-    print("=" * 60)
-    print(f"  Graph       : {data.number_of_nodes():,} nodes")
-    print(f"  SNOMED CUIs : {len(SNOMED_CUIS):,}")
+FOCAL_CUIS = [
+    ("C0032285", "Pneumonia"),
+    ("C0021368", "Inflammation"),
+    ("C0024109", "Lung"),
+    ("C0011849", "Diabetes mellitus"),
+    ("C1527304", "Allergic reaction"),
+    ("C0559470", "Allergy to peanut"),
+    ("C0002792", "Anaphylaxis"),
+    ("C0013182", "Allergy to drug"),
+    ("C2142181", "Pain of left knee joint"),
+    ("C1621958", "Glioblastoma multiforme"),
+]
 
-    neighbors = flatten_graph(data, SNOMED_CUIS)
-    cui_topic_id, topic_to_cuis = build_neighborhood_topics(neighbors, SNOMED_CUIS)
-    report(cui_topic_id, topic_to_cuis, SNOMED_CUIS, neighbors, tags, labels)
-
-    print(f"\n[3/3] Saving to {OUTPUT_PATH} ...")
-    payload = {
-        "built_at":            datetime.datetime.now().isoformat(),
-        "method":              "neighborhood (each CUI's topic = self + 1-hop neighbors)",
-        "source":              "network graph (team-provided)",
-        "snomed_cuis":         SNOMED_CUIS,
-        "cui_topic_id":        cui_topic_id,     # cui -> topic_id (which equals cui)
-        "topic_to_cuis":       topic_to_cuis,    # cui -> set of members
-        "flattened_neighbors": neighbors,
-    }
-    if tags:
-        payload["tags"] = tags
-    if labels:
-        payload["labels"] = labels
-
-    with open(OUTPUT_PATH, "wb") as f:
-        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
-    print(f"  wrote {size_mb:.1f} MB")
-    print("\nDONE")
+print("\n" + "#"*80)
+print("# SECTION 1: Focal CUI lookups (each CUI's full topic)")
+print("#"*80)
+for cui, _ in FOCAL_CUIS:
+    lookup(cui)
 
 
-main()
+print("\n\n" + "#"*80)
+print("# SECTION 2: Pair retrieval tests")
+print("#"*80)
+PAIRS = [
+    # Allergy
+    ("C1527304", "C0559470"),  # Allergic reaction <-> Peanut allergy
+    ("C1527304", "C0002792"),  # Allergic reaction <-> Anaphylaxis
+    ("C1527304", "C0013182"),  # Allergic reaction <-> Drug allergy
+    ("C0559470", "C0002792"),  # Peanut allergy <-> Anaphylaxis
+    ("C0559470", "C0013182"),  # Peanut allergy <-> Drug allergy
+    # Anatomy / Disease
+    ("C0032285", "C0024109"),  # Pneumonia <-> Lung
+    ("C0032285", "C0035243"),  # Pneumonia <-> Respiratory tract infection
+    # Knee
+    ("C2142181", "C0231749"),  # Pain left knee joint <-> Pain of knee region
+    ("C2142181", "C5442019"),  # Pain left knee joint <-> Pain of left knee
+    # Cross-domain (should NOT match)
+    ("C0032285", "C0011849"),  # Pneumonia <-> Diabetes
+    ("C0559470", "C0024109"),  # Peanut allergy <-> Lung
+    ("C0021368", "C0011849"),  # Inflammation <-> Diabetes
+]
+for a, b in PAIRS:
+    retrieval_test(a, b)
+
+
+# ============================================================================
+# Section 3: distribution sanity
+# ============================================================================
+
+print("\n\n" + "#"*80)
+print("# SECTION 3: Size distribution + outliers")
+print("#"*80)
+
+sizes = sorted(len(c) for c in topic_to_cuis.values())
+print(f"  Topic sizes: min={sizes[0]}, median={sizes[len(sizes)//2]}, "
+      f"mean={sum(sizes)/len(sizes):.1f}, max={sizes[-1]}")
+print(f"  Size buckets:")
+bucket_counts = {1: 0, 2: 0, "3-5": 0, "6-10": 0, "11-50": 0, "51-100": 0, ">100": 0}
+for s in sizes:
+    if s == 1: bucket_counts[1] += 1
+    elif s == 2: bucket_counts[2] += 1
+    elif s <= 5: bucket_counts["3-5"] += 1
+    elif s <= 10: bucket_counts["6-10"] += 1
+    elif s <= 50: bucket_counts["11-50"] += 1
+    elif s <= 100: bucket_counts["51-100"] += 1
+    else: bucket_counts[">100"] += 1
+for k, v in bucket_counts.items():
+    pct = 100 * v / len(sizes)
+    print(f"    size {k:>10}: {v:>7,d}  ({pct:.1f}%)")
+
+# Top 10 largest topics
+print(f"\n  Top 10 largest topics (likely hubs):")
+top10 = sorted(topic_to_cuis.items(), key=lambda kv: -len(kv[1]))[:10]
+for cui, members in top10:
+    print(f"    {cui} '{lbl(cui)}': {len(members)} members")
+    for m in sorted(members)[:3]:
+        if m != cui:
+            print(f"      {m}  '{lbl(m)}'")
+
+
+print("\n\nDONE")
