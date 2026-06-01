@@ -1,11 +1,182 @@
+"""
+test_louvain_topics.py
+----------------------
+Load topic_lookup_graph_final.pkl and run lookups + retrieval tests.
+
+Just paste in a notebook cell — no globals needed, it loads everything
+from the pickle.
+"""
+
 import pickle
 
-cache = pickle.load(open("umls_cache.pkl", "rb"))
 
-SNOMED_CUIS = cache["cuis"]      # set of ~374,538 SNOMED CUIs
-TAGS        = cache["tags"]       # dict cui -> STY codes
-LABELS      = cache["labels"]     # dict cui -> preferred name (optional but useful)
+PICKLE_PATH = "topic_lookup_graph_final.pkl"
 
-print(f"SNOMED_CUIS: {len(SNOMED_CUIS):,}")
-print(f"TAGS: {len(TAGS):,}")
-print(f"LABELS: {len(LABELS):,}")
+
+# ============================================================================
+# Load
+# ============================================================================
+
+print(f"Loading {PICKLE_PATH} ...")
+with open(PICKLE_PATH, "rb") as f:
+    payload = pickle.load(f)
+
+cui_topic_id        = payload["cui_topic_id"]        # cui -> topic_id
+topic_to_cuis       = payload["topic_to_cuis"]       # topic_id -> set of CUIs
+topic_info          = payload["topic_info"]          # topic_id -> {size, dominant_sty, ...}
+flattened_neighbors = payload["flattened_neighbors"] # cui -> set of direct CUI neighbors
+labels              = payload.get("labels", {})
+tags                = payload.get("tags", {})
+
+print(f"  CUIs with topic        : {len(cui_topic_id):,}")
+print(f"  Total topics           : {len(topic_to_cuis):,}")
+print(f"  CUIs in flattened graph: {len(flattened_neighbors):,}")
+print(f"  Labels available       : {len(labels):,}")
+
+
+def lbl(c):
+    return labels.get(c, "?")[:35] if labels else "?"
+
+
+# ============================================================================
+# Lookup 1: For a CUI, print its topic + members
+# ============================================================================
+
+def lookup(cui):
+    """Print everything about a CUI's topic."""
+    print(f"\n{'='*80}")
+    print(f"  CUI: {cui}  '{lbl(cui)}'")
+    print(f"{'='*80}")
+
+    tid = cui_topic_id.get(cui)
+    if tid is None:
+        print(f"  CUI not in any topic")
+        return
+
+    info = topic_info.get(tid, {})
+    members = topic_to_cuis.get(tid, set())
+    direct_nbrs = flattened_neighbors.get(cui, set())
+
+    print(f"  Topic ID            : {tid}")
+    print(f"  Topic size          : {info.get('size', '?'):,}")
+    print(f"  Dominant STY        : {info.get('dominant_sty', '?')}")
+    print(f"  STY purity          : {info.get('sty_purity', 0):.0%}")
+    sty_dist = info.get("sty_distribution", {})
+    if sty_dist:
+        print(f"  STY distribution    : {dict(list(sty_dist.items())[:5])}")
+
+    print(f"  Direct graph neighbors ({len(direct_nbrs)}):")
+    for n in sorted(direct_nbrs)[:10]:
+        in_same_topic = "✓" if cui_topic_id.get(n) == tid else "✗"
+        print(f"    [{in_same_topic}] {n}  '{lbl(n)}'")
+    if len(direct_nbrs) > 10:
+        print(f"    ... +{len(direct_nbrs)-10} more")
+
+    # Sample of topic members (excluding self)
+    others = sorted(members - {cui})
+    print(f"  Topic members sample ({len(others)} others, showing 10):")
+    for m in others[:10]:
+        is_direct = "[N]" if m in direct_nbrs else "   "
+        print(f"    {is_direct} {m}  '{lbl(m)}'")
+    if len(others) > 10:
+        print(f"    ... +{len(others)-10} more")
+
+
+# ============================================================================
+# Lookup 2: Do two CUIs share a topic?
+# ============================================================================
+
+def same_topic(cui_a, cui_b):
+    """Test if two CUIs are in the same community."""
+    ta = cui_topic_id.get(cui_a)
+    tb = cui_topic_id.get(cui_b)
+    return ta is not None and ta == tb
+
+
+def neighborhood_overlap(cui_a, cui_b):
+    """Test if their direct neighborhoods overlap (even if not same community)."""
+    na = flattened_neighbors.get(cui_a, set()) | {cui_a}
+    nb = flattened_neighbors.get(cui_b, set()) | {cui_b}
+    return na & nb
+
+
+def retrieval_test(cui_a, cui_b):
+    print(f"\n  '{lbl(cui_a)}' ({cui_a}) <-> '{lbl(cui_b)}' ({cui_b})")
+    same = same_topic(cui_a, cui_b)
+    overlap = neighborhood_overlap(cui_a, cui_b)
+    print(f"    Same Louvain community  : {'YES' if same else 'NO'}")
+    if same:
+        tid = cui_topic_id[cui_a]
+        info = topic_info.get(tid, {})
+        print(f"      Topic: {tid} (size={info.get('size','?')})")
+    print(f"    Neighborhood overlap    : {'YES' if overlap else 'NO'}")
+    if overlap:
+        print(f"      Shared neighbors:")
+        for c in sorted(overlap)[:5]:
+            print(f"        {c}  '{lbl(c)}'")
+
+
+# ============================================================================
+# Run tests
+# ============================================================================
+
+# Single-CUI lookups
+FOCAL_CUIS = [
+    "C0032285",  # Pneumonia
+    "C0021368",  # Inflammation
+    "C0024109",  # Lung
+    "C0011849",  # Diabetes mellitus
+    "C1527304",  # Allergic reaction
+    "C0559470",  # Allergy to peanut
+    "C0002792",  # Anaphylaxis
+    "C0013182",  # Allergy to drug
+    "C2142181",  # Pain of left knee joint
+    "C1621958",  # Glioblastoma multiforme
+]
+
+print("\n" + "#"*80)
+print("# SECTION 1: Focal CUI lookups")
+print("#"*80)
+for cui in FOCAL_CUIS:
+    lookup(cui)
+
+# Pair retrieval tests
+print("\n" + "#"*80)
+print("# SECTION 2: Pair retrieval tests")
+print("#"*80)
+PAIRS = [
+    # Allergy chain
+    ("C1527304", "C0559470"),  # Allergic reaction <-> Peanut allergy
+    ("C1527304", "C0002792"),  # Allergic reaction <-> Anaphylaxis
+    ("C1527304", "C0013182"),  # Allergic reaction <-> Drug allergy
+    ("C0559470", "C0002792"),  # Peanut allergy <-> Anaphylaxis
+    ("C0559470", "C0013182"),  # Peanut allergy <-> Drug allergy
+    # Anatomy chain
+    ("C0032285", "C0024109"),  # Pneumonia <-> Lung
+    ("C0032285", "C0035243"),  # Pneumonia <-> Respiratory tract infection
+    # Knee chain
+    ("C2142181", "C0231749"),  # Pain left knee joint <-> Pain of knee region
+    ("C2142181", "C5442019"),  # Pain left knee joint <-> Pain of left knee
+    # Cross-domain (should NOT match)
+    ("C0032285", "C0011849"),  # Pneumonia <-> Diabetes (unrelated)
+    ("C0559470", "C0024109"),  # Peanut allergy <-> Lung
+]
+for a, b in PAIRS:
+    retrieval_test(a, b)
+
+
+# Topic-level inspection
+print("\n" + "#"*80)
+print("# SECTION 3: Top 10 largest topics — what's in them?")
+print("#"*80)
+top10 = sorted(topic_info.items(), key=lambda kv: -kv[1].get("size", 0))[:10]
+for tid, info in top10:
+    cuis = topic_to_cuis[tid]
+    print(f"\n  {tid}  size={info['size']:,}  dom_sty={info.get('dominant_sty','?')} "
+          f"  purity={info.get('sty_purity',0):.0%}")
+    print(f"    sample members:")
+    for c in sorted(cuis)[:6]:
+        print(f"      {c}  '{lbl(c)}'")
+
+
+print("\n\nDONE")
