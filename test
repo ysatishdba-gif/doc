@@ -1,182 +1,488 @@
-"""
-test_louvain_topics.py
-----------------------
-Load topic_lookup_graph_final.pkl and run lookups + retrieval tests.
+Loading topic_lookup_graph_final.pkl ...
+  CUIs with topic        : 374,538
+  Total topics           : 1,324
+  CUIs in flattened graph: 373,605
+  Labels available       : 374,538
 
-Just paste in a notebook cell — no globals needed, it loads everything
-from the pickle.
-"""
+################################################################################
+# SECTION 1: Focal CUI lookups
+################################################################################
 
-import pickle
+================================================================================
+  CUI: C0032285  'Pneumonia (disorder)'
+================================================================================
+  Topic ID            : tp_000420
+  Topic size          : 25,416
+  Dominant STY        : Disease or Syndrome
+  STY purity          : 41%
+  STY distribution    : {'Disease or Syndrome': 10516, 'Neoplastic Process': 6922, 'Injury or Poisoning': 2378, 'Finding': 1859, 'Pathologic Function': 1364}
+  Direct graph neighbors (41):
+    [✓] C0004626  'Bacterial pneumonia'
+    [✓] C0006285  'Lobular pneumonia'
+    [✗] C0024115  'Disorder of lung'
+    [✓] C0032241  'Pleurobronchopneumonia (disorder)'
+    [✓] C0032290  'Aspiration pneumonia'
+    [✓] C0032300  'Lobar pneumonia'
+    [✓] C0032310  'Viral pneumonia'
+    [✓] C0035243  'Respiratory tract infection'
+    [✓] C0152413  'Pneumonia caused by respiratory syn'
+    [✓] C0155870  'Pneumonia and influenza'
+    ... +31 more
+  Topic members sample (25415 others, showing 10):
+        C0000727  'Acute abdomen'
+        C0000734  'Abdominal mass (finding)'
+        C0000735  'Tumor of abdomen'
+        C0000737  'Abdominal pain'
+        C0000809  'Habitual abortion'
+        C0000810  'Retained products of conception fol'
+        C0000814  'Missed miscarriage'
+        C0000817  'Septic abortion'
+        C0000821  'Threatened miscarriage'
+        C0000822  'Tubal abortion'
+    ... +25405 more
+
+================================================================================
+  CUI: C0021368  'Inflammation'
+================================================================================
+  Topic ID            : tp_001094
+  Topic size          : 2,475
+  Dominant STY        : Cell
+  STY purity          : 21%
+  STY distribution    : {'Cell': 512, 'Pathologic Function': 506, 'Finding': 250, 'Cell or Molecular Dysfunction': 239, 'Disease or Syndrome': 157}
+  Direct graph neighbors (8):
+    [✓] C0016549  'Foreign body reaction'
+    [✓] C0030660  'Pathological process (attribute)'
+    [✗] C0036749  'Serositis (disorder)'
+    [✗] C0242966  'Systemic inflammatory response synd'
+    [✗] C0262627  'Seroma (disorder)'
+    [✓] C0333383  'Acute and chronic inflammation'
+    [✓] C1260958  'Serofibrinous inflammation'
+    [✓] C1265832  'Focal acute inflammation'
+  Topic members sample (2474 others, showing 10):
+        C0000846  'Agenesis'
+        C0000886  'Acanthrocyte'
+        C0000887  'Acantholysis (morphologic abnormali'
+        C0001280  'Armed macrophage'
+        C0001304  'Acute abscess'
+        C0001525  'Adipocere (morphologic abnormality)'
+        C0002044  'Algor mortis'
+        C0002793  'Dedifferentiation (morphologic abno'
+        C0003148  'Antemortem thrombus'
+        C0003782  'Argyrosis'
+    ... +2464 more
+
+================================================================================
+  CUI: C0024109  'Lung'
+================================================================================
+  Topic ID            : tp_000167
+  Topic size          : 28,729
+  Dominant STY        : Body Part, Organ, or Organ Component
+  STY purity          : 72%
+  STY distribution    : {'Body Part, Organ, or Organ Component': 20653, 'Body Location or Region': 2760, 'Body Space or Junction': 2450, 'Tissue': 1395, 'Embryonic Structure': 640}
+  Direct graph neighbors (15):
+    [✓] C0006255  'Bronchus'
+    [✓] C0034051  'Pulmonary alveolar structure (body '
+    [✓] C0035237  'Respiratory system'
+    [✓] C0225698  'Pneumocyte (cell)'
+    [✓] C0225706  'Right lung structure (body structur'
+    [✓] C0225730  'Left lung structure'
+    [✓] C0229962  'Body part structure (body structure'
+    [✓] C0230130  'Thoracic viscus'
+    [✓] C0278427  'Structure of transplanted lung (bod'
+    [✓] C0458579  'Lower respiratory tract'
+    ... +5 more
+  Topic members sample (28728 others, showing 10):
+        C0000726  'Structure of abdominopelvic cavity '
+        C0000741  'Abducens nerve (VI)'
+        C0000781  'Structure of abortus'
+        C0000905  'Spinal accessory nerve'
+        C0000962  'Bone structure of acetabulum'
+        C0001074  'Structure of Achilles tendon'
+        C0001162  'Acoustic nerve'
+        C0001208  'Acromioclavicular joint'
+        C0001209  'Structure of acromion (body structu'
+        C0001428  'Adenoids'
+    ... +28718 more
+
+================================================================================
+  CUI: C0011849  'Diabetes mellitus'
+================================================================================
+  Topic ID            : tp_001196
+  Topic size          : 30,162
+  Dominant STY        : Disease or Syndrome
+  STY purity          : 61%
+  STY distribution    : {'Disease or Syndrome': 18287, 'Congenital Abnormality': 4480, 'Finding': 2237, 'Pathologic Function': 1599, 'Anatomical Abnormality': 704}
+  Direct graph neighbors (40):
+    [✓] C0001792  'Advanced age'
+    [✓] C0011854  'Diabetes mellitus type 1'
+    [✓] C0011859  'Lipodystrophic diabetes'
+    [✓] C0011860  'Type II diabetes mellitus'
+    [✓] C0011871  'Peripheral angiopathy due to diabet'
+    [✗] C0011878  'Diabetic diet'
+    [✓] C0011880  'Diabetic ketoacidosis'
+    [✗] C0011881  'Diabetic nephropathy'
+    [✓] C0011882  'Diabetic neuropathy'
+    [✓] C0014130  'Endocrine system disease'
+    ... +30 more
+  Topic members sample (30161 others, showing 10):
+        C0000744  'Abetalipoproteinaemia'
+        C0000768  'Congenital abnormality'
+        C0000889  'Acanthosis nigricans'
+        C0001079  'Achondrogenesis (disorder)'
+        C0001080  'Achondroplastic dwarf'
+        C0001118  'Abnormal acid-base balance'
+        C0001122  'Acidosis (disorder)'
+        C0001125  'Lactic acidosis'
+        C0001126  'RTA - Renal tubular acidosis'
+        C0001127  'Respiratory acidosis'
+    ... +30151 more
+
+================================================================================
+  CUI: C1527304  'Allergic reaction'
+================================================================================
+  Topic ID            : tp_001108
+  Topic size          : 3,919
+  Dominant STY        : Pathologic Function
+  STY purity          : 43%
+  STY distribution    : {'Pathologic Function': 1700, 'Mental or Behavioral Dysfunction': 1349, 'Finding': 442, 'Disease or Syndrome': 265, 'Sign or Symptom': 58}
+  Direct graph neighbors (30):
+    [✗] C0013182  'Allergy to drug'
+    [✗] C0016470  'Food allergy'
+    [✗] C0020517  'Hypersensitivity reaction (disorder'
+    [✓] C0259756  'Jarisch Herxheimer reaction'
+    [✓] C0271157  'Phacoanaphylaxis'
+    [✗] C0343029  'Tuberculids'
+    [✗] C0392707  'Atopic diathesis'
+    [✓] C0413234  'Acute allergic reaction'
+    [✗] C0429892  'Type 1 hypersensitivity response'
+    [✗] C0851444  'Allergic condition'
+    ... +20 more
+  Topic members sample (3918 others, showing 10):
+        C0001723  'Affective psychosis (disorder)'
+        C0001818  'Fear of open spaces (finding)'
+        C0001819  'Agoraphobia without history of pani'
+        C0001940  'Alcohol amnestic disorder'
+        C0001956  'Alcohol use disorder'
+        C0001957  'Alcohol withdrawal delirium'
+        C0001973  'Alcohol dependence (disorder)'
+        C0002792  'Anaphylaxis'
+        C0003431  'Antisocial personality disorder'
+        C0003469  'Anxiety disorder'
+    ... +3908 more
+
+================================================================================
+  CUI: C0559470  'Allergy to peanut'
+================================================================================
+  Topic ID            : tp_000032
+  Topic size          : 1,526
+  Dominant STY        : Disease or Syndrome
+  STY purity          : 78%
+  STY distribution    : {'Disease or Syndrome': 1184, 'Pathologic Function': 179, 'Finding': 154, 'Anatomical Abnormality': 3, 'Sign or Symptom': 3}
+  Direct graph neighbors (1):
+    [✓] C1096735  'Allergy to pulse vegetable'
+  Topic members sample (1525 others, showing 10):
+        C0004058  'Aspirin allergy'
+        C0008127  'Sodium hydrogen L-glutamate intoler'
+        C0009215  'Allergy to codeine'
+        C0013182  'Allergy to drug'
+        C0014808  'Allergy to erythromycin'
+        C0016470  'Food allergy'
+        C0020741  'Ibuprofen allergy'
+        C0030824  'Penicillin allergy'
+        C0038757  'Sulfonamide allergy'
+        C0039645  'Tetracycline allergy'
+    ... +1515 more
+
+================================================================================
+  CUI: C0002792  'Anaphylaxis'
+================================================================================
+  Topic ID            : tp_001108
+  Topic size          : 3,919
+  Dominant STY        : Pathologic Function
+  STY purity          : 43%
+  STY distribution    : {'Pathologic Function': 1700, 'Mental or Behavioral Dysfunction': 1349, 'Finding': 442, 'Disease or Syndrome': 265, 'Sign or Symptom': 58}
+  Direct graph neighbors (25):
+    [✗] C0020517  'Hypersensitivity reaction (disorder'
+    [✗] C0020523  'IgE-mediated allergic disorder'
+    [✗] C0020962  'Structure of immune system'
+    [✓] C0161840  'Anaphylactic transfusion reaction'
+    [✓] C0274305  'Localized anaphylaxis'
+    [✓] C0344159  'Anaphylaxis caused by venom'
+    [✓] C0344168  'Drug-induced anaphylaxis'
+    [✓] C0344172  'Seminal fluid-induced anaphylaxis'
+    [✓] C0344183  'Exercise-induced anaphylaxis'
+    [✓] C0413234  'Acute allergic reaction'
+    ... +15 more
+  Topic members sample (3918 others, showing 10):
+        C0001723  'Affective psychosis (disorder)'
+        C0001818  'Fear of open spaces (finding)'
+        C0001819  'Agoraphobia without history of pani'
+        C0001940  'Alcohol amnestic disorder'
+        C0001956  'Alcohol use disorder'
+        C0001957  'Alcohol withdrawal delirium'
+        C0001973  'Alcohol dependence (disorder)'
+        C0003431  'Antisocial personality disorder'
+        C0003469  'Anxiety disorder'
+        C0003471  'Anxiety disorder of childhood OR ad'
+    ... +3908 more
+
+================================================================================
+  CUI: C0013182  'Allergy to drug'
+================================================================================
+  Topic ID            : tp_000032
+  Topic size          : 1,526
+  Dominant STY        : Disease or Syndrome
+  STY purity          : 78%
+  STY distribution    : {'Disease or Syndrome': 1184, 'Pathologic Function': 179, 'Finding': 154, 'Anatomical Abnormality': 3, 'Sign or Symptom': 3}
+  Direct graph neighbors (566):
+    [✗] C0011609  'Drug eruption'
+    [✓] C0014808  'Allergy to erythromycin'
+    [✗] C0020517  'Hypersensitivity reaction (disorder'
+    [✓] C0030824  'Penicillin allergy'
+    [✓] C0039645  'Tetracycline allergy'
+    [✗] C0041755  'Adverse drug reaction'
+    [✓] C0237865  'Propensity to adverse reactions to '
+    [✓] C0277585  'Drug intolerance'
+    [✗] C0344168  'Drug-induced anaphylaxis'
+    [✓] C0570513  'Acetaminophen allergy'
+    ... +556 more
+  Topic members sample (1525 others, showing 10):
+        C0004058  'Aspirin allergy'
+        C0008127  'Sodium hydrogen L-glutamate intoler'
+        C0009215  'Allergy to codeine'
+    [N] C0014808  'Allergy to erythromycin'
+        C0016470  'Food allergy'
+        C0020741  'Ibuprofen allergy'
+    [N] C0030824  'Penicillin allergy'
+        C0038757  'Sulfonamide allergy'
+    [N] C0039645  'Tetracycline allergy'
+        C0149696  'Food intolerance'
+    ... +1515 more
+
+================================================================================
+  CUI: C2142181  'Pain of left knee joint (finding)'
+================================================================================
+  Topic ID            : tp_001037
+  Topic size          : 14,893
+  Dominant STY        : Injury or Poisoning
+  STY purity          : 35%
+  STY distribution    : {'Injury or Poisoning': 5195, 'Disease or Syndrome': 4112, 'Finding': 1373, 'Pathologic Function': 971, 'Neoplastic Process': 848}
+  Direct graph neighbors (5):
+    [✓] C0231749  'Pain of knee region'
+    [✓] C2051306  'Patellofemoral syndrome of left kne'
+    [✓] C2220048  'Pain of bilateral knee joints'
+    [✓] C4509797  'Chronic pain following left total k'
+    [✓] C5442019  'Pain of left knee'
+  Topic members sample (14892 others, showing 10):
+        C0001860  'Dactylolysis spontanea'
+        C0002695  'Amputee'
+        C0003090  'Ankylosis'
+        C0003862  'Pain of joint'
+        C0003864  'Arthritis'
+        C0003868  'Gouty arthritis'
+        C0003869  'Pyogenic arthritis'
+        C0003872  'Psoriatic arthritis'
+        C0003874  'Acute suppurative arthritis caused '
+        C0003875  'Viral arthritis'
+    ... +14882 more
+
+================================================================================
+  CUI: C1621958  'Glioblastoma multiforme'
+================================================================================
+  Topic ID            : tp_000248
+  Topic size          : 307
+  Dominant STY        : Neoplastic Process
+  STY purity          : 97%
+  STY distribution    : {'Neoplastic Process': 299, 'Disease or Syndrome': 6, 'Pathologic Function': 1, 'Finding': 1}
+  Direct graph neighbors (12):
+    [✗] C0006826  'Malignant neoplasm'
+    [✓] C0017638  'Glioma'
+    [✓] C0206726  'Gliosarcoma (morphologic abnormalit'
+    [✓] C0334579  'Astrocytoma, anaplastic'
+    [✓] C0334588  'Giant cell glioblastoma'
+    [✓] C0349543  'Glioblastoma multiforme of brain'
+    [✓] C1272516  'Small-cell glioblastoma'
+    [✓] C4076507  'Glioblastoma multiforme of central '
+    [✓] C4289580  'Epithelioid glioblastoma'
+    [✓] C4518227  'Glioblastoma isocitrate dehydrogena'
+    ... +2 more
+  Topic members sample (306 others, showing 10):
+        C0004114  'Astrocytoma'
+        C0007798  'Neoplasm of ventricle of brain (dis'
+        C0014474  'Ependymoma (disorder)'
+    [N] C0017638  'Glioma'
+        C0021141  'Syndrome of inappropriate vasopress'
+        C0025149  'Medulloblastoma (morphologic abnorm'
+        C0028945  'Oligodendroglioma (morphologic abno'
+        C0085138  'Neoplasm of choroid plexus'
+        C0153635  'Malignant neoplasm of frontal lobe'
+        C0153637  'Malignant neoplasm of parietal lobe'
+    ... +296 more
+
+################################################################################
+# SECTION 2: Pair retrieval tests
+################################################################################
+
+  'Allergic reaction' (C1527304) <-> 'Allergy to peanut' (C0559470)
+    Same Louvain community  : NO
+    Neighborhood overlap    : NO
+
+  'Allergic reaction' (C1527304) <-> 'Anaphylaxis' (C0002792)
+    Same Louvain community  : YES
+      Topic: tp_001108 (size=3919)
+    Neighborhood overlap    : YES
+      Shared neighbors:
+        C0020517  'Hypersensitivity reaction (disorder'
+        C0413234  'Acute allergic reaction'
+
+  'Allergic reaction' (C1527304) <-> 'Allergy to drug' (C0013182)
+    Same Louvain community  : NO
+    Neighborhood overlap    : YES
+      Shared neighbors:
+        C0013182  'Allergy to drug'
+        C0020517  'Hypersensitivity reaction (disorder'
+        C1527304  'Allergic reaction'
+
+  'Allergy to peanut' (C0559470) <-> 'Anaphylaxis' (C0002792)
+    Same Louvain community  : NO
+    Neighborhood overlap    : NO
+
+  'Allergy to peanut' (C0559470) <-> 'Allergy to drug' (C0013182)
+    Same Louvain community  : YES
+      Topic: tp_000032 (size=1526)
+    Neighborhood overlap    : NO
+
+  'Pneumonia (disorder)' (C0032285) <-> 'Lung' (C0024109)
+    Same Louvain community  : NO
+    Neighborhood overlap    : NO
+
+  'Pneumonia (disorder)' (C0032285) <-> 'Respiratory tract infection' (C0035243)
+    Same Louvain community  : YES
+      Topic: tp_000420 (size=25416)
+    Neighborhood overlap    : YES
+      Shared neighbors:
+        C0032285  'Pneumonia (disorder)'
+        C0035243  'Respiratory tract infection'
+
+  'Pain of left knee joint (finding)' (C2142181) <-> 'Pain of knee region' (C0231749)
+    Same Louvain community  : YES
+      Topic: tp_001037 (size=14893)
+    Neighborhood overlap    : YES
+      Shared neighbors:
+        C0231749  'Pain of knee region'
+        C2142181  'Pain of left knee joint (finding)'
+        C5442019  'Pain of left knee'
+
+  'Pain of left knee joint (finding)' (C2142181) <-> 'Pain of left knee' (C5442019)
+    Same Louvain community  : YES
+      Topic: tp_001037 (size=14893)
+    Neighborhood overlap    : YES
+      Shared neighbors:
+        C0231749  'Pain of knee region'
+        C2142181  'Pain of left knee joint (finding)'
+        C5442019  'Pain of left knee'
+
+  'Pneumonia (disorder)' (C0032285) <-> 'Diabetes mellitus' (C0011849)
+    Same Louvain community  : NO
+    Neighborhood overlap    : NO
+
+  'Allergy to peanut' (C0559470) <-> 'Lung' (C0024109)
+    Same Louvain community  : NO
+    Neighborhood overlap    : NO
+
+################################################################################
+# SECTION 3: Top 10 largest topics — what's in them?
+################################################################################
+
+  tp_000802  size=37,038  dom_sty=Therapeutic or Preventive Procedure   purity=76%
+    sample members:
+      C0000820  'Therapeutic abortion'
+      C0001425  'Excision of adenoid'
+      C0001560  'Administration of drug or medicamen'
+      C0001561  'Medication administration: vaginal'
+      C0001563  'Administration of drug or medicamen'
+      C0001566  'Topical administration of treatment'
+
+  tp_001196  size=30,162  dom_sty=Disease or Syndrome   purity=61%
+    sample members:
+      C0000744  'Abetalipoproteinaemia'
+      C0000768  'Congenital abnormality'
+      C0000889  'Acanthosis nigricans'
+      C0001079  'Achondrogenesis (disorder)'
+      C0001080  'Achondroplastic dwarf'
+      C0001118  'Abnormal acid-base balance'
+
+  tp_000653  size=29,509  dom_sty=Pharmacologic Substance   purity=48%
+    sample members:
+      C0000097  'Methylphenyltetrahydropyridine (sub'
+      C0000102  '1-naphthylamine'
+      C0000163  '17-hydroxycorticosteroid'
+      C0000167  '17-ketosteroid'
+      C0000172  '18-hydroxycorticosterone'
+      C0000215  '2,4,5-trichlorophenoxyacetic acid'
+
+  tp_000167  size=28,729  dom_sty=Body Part, Organ, or Organ Component   purity=72%
+    sample members:
+      C0000726  'Structure of abdominopelvic cavity '
+      C0000741  'Abducens nerve (VI)'
+      C0000781  'Structure of abortus'
+      C0000905  'Spinal accessory nerve'
+      C0000962  'Bone structure of acetabulum'
+      C0001074  'Structure of Achilles tendon'
+
+  tp_000420  size=25,416  dom_sty=Disease or Syndrome   purity=41%
+    sample members:
+      C0000727  'Acute abdomen'
+      C0000734  'Abdominal mass (finding)'
+      C0000735  'Tumor of abdomen'
+      C0000737  'Abdominal pain'
+      C0000809  'Habitual abortion'
+      C0000810  'Retained products of conception fol'
+
+  tp_001037  size=14,893  dom_sty=Injury or Poisoning   purity=35%
+    sample members:
+      C0001860  'Dactylolysis spontanea'
+      C0002695  'Amputee'
+      C0003090  'Ankylosis'
+      C0003862  'Pain of joint'
+      C0003864  'Arthritis'
+      C0003868  'Gouty arthritis'
+
+  tp_001060  size=13,849  dom_sty=Injury or Poisoning   purity=44%
+    sample members:
+      C0000916  'Accidents due to residence or prolo'
+      C0000925  'Incised wound'
+      C0001144  'Acne vulgaris'
+      C0001168  'Obturation'
+      C0001510  'Postoperative adhesion'
+      C0001511  'Adhesion (morphologic abnormality)'
+
+  tp_000240  size=13,471  dom_sty=Medical Device   purity=88%
+    sample members:
+      C0001514  'Adhesive tape, device (physical obj'
+      C0001516  'Adhesive'
+      C0002839  'Andresen orthodontic appliance (phy'
+      C0003918  'Artificial organ'
+      C0004185  'Atomiser'
+      C0004295  'Audiotapes (physical object)'
+
+  tp_000538  size=9,695  dom_sty=Laboratory Procedure   purity=92%
+    sample members:
+      C0001802  'Agglutination assay'
+      C0002500  'Amikacin level'
+      C0002778  'Analysis (qualifier value)'
+      C0002866  'Androsterone measurement (procedure'
+      C0004076  'Glucose measurement, urine'
+      C0004398  'Autopsy examination (procedure)'
+
+  tp_000338  size=7,615  dom_sty=Finding   purity=51%
+    sample members:
+      C0000765  'Excessive weight gain (finding)'
+      C0000934  'Acclimatisation'
+      C0000936  'Ocular accommodation (observable en'
+      C0001117  'Acid-base equilibrium'
+      C0001241  'Acting out - mental defense mechani'
+      C0001539  'Adjustment disorder with depressed '
 
 
-PICKLE_PATH = "topic_lookup_graph_final.pkl"
-
-
-# ============================================================================
-# Load
-# ============================================================================
-
-print(f"Loading {PICKLE_PATH} ...")
-with open(PICKLE_PATH, "rb") as f:
-    payload = pickle.load(f)
-
-cui_topic_id        = payload["cui_topic_id"]        # cui -> topic_id
-topic_to_cuis       = payload["topic_to_cuis"]       # topic_id -> set of CUIs
-topic_info          = payload["topic_info"]          # topic_id -> {size, dominant_sty, ...}
-flattened_neighbors = payload["flattened_neighbors"] # cui -> set of direct CUI neighbors
-labels              = payload.get("labels", {})
-tags                = payload.get("tags", {})
-
-print(f"  CUIs with topic        : {len(cui_topic_id):,}")
-print(f"  Total topics           : {len(topic_to_cuis):,}")
-print(f"  CUIs in flattened graph: {len(flattened_neighbors):,}")
-print(f"  Labels available       : {len(labels):,}")
-
-
-def lbl(c):
-    return labels.get(c, "?")[:35] if labels else "?"
-
-
-# ============================================================================
-# Lookup 1: For a CUI, print its topic + members
-# ============================================================================
-
-def lookup(cui):
-    """Print everything about a CUI's topic."""
-    print(f"\n{'='*80}")
-    print(f"  CUI: {cui}  '{lbl(cui)}'")
-    print(f"{'='*80}")
-
-    tid = cui_topic_id.get(cui)
-    if tid is None:
-        print(f"  CUI not in any topic")
-        return
-
-    info = topic_info.get(tid, {})
-    members = topic_to_cuis.get(tid, set())
-    direct_nbrs = flattened_neighbors.get(cui, set())
-
-    print(f"  Topic ID            : {tid}")
-    print(f"  Topic size          : {info.get('size', '?'):,}")
-    print(f"  Dominant STY        : {info.get('dominant_sty', '?')}")
-    print(f"  STY purity          : {info.get('sty_purity', 0):.0%}")
-    sty_dist = info.get("sty_distribution", {})
-    if sty_dist:
-        print(f"  STY distribution    : {dict(list(sty_dist.items())[:5])}")
-
-    print(f"  Direct graph neighbors ({len(direct_nbrs)}):")
-    for n in sorted(direct_nbrs)[:10]:
-        in_same_topic = "✓" if cui_topic_id.get(n) == tid else "✗"
-        print(f"    [{in_same_topic}] {n}  '{lbl(n)}'")
-    if len(direct_nbrs) > 10:
-        print(f"    ... +{len(direct_nbrs)-10} more")
-
-    # Sample of topic members (excluding self)
-    others = sorted(members - {cui})
-    print(f"  Topic members sample ({len(others)} others, showing 10):")
-    for m in others[:10]:
-        is_direct = "[N]" if m in direct_nbrs else "   "
-        print(f"    {is_direct} {m}  '{lbl(m)}'")
-    if len(others) > 10:
-        print(f"    ... +{len(others)-10} more")
-
-
-# ============================================================================
-# Lookup 2: Do two CUIs share a topic?
-# ============================================================================
-
-def same_topic(cui_a, cui_b):
-    """Test if two CUIs are in the same community."""
-    ta = cui_topic_id.get(cui_a)
-    tb = cui_topic_id.get(cui_b)
-    return ta is not None and ta == tb
-
-
-def neighborhood_overlap(cui_a, cui_b):
-    """Test if their direct neighborhoods overlap (even if not same community)."""
-    na = flattened_neighbors.get(cui_a, set()) | {cui_a}
-    nb = flattened_neighbors.get(cui_b, set()) | {cui_b}
-    return na & nb
-
-
-def retrieval_test(cui_a, cui_b):
-    print(f"\n  '{lbl(cui_a)}' ({cui_a}) <-> '{lbl(cui_b)}' ({cui_b})")
-    same = same_topic(cui_a, cui_b)
-    overlap = neighborhood_overlap(cui_a, cui_b)
-    print(f"    Same Louvain community  : {'YES' if same else 'NO'}")
-    if same:
-        tid = cui_topic_id[cui_a]
-        info = topic_info.get(tid, {})
-        print(f"      Topic: {tid} (size={info.get('size','?')})")
-    print(f"    Neighborhood overlap    : {'YES' if overlap else 'NO'}")
-    if overlap:
-        print(f"      Shared neighbors:")
-        for c in sorted(overlap)[:5]:
-            print(f"        {c}  '{lbl(c)}'")
-
-
-# ============================================================================
-# Run tests
-# ============================================================================
-
-# Single-CUI lookups
-FOCAL_CUIS = [
-    "C0032285",  # Pneumonia
-    "C0021368",  # Inflammation
-    "C0024109",  # Lung
-    "C0011849",  # Diabetes mellitus
-    "C1527304",  # Allergic reaction
-    "C0559470",  # Allergy to peanut
-    "C0002792",  # Anaphylaxis
-    "C0013182",  # Allergy to drug
-    "C2142181",  # Pain of left knee joint
-    "C1621958",  # Glioblastoma multiforme
-]
-
-print("\n" + "#"*80)
-print("# SECTION 1: Focal CUI lookups")
-print("#"*80)
-for cui in FOCAL_CUIS:
-    lookup(cui)
-
-# Pair retrieval tests
-print("\n" + "#"*80)
-print("# SECTION 2: Pair retrieval tests")
-print("#"*80)
-PAIRS = [
-    # Allergy chain
-    ("C1527304", "C0559470"),  # Allergic reaction <-> Peanut allergy
-    ("C1527304", "C0002792"),  # Allergic reaction <-> Anaphylaxis
-    ("C1527304", "C0013182"),  # Allergic reaction <-> Drug allergy
-    ("C0559470", "C0002792"),  # Peanut allergy <-> Anaphylaxis
-    ("C0559470", "C0013182"),  # Peanut allergy <-> Drug allergy
-    # Anatomy chain
-    ("C0032285", "C0024109"),  # Pneumonia <-> Lung
-    ("C0032285", "C0035243"),  # Pneumonia <-> Respiratory tract infection
-    # Knee chain
-    ("C2142181", "C0231749"),  # Pain left knee joint <-> Pain of knee region
-    ("C2142181", "C5442019"),  # Pain left knee joint <-> Pain of left knee
-    # Cross-domain (should NOT match)
-    ("C0032285", "C0011849"),  # Pneumonia <-> Diabetes (unrelated)
-    ("C0559470", "C0024109"),  # Peanut allergy <-> Lung
-]
-for a, b in PAIRS:
-    retrieval_test(a, b)
-
-
-# Topic-level inspection
-print("\n" + "#"*80)
-print("# SECTION 3: Top 10 largest topics — what's in them?")
-print("#"*80)
-top10 = sorted(topic_info.items(), key=lambda kv: -kv[1].get("size", 0))[:10]
-for tid, info in top10:
-    cuis = topic_to_cuis[tid]
-    print(f"\n  {tid}  size={info['size']:,}  dom_sty={info.get('dominant_sty','?')} "
-          f"  purity={info.get('sty_purity',0):.0%}")
-    print(f"    sample members:")
-    for c in sorted(cuis)[:6]:
-        print(f"      {c}  '{lbl(c)}'")
-
-
-print("\n\nDONE")
+DONE
