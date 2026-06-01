@@ -1,197 +1,18 @@
 """
-build_subtopics.py
-------------------
-Add sub-topics to the existing main topics (neighborhood build).
+test_subtopics.py
+-----------------
+Test sub-topics. Just change CUIS_TO_TEST below.
 
-For each main topic T (= a CUI + its direct neighbors):
-  1. Build the INDUCED SUBGRAPH on T's members
-  2. Find sub-topics by two methods:
-     - METHOD A: Connected components of the induced subgraph
-       (exclusive partition — each CUI in one sub-topic per topic)
-     - METHOD B: Maximal cliques on the induced subgraph
-       (overlapping — CUIs can be in many cliques)
-
-Outputs an enriched pickle that contains:
-  - Original main topic data (preserved)
-  - cui_subtopics_components: per CUI, sub-topic components within its main topic
-  - cui_subtopics_cliques:    per CUI, set of cliques it belongs to within its main topic
-
-Inputs (notebook globals):
-  - flattened_neighbors: dict[cui] -> set of direct CUI neighbors
-    (load this from topic_lookup_neighborhoods.pkl if not in memory)
-
-Or the script will load it from the pickle automatically.
+Paste in a notebook cell after build_subtopics.py has finished.
 """
 
 import pickle
-import datetime
-import time
-import os
-import statistics
-from collections import defaultdict
 
 
-INPUT_PATH  = "topic_lookup_neighborhoods.pkl"
-OUTPUT_PATH = "topic_lookup_subtopics.pkl"
+PICKLE_PATH = "topic_lookup_subtopics.pkl"
 
-
-# ============================================================================
-# Helpers
-# ============================================================================
-
-def lbl(c, labels):
-    return labels.get(c, "?")[:40] if labels else "?"
-
-
-def induced_subgraph_edges(members, neighbors):
-    """
-    Given a set of CUIs (members) and the global neighbors dict, return the
-    induced subgraph as adjacency dict: cui -> set of its topic-mate neighbors.
-    """
-    members_set = set(members)
-    sub_adj = {}
-    for cui in members:
-        sub_adj[cui] = neighbors.get(cui, set()) & members_set
-    return sub_adj
-
-
-# ============================================================================
-# Method A: Connected components on the induced subgraph
-# ============================================================================
-
-def find_components(sub_adj):
-    """BFS-based connected components. Returns list of sets."""
-    visited = set()
-    components = []
-    for start in sub_adj:
-        if start in visited:
-            continue
-        comp = set()
-        frontier = [start]
-        while frontier:
-            u = frontier.pop()
-            if u in visited:
-                continue
-            visited.add(u)
-            comp.add(u)
-            for v in sub_adj.get(u, ()):
-                if v not in visited:
-                    frontier.append(v)
-        components.append(comp)
-    return components
-
-
-# ============================================================================
-# Method B: Maximal cliques on the induced subgraph
-# ============================================================================
-# Use Bron-Kerbosch. For small induced subgraphs (typical topic size 2-50)
-# this is very fast.
-
-def bron_kerbosch(R, P, X, sub_adj, results, max_results=200):
-    """
-    Standard Bron-Kerbosch without pivoting. Sufficient for small graphs.
-    Truncates if too many cliques to avoid runaway on large hubs.
-    """
-    if len(results) >= max_results:
-        return
-    if not P and not X:
-        if len(R) >= 2:  # only cliques of size >=2
-            results.append(set(R))
-        return
-    P_list = list(P)
-    for v in P_list:
-        if len(results) >= max_results:
-            return
-        Nv = sub_adj.get(v, set())
-        bron_kerbosch(
-            R | {v},
-            P & Nv,
-            X & Nv,
-            sub_adj,
-            results,
-            max_results,
-        )
-        P = P - {v}
-        X = X | {v}
-
-
-def find_maximal_cliques(sub_adj):
-    """Find all maximal cliques. Returns list of sets."""
-    results = []
-    bron_kerbosch(
-        set(),
-        set(sub_adj.keys()),
-        set(),
-        sub_adj,
-        results,
-        max_results=200,
-    )
-    return results
-
-
-# ============================================================================
-# Main build
-# ============================================================================
-
-def build_subtopics(payload):
-    cui_topic_id        = payload["cui_topic_id"]
-    topic_to_cuis       = payload["topic_to_cuis"]
-    flattened_neighbors = payload["flattened_neighbors"]
-    labels              = payload.get("labels", {})
-
-    print(f"  main topics: {len(topic_to_cuis):,}")
-
-    # cui -> list of components/cliques it belongs to
-    cui_subtopics_components = {}  # exclusive sub-topic membership
-    cui_subtopics_cliques    = {}  # overlapping clique memberships
-
-    # Stats
-    comp_sizes = []
-    clique_sizes = []
-    n_topics_processed = 0
-    n_with_real_substructure = 0  # topics with >1 component or >1 clique
-    t0 = time.time()
-
-    for topic_cui, members in topic_to_cuis.items():
-        n_topics_processed += 1
-
-        if len(members) < 2:
-            # Trivial topic, no sub-structure
-            cui_subtopics_components[topic_cui] = [frozenset(members)]
-            cui_subtopics_cliques[topic_cui] = [frozenset(members)]
-            continue
-
-        sub_adj = induced_subgraph_edges(members, flattened_neighbors)
-
-        # Method A: components
-        comps = find_components(sub_adj)
-        cui_subtopics_components[topic_cui] = [frozenset(c) for c in comps]
-        comp_sizes.extend(len(c) for c in comps)
-
-        # Method B: cliques
-        cliques = find_maximal_cliques(sub_adj)
-        cui_subtopics_cliques[topic_cui] = [frozenset(c) for c in cliques]
-        clique_sizes.extend(len(c) for c in cliques)
-
-        if len(comps) > 1 or len(cliques) > 1:
-            n_with_real_substructure += 1
-
-        if n_topics_processed % 50000 == 0:
-            print(f"    {n_topics_processed:,}/{len(topic_to_cuis):,}"
-                  f" ({time.time()-t0:.0f}s)")
-
-    print(f"  done in {time.time()-t0:.0f}s")
-    print(f"  topics with real sub-structure: {n_with_real_substructure:,} "
-          f"({100*n_with_real_substructure/max(n_topics_processed,1):.1f}%)")
-
-    return cui_subtopics_components, cui_subtopics_cliques, comp_sizes, clique_sizes
-
-
-# ============================================================================
-# Reporting
-# ============================================================================
-
-FOCAL_CUIS = [
+# Add or remove CUIs here — that's all you need to change
+CUIS_TO_TEST = [
     "C0032285",  # Pneumonia
     "C0021368",  # Inflammation
     "C0024109",  # Lung
@@ -205,94 +26,61 @@ FOCAL_CUIS = [
 ]
 
 
-def report(payload, cui_subtopics_components, cui_subtopics_cliques,
-           comp_sizes, clique_sizes):
-    print(f"\n{'='*80}")
-    print(f"  COMPONENT SIZES (Method A)")
-    print(f"{'='*80}")
-    if comp_sizes:
-        cs = sorted(comp_sizes)
-        print(f"  total components            : {len(cs):,}")
-        print(f"  min/median/p90/p99/max      : "
-              f"{cs[0]} / {cs[len(cs)//2]} / "
-              f"{cs[int(0.9*len(cs))]} / {cs[int(0.99*len(cs))]} / {cs[-1]:,}")
+# ============================================================================
+# Load
+# ============================================================================
 
-    print(f"\n{'='*80}")
-    print(f"  CLIQUE SIZES (Method B)")
-    print(f"{'='*80}")
-    if clique_sizes:
-        cs = sorted(clique_sizes)
-        print(f"  total cliques               : {len(cs):,}")
-        print(f"  min/median/p90/p99/max      : "
-              f"{cs[0]} / {cs[len(cs)//2]} / "
-              f"{cs[int(0.9*len(cs))]} / {cs[int(0.99*len(cs))]} / {cs[-1]:,}")
+print(f"Loading {PICKLE_PATH} ...")
+with open(PICKLE_PATH, "rb") as f:
+    payload = pickle.load(f)
 
-    # Focal CUI deep dives
-    labels = payload.get("labels", {})
-    topic_to_cuis = payload["topic_to_cuis"]
+topic_to_cuis = payload["topic_to_cuis"]
+sub_components = payload["cui_subtopics_components"]
+sub_cliques    = payload["cui_subtopics_cliques"]
+labels         = payload.get("labels", {})
 
-    print(f"\n{'='*80}")
-    print(f"  FOCAL CUI sub-structure inspection")
-    print(f"{'='*80}")
-    for cui in FOCAL_CUIS:
-        members = topic_to_cuis.get(cui, set())
-        if not members:
-            continue
 
-        comps = cui_subtopics_components.get(cui, [])
-        cliques = cui_subtopics_cliques.get(cui, [])
-
-        print(f"\n  {cui} '{lbl(cui, labels)}'")
-        print(f"    Main topic size           : {len(members)}")
-        print(f"    Components (Method A)     : {len(comps)}")
-        for i, c in enumerate(comps[:5]):
-            print(f"      Comp {i+1} (size {len(c)}):")
-            for m in sorted(c)[:6]:
-                print(f"        {m}  '{lbl(m, labels)}'")
-            if len(c) > 6:
-                print(f"        ... +{len(c)-6} more")
-        if len(comps) > 5:
-            print(f"      ... +{len(comps)-5} more components")
-
-        print(f"    Cliques (Method B)        : {len(cliques)}")
-        # Sort cliques by size, show largest first
-        for i, c in enumerate(sorted(cliques, key=lambda s: -len(s))[:5]):
-            print(f"      Clique {i+1} (size {len(c)}):")
-            for m in sorted(c)[:6]:
-                print(f"        {m}  '{lbl(m, labels)}'")
-            if len(c) > 6:
-                print(f"        ... +{len(c)-6} more")
-        if len(cliques) > 5:
-            print(f"      ... +{len(cliques)-5} more cliques")
+def lbl(c):
+    return labels.get(c, "?")[:40] if labels else "?"
 
 
 # ============================================================================
-# Main
+# Print
 # ============================================================================
 
-def main():
-    print(f"Loading {INPUT_PATH} ...")
-    with open(INPUT_PATH, "rb") as f:
-        payload = pickle.load(f)
-    print(f"  CUIs with topic        : {len(payload['cui_topic_id']):,}")
+for cui in CUIS_TO_TEST:
+    main_members = topic_to_cuis.get(cui, set())
+    comps        = sub_components.get(cui, [])
+    cliques      = sub_cliques.get(cui, [])
 
-    print(f"\n[1] Building sub-topics (Method A: components, Method B: cliques) ...")
-    components, cliques, comp_sizes, clique_sizes = build_subtopics(payload)
+    print(f"\n{'='*80}")
+    print(f"  {cui}  '{lbl(cui)}'")
+    print(f"{'='*80}")
+    print(f"  Main topic size : {len(main_members)}")
+    print(f"  # components    : {len(comps)}")
+    print(f"  # cliques       : {len(cliques)}")
 
-    report(payload, components, cliques, comp_sizes, clique_sizes)
+    # Components (Method A — exclusive partition)
+    print(f"\n  COMPONENTS (Method A):")
+    if not comps:
+        print(f"    (none)")
+    for i, c in enumerate(comps):
+        print(f"    Component {i+1} (size {len(c)}):")
+        for m in sorted(c):
+            marker = " <-- self" if m == cui else ""
+            print(f"      {m}  '{lbl(m)}'{marker}")
 
-    # Save
-    print(f"\n[Saving] {OUTPUT_PATH}")
-    out = dict(payload)  # carry forward all original fields
-    out["cui_subtopics_components"] = components
-    out["cui_subtopics_cliques"]    = cliques
-    out["subtopic_built_at"]        = datetime.datetime.now().isoformat()
+    # Cliques (Method B — overlapping)
+    print(f"\n  CLIQUES (Method B):")
+    if not cliques:
+        print(f"    (none)")
+    # Sort cliques by size descending
+    sorted_cliques = sorted(cliques, key=lambda s: -len(s))
+    for i, c in enumerate(sorted_cliques):
+        contains_self = " (contains self)" if cui in c else ""
+        print(f"    Clique {i+1} (size {len(c)}){contains_self}:")
+        for m in sorted(c):
+            marker = " <-- self" if m == cui else ""
+            print(f"      {m}  '{lbl(m)}'{marker}")
 
-    with open(OUTPUT_PATH, "wb") as f:
-        pickle.dump(out, f, protocol=pickle.HIGHEST_PROTOCOL)
-    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
-    print(f"  wrote {size_mb:.1f} MB")
-    print("\nDONE")
-
-
-main()
+print("\n\nDONE")
