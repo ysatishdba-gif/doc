@@ -1,17 +1,26 @@
 """
-build_topics_neighborhoods.py
------------------------------
-Simplest possible topic build: each CUI's topic = {itself + its direct
-graph neighbors}.
+build_subtopics.py
+------------------
+Add sub-topics to the existing main topics (neighborhood build).
 
-No algorithm beyond:
-  1. Flatten suffix-bridge graph to direct CUI-CUI edges (SNOMED-only)
-  2. For each CUI, topic = {cui} ∪ neighbors[cui]
+For each main topic T (= a CUI + its direct neighbors):
+  1. Build the INDUCED SUBGRAPH on T's members
+  2. Find sub-topics by two methods:
+     - METHOD A: Connected components of the induced subgraph
+       (exclusive partition — each CUI in one sub-topic per topic)
+     - METHOD B: Maximal cliques on the induced subgraph
+       (overlapping — CUIs can be in many cliques)
 
-That's it. Edges ARE the relations. Each neighborhood IS a topic.
+Outputs an enriched pickle that contains:
+  - Original main topic data (preserved)
+  - cui_subtopics_components: per CUI, sub-topic components within its main topic
+  - cui_subtopics_cliques:    per CUI, set of cliques it belongs to within its main topic
 
 Inputs (notebook globals):
-  data, SNOMED_CUIS, TAGS (optional), LABELS (optional)
+  - flattened_neighbors: dict[cui] -> set of direct CUI neighbors
+    (load this from topic_lookup_neighborhoods.pkl if not in memory)
+
+Or the script will load it from the pickle automatically.
 """
 
 import pickle
@@ -19,150 +28,268 @@ import datetime
 import time
 import os
 import statistics
-from collections import defaultdict, Counter
+from collections import defaultdict
 
 
-OUTPUT_PATH = "topic_lookup_neighborhoods.pkl"
+INPUT_PATH  = "topic_lookup_neighborhoods.pkl"
+OUTPUT_PATH = "topic_lookup_subtopics.pkl"
 
 
-def cui_of(s):
-    return s.rsplit("-", 1)[0] if "-" in s else s
+# ============================================================================
+# Helpers
+# ============================================================================
+
+def lbl(c, labels):
+    return labels.get(c, "?")[:40] if labels else "?"
 
 
-def flatten_graph(g, snomed_cuis):
-    print(f"[1/3] Flattening suffix-bridge -> CUI-CUI edges (SNOMED-only) ...")
-    neighbors = defaultdict(set)
-    t0 = time.time()
-    n_proc = 0
-    for cui in snomed_cuis:
-        if cui not in g:
-            n_proc += 1
+def induced_subgraph_edges(members, neighbors):
+    """
+    Given a set of CUIs (members) and the global neighbors dict, return the
+    induced subgraph as adjacency dict: cui -> set of its topic-mate neighbors.
+    """
+    members_set = set(members)
+    sub_adj = {}
+    for cui in members:
+        sub_adj[cui] = neighbors.get(cui, set()) & members_set
+    return sub_adj
+
+
+# ============================================================================
+# Method A: Connected components on the induced subgraph
+# ============================================================================
+
+def find_components(sub_adj):
+    """BFS-based connected components. Returns list of sets."""
+    visited = set()
+    components = []
+    for start in sub_adj:
+        if start in visited:
             continue
-        for suffix in g.successors(cui):
-            if "-" not in suffix:
+        comp = set()
+        frontier = [start]
+        while frontier:
+            u = frontier.pop()
+            if u in visited:
                 continue
-            for pred in g.predecessors(suffix):
-                if pred == cui or pred == "CUI" or "-" not in pred:
-                    continue
-                oc = cui_of(pred)
-                if oc != cui and oc in snomed_cuis:
-                    neighbors[cui].add(oc)
-                    neighbors[oc].add(cui)
-        n_proc += 1
-        if n_proc % 100000 == 0:
-            print(f"  {n_proc:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
-    n_edges = sum(len(s) for s in neighbors.values()) // 2
-    print(f"  -> {n_edges:,} undirected edges in {time.time()-t0:.0f}s")
-    return dict(neighbors)
+            visited.add(u)
+            comp.add(u)
+            for v in sub_adj.get(u, ()):
+                if v not in visited:
+                    frontier.append(v)
+        components.append(comp)
+    return components
 
 
-def build_neighborhood_topics(neighbors, snomed_cuis):
+# ============================================================================
+# Method B: Maximal cliques on the induced subgraph
+# ============================================================================
+# Use Bron-Kerbosch. For small induced subgraphs (typical topic size 2-50)
+# this is very fast.
+
+def bron_kerbosch(R, P, X, sub_adj, results, max_results=200):
     """
-    Each CUI's topic = {cui} ∪ neighbors[cui].
-    The topic_id is the CUI itself (no hashing — each CUI defines its own
-    topic). This means there are exactly as many topics as there are CUIs
-    with at least one neighbor (others get a singleton topic = {self}).
+    Standard Bron-Kerbosch without pivoting. Sufficient for small graphs.
+    Truncates if too many cliques to avoid runaway on large hubs.
     """
-    print(f"[2/3] Building neighborhood topics ...")
-    cui_topic_id = {}     # cui -> its own topic_id
-    topic_to_cuis = {}    # topic_id -> set of member CUIs
-    for cui in snomed_cuis:
-        members = neighbors.get(cui, set()) | {cui}
-        # Topic ID is just the CUI itself
-        topic_to_cuis[cui] = members
-        cui_topic_id[cui] = cui
-    print(f"  -> {len(topic_to_cuis):,} topics (one per CUI)")
-    return cui_topic_id, topic_to_cuis
+    if len(results) >= max_results:
+        return
+    if not P and not X:
+        if len(R) >= 2:  # only cliques of size >=2
+            results.append(set(R))
+        return
+    P_list = list(P)
+    for v in P_list:
+        if len(results) >= max_results:
+            return
+        Nv = sub_adj.get(v, set())
+        bron_kerbosch(
+            R | {v},
+            P & Nv,
+            X & Nv,
+            sub_adj,
+            results,
+            max_results,
+        )
+        P = P - {v}
+        X = X | {v}
 
 
-def report(cui_topic_id, topic_to_cuis, snomed_cuis, neighbors, tags=None, labels=None):
-    print(f"\n{'='*78}")
-    print(f"  RESULTS")
-    print(f"{'='*78}")
-    n_total = len(snomed_cuis)
-    n_topics = len(topic_to_cuis)
-    sizes = sorted(len(cuis) for cuis in topic_to_cuis.values())
-    print(f"  SNOMED CUIs                : {n_total:,}")
-    print(f"  Topics (one per CUI)       : {n_topics:,}")
-    print(f"  Topic size = 1 (no neighbors): {sum(1 for s in sizes if s == 1):,}")
-    print(f"  Topic size distribution:")
-    print(f"    min     : {sizes[0]}")
-    print(f"    median  : {sizes[len(sizes)//2]}")
-    print(f"    mean    : {statistics.mean(sizes):.1f}")
-    print(f"    p90     : {sizes[int(0.9*len(sizes))]}")
-    print(f"    p99     : {sizes[int(0.99*len(sizes))]}")
-    print(f"    max     : {sizes[-1]:,}")
+def find_maximal_cliques(sub_adj):
+    """Find all maximal cliques. Returns list of sets."""
+    results = []
+    bron_kerbosch(
+        set(),
+        set(sub_adj.keys()),
+        set(),
+        sub_adj,
+        results,
+        max_results=200,
+    )
+    return results
 
-    # Focal CUIs
-    focal = [
-        "C0032285", "C0021368", "C0024109", "C1527304", "C0559470",
-        "C0002792", "C2142181", "C0011849",
-    ]
-    print(f"\n  Focal CUI lookups:")
-    for cui in focal:
+
+# ============================================================================
+# Main build
+# ============================================================================
+
+def build_subtopics(payload):
+    cui_topic_id        = payload["cui_topic_id"]
+    topic_to_cuis       = payload["topic_to_cuis"]
+    flattened_neighbors = payload["flattened_neighbors"]
+    labels              = payload.get("labels", {})
+
+    print(f"  main topics: {len(topic_to_cuis):,}")
+
+    # cui -> list of components/cliques it belongs to
+    cui_subtopics_components = {}  # exclusive sub-topic membership
+    cui_subtopics_cliques    = {}  # overlapping clique memberships
+
+    # Stats
+    comp_sizes = []
+    clique_sizes = []
+    n_topics_processed = 0
+    n_with_real_substructure = 0  # topics with >1 component or >1 clique
+    t0 = time.time()
+
+    for topic_cui, members in topic_to_cuis.items():
+        n_topics_processed += 1
+
+        if len(members) < 2:
+            # Trivial topic, no sub-structure
+            cui_subtopics_components[topic_cui] = [frozenset(members)]
+            cui_subtopics_cliques[topic_cui] = [frozenset(members)]
+            continue
+
+        sub_adj = induced_subgraph_edges(members, flattened_neighbors)
+
+        # Method A: components
+        comps = find_components(sub_adj)
+        cui_subtopics_components[topic_cui] = [frozenset(c) for c in comps]
+        comp_sizes.extend(len(c) for c in comps)
+
+        # Method B: cliques
+        cliques = find_maximal_cliques(sub_adj)
+        cui_subtopics_cliques[topic_cui] = [frozenset(c) for c in cliques]
+        clique_sizes.extend(len(c) for c in cliques)
+
+        if len(comps) > 1 or len(cliques) > 1:
+            n_with_real_substructure += 1
+
+        if n_topics_processed % 50000 == 0:
+            print(f"    {n_topics_processed:,}/{len(topic_to_cuis):,}"
+                  f" ({time.time()-t0:.0f}s)")
+
+    print(f"  done in {time.time()-t0:.0f}s")
+    print(f"  topics with real sub-structure: {n_with_real_substructure:,} "
+          f"({100*n_with_real_substructure/max(n_topics_processed,1):.1f}%)")
+
+    return cui_subtopics_components, cui_subtopics_cliques, comp_sizes, clique_sizes
+
+
+# ============================================================================
+# Reporting
+# ============================================================================
+
+FOCAL_CUIS = [
+    "C0032285",  # Pneumonia
+    "C0021368",  # Inflammation
+    "C0024109",  # Lung
+    "C0011849",  # Diabetes mellitus
+    "C1527304",  # Allergic reaction
+    "C0559470",  # Allergy to peanut
+    "C0002792",  # Anaphylaxis
+    "C0013182",  # Allergy to drug
+    "C2142181",  # Pain of left knee joint
+    "C1621958",  # Glioblastoma multiforme
+]
+
+
+def report(payload, cui_subtopics_components, cui_subtopics_cliques,
+           comp_sizes, clique_sizes):
+    print(f"\n{'='*80}")
+    print(f"  COMPONENT SIZES (Method A)")
+    print(f"{'='*80}")
+    if comp_sizes:
+        cs = sorted(comp_sizes)
+        print(f"  total components            : {len(cs):,}")
+        print(f"  min/median/p90/p99/max      : "
+              f"{cs[0]} / {cs[len(cs)//2]} / "
+              f"{cs[int(0.9*len(cs))]} / {cs[int(0.99*len(cs))]} / {cs[-1]:,}")
+
+    print(f"\n{'='*80}")
+    print(f"  CLIQUE SIZES (Method B)")
+    print(f"{'='*80}")
+    if clique_sizes:
+        cs = sorted(clique_sizes)
+        print(f"  total cliques               : {len(cs):,}")
+        print(f"  min/median/p90/p99/max      : "
+              f"{cs[0]} / {cs[len(cs)//2]} / "
+              f"{cs[int(0.9*len(cs))]} / {cs[int(0.99*len(cs))]} / {cs[-1]:,}")
+
+    # Focal CUI deep dives
+    labels = payload.get("labels", {})
+    topic_to_cuis = payload["topic_to_cuis"]
+
+    print(f"\n{'='*80}")
+    print(f"  FOCAL CUI sub-structure inspection")
+    print(f"{'='*80}")
+    for cui in FOCAL_CUIS:
         members = topic_to_cuis.get(cui, set())
-        lbl = (labels or {}).get(cui, "?")[:30] if labels else "?"
-        print(f"\n    {cui} '{lbl}': {len(members)} members")
-        for m in sorted(members)[:6]:
-            mlbl = (labels or {}).get(m, "?")[:35] if labels else "?"
-            marker = " <-- self" if m == cui else ""
-            print(f"      {m} '{mlbl}'{marker}")
-        if len(members) > 6:
-            print(f"      ... +{len(members)-6} more")
+        if not members:
+            continue
 
-    # Pair-retrieval test (overlap of neighborhoods)
-    pairs = [
-        ("C1527304", "Allergic reaction", "C0559470", "Peanut allergy"),
-        ("C1527304", "Allergic reaction", "C0002792", "Anaphylaxis"),
-        ("C2142181", "Pain left knee jt", "C0231749", "Pain knee region"),
-    ]
-    print(f"\n  Retrieval test — overlap of neighborhoods:")
-    for ca, la, cb, lb_ in pairs:
-        ta = topic_to_cuis.get(ca, set())
-        tb = topic_to_cuis.get(cb, set())
-        overlap = ta & tb
-        result = "MATCH" if overlap else "no match"
-        print(f"    '{la}' <-> '{lb_}': {result}")
-        if overlap:
-            for c in sorted(overlap)[:3]:
-                clbl = (labels or {}).get(c, "?")[:30] if labels else "?"
-                print(f"        shared: {c} '{clbl}'")
+        comps = cui_subtopics_components.get(cui, [])
+        cliques = cui_subtopics_cliques.get(cui, [])
 
+        print(f"\n  {cui} '{lbl(cui, labels)}'")
+        print(f"    Main topic size           : {len(members)}")
+        print(f"    Components (Method A)     : {len(comps)}")
+        for i, c in enumerate(comps[:5]):
+            print(f"      Comp {i+1} (size {len(c)}):")
+            for m in sorted(c)[:6]:
+                print(f"        {m}  '{lbl(m, labels)}'")
+            if len(c) > 6:
+                print(f"        ... +{len(c)-6} more")
+        if len(comps) > 5:
+            print(f"      ... +{len(comps)-5} more components")
+
+        print(f"    Cliques (Method B)        : {len(cliques)}")
+        # Sort cliques by size, show largest first
+        for i, c in enumerate(sorted(cliques, key=lambda s: -len(s))[:5]):
+            print(f"      Clique {i+1} (size {len(c)}):")
+            for m in sorted(c)[:6]:
+                print(f"        {m}  '{lbl(m, labels)}'")
+            if len(c) > 6:
+                print(f"        ... +{len(c)-6} more")
+        if len(cliques) > 5:
+            print(f"      ... +{len(cliques)-5} more cliques")
+
+
+# ============================================================================
+# Main
+# ============================================================================
 
 def main():
-    for v in ["data", "SNOMED_CUIS"]:
-        if v not in globals():
-            raise RuntimeError(f"Set '{v}' in notebook first")
-    tags = TAGS if "TAGS" in globals() else None
-    labels = LABELS if "LABELS" in globals() else None
+    print(f"Loading {INPUT_PATH} ...")
+    with open(INPUT_PATH, "rb") as f:
+        payload = pickle.load(f)
+    print(f"  CUIs with topic        : {len(payload['cui_topic_id']):,}")
 
-    print("=" * 60)
-    print("Neighborhood-based topic build (each CUI = its own topic)")
-    print("=" * 60)
-    print(f"  Graph       : {data.number_of_nodes():,} nodes")
-    print(f"  SNOMED CUIs : {len(SNOMED_CUIS):,}")
+    print(f"\n[1] Building sub-topics (Method A: components, Method B: cliques) ...")
+    components, cliques, comp_sizes, clique_sizes = build_subtopics(payload)
 
-    neighbors = flatten_graph(data, SNOMED_CUIS)
-    cui_topic_id, topic_to_cuis = build_neighborhood_topics(neighbors, SNOMED_CUIS)
-    report(cui_topic_id, topic_to_cuis, SNOMED_CUIS, neighbors, tags, labels)
+    report(payload, components, cliques, comp_sizes, clique_sizes)
 
-    print(f"\n[3/3] Saving to {OUTPUT_PATH} ...")
-    payload = {
-        "built_at":            datetime.datetime.now().isoformat(),
-        "method":              "neighborhood (each CUI's topic = self + 1-hop neighbors)",
-        "source":              "network graph (team-provided)",
-        "snomed_cuis":         SNOMED_CUIS,
-        "cui_topic_id":        cui_topic_id,     # cui -> topic_id (which equals cui)
-        "topic_to_cuis":       topic_to_cuis,    # cui -> set of members
-        "flattened_neighbors": neighbors,
-    }
-    if tags:
-        payload["tags"] = tags
-    if labels:
-        payload["labels"] = labels
+    # Save
+    print(f"\n[Saving] {OUTPUT_PATH}")
+    out = dict(payload)  # carry forward all original fields
+    out["cui_subtopics_components"] = components
+    out["cui_subtopics_cliques"]    = cliques
+    out["subtopic_built_at"]        = datetime.datetime.now().isoformat()
 
     with open(OUTPUT_PATH, "wb") as f:
-        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump(out, f, protocol=pickle.HIGHEST_PROTOCOL)
     size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
     print(f"  wrote {size_mb:.1f} MB")
     print("\nDONE")
