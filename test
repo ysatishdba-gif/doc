@@ -1,233 +1,130 @@
 """
-build_subtopics_v2.py
----------------------
-Same sub-topic build as before (components + cliques) but with
-bidirectional indexing so we can:
-  - Look up sub-topics for a main topic (forward)
-  - Look up main topics for a sub-topic (reverse)
-  - Look up all sub-topics a CUI belongs to (across all main topics)
+test_subtopics_v2.py
+--------------------
+Test the bidirectional sub-topic build.
 
-Each unique sub-topic gets a stable ID:
-  subtopic_id = "st_<hash>"
-
-Output pickle:
-  cui_topic_id                  : main topic per CUI (preserved)
-  topic_to_cuis                 : main topic members (preserved)
-  flattened_neighbors           : direct CUI edges (preserved)
-  labels, tags, snomed_cuis     : metadata (preserved)
-
-  Sub-topic additions:
-  main_topic_to_subtopic_ids    : main_topic_cui -> list of subtopic_ids (forward)
-  subtopic_id_to_cuis           : subtopic_id -> frozenset of member CUIs
-  subtopic_id_to_main_topics    : subtopic_id -> set of main_topic_cuis (reverse)
-  cui_to_subtopic_ids           : cui -> set of subtopic_ids it appears in
-  subtopic_metadata             : subtopic_id -> {size, method ("clique"/"component")}
+Demonstrates both directions:
+  - Forward: given a main topic CUI, list its sub-topics
+  - Reverse: given a sub-topic, list which main topics it belongs to
+  - Per CUI: which sub-topics does this CUI appear in?
 """
 
 import pickle
-import datetime
-import hashlib
-import time
-import os
-from collections import defaultdict
+from collections import Counter
 
 
-INPUT_PATH  = "topic_lookup_neighborhoods.pkl"
-OUTPUT_PATH = "topic_lookup_subtopics_v2.pkl"
+PICKLE_PATH = "topic_lookup_subtopics_v2.pkl"
+
+CUIS_TO_TEST = [
+    "C0032285",  # Pneumonia
+    "C0021368",  # Inflammation
+    "C0024109",  # Lung
+    "C0011849",  # Diabetes
+    "C1527304",  # Allergic reaction
+    "C0559470",  # Allergy to peanut
+    "C0002792",  # Anaphylaxis
+    "C0013182",  # Allergy to drug
+    "C2142181",  # Pain of left knee joint
+    "C1621958",  # Glioblastoma multiforme
+]
 
 
-# ============================================================================
-# Helpers
-# ============================================================================
+print(f"Loading {PICKLE_PATH} ...")
+with open(PICKLE_PATH, "rb") as f:
+    p = pickle.load(f)
 
-def subtopic_id(members_frozenset):
-    """
-    Stable ID for a sub-topic given its members.
-    Hash the sorted CUI list.
-    """
-    sorted_members = "|".join(sorted(members_frozenset))
-    h = hashlib.sha1(sorted_members.encode()).hexdigest()[:14]
-    return f"st_{h}"
-
-
-def induced_subgraph(members, neighbors):
-    """Return adjacency dict for the induced subgraph on these members."""
-    members_set = set(members)
-    return {
-        cui: neighbors.get(cui, set()) & members_set
-        for cui in members
-    }
+topic_to_cuis              = p["topic_to_cuis"]
+main_topic_to_subtopic_ids = p["main_topic_to_subtopic_ids"]
+subtopic_id_to_cuis        = p["subtopic_id_to_cuis"]
+subtopic_id_to_main_topics = p["subtopic_id_to_main_topics"]
+cui_to_subtopic_ids        = p["cui_to_subtopic_ids"]
+subtopic_metadata          = p["subtopic_metadata"]
+labels                     = p.get("labels", {})
 
 
-def find_components(sub_adj):
-    """BFS connected components. Returns list of sets."""
-    visited = set()
-    components = []
-    for start in sub_adj:
-        if start in visited:
-            continue
-        comp = set()
-        stack = [start]
-        while stack:
-            u = stack.pop()
-            if u in visited:
-                continue
-            visited.add(u)
-            comp.add(u)
-            for v in sub_adj.get(u, ()):
-                if v not in visited:
-                    stack.append(v)
-        components.append(comp)
-    return components
+def lbl(c):
+    return labels.get(c, "?")[:40] if labels else "?"
 
 
-def bron_kerbosch(R, P, X, sub_adj, results, max_results=200):
-    """Maximal cliques via Bron-Kerbosch (no pivoting; sufficient for tiny graphs)."""
-    if len(results) >= max_results:
-        return
-    if not P and not X:
-        if len(R) >= 2:
-            results.append(frozenset(R))
-        return
-    for v in list(P):
-        if len(results) >= max_results:
-            return
-        Nv = sub_adj.get(v, set())
-        bron_kerbosch(R | {v}, P & Nv, X & Nv, sub_adj, results, max_results)
-        P = P - {v}
-        X = X | {v}
-
-
-def find_cliques(sub_adj):
-    """All maximal cliques of size >= 2. Returns list of frozensets."""
-    results = []
-    bron_kerbosch(set(), set(sub_adj.keys()), set(), sub_adj, results,
-                  max_results=200)
-    return results
+print(f"  Main topics             : {len(topic_to_cuis):,}")
+print(f"  Unique sub-topics       : {len(subtopic_id_to_cuis):,}")
 
 
 # ============================================================================
-# Main build
+# Per-CUI inspection
 # ============================================================================
 
-def build_subtopics(payload):
-    cui_topic_id        = payload["cui_topic_id"]
-    topic_to_cuis       = payload["topic_to_cuis"]
-    flattened_neighbors = payload["flattened_neighbors"]
+for cui in CUIS_TO_TEST:
+    print(f"\n\n{'='*80}")
+    print(f"  {cui}  '{lbl(cui)}'")
+    print(f"{'='*80}")
 
-    print(f"  main topics to process: {len(topic_to_cuis):,}")
+    main_members = topic_to_cuis.get(cui, set())
+    print(f"\n  MAIN TOPIC (size {len(main_members)})")
 
-    # Build forward + reverse indices
-    main_topic_to_subtopic_ids = defaultdict(list)  # main -> list of subtopic_ids
-    subtopic_id_to_cuis        = {}                  # subtopic_id -> frozenset
-    subtopic_id_to_main_topics = defaultdict(set)    # subtopic_id -> set of main_topic_cuis
-    cui_to_subtopic_ids        = defaultdict(set)    # cui -> set of subtopic_ids
-    subtopic_metadata          = {}                  # subtopic_id -> {size, method}
+    # All sub-topics this CUI belongs to
+    sids = cui_to_subtopic_ids.get(cui, set())
+    print(f"\n  This CUI appears in {len(sids)} sub-topics total")
 
-    n_processed = 0
-    n_components_total = 0
-    n_cliques_total = 0
-    t0 = time.time()
+    # Group by size for readability
+    by_size = Counter()
+    for sid in sids:
+        size = subtopic_metadata.get(sid, {}).get("size", 0)
+        by_size[size] += 1
+    print(f"  By size:")
+    for size in sorted(by_size):
+        print(f"    size {size:>3}: {by_size[size]} sub-topics")
 
-    for main_topic, members in topic_to_cuis.items():
-        n_processed += 1
-        if len(members) < 2:
-            # Singleton topic — its sub-topic is itself
-            sid = subtopic_id(frozenset(members))
-            subtopic_id_to_cuis[sid] = frozenset(members)
-            subtopic_metadata[sid] = {"size": len(members), "method": "singleton"}
-            main_topic_to_subtopic_ids[main_topic].append(sid)
-            subtopic_id_to_main_topics[sid].add(main_topic)
-            for c in members:
-                cui_to_subtopic_ids[c].add(sid)
-            continue
+    # Forward: sub-topics within THIS CUI's main topic
+    own_subtopics = main_topic_to_subtopic_ids.get(cui, [])
+    # Deduplicate (same subtopic_id can appear multiple times in list)
+    unique_own_subtopics = list(dict.fromkeys(own_subtopics))
+    print(f"\n  SUB-TOPICS within this main topic ({len(unique_own_subtopics)}):")
 
-        sub_adj = induced_subgraph(members, flattened_neighbors)
-
-        # Components
-        comps = find_components(sub_adj)
-        for comp in comps:
-            sid = subtopic_id(frozenset(comp))
-            if sid not in subtopic_id_to_cuis:
-                subtopic_id_to_cuis[sid] = frozenset(comp)
-                subtopic_metadata[sid] = {"size": len(comp), "method": "component"}
-            main_topic_to_subtopic_ids[main_topic].append(sid)
-            subtopic_id_to_main_topics[sid].add(main_topic)
-            for c in comp:
-                cui_to_subtopic_ids[c].add(sid)
-            n_components_total += 1
-
-        # Cliques (size >= 2)
-        cliques = find_cliques(sub_adj)
-        for clq in cliques:
-            sid = subtopic_id(clq)
-            if sid not in subtopic_id_to_cuis:
-                subtopic_id_to_cuis[sid] = clq
-                subtopic_metadata[sid] = {"size": len(clq), "method": "clique"}
-            main_topic_to_subtopic_ids[main_topic].append(sid)
-            subtopic_id_to_main_topics[sid].add(main_topic)
-            for c in clq:
-                cui_to_subtopic_ids[c].add(sid)
-            n_cliques_total += 1
-
-        if n_processed % 50000 == 0:
-            print(f"    processed {n_processed:,} ({time.time()-t0:.0f}s)")
-
-    print(f"  done in {time.time()-t0:.0f}s")
-    print(f"\n  Stats:")
-    print(f"    unique sub-topics      : {len(subtopic_id_to_cuis):,}")
-    print(f"    total component refs   : {n_components_total:,}")
-    print(f"    total clique refs      : {n_cliques_total:,}")
-    print(f"    CUIs with sub-topic    : {len(cui_to_subtopic_ids):,}")
-
-    # Size distribution
-    sizes = sorted(meta["size"] for meta in subtopic_metadata.values())
-    print(f"\n  Sub-topic size distribution:")
-    print(f"    min/median/p90/p99/max : "
-          f"{sizes[0]} / {sizes[len(sizes)//2]} / "
-          f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
-          f"{sizes[-1]}")
-
-    by_method = defaultdict(int)
-    for meta in subtopic_metadata.values():
-        by_method[meta["method"]] += 1
-    print(f"\n  By method:")
-    for method, n in by_method.items():
-        print(f"    {method:<12s}: {n:,}")
-
-    return {
-        "main_topic_to_subtopic_ids": dict(main_topic_to_subtopic_ids),
-        "subtopic_id_to_cuis":        subtopic_id_to_cuis,
-        "subtopic_id_to_main_topics": dict(subtopic_id_to_main_topics),
-        "cui_to_subtopic_ids":        dict(cui_to_subtopic_ids),
-        "subtopic_metadata":          subtopic_metadata,
-    }
+    # Sort by size descending, show interesting ones
+    sorted_subs = sorted(
+        unique_own_subtopics,
+        key=lambda s: -subtopic_metadata.get(s, {}).get("size", 0),
+    )
+    for sid in sorted_subs[:10]:
+        meta = subtopic_metadata.get(sid, {})
+        members = subtopic_id_to_cuis.get(sid, frozenset())
+        n_main_topics = len(subtopic_id_to_main_topics.get(sid, set()))
+        print(f"    {sid}  size={meta.get('size')} "
+              f"method={meta.get('method')} "
+              f"appears_in_main_topics={n_main_topics}")
+        for m in sorted(members):
+            marker = " <-- self" if m == cui else ""
+            print(f"      {m}  '{lbl(m)}'{marker}")
+    if len(sorted_subs) > 10:
+        print(f"    ... +{len(sorted_subs)-10} more sub-topics")
 
 
 # ============================================================================
-# Main
+# Reverse lookup demo: pick a few sub-topics, show which main topics they're in
 # ============================================================================
 
-def main():
-    print(f"Loading {INPUT_PATH} ...")
-    with open(INPUT_PATH, "rb") as f:
-        payload = pickle.load(f)
-    print(f"  CUIs        : {len(payload['cui_topic_id']):,}")
+print(f"\n\n{'#'*80}")
+print(f"#  REVERSE LOOKUP DEMO")
+print(f"#  (For a few sub-topics, show which main topics they appear in)")
+print(f"{'#'*80}")
 
-    print(f"\n[1] Building sub-topics with bidirectional indexing ...")
-    subtopic_data = build_subtopics(payload)
+# Find some sub-topics of size >= 3 to demonstrate
+demo_sids = [
+    sid for sid, meta in subtopic_metadata.items()
+    if meta.get("size", 0) >= 3 and meta.get("method") == "clique"
+][:5]
 
-    # Merge with original
-    out = dict(payload)
-    out.update(subtopic_data)
-    out["subtopic_built_at"] = datetime.datetime.now().isoformat()
+for sid in demo_sids:
+    members = subtopic_id_to_cuis[sid]
+    main_topics = subtopic_id_to_main_topics[sid]
+    print(f"\n  Sub-topic {sid} (size {len(members)}):")
+    print(f"    Members:")
+    for m in sorted(members):
+        print(f"      {m}  '{lbl(m)}'")
+    print(f"    Appears in {len(main_topics)} main topic(s):")
+    for mt in sorted(main_topics):
+        print(f"      {mt}  '{lbl(mt)}'")
 
-    print(f"\n[Saving] {OUTPUT_PATH}")
-    with open(OUTPUT_PATH, "wb") as f:
-        pickle.dump(out, f, protocol=pickle.HIGHEST_PROTOCOL)
-    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
-    print(f"  wrote {size_mb:.1f} MB")
-    print("\nDONE")
 
-
-main()
+print("\n\nDONE")
