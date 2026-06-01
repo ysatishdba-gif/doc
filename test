@@ -1,944 +1,171 @@
-Total CUIs with topic     : 374,538
-  Total topics (= CUI count): 374,538
-  CUIs in flattened graph   : 373,605
-  Labels available          : 374,538
+"""
+build_topics_neighborhoods.py
+-----------------------------
+Simplest possible topic build: each CUI's topic = {itself + its direct
+graph neighbors}.
 
-################################################################################
-# SECTION 1: Focal CUI lookups (each CUI's full topic)
-################################################################################
+No algorithm beyond:
+  1. Flatten suffix-bridge graph to direct CUI-CUI edges (SNOMED-only)
+  2. For each CUI, topic = {cui} ∪ neighbors[cui]
 
-================================================================================
-  CUI: C0032285  'Pneumonia (disorder)'
-================================================================================
-  Topic ID     : C0032285  (each CUI is its own topic)
-  Topic size   : 42
-  Members:
-    C0004626  'Bacterial pneumonia'
-    C0006285  'Lobular pneumonia'
-    C0024115  'Disorder of lung'
-    C0032241  'Pleurobronchopneumonia (disorder)'
-    C0032285  'Pneumonia (disorder)' <-- self
-    C0032290  'Aspiration pneumonia'
-    C0032300  'Lobar pneumonia'
-    C0032310  'Viral pneumonia'
-    C0035243  'Respiratory tract infection'
-    C0152413  'Pneumonia caused by respiratory syn'
-    C0155870  'Pneumonia and influenza'
-    C0158935  'Congenital pneumonia'
-    C0206061  'Interstitial pneumonia'
-    C0264377  'Peribronchial pneumonia'
-    C0264381  'Unresolved pneumonia'
-    C0264386  'Foreign body pneumonia'
-    C0264515  'Necrotizing pneumonia'
-    C0264522  'Hypostatic pneumonia'
-    C0276253  'Cytomegaloviral pneumonia'
-    C0276527  'Pneumonia with AIDS (acquired immun'
-    C0276688  'Pulmonary cryptococcosis'
-    C0339961  'Fungal pneumonia'
-    C0339965  'Haemorrhagic pneumonia'
-    C0339968  'Neonatal pneumonia'
-    C0339969  'Pneumonia due to parasitic infestat'
-    C0348806  'Abscess of lung with pneumonia'
-    C0694549  'Community acquired pneumonia'
-    C0694550  'Recurrent pneumonia (disorder)'
-    C0747674  'Cavitary pneumonia'
-    C0747690  'Postobstructive pneumonia'
-    C0876973  'Pulmonary infection'
-    C0949083  'Nosocomial pneumonia (disorder)'
-    C1112452  'Post measles pneumonia'
-    C1142578  'Bilateral pneumonia'
-    C1279386  'Postoperative pneumonia'
-    C1290339  'Focal pneumonia'
-    C1290340  'Confluent pneumonia'
-    C1535939  'Pulmonary pneumocystosis'
-    C1701940  'Ventilator-associated pneumonia'
-    C3495445  'Toxoplasma pneumonia'
-    C3714636  'Pneumonitis'
-    C4039254  'Chronic pneumonia'
+That's it. Edges ARE the relations. Each neighborhood IS a topic.
 
-================================================================================
-  CUI: C0021368  'Inflammation'
-================================================================================
-  Topic ID     : C0021368  (each CUI is its own topic)
-  Topic size   : 9
-  Members:
-    C0016549  'Foreign body reaction'
-    C0021368  'Inflammation' <-- self
-    C0030660  'Pathological process (attribute)'
-    C0036749  'Serositis (disorder)'
-    C0242966  'Systemic inflammatory response synd'
-    C0262627  'Seroma (disorder)'
-    C0333383  'Acute and chronic inflammation'
-    C1260958  'Serofibrinous inflammation'
-    C1265832  'Focal acute inflammation'
+Inputs (notebook globals):
+  data, SNOMED_CUIS, TAGS (optional), LABELS (optional)
+"""
 
-================================================================================
-  CUI: C0024109  'Lung'
-================================================================================
-  Topic ID     : C0024109  (each CUI is its own topic)
-  Topic size   : 16
-  Members:
-    C0006255  'Bronchus'
-    C0024109  'Lung' <-- self
-    C0034051  'Pulmonary alveolar structure (body '
-    C0035237  'Respiratory system'
-    C0225698  'Pneumocyte (cell)'
-    C0225706  'Right lung structure (body structur'
-    C0225730  'Left lung structure'
-    C0229962  'Body part structure (body structure'
-    C0230130  'Thoracic viscus'
-    C0278427  'Structure of transplanted lung (bod'
-    C0458579  'Lower respiratory tract'
-    C1268107  'Lung part'
-    C1278908  'Entire lung'
-    C1285482  'Pulmonary structure including vesse'
-    C3698225  'Structure of pulmopleural compartme'
-    C4075195  'Structure of organ in respiratory s'
-
-================================================================================
-  CUI: C0011849  'Diabetes mellitus'
-================================================================================
-  Topic ID     : C0011849  (each CUI is its own topic)
-  Topic size   : 41
-  Members:
-    C0001792  'Advanced age'
-    C0011849  'Diabetes mellitus' <-- self
-    C0011854  'Diabetes mellitus type 1'
-    C0011859  'Lipodystrophic diabetes'
-    C0011860  'Type II diabetes mellitus'
-    C0011871  'Peripheral angiopathy due to diabet'
-    C0011878  'Diabetic diet'
-    C0011880  'Diabetic ketoacidosis'
-    C0011881  'Diabetic nephropathy'
-    C0011882  'Diabetic neuropathy'
-    C0014130  'Endocrine system disease'
-    C0014136  'Endocrine structure'
-    C0020456  'Hyperglycaemia'
-    C0085207  'Gestational diabetes'
-    C0206172  'Diabetic foot'
-    C0265344  'Donohue's syndrome'
-    C0271640  'Secondary diabetes mellitus'
-    C0271641  'Malnutrition related diabetes melli'
-    C0271650  'Impaired glucose tolerance (disorde'
-    C0341893  'Diabetes mellitus in mother complic'
-    C0342245  'Disorder of eye due to diabetes mel'
-    C0342257  'Disorder associated with diabetes m'
-    C0342276  'Maturity-onset diabetes of the youn'
-    C0342302  'Brittle diabetes mellitus (disorder'
-    C0362046  'Prediabetes (finding)'
-    C0392201  'Glucose measurement, blood'
-    C0474680  'Haemoglobin A1c measurement'
-    C0524620  'Metabolic syndrome X'
-    C0694452  'Endocrine / nutritional / metabolic'
-    C1257958  'Disorder of glucose metabolism'
-    C1263962  'Houssay syndrome'
-    C1320655  'Newly diagnosed diabetes'
-    C1859965  'Alaninuria, microcephaly, dwarfism,'
-    C2874124  'Diabetes mellitus due to genetic de'
-    C2874125  'Diabetes mellitus due to genetic de'
-    C2931296  'Pancreatic hypoplasia, diabetes mel'
-    C3837958  'Ketosis-prone diabetes mellitus'
-    C3839440  'Diabetes mellitus in remission'
-    C3875503  'Diabetes mellitus due to pancreatic'
-    C4274674  'Gingival disease co-occurrent with '
-    C4302120  'Atypical diabetes mellitus'
-
-================================================================================
-  CUI: C1527304  'Allergic reaction'
-================================================================================
-  Topic ID     : C1527304  (each CUI is its own topic)
-  Topic size   : 31
-  Members:
-    C0013182  'Allergy to drug'
-    C0016470  'Food allergy'
-    C0020517  'Hypersensitivity reaction (disorder'
-    C0259756  'Jarisch Herxheimer reaction'
-    C0271157  'Phacoanaphylaxis'
-    C0343029  'Tuberculids'
-    C0392707  'Atopic diathesis'
-    C0413234  'Acute allergic reaction'
-    C0429892  'Type 1 hypersensitivity response'
-    C0851444  'Allergic condition'
-    C1283787  'Allergic transfusion reaction'
-    C1304076  'Angry back syndrome'
-    C1527304  'Allergic reaction' <-- self
-    C1532237  'Disorder of immune function'
-    C1626923  'Allergic reaction to chemical'
-    C1630647  'Allergic reaction to animal'
-    C1631062  'Allergic reaction to detergent'
-    C1633733  'Allergic reaction to cosmetics'
-    C1633749  'Allergic reaction to adhesive'
-    C1635270  'Allergic reaction to pollen'
-    C1636155  'Allergic reaction to plant, except '
-    C1690580  'Allergic reaction to food'
-    C1690975  'Allergic reaction to flour dust'
-    C2317062  'Allergic reaction to tattoo ink'
-    C3532600  'Allergic reaction to hair dye'
-    C3662037  'Allergic reaction to radiocontrast '
-    C4082933  'Animal allergy'
-    C4749634  'Allergic reaction caused by vaccine'
-    C5192382  'Allergic reaction due to allergy sk'
-    C5397549  'Allergic reaction caused by insect '
-    C5397552  'Allergic reaction after allergen im'
-
-================================================================================
-  CUI: C0559470  'Allergy to peanut'
-================================================================================
-  Topic ID     : C0559470  (each CUI is its own topic)
-  Topic size   : 2
-  Members:
-    C0559470  'Allergy to peanut' <-- self
-    C1096735  'Allergy to pulse vegetable'
-
-================================================================================
-  CUI: C0002792  'Anaphylaxis'
-================================================================================
-  Topic ID     : C0002792  (each CUI is its own topic)
-  Topic size   : 26
-  Members:
-    C0002792  'Anaphylaxis' <-- self
-    C0020517  'Hypersensitivity reaction (disorder'
-    C0020523  'IgE-mediated allergic disorder'
-    C0020962  'Structure of immune system'
-    C0161840  'Anaphylactic transfusion reaction'
-    C0274305  'Localized anaphylaxis'
-    C0344159  'Anaphylaxis caused by venom'
-    C0344168  'Drug-induced anaphylaxis'
-    C0344172  'Seminal fluid-induced anaphylaxis'
-    C0344183  'Exercise-induced anaphylaxis'
-    C0413234  'Acute allergic reaction'
-    C0413235  'Idiopathic anaphylaxis'
-    C0442893  'Systemic illness'
-    C0685898  'Food anaphylaxis'
-    C4316895  'Shock due to anaphylaxis'
-    C4543745  'Anaphylaxis due to mast cell disord'
-    C4546212  'Anaphylaxis caused by low temperatu'
-    C5192386  'Anaphylaxis after allergen immunoth'
-    C5397548  'Anaphylaxis caused by insect bite a'
-    C5438739  'Anaphylaxis caused by Hevea brasili'
-    C5549840  'Anaphylaxis caused by component of '
-    C5687621  'Anaphylaxis caused by allergy skin '
-    C5788565  'Postoperative anaphylaxis'
-    C5817050  'Anaphylaxis caused by radiographic '
-    C5817051  'Anaphylaxis caused by sulfonamide'
-    C5817053  'Anaphylaxis caused by food additive'
-
-================================================================================
-  CUI: C0013182  'Allergy to drug'
-================================================================================
-  Topic ID     : C0013182  (each CUI is its own topic)
-  Topic size   : 567
-  Members:
-    C0011609  'Drug eruption'
-    C0013182  'Allergy to drug' <-- self
-    C0014808  'Allergy to erythromycin'
-    C0020517  'Hypersensitivity reaction (disorder'
-    C0030824  'Penicillin allergy'
-    C0039645  'Tetracycline allergy'
-    C0041755  'Adverse drug reaction'
-    C0237865  'Propensity to adverse reactions to '
-    C0277585  'Drug intolerance'
-    C0344168  'Drug-induced anaphylaxis'
-    C0570513  'Acetaminophen allergy'
-    C0570514  'Salicylate allergy'
-    C0570537  'Allergy to non-steroidal anti-infla'
-    C0570569  'Allergy to tripotassium dicitratobi'
-    C0570570  'Sucralfate allergy'
-    C0570573  'Allergy to histamine H2 receptor an'
-    C0570578  'Allergy to H+/K+-exchanging ATPase '
-    C0570581  'Carbenoxolone allergy'
-    C0570582  'Allergy to pirenzepine'
-    C0570583  'Pancreatin allergy'
-    C0570589  'Allergy to magnesium trisilicate'
-    C0570590  'Allergy to aluminum hydroxide'
-    C0570592  'Allergy to loperamide'
-    C0570595  'Cisapride allergy'
-    C0570597  'Nabilone allergy'
-    C0570598  'Allergy to domperidone'
-    C0570599  'Metoclopramide allergy'
-    C0570600  'Allergy to 5-hydroxytryptamine-3-re'
-    C0570602  'Bisacodyl allergy'
-    C0570603  'Allergy to danthron'
-    C0570604  'Sodium picosulphate allergy'
-    C0570605  'Allergy to lactulose'
-    C0570606  'Magnesium sulphate allergy'
-    C0570609  'Cascara allergy'
-    C0570610  'Allergy to senna'
-    C0570611  'Allergy to docusate'
-    C0570614  'Peppermint oil allergy'
-    C0570615  'Allergy to alverine'
-    C0570616  'Allergy to mebeverine'
-    C0570617  'Allergy to dicyclomine'
-    C0570618  'Mepenzolate allergy'
-    C0570619  'Pipenzolate allergy'
-    C0570620  'Allergy to poldine'
-    C0570621  'Propantheline allergy'
-    C0570624  'Dehydrocholic acid allergy'
-    C0570630  'Etomidate allergy'
-    C0570631  'Ketamine allergy'
-    C0570632  'Propofol allergy'
-    C0570636  'Enflurane allergy'
-    C0570638  'Halothane allergy'
-    C0570639  'Isoflurane allergy'
-    C0570640  'Trichloroethylene allergy'
-    C0570641  'Desflurane allergy'
-    C0570642  'Allergy to local anaesthetic'
-    C0570655  'Allergy to amifostine'
-    C0570656  'Allergy to aldesleukin'
-    C0570658  'Molgramostim allergy'
-    C0570659  'Allergy to lenograstim'
-    C0570660  'Allergy to filgrastim'
-    C0570661  'Levamisole allergy'
-    C0570663  'Allergy to alkylating agent'
-    C0570666  'Treosulfan allergy'
-    C0570682  'Dactinomycin allergy'
-    C0570683  'Bleomycin allergy'
-    C0570684  'Allergy to mitomycin'
-    C0570685  'Plicamycin allergy'
-    C0570686  'Allergy to aclarubicin'
-    C0570688  'Doxorubicin allergy'
-    C0570689  'Allergy to epirubicin'
-    C0570690  'Idarubicin allergy'
-    C0570692  'Allergy to mercuric oxide'
-    C0570693  'Methotrexate allergy'
-    C0570694  'Allergy to mercaptopurine'
-    C0570695  'Allergy to thioguanine'
-    C0570696  'Allergy to pentostatin'
-    C0570697  'Cytarabine allergy'
-    C0570698  'Allergy to fluorouracil'
-    C0570699  'Allergy to etoposide'
-    C0570700  'Allergy to amsacrine'
-    C0570701  'Carboplatin allergy'
-    C0570702  'Cisplatin allergy'
-    C0570703  'Hydroxyurea allergy'
-    C0570704  'Allergy to procarbazine'
-    C0570705  'Razoxane allergy'
-    C0570706  'Crisantaspase allergy'
-    C0570707  'Paclitaxel allergy'
-    C0570708  'Allergy to fludarabine'
-    C0570709  'Allergy to aminoglutethimide'
-    C0570710  'Allergy to estrogen receptor antago'
-    C0570714  'Vinca alkaloid allergy'
-    C0570718  'Allergy to dimethyl sulfoxide'
-    C0570720  'Allergy to cyclosporine'
-    C0570721  'Allergy to azathioprine'
-    C0570724  'Allergy to mazindol'
-    C0570727  'Allergy to diethylpropion'
-    C0570733  'Amantadine allergy'
-    C0570734  'Apomorphine allergy'
-    C0570743  'Butriptyline allergy'
-    C0570744  'Doxepin allergy'
-    C0570745  'Iprindole allergy'
-    C0570746  'Lofepramine allergy'
-    C0570747  'Nortriptyline allergy'
-    C0570748  'Allergy to trimipramine'
-    C0570749  'Amoxapine allergy'
-    C0570750  'Amitriptyline allergy'
-    C0570751  'Clomipramine allergy'
-    C0570752  'Allergy to desipramine'
-    C0570753  'Allergy to dothiepin'
-    C0570754  'Imipramine allergy'
-    C0570755  'Allergy to protriptyline'
-    C0570756  'Allergy to monoamine oxidase inhibi'
-    C0570765  'Allergy to selective serotonin re-u'
-    C0570773  'Allergy to maprotiline'
-    C0570775  'Allergy to trazodone'
-    C0570776  'Allergy to viloxazine'
-    C0570778  'Allergy to beclamide'
-    C0570779  'Lamotrigine allergy'
-    C0570780  'Piracetam allergy'
-    C0570781  'Allergy to gabapentin'
-    C0570787  'Allergy to carbamazepine'
-    C0570788  'Allergy to vigabatrin'
-    C0570789  'Phenytoin allergy'
-    C0570790  'Ethosuximide allergy'
-    C0570794  'Zopiclone allergy'
-    C0570795  'Allergy to zolpidem'
-    C0570796  'Allergy to chlormezanone'
-    C0570797  'Allergy to methyprylon'
-    C0570798  'Allergy to paraldehyde'
-    C0570826  'Meprobamate allergy'
-    C0570831  'Buspirone allergy'
-    C0570832  'Chlormethiazole allergy'
-    C0570834  'Allergy to sulpiride'
-    C0570835  'Loxapine allergy'
-    C0570836  'Allergy to clozapine'
-    C0570837  'Risperidone allergy'
-    C0570838  'Tetrabenazine allergy'
-    C0570839  'Allergy to butyrophenone derivative'
-    C0570845  'Diphenylbutylpiperidine allergy'
-    C0570848  'Allergy to phenothiazine'
-    C0570853  'Allergy to thiethylperazine'
-    C0570862  'Allergy to thioxanthene'
-    C0570868  'Allergy to oxypertine'
-    C0570869  'Allergy to remoxipride'
-    C0570873  'Allergy to pemoline'
-    C0570874  'Allergy to methylphenidate'
-    C0570876  'Allergy to amfetamine and/or amfeta'
-    C0570881  'Allergy to beta adrenergic receptor'
-    C0570904  'Allergy to alpha adrenergic recepto'
-    C0570912  'Allergy to nicotine'
-    C0570914  'Allergy to lidoflazine'
-    C0570915  'Nifedipine allergy'
-    C0570916  'Prenylamine allergy'
-    C0570917  'Isradipine allergy'
-    C0570918  'Allergy to felodipine'
-    C0570919  'Allergy to lacidipine'
-    C0570920  'Nimodipine allergy'
-    C0570921  'Amlodipine allergy'
-    C0570922  'Diltiazem allergy'
-    C0570923  'Nicardipine allergy'
-    C0570924  'Allergy to verapamil'
-    C0570926  'Pilocarpine allergy'
-    C0570928  'Allergy to methacholine'
-    C0570929  'Allergy to acetylcholinesterase inh'
-    C0570937  'Bethanechol allergy'
-    C0570938  'Allergy to carbachol'
-    C0570943  'Allergy to alpha adrenergic recepto'
-    C0570952  'Allergy to beta-2 adrenergic recept'
-    C0570958  'Allergy to metaproterenol'
-    C0570961  'Allergy to ritodrine'
-    C0570963  'Allergy to tulobuterol'
-    C0570965  'Allergy to dobutamine'
-    C0570966  'Allergy to dopexamine'
-    C0570967  'Allergy to isoproterenol'
-    C0570977  'Allergy to dipivefrin'
-    C0570978  'Allergy to dopamine'
-    C0570981  'Allergy to xamoterol'
-    C0570984  'Allergy to belladonna alkaloid'
-    C0570986  'Biperiden allergy'
-    C0570990  'Tropicamide allergy'
-    C0570991  'Allergy to scopolamine'
-    C0570993  'Atropine allergy'
-    C0570994  'Trihexyphenidyl allergy'
-    C0570995  'Allergy to benztropine'
-    C0570996  'Cyclopentolate allergy'
-    C0570997  'Glycopyrronium allergy'
-    C0570998  'Allergy to homatropine'
-    C0570999  'Allergy to ipratropium'
-    C0571000  'Allergy to methixene'
-    C0571001  'Allergy to orphenadrine'
-    C0571004  'Oxitropium allergy'
-    C0571005  'Allergy to oxybutynin'
-    C0571006  'Allergy to procyclidine'
-    C0571008  'Allergy to dornase alfa'
-    C0571010  'Tyloxapol allergy'
-    C0571012  'Allergy to carbocisteine'
-    C0571013  'Methylcysteine allergy'
-    C0571014  'Acetylcysteine allergy'
-    C0571018  'Allergy to doxapram'
-    C0571020  'Allergy to beractant'
-    C0571022  'Allergy to pumactant'
-    C0571023  'Colfosceril allergy'
-    C0571031  'Loratadine allergy'
-    C0571032  'Allergy to azelastine'
-    C0571033  'Cetirizine allergy'
-    C0571035  'Allergy to clemastine'
-    C0571040  'Allergy to dimenhydrinate'
-    C0571042  'Antazoline allergy'
-    C0571043  'Promethazine allergy'
-    C0571044  'Azatadine allergy'
-    C0571046  'Allergy to chlorpheniramine'
-    C0571048  'Cyproheptadine allergy'
-    C0571050  'Diphenhydramine allergy'
-    C0571051  'Diphenylpyraline allergy'
-    C0571052  'Hydroxyzine allergy'
-    C0571055  'Pheniramine allergy'
-    C0571061  'Ketotifen allergy'
-    C0571062  'Allergy to lodoxamide'
-    C0571065  'Allergy to isoaminile'
-    C0571074  'Aminophylline allergy'
-    C0571076  'Theophylline allergy'
-    C0571085  'Allergy to coal tar'
-    C0571099  'Allergy to podophyllotoxin'
-    C0571123  'Retinoid allergy'
-    C0571133  'Probenecid allergy'
-    C0571134  'Sulfinpyrazone allergy'
-    C0571136  'Allopurinol allergy'
-    C0571140  'Allergy to succinylcholine'
-    C0571141  'Allergy to nondepolarising agent'
-    C0571147  'Allergy to tubocurarine'
-    C0571150  'Baclofen allergy'
-    C0571151  'Carisoprodol allergy'
-    C0571152  'Allergy to methocarbamol'
-    C0571153  'Allergy to dantrolene'
-    C0571156  'Allergy to auranofin'
-    C0571158  'Allergy to papaverine'
-    C0571159  'Flavoxate allergy'
-    C0571161  'Mifepristone allergy'
-    C0571165  'Prostaglandin allergy'
-    C0571179  'Allergy to ipecacuanha'
-    C0571180  'Charcoal-activated allergy'
-    C0571181  'Allergy to sodium nitrite'
-    C0571183  'Allergy to digoxin immune fab'
-    C0571184  'Mesna allergy'
-    C0571185  'Allergy to benzodiazepine receptor '
-    C0571188  'Allergy to pralidoxime'
-    C0571191  'Allergy to naltrexone'
-    C0571192  'Allergy to naloxone'
-    C0571193  'Protamine allergy'
-    C0571195  'Allergy to Fuller's earth'
-    C0571196  'Allergy to bentonite'
-    C0571198  'Allergy to dimercaprol'
-    C0571199  'Allergy to deferoxamine'
-    C0571206  'Allergy to penicillamine'
-    C0571232  'Allergy to castor oil'
-    C0571234  'Allergy to glycerin'
-    C0571241  'Allergy to mineral oil'
-    C0571256  'Flucytosine allergy'
-    C0571257  'Terbinafine allergy'
-    C0571258  'Nitrophenol allergy'
-    C0571259  'Tolnaftate allergy'
-    C0571260  'Allergy to amorolfine'
-    C0571262  'Allergy to griseofulvin'
-    C0571263  'Allergy to amphotericin'
-    C0571264  'Natamycin allergy'
-    C0571265  'Allergy to nystatin'
-    C0571269  'Allergy to clotrimazole'
-    C0571270  'Allergy to fenticonazole'
-    C0571271  'Tioconazole allergy'
-    C0571272  'Allergy to econazole'
-    C0571273  'Isoconazole allergy'
-    C0571274  'Allergy to sulconazole'
-    C0571275  'Allergy to ketoconazole'
-    C0571276  'Allergy to miconazole'
-    C0571278  'Fluconazole allergy'
-    C0571279  'Itraconazole allergy'
-    C0571281  'Allergy to inosine pranobex'
-    C0571283  'Ganciclovir allergy'
-    C0571284  'Famciclovir allergy'
-    C0571287  'Valaciclovir allergy'
-    C0571288  'Interferons allergy'
-    C0571293  'Allergy to ribavirin'
-    C0571294  'Allergy to trifluridine'
-    C0571295  'Foscarnet allergy'
-    C0571296  'Vidarabine allergy'
-    C0571297  'Allergy to aciclovir'
-    C0571298  'Idoxuridine allergy'
-    C0571301  'Pyrimethamine allergy'
-    C0571309  'Allergy to proguanil'
-    C0571311  'Quinine allergy'
-    C0571312  'Allergy to halofantrine'
-    C0571313  'Allergy to quinacrine'
-    C0571317  'Acetic acid allergy'
-    C0571318  'Hydrargaphen allergy'
-    C0571319  'Allergy to polynoxylin'
-    C0571320  'Allergy to hexetidine'
-    C0571321  'Allergy to sodium perborate'
-    C0571328  'Allergy to chloroxylenol'
-    C0571330  'Allergy to triclosan'
-    C0571336  'Glutaraldehyde allergy'
-    C0571338  'Noxythiolin allergy'
-    C0571339  'Allergy to formaldehyde'
-    C0571344  'Allergy to chlorhexidine'
-    C0571347  'Boric acid allergy'
-    C0571349  'Quaternary ammonium surfactant alle'
-    C0571353  'Allergy to quaternary pyridinium su'
-    C0571354  'Allergy to cetylpyridinium'
-    C0571355  'Allergy to quaternary quinolinium s'
-    C0571360  'Allergy to gentian violet'
-    C0571361  'Allergy to brilliant green'
-    C0571362  'Hydrogen peroxide allergy'
-    C0571364  'Piperazine allergy'
-    C0571365  'Pyrantel allergy'
-    C0571366  'Allergy to niclosamide'
-    C0571367  'Bephenium allergy'
-    C0571368  'Allergy to diethylcarbamazine'
-    C0571370  'Mebendazole allergy'
-    C0571371  'Allergy to albendazole'
-    C0571372  'Thiabendazole allergy'
-    C0571375  'Amikacin allergy'
-    C0571376  'Allergy to kanamycin'
-    C0571377  'Netilmicin allergy'
-    C0571378  'Allergy to streptomycin'
-    C0571379  'Framycetin allergy'
-    C0571380  'Neomycin allergy'
-    C0571381  'Allergy to gentamicin'
-    C0571382  'Tobramycin allergy'
-    C0571384  'Allergy to clarithromycin'
-    C0571385  'Allergy to azithromycin'
-    C0571387  'Spectinomycin allergy'
-    C0571388  'Vancomycin allergy'
-    C0571389  'Teicoplanin allergy'
-    C0571390  'Allergy to trimethoprim'
-    C0571391  'Nitrofurantoin allergy'
-    C0571393  'Allergy to mupirocin'
-    C0571394  'Nitrofurazone allergy'
-    C0571395  'Allergy to fusidic acid'
-    C0571397  'Allergy to rosoxacin'
-    C0571398  'Cinoxacin allergy'
-    C0571399  'Allergy to nalidixic acid'
-    C0571440  'Polymyxins allergy'
-    C0571444  'Allergy to cephalosporin'
-    C0571470  'Fosfomycin allergy'
-    C0571472  'Clindamycin allergy'
-    C0571473  'Allergy to lincomycin'
-    C0571474  'Mandelic acid allergy'
-    C0571476  'Allergy to aztreonam'
-    C0571477  'Nitroimidazole allergy'
-    C0571495  'Allergy to clomocycline'
-    C0571496  'Allergy to doxycycline'
-    C0571497  'Lymecycline allergy'
-    C0571498  'Allergy to minocycline'
-    C0571499  'Allergy to oxytetracycline'
-    C0571501  'Allergy to chlortetracycline'
-    C0571502  'Allergy to demeclocycline'
-    C0571503  'Chloramphenicol allergy'
-    C0571506  'Atovaquone allergy'
-    C0571508  'Sodium stibogluconate allergy'
-    C0571510  'Pentamidine allergy'
-    C0571512  'Allergy to diloxanide'
-    C0571517  'Pyrazinamide allergy'
-    C0571519  'Allergy to capreomycin'
-    C0571520  'Cycloserine allergy'
-    C0571521  'Allergy to rifampin'
-    C0571522  'Allergy to rifabutin'
-    C0571524  'Allergy to isoniazid'
-    C0571525  'Allergy to ethambutol'
-    C0571527  'Allergy to dapsone'
-    C0571528  'Allergy to clofazimine'
-    C0571530  'Allergy to benzyl benzoate'
-    C0571531  'Allergy to monosulfiram'
-    C0571543  'Allergy to human immunoglobulin'
-    C0571548  'Allergy to tetanus immunoglobulin'
-    C0571549  'Allergy to Varicella-zoster virus a'
-    C0571577  'Allergy to botulinum antitoxin'
-    C0571578  'Diphtheria antitoxin allergy'
-    C0571580  'Glucagon allergy'
-    C0571585  'Allergy to propylthiouracil'
-    C0571586  'Allergy to corticosteroid and/or co'
-    C0571622  'Insulin allergy'
-    C0571637  'Allergy to acetohexamide'
-    C0571638  'Chlorpropamide allergy'
-    C0571639  'Allergy to glyburide'
-    C0571640  'Allergy to glibornuride'
-    C0571641  'Allergy to gliclazide'
-    C0571642  'Allergy to glipizide'
-    C0571643  'Allergy to gliquidone'
-    C0571645  'Tolazamide allergy'
-    C0571646  'Tolbutamide allergy'
-    C0571648  'Metformin allergy'
-    C0571650  'Allergy to acarbose'
-    C0571652  'Allergy to progestational hormone'
-    C0571669  'Cyclofenil allergy'
-    C0571673  'Allergy to finasteride'
-    C0571674  'Allergy to flutamide'
-    C0571675  'Allergy to bicalutamide'
-    C0571677  'Allergy to cyproterone'
-    C0571679  'Androgen allergy'
-    C0571687  'Allergy to estrogen'
-    C0571705  'Allergy to ergoline derivative'
-    C0571713  'Desmopressin allergy'
-    C0571720  'Allergy to gonad regulating hormone'
-    C0571732  'Octreotide allergy'
-    C0571734  'Allergy to thyrotropin releasing fa'
-    C0571735  'Protirelin allergy'
-    C0571738  'Allergy to bisphosphonate'
-    C0571743  'Calcium regulating hormone allergy'
-    C0571752  'Allergy to gelatin'
-    C0571760  'Antithrombin III allergy'
-    C0571769  'Allergy to anti-inhibitor coagulant'
-    C0571775  'Ancrod allergy'
-    C0571776  'Allergy to heparin'
-    C0571777  'Allergy to enoxaparin'
-    C0571778  'Allergy to dalteparin'
-    C0571779  'Allergy to tinzaparin'
-    C0571780  'Allergy to heparinoid'
-    C0571784  'Allergy to acenocoumarol'
-    C0571785  'Warfarin allergy'
-    C0571789  'Allergy to etamsylate'
-    C0571791  'Tranexamic acid allergy'
-    C0571792  'Collagen allergy'
-    C0571793  'Aprotinin allergy'
-    C0571816  'Allergy to levocarnitine'
-    C0571828  'Allergy to vitamin D and/or vitamin'
-    C0571829  'Allergy to vitamin K and/or vitamin'
-    C0571830  'Allergy to alpha-tocopherol'
-    C0571833  'Allergy to niacin'
-    C0571834  'Allergy to folic acid'
-    C0571835  'Allergy to folinic acid'
-    C0571841  'Inositol allergy'
-    C0571844  'Ascorbic acid allergy'
-    C0571861  'Probucol allergy'
-    C0571862  'Allergy to acipimox'
-    C0571864  'Allergy to colestipol'
-    C0571865  'Cholestyramine allergy'
-    C0571868  'Allergy to clofibrate'
-    C0571869  'Allergy to fenofibrate'
-    C0571873  'Allergy to 3-hydroxy-3-methylglutar'
-    C0571878  'Allergy to adenosine'
-    C0571880  'Disopyramide allergy'
-    C0571881  'Quinidine allergy'
-    C0571882  'Allergy to flecainide'
-    C0571883  'Allergy to mexiletine'
-    C0571884  'Allergy to moricizine'
-    C0571885  'Allergy to procainamide'
-    C0571886  'Propafenone allergy'
-    C0571887  'Tocainide allergy'
-    C0571889  'Bretylium allergy'
-    C0571891  'Amiodarone allergy'
-    C0571895  'Allergy to bendroflumethiazide'
-    C0571896  'Allergy to chlorothiazide'
-    C0571897  'Cyclopenthiazide allergy'
-    C0571898  'Allergy to hydrochlorothiazide'
-    C0571899  'Hydroflumethiazide allergy'
-    C0571900  'Allergy to methyclothiazide'
-    C0571901  'Allergy to polythiazide'
-    C0571905  'Allergy to ethacrynic acid'
-    C0571906  'Allergy to piretanide'
-    C0571907  'Allergy to torsemide'
-    C0571909  'Triamterene allergy'
-    C0571910  'Allergy to aldosterone receptor ant'
-    C0571913  'Allergy to amiloride'
-    C0571922  'Mannitol allergy'
-    C0571924  'Mersalyl allergy'
-    C0571933  'Allergy to acetazolamide'
-    C0571936  'Bethanidine allergy'
-    C0571937  'Debrisoquine allergy'
-    C0571938  'Guanethidine allergy'
-    C0571950  'Allergy to trimetaphan'
-    C0571951  'Allergy to metyrosine'
-    C0571962  'Enoximone allergy'
-    C0571963  'Allergy to milrinone'
-    C0571967  'Ergot alkaloid allergy'
-    C0571972  'Allergy to minoxidil'
-    C0571974  'Flosequinan allergy'
-    C0571975  'Diazoxide allergy'
-    C0571976  'Allergy to hydralazine'
-    C0571977  'Allergy to nicorandil'
-    C0571978  'Dipyridamole allergy'
-    C0571980  'Allergy to nitroglycerin'
-    C0571992  'Allergy to pentaerythritol tetranit'
-    C0571995  'Pentoxifylline allergy'
-    C0571996  'Cyclandelate allergy'
-    C0571997  'Allergy to nicofuranose'
-    C0571999  'Isoxsuprine allergy'
-    C0572000  'Allergy to nafronyl'
-    C0572001  'Nicotinyl alcohol allergy'
-    C0572004  'Betahistine allergy'
-    C0572009  'Streptokinase allergy'
-    C0572010  'Allergy to urokinase'
-    C0572011  'Allergy to alteplase'
-    C0572012  'Anistreplase allergy'
-    C0740909  'Allergy to ethanol'
-    C0741440  'Barbiturate allergy'
-    C0741856  'Allergy to caffeine'
-    C0746910  'Allergy to nitroprusside'
-    C1319853  'Aspirin-induced asthma'
-    C1320835  'Drug fever'
-    C1527304  'Allergic reaction'
-    C1629019  'Allergy to phenothiazine derivative'
-    C1640722  'Allergic reaction to colophony'
-    C1640727  'Sulphonamide diuretic allergy'
-    C1998306  'Allergy to sulphonamide antibiotic'
-    C2584599  'Allergy to thiazolidinedione'
-    C2711220  'Allergy to meropenem'
-    C2711572  'Sevoflurane allergy'
-    C2711594  'Allergy to imipenem'
-    C2711902  'Allergy to ertapenem'
-    C3539909  'Allergic disposition'
-    C4076266  'Allergy to protease inhibitor'
-    C4076278  'Allergy to reverse transcriptase in'
-    C4303914  'Allergy to bile acid'
-    C4316577  'Allergy to opiate agonist'
-    C4545176  'Allergy to denosumab'
-    C4707910  'Hypothalamic hormone allergy'
-    C4707911  'Pituitary hormone allergy'
-    C4707986  'Allergy to diethyl ether (finding)'
-    C4707989  'Allergy to cromolyn'
-    C4708096  'Allergy to urea'
-    C4708098  'Vitamin B12 and/or vitamin B12 deri'
-    C4708099  'Thiamine allergy'
-    C4708100  'Allergy to pyridoxine'
-    C4708163  'Allergy to benzodiazepine'
-    C4749576  'Allergy to coagulation protein'
-    C4750836  'Allergy to acetylcholine'
-    C4750852  'Bamethan allergy'
-    C4750860  'Allergy to isosorbide'
-    C4750901  'Hyaluronic acid allergy'
-    C4750903  'Allergy to valproic acid'
-    C4750905  'Allergy to dibromopropamidine'
-    C4750916  'Allergy to emepronium'
-    C4750919  'Propamidine allergy'
-    C4750932  'Allergy to phenylpropanolamine'
-    C4758633  'Allergy to Digitalis glycoside'
-    C4758634  'Allergy to chloral derivative'
-    C4758641  'Allergy to indanedione'
-    C4758644  'Allergy to lithium compound'
-    C4758652  'Allergy to acridine derivative azo'
-    C4758658  'Allergy to rauwolfia alkaloid'
-    C4758661  'Allergy to thiouracil'
-    C4758662  'Allergy to thiourea'
-    C4758663  'Allergy to thyroid hormone'
-    C4758664  'Allergy to triphenylmethane triisoc'
-    C5240002  'Meclizine allergy'
-    C5394741  'Allergy to bromhexine'
-    C5394788  'Polystyrene sulfonate allergy'
-    C5394792  'Lachesine allergy'
-    C5394793  'Metamizole allergy'
-    C5394794  'Allergy to methenamine'
-    C5394796  'Allergy to piperidolate'
-    C5394798  'Sodium sulfate allergy'
-    C5394799  'Allergy to terodiline'
-    C5394818  'Balsam of Peru allergy'
-    C5394838  'Aldehyde dehydrogenase inhibitor al'
-    C5395046  'Fluoroquinolone allergy'
-    C5395879  'Allergy to oxyquinoline'
-    C5395979  'Aminoquinoline allergy'
-    C5397081  'Carbidopa and/or levodopa allergy'
-    C5548169  'Allergy to erythropoietin receptor '
-    C5566590  'Allergic reaction caused by analges'
-    C5566611  'Allergic reaction caused by anaesth'
-    C5687061  'Allergy to dapagliflozin'
-    C5687062  'Allergy to ertugliflozin'
-    C5687063  'Allergy to canagliflozin'
-    C5817138  'Allergic reaction caused by antiinf'
-    C5921987  'Allergy to reteplase'
-    C5921988  'Allergy to tenecteplase'
-    C5923088  'Allergy to cetuximab due to alpha-g'
-
-================================================================================
-  CUI: C2142181  'Pain of left knee joint (finding)'
-================================================================================
-  Topic ID     : C2142181  (each CUI is its own topic)
-  Topic size   : 6
-  Members:
-    C0231749  'Pain of knee region'
-    C2051306  'Patellofemoral syndrome of left kne'
-    C2142181  'Pain of left knee joint (finding)' <-- self
-    C2220048  'Pain of bilateral knee joints'
-    C4509797  'Chronic pain following left total k'
-    C5442019  'Pain of left knee'
-
-================================================================================
-  CUI: C1621958  'Glioblastoma multiforme'
-================================================================================
-  Topic ID     : C1621958  (each CUI is its own topic)
-  Topic size   : 13
-  Members:
-    C0006826  'Malignant neoplasm'
-    C0017638  'Glioma'
-    C0206726  'Gliosarcoma (morphologic abnormalit'
-    C0334579  'Astrocytoma, anaplastic'
-    C0334588  'Giant cell glioblastoma'
-    C0349543  'Glioblastoma multiforme of brain'
-    C1272516  'Small-cell glioblastoma'
-    C1621958  'Glioblastoma multiforme' <-- self
-    C4076507  'Glioblastoma multiforme of central '
-    C4289580  'Epithelioid glioblastoma'
-    C4518227  'Glioblastoma isocitrate dehydrogena'
-    C4518228  'Glioblastoma isocitrate dehydrogena'
-    C4722099  'High-grade glioma'
+import pickle
+import datetime
+import time
+import os
+import statistics
+from collections import defaultdict, Counter
 
 
-################################################################################
-# SECTION 2: Pair retrieval tests
-################################################################################
-
-  'Allergic reaction' (C1527304) <-> 'Allergy to peanut' (C0559470)
-    no match
-
-  'Allergic reaction' (C1527304) <-> 'Anaphylaxis' (C0002792)
-    MATCH via 2 shared CUI(s):
-      C0020517  'Hypersensitivity reaction (disorder'
-      C0413234  'Acute allergic reaction'
-
-  'Allergic reaction' (C1527304) <-> 'Allergy to drug' (C0013182)
-    MATCH via 3 shared CUI(s):
-      C0013182  'Allergy to drug'
-      C0020517  'Hypersensitivity reaction (disorder'
-      C1527304  'Allergic reaction'
-
-  'Allergy to peanut' (C0559470) <-> 'Anaphylaxis' (C0002792)
-    no match
-
-  'Allergy to peanut' (C0559470) <-> 'Allergy to drug' (C0013182)
-    no match
-
-  'Pneumonia (disorder)' (C0032285) <-> 'Lung' (C0024109)
-    no match
-
-  'Pneumonia (disorder)' (C0032285) <-> 'Respiratory tract infection' (C0035243)
-    MATCH via 2 shared CUI(s):
-      C0032285  'Pneumonia (disorder)'
-      C0035243  'Respiratory tract infection'
-
-  'Pain of left knee joint (finding)' (C2142181) <-> 'Pain of knee region' (C0231749)
-    MATCH via 3 shared CUI(s):
-      C0231749  'Pain of knee region'
-      C2142181  'Pain of left knee joint (finding)'
-      C5442019  'Pain of left knee'
-
-  'Pain of left knee joint (finding)' (C2142181) <-> 'Pain of left knee' (C5442019)
-    MATCH via 3 shared CUI(s):
-      C0231749  'Pain of knee region'
-      C2142181  'Pain of left knee joint (finding)'
-      C5442019  'Pain of left knee'
-
-  'Pneumonia (disorder)' (C0032285) <-> 'Diabetes mellitus' (C0011849)
-    no match
-
-  'Allergy to peanut' (C0559470) <-> 'Lung' (C0024109)
-    no match
-
-  'Inflammation' (C0021368) <-> 'Diabetes mellitus' (C0011849)
-    no match
+OUTPUT_PATH = "topic_lookup_neighborhoods.pkl"
 
 
-################################################################################
-# SECTION 3: Size distribution + outliers
-################################################################################
-  Topic sizes: min=1, median=3, mean=4.6, max=3123
-  Size buckets:
-    size          1:     933  (0.2%)
-    size          2: 143,849  (38.4%)
-    size        3-5: 159,788  (42.7%)
-    size       6-10:  50,003  (13.4%)
-    size      11-50:  18,717  (5.0%)
-    size     51-100:     868  (0.2%)
-    size       >100:     380  (0.1%)
-
-  Top 10 largest topics (likely hubs):
-    C0033684 'Protein (substance)': 3123 members
-      C0000246  '2-acetolactate mutase'
-      C0000291  '2-isopropylmalate synthase'
-      C0000359  '3',5'-cyclic-nucleotide phosphodies'
-    C0993159 'Oral tablet': 2541 members
-      C0039225  'Tablet'
-      C0039226  'Delayed-release oral tablet'
-      C0304290  'Chewable tablet'
-    C0265388 'Recessive hereditary disorder (auto': 1489 members
-      C0000744  'Abetalipoproteinaemia'
-      C0001627  'Congenital adrenal hyperplasia'
-      C0002066  'Homogentisic acid oxidase deficienc'
-    C1285243 'Developmental hereditary disorder': 1433 members
-      C0001080  'Achondroplastic dwarf'
-      C0001193  'Acrocephalosyndactyly (Apert)'
-      C0001627  'Congenital adrenal hyperplasia'
-    C2586094 'Product manufactured as oral dose f': 1316 members
-      C0013227  'Drug or medicament (substance)'
-      C0357141  'Product containing potassium in ora'
-      C0358505  'Sodium bicarbonate-containing produ'
-    C0450973 'Assessment scales': 1270 members
-      C0000722  'Abbreviated injury scale'
-      C0003533  'Apgar score (assessment scale)'
-      C0004972  'Bender visual motor gestalt test (a'
-    C0265385 'AD - Autosomal dominant': 976 members
-      C0001080  'Achondroplastic dwarf'
-      C0001193  'Acrocephalosyndactyly (Apert)'
-      C0004779  'Basal cell nevus syndrome'
-    C2584795 'Product manufactured as parenteral ': 877 members
-      C0013227  'Drug or medicament (substance)'
-      C0309448  'Product containing mannitol in pare'
-      C0360652  'Potassium-containing product in par'
-    C2316799 'Measurement of substance': 770 members
-      C0005774  'Blood chemistry'
-      C0005800  'Blood gas analysis'
-      C0006101  'Bradykinin measurement (procedure)'
-    C0991533 'Oral capsule': 769 members
-      C0006935  'Capsule (basic dose form)'
-      C0350895  'Cycloserine 125 mg oral capsule'
-      C0353662  'Tramadol hydrochloride 50 mg oral c'
+def cui_of(s):
+    return s.rsplit("-", 1)[0] if "-" in s else s
 
 
-DONE
+def flatten_graph(g, snomed_cuis):
+    print(f"[1/3] Flattening suffix-bridge -> CUI-CUI edges (SNOMED-only) ...")
+    neighbors = defaultdict(set)
+    t0 = time.time()
+    n_proc = 0
+    for cui in snomed_cuis:
+        if cui not in g:
+            n_proc += 1
+            continue
+        for suffix in g.successors(cui):
+            if "-" not in suffix:
+                continue
+            for pred in g.predecessors(suffix):
+                if pred == cui or pred == "CUI" or "-" not in pred:
+                    continue
+                oc = cui_of(pred)
+                if oc != cui and oc in snomed_cuis:
+                    neighbors[cui].add(oc)
+                    neighbors[oc].add(cui)
+        n_proc += 1
+        if n_proc % 100000 == 0:
+            print(f"  {n_proc:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
+    n_edges = sum(len(s) for s in neighbors.values()) // 2
+    print(f"  -> {n_edges:,} undirected edges in {time.time()-t0:.0f}s")
+    return dict(neighbors)
+
+
+def build_neighborhood_topics(neighbors, snomed_cuis):
+    """
+    Each CUI's topic = {cui} ∪ neighbors[cui].
+    The topic_id is the CUI itself (no hashing — each CUI defines its own
+    topic). This means there are exactly as many topics as there are CUIs
+    with at least one neighbor (others get a singleton topic = {self}).
+    """
+    print(f"[2/3] Building neighborhood topics ...")
+    cui_topic_id = {}     # cui -> its own topic_id
+    topic_to_cuis = {}    # topic_id -> set of member CUIs
+    for cui in snomed_cuis:
+        members = neighbors.get(cui, set()) | {cui}
+        # Topic ID is just the CUI itself
+        topic_to_cuis[cui] = members
+        cui_topic_id[cui] = cui
+    print(f"  -> {len(topic_to_cuis):,} topics (one per CUI)")
+    return cui_topic_id, topic_to_cuis
+
+
+def report(cui_topic_id, topic_to_cuis, snomed_cuis, neighbors, tags=None, labels=None):
+    print(f"\n{'='*78}")
+    print(f"  RESULTS")
+    print(f"{'='*78}")
+    n_total = len(snomed_cuis)
+    n_topics = len(topic_to_cuis)
+    sizes = sorted(len(cuis) for cuis in topic_to_cuis.values())
+    print(f"  SNOMED CUIs                : {n_total:,}")
+    print(f"  Topics (one per CUI)       : {n_topics:,}")
+    print(f"  Topic size = 1 (no neighbors): {sum(1 for s in sizes if s == 1):,}")
+    print(f"  Topic size distribution:")
+    print(f"    min     : {sizes[0]}")
+    print(f"    median  : {sizes[len(sizes)//2]}")
+    print(f"    mean    : {statistics.mean(sizes):.1f}")
+    print(f"    p90     : {sizes[int(0.9*len(sizes))]}")
+    print(f"    p99     : {sizes[int(0.99*len(sizes))]}")
+    print(f"    max     : {sizes[-1]:,}")
+
+    # Focal CUIs
+    focal = [
+        "C0032285", "C0021368", "C0024109", "C1527304", "C0559470",
+        "C0002792", "C2142181", "C0011849",
+    ]
+    print(f"\n  Focal CUI lookups:")
+    for cui in focal:
+        members = topic_to_cuis.get(cui, set())
+        lbl = (labels or {}).get(cui, "?")[:30] if labels else "?"
+        print(f"\n    {cui} '{lbl}': {len(members)} members")
+        for m in sorted(members)[:6]:
+            mlbl = (labels or {}).get(m, "?")[:35] if labels else "?"
+            marker = " <-- self" if m == cui else ""
+            print(f"      {m} '{mlbl}'{marker}")
+        if len(members) > 6:
+            print(f"      ... +{len(members)-6} more")
+
+    # Pair-retrieval test (overlap of neighborhoods)
+    pairs = [
+        ("C1527304", "Allergic reaction", "C0559470", "Peanut allergy"),
+        ("C1527304", "Allergic reaction", "C0002792", "Anaphylaxis"),
+        ("C2142181", "Pain left knee jt", "C0231749", "Pain knee region"),
+    ]
+    print(f"\n  Retrieval test — overlap of neighborhoods:")
+    for ca, la, cb, lb_ in pairs:
+        ta = topic_to_cuis.get(ca, set())
+        tb = topic_to_cuis.get(cb, set())
+        overlap = ta & tb
+        result = "MATCH" if overlap else "no match"
+        print(f"    '{la}' <-> '{lb_}': {result}")
+        if overlap:
+            for c in sorted(overlap)[:3]:
+                clbl = (labels or {}).get(c, "?")[:30] if labels else "?"
+                print(f"        shared: {c} '{clbl}'")
+
+
+def main():
+    for v in ["data", "SNOMED_CUIS"]:
+        if v not in globals():
+            raise RuntimeError(f"Set '{v}' in notebook first")
+    tags = TAGS if "TAGS" in globals() else None
+    labels = LABELS if "LABELS" in globals() else None
+
+    print("=" * 60)
+    print("Neighborhood-based topic build (each CUI = its own topic)")
+    print("=" * 60)
+    print(f"  Graph       : {data.number_of_nodes():,} nodes")
+    print(f"  SNOMED CUIs : {len(SNOMED_CUIS):,}")
+
+    neighbors = flatten_graph(data, SNOMED_CUIS)
+    cui_topic_id, topic_to_cuis = build_neighborhood_topics(neighbors, SNOMED_CUIS)
+    report(cui_topic_id, topic_to_cuis, SNOMED_CUIS, neighbors, tags, labels)
+
+    print(f"\n[3/3] Saving to {OUTPUT_PATH} ...")
+    payload = {
+        "built_at":            datetime.datetime.now().isoformat(),
+        "method":              "neighborhood (each CUI's topic = self + 1-hop neighbors)",
+        "source":              "network graph (team-provided)",
+        "snomed_cuis":         SNOMED_CUIS,
+        "cui_topic_id":        cui_topic_id,     # cui -> topic_id (which equals cui)
+        "topic_to_cuis":       topic_to_cuis,    # cui -> set of members
+        "flattened_neighbors": neighbors,
+    }
+    if tags:
+        payload["tags"] = tags
+    if labels:
+        payload["labels"] = labels
+
+    with open(OUTPUT_PATH, "wb") as f:
+        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
+    print(f"  wrote {size_mb:.1f} MB")
+    print("\nDONE")
+
+
+main()
