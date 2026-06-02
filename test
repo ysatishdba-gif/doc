@@ -1,169 +1,102 @@
 """
-build_subtopics_final.py
-------------------------
-Final sub-topic build: keep ONLY size-3+ cliques.
+test_final.py
+-------------
+Test the filtered sub-topic build (size-3+ cliques only).
 
-Drops:
-  - Component sub-topics (they're duplicates of main topics)
-  - Size-2 cliques (they're just edges, already encoded in main topic)
-
-Keeps:
-  - Size-3+ maximal cliques (genuine tight clusters that add precision)
-
-Inputs (notebook globals OR loadable pickle):
-  Loads topic_lookup_neighborhoods.pkl directly.
-
-Outputs:
-  topic_lookup_final.pkl with:
-    Main topic data (preserved from neighborhoods build)
-    Sub-topic indices:
-      main_topic_to_subtopic_ids
-      subtopic_id_to_cuis
-      subtopic_id_to_main_topics
-      cui_to_subtopic_ids
-      subtopic_metadata  (size only; method is always "clique")
+Loads topic_lookup_final.pkl. No notebook globals needed.
+Edit CUIS_TO_TEST below.
 """
 
 import pickle
-import datetime
-import hashlib
-import time
-import os
-from collections import defaultdict
+from collections import Counter
 
 
-INPUT_PATH  = "topic_lookup_neighborhoods.pkl"
-OUTPUT_PATH = "topic_lookup_final.pkl"
+PICKLE_PATH = "topic_lookup_final.pkl"
 
-MIN_CLIQUE_SIZE = 3
-
-
-def subtopic_id(members_frozenset):
-    """Stable ID hashed from sorted member CUIs."""
-    sorted_members = "|".join(sorted(members_frozenset))
-    h = hashlib.sha1(sorted_members.encode()).hexdigest()[:14]
-    return f"st_{h}"
-
-
-def induced_subgraph(members, neighbors):
-    members_set = set(members)
-    return {cui: neighbors.get(cui, set()) & members_set for cui in members}
-
-
-def bron_kerbosch(R, P, X, sub_adj, results, min_size=3, max_results=200):
-    """Maximal cliques of size >= min_size."""
-    if len(results) >= max_results:
-        return
-    if not P and not X:
-        if len(R) >= min_size:
-            results.append(frozenset(R))
-        return
-    for v in list(P):
-        if len(results) >= max_results:
-            return
-        Nv = sub_adj.get(v, set())
-        bron_kerbosch(R | {v}, P & Nv, X & Nv, sub_adj, results,
-                      min_size, max_results)
-        P = P - {v}
-        X = X | {v}
+CUIS_TO_TEST = [
+    "C0032285",  # Pneumonia
+    "C0021368",  # Inflammation
+    "C0024109",  # Lung
+    "C0011849",  # Diabetes mellitus
+    "C1527304",  # Allergic reaction
+    "C0559470",  # Allergy to peanut
+    "C0002792",  # Anaphylaxis
+    "C0013182",  # Allergy to drug
+    "C2142181",  # Pain of left knee joint
+    "C1621958",  # Glioblastoma multiforme
+    "C0016470",  # Food allergy
+]
 
 
-def find_cliques_min_size(sub_adj, min_size=3):
-    results = []
-    bron_kerbosch(set(), set(sub_adj.keys()), set(), sub_adj, results,
-                  min_size=min_size, max_results=200)
-    return results
+print(f"Loading {PICKLE_PATH} ...")
+with open(PICKLE_PATH, "rb") as f:
+    p = pickle.load(f)
+
+topic_to_cuis              = p["topic_to_cuis"]
+main_topic_to_subtopic_ids = p["main_topic_to_subtopic_ids"]
+subtopic_id_to_cuis        = p["subtopic_id_to_cuis"]
+subtopic_id_to_main_topics = p["subtopic_id_to_main_topics"]
+cui_to_subtopic_ids        = p["cui_to_subtopic_ids"]
+subtopic_metadata          = p["subtopic_metadata"]
+labels                     = p.get("labels", {})
 
 
-def build(payload):
-    cui_topic_id        = payload["cui_topic_id"]
-    topic_to_cuis       = payload["topic_to_cuis"]
-    flattened_neighbors = payload["flattened_neighbors"]
-
-    print(f"  main topics to scan: {len(topic_to_cuis):,}")
-
-    main_topic_to_subtopic_ids = defaultdict(list)
-    subtopic_id_to_cuis        = {}
-    subtopic_id_to_main_topics = defaultdict(set)
-    cui_to_subtopic_ids        = defaultdict(set)
-    subtopic_metadata          = {}
-
-    n_processed = 0
-    n_topics_with_subtopics = 0
-    t0 = time.time()
-
-    for main_topic, members in topic_to_cuis.items():
-        n_processed += 1
-        if len(members) < MIN_CLIQUE_SIZE:
-            continue   # can't have a size-3 sub-topic in a <3 member main topic
-
-        sub_adj = induced_subgraph(members, flattened_neighbors)
-        cliques = find_cliques_min_size(sub_adj, min_size=MIN_CLIQUE_SIZE)
-        if not cliques:
-            continue
-
-        n_topics_with_subtopics += 1
-        for clq in cliques:
-            sid = subtopic_id(clq)
-            if sid not in subtopic_id_to_cuis:
-                subtopic_id_to_cuis[sid] = clq
-                subtopic_metadata[sid] = {"size": len(clq)}
-            main_topic_to_subtopic_ids[main_topic].append(sid)
-            subtopic_id_to_main_topics[sid].add(main_topic)
-            for c in clq:
-                cui_to_subtopic_ids[c].add(sid)
-
-        if n_processed % 50000 == 0:
-            print(f"    processed {n_processed:,}/{len(topic_to_cuis):,} "
-                  f"(sub-topics so far: {len(subtopic_id_to_cuis):,}, "
-                  f"{time.time()-t0:.0f}s)")
-
-    print(f"  done in {time.time()-t0:.0f}s")
-    print(f"\n  Results:")
-    print(f"    unique sub-topics       : {len(subtopic_id_to_cuis):,}")
-    print(f"    main topics w/ sub-topic: {n_topics_with_subtopics:,}")
-    print(f"    CUIs w/ at least 1 sub  : {len(cui_to_subtopic_ids):,}")
-
-    sizes = sorted(meta["size"] for meta in subtopic_metadata.values())
-    if sizes:
-        print(f"\n  Sub-topic size distribution (all size>=3):")
-        print(f"    min/median/p90/p99/max : "
-              f"{sizes[0]} / {sizes[len(sizes)//2]} / "
-              f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
-              f"{sizes[-1]}")
-
-    return {
-        "main_topic_to_subtopic_ids": dict(main_topic_to_subtopic_ids),
-        "subtopic_id_to_cuis":        subtopic_id_to_cuis,
-        "subtopic_id_to_main_topics": dict(subtopic_id_to_main_topics),
-        "cui_to_subtopic_ids":        dict(cui_to_subtopic_ids),
-        "subtopic_metadata":          subtopic_metadata,
-    }
+def lbl(c):
+    return labels.get(c, "?")[:45] if labels else "?"
 
 
-def main():
-    print(f"Loading {INPUT_PATH} ...")
-    with open(INPUT_PATH, "rb") as f:
-        payload = pickle.load(f)
-    print(f"  Main topics: {len(payload['topic_to_cuis']):,}")
-
-    print(f"\n[1] Building size-{MIN_CLIQUE_SIZE}+ clique sub-topics ...")
-    sub_data = build(payload)
-
-    out = dict(payload)
-    out.update(sub_data)
-    out["subtopic_built_at"] = datetime.datetime.now().isoformat()
-    out["subtopic_config"] = {
-        "min_clique_size": MIN_CLIQUE_SIZE,
-        "method": "maximal cliques only (no components, no size-2)",
-    }
-
-    print(f"\n[Saving] {OUTPUT_PATH}")
-    with open(OUTPUT_PATH, "wb") as f:
-        pickle.dump(out, f, protocol=pickle.HIGHEST_PROTOCOL)
-    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
-    print(f"  wrote {size_mb:.1f} MB")
-    print("\nDONE")
+print(f"  Main topics: {len(topic_to_cuis):,}")
+print(f"  Unique sub-topics (size>=3): {len(subtopic_id_to_cuis):,}")
+print(f"  Ratio: {len(subtopic_id_to_cuis)/max(len(topic_to_cuis),1):.2f} sub-topics per main topic")
 
 
-main()
+for cui in CUIS_TO_TEST:
+    print(f"\n\n{'='*80}")
+    print(f"  {cui}  '{lbl(cui)}'")
+    print(f"{'='*80}")
+
+    main_members = topic_to_cuis.get(cui, set())
+    print(f"  Main topic size  : {len(main_members)}")
+
+    sids = cui_to_subtopic_ids.get(cui, set())
+    print(f"  In total {len(sids)} sub-topics (across all main topics)")
+
+    own = list(dict.fromkeys(main_topic_to_subtopic_ids.get(cui, [])))
+    print(f"\n  SUB-TOPICS within this main topic ({len(own)}):")
+    if not own:
+        print(f"    (no sub-topics — main topic is too small or graph is star-shaped)")
+
+    # Sort by size descending
+    own_sorted = sorted(own, key=lambda s: -subtopic_metadata[s]["size"])
+    for sid in own_sorted[:8]:
+        meta = subtopic_metadata[sid]
+        members = subtopic_id_to_cuis[sid]
+        n_main_topics = len(subtopic_id_to_main_topics[sid])
+        print(f"\n    {sid}  size={meta['size']}  "
+              f"appears_in_main_topics={n_main_topics}")
+        for m in sorted(members):
+            marker = " <-- self" if m == cui else ""
+            print(f"      {m}  '{lbl(m)}'{marker}")
+    if len(own_sorted) > 8:
+        print(f"\n    ... +{len(own_sorted)-8} more sub-topics")
+
+
+# Reverse lookup demo
+print(f"\n\n{'#'*80}")
+print(f"# REVERSE LOOKUP DEMO")
+print(f"{'#'*80}")
+
+# Pick the 5 largest sub-topics to show what they represent
+top5 = sorted(subtopic_metadata.items(),
+              key=lambda kv: -kv[1]["size"])[:5]
+for sid, meta in top5:
+    members = subtopic_id_to_cuis[sid]
+    mains = subtopic_id_to_main_topics[sid]
+    print(f"\n  {sid} (size {meta['size']}, appears in {len(mains)} main topics):")
+    for m in sorted(members)[:8]:
+        print(f"    {m}  '{lbl(m)}'")
+    if len(members) > 8:
+        print(f"    ... +{len(members)-8} more")
+
+
+print("\n\nDONE")
