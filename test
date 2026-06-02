@@ -7,8 +7,13 @@ Usage:
     from lookup_topics import TopicLookup
     lookup = TopicLookup("topic_lookup.pkl")
 
+    # All CUIs in the SNOMED universe
+    all_cuis = lookup.cuis                          # set
+    for cui in lookup.iter_cuis():
+        ...
+
     # Broad: main topic membership (CUI's neighborhood)
-    topic = lookup.topic_of("C0032285")            # set of CUIs
+    topic = lookup.topic_of("C0032285")             # set of CUIs
 
     # Match two CUIs via main topic (broad - 2-hop reachable)
     if lookup.match_main(cui_a, cui_b):
@@ -57,7 +62,34 @@ class TopicLookup:
         self.snomed_cuis = p.get("snomed_cuis", set())
         self.config      = p.get("config", {})
 
+        # Internal: all CUIs we have main topics for
         self._known_cuis = set(self.cui_topic_id.keys())
+
+    # ------------------------------------------------------------------
+    # CUI universe access
+    # ------------------------------------------------------------------
+
+    @property
+    def cuis(self):
+        """The full set of SNOMED CUIs in this build.
+        Returns the same set we filtered by during construction."""
+        return self.snomed_cuis
+
+    def all_cuis(self):
+        """Alias for `cuis` property. Returns the full set of SNOMED CUIs."""
+        return self.snomed_cuis
+
+    def iter_cuis(self):
+        """Iterate over all CUIs (sorted for stability)."""
+        return iter(sorted(self.snomed_cuis))
+
+    def num_cuis(self):
+        """Total CUI count."""
+        return len(self.snomed_cuis)
+
+    def is_known(self, cui):
+        """Whether cui is in the SNOMED universe."""
+        return cui in self._known_cuis
 
     # ------------------------------------------------------------------
     # Main topic API
@@ -82,6 +114,10 @@ class TopicLookup:
     def shared_topic_members(self, cui_a, cui_b):
         """Set of CUIs that appear in both A's and B's main topics."""
         return self.topic_of(cui_a) & self.topic_of(cui_b)
+
+    def neighbors_of(self, cui):
+        """Direct graph neighbors of a CUI (= topic members minus self)."""
+        return self.flattened_neighbors.get(cui, set())
 
     # ------------------------------------------------------------------
     # Sub-topic API
@@ -159,9 +195,6 @@ class TopicLookup:
 
     def sty_tags(self, cui):
         return self.tags.get(cui, frozenset())
-
-    def is_known(self, cui):
-        return cui in self._known_cuis
 
     def stats(self):
         """Summary statistics."""
