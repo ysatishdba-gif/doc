@@ -1,115 +1,404 @@
-"""
-test_all_cliques.py
--------------------
-Test the all-cliques sub-topic build. Loads topic_lookup_all_cliques.pkl.
-Edit CUIS_TO_TEST as needed.
-
-Shows size breakdown (size-2 vs size-3+) per CUI so you can see how
-much leaf-CUI precision was added back.
-"""
-
-import pickle
-from collections import Counter
+Loading topic_lookup_all_cliques.pkl ...
+  Main topics                     : 374,538
+  Unique sub-topics (size>=2)     : 631,786
+  Ratio                           : 1.69 sub-topics per main topic
 
 
-PICKLE_PATH = "topic_lookup_all_cliques.pkl"
-
-CUIS_TO_TEST = [
-    "C0032285",  # Pneumonia
-    "C0021368",  # Inflammation
-    "C0024109",  # Lung
-    "C0011849",  # Diabetes
-    "C1527304",  # Allergic reaction
-    "C0559470",  # Allergy to peanut
-    "C0002792",  # Anaphylaxis
-    "C0013182",  # Allergy to drug    <-- the big test, was only 3 size-3+ subs
-    "C2142181",  # Pain of left knee joint
-    "C1621958",  # Glioblastoma multiforme
-    "C0016470",  # Food allergy
-]
-
-
-print(f"Loading {PICKLE_PATH} ...")
-with open(PICKLE_PATH, "rb") as f:
-    p = pickle.load(f)
-
-topic_to_cuis              = p["topic_to_cuis"]
-main_topic_to_subtopic_ids = p["main_topic_to_subtopic_ids"]
-subtopic_id_to_cuis        = p["subtopic_id_to_cuis"]
-subtopic_id_to_main_topics = p["subtopic_id_to_main_topics"]
-cui_to_subtopic_ids        = p["cui_to_subtopic_ids"]
-subtopic_metadata          = p["subtopic_metadata"]
-labels                     = p.get("labels", {})
+==========================================================================================
+  SUMMARY TABLE
+==========================================================================================
+  CUI           Label                          Main   Subs    sz2   sz3+
+  C0032285      Pneumonia (disorder)             42     39     25     14
+  C0021368      Inflammation                      9      8      8      0
+  C0024109      Lung                             16     13     11      2
+  C0011849      Diabetes mellitus                41     37     14     23
+  C1527304      Allergic reaction                31     29     26      3
+  C0559470      Allergy to peanut                 2      1      1      0
+  C0002792      Anaphylaxis                      26     23     16      7
+  C0013182      Allergy to drug                 567    563    560      3
+  C2142181      Pain of left knee joint (fin      6      4      3      1
+  C1621958      Glioblastoma multiforme          13      9      6      3
+  C0016470      Food allergy                     38     34     29      5
 
 
-def lbl(c):
-    return labels.get(c, "?")[:42] if labels else "?"
+================================================================================
+  C0032285  'Pneumonia (disorder)'
+================================================================================
+  Main topic size: 42
+  Sub-topics in this main topic: 39
+  Size breakdown:
+    size   2: 25 sub-topics
+    size   3: 14 sub-topics
+
+  Largest 4 sub-topics:
+
+    st_247d83b6701ece (size 3):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0032310  'Viral pneumonia'
+      C0276253  'Cytomegaloviral pneumonia'
+
+    st_011c53c15689ff (size 3):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0032310  'Viral pneumonia'
+      C0155870  'Pneumonia and influenza'
+
+    st_24618dd4036963 (size 3):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0032310  'Viral pneumonia'
+      C0152413  'Pneumonia caused by respiratory syncytial '
+
+    st_5a9eb227a11b2a (size 3):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0876973  'Pulmonary infection'
+      C0949083  'Nosocomial pneumonia (disorder)'
+
+  Sample size-2 sub-topics (showing first 3):
+    st_3ad8ced2f55208: self + 'Post measles pneumonia'
+    st_a127812ce59e0e: self + 'Haemorrhagic pneumonia'
+    st_bbbd14e1ede3fe: self + 'Focal pneumonia'
 
 
-print(f"  Main topics                     : {len(topic_to_cuis):,}")
-print(f"  Unique sub-topics (size>=2)     : {len(subtopic_id_to_cuis):,}")
-print(f"  Ratio                           : "
-      f"{len(subtopic_id_to_cuis)/max(len(topic_to_cuis),1):.2f} "
-      f"sub-topics per main topic")
+================================================================================
+  C0021368  'Inflammation'
+================================================================================
+  Main topic size: 9
+  Sub-topics in this main topic: 8
+  Size breakdown:
+    size   2: 8 sub-topics
 
-# Summary table
-print(f"\n\n{'='*90}")
-print(f"  SUMMARY TABLE")
-print(f"{'='*90}")
-print(f"  {'CUI':<12s}  {'Label':<28s}  {'Main':>5s}  {'Subs':>5s}  "
-      f"{'sz2':>5s}  {'sz3+':>5s}")
+  Largest 4 sub-topics:
 
-for cui in CUIS_TO_TEST:
-    main_sz = len(topic_to_cuis.get(cui, set()))
-    own = list(dict.fromkeys(main_topic_to_subtopic_ids.get(cui, [])))
-    sz2 = sum(1 for s in own if subtopic_metadata[s]["size"] == 2)
-    sz3plus = sum(1 for s in own if subtopic_metadata[s]["size"] >= 3)
-    print(f"  {cui:<12s}  {lbl(cui)[:28]:<28s}  "
-          f"{main_sz:>5d}  {len(own):>5d}  {sz2:>5d}  {sz3plus:>5d}")
+    st_ecca8ae744625f (size 2):
+      C0021368  'Inflammation' <-- self
+      C1265832  'Focal acute inflammation'
 
+    st_daef110cbb2a8d (size 2):
+      C0021368  'Inflammation' <-- self
+      C0333383  'Acute and chronic inflammation'
 
-# Detailed per CUI
-for cui in CUIS_TO_TEST:
-    print(f"\n\n{'='*80}")
-    print(f"  {cui}  '{lbl(cui)}'")
-    print(f"{'='*80}")
+    st_e5b7dddf657f9f (size 2):
+      C0021368  'Inflammation' <-- self
+      C0242966  'Systemic inflammatory response syndrome'
 
-    main_members = topic_to_cuis.get(cui, set())
-    print(f"  Main topic size: {len(main_members)}")
+    st_1aca4f85a1a6cb (size 2):
+      C0021368  'Inflammation' <-- self
+      C0030660  'Pathological process (attribute)'
 
-    own = list(dict.fromkeys(main_topic_to_subtopic_ids.get(cui, [])))
-    print(f"  Sub-topics in this main topic: {len(own)}")
-
-    if not own:
-        print(f"    (none — main topic < 2 members or no edges)")
-        continue
-
-    # Size distribution
-    by_size = Counter(subtopic_metadata[s]["size"] for s in own)
-    print(f"  Size breakdown:")
-    for size in sorted(by_size):
-        print(f"    size {size:>3d}: {by_size[size]} sub-topics")
-
-    # Show the largest 4 sub-topics
-    own_sorted = sorted(own, key=lambda s: -subtopic_metadata[s]["size"])
-    print(f"\n  Largest 4 sub-topics:")
-    for sid in own_sorted[:4]:
-        meta = subtopic_metadata[sid]
-        members = subtopic_id_to_cuis[sid]
-        print(f"\n    {sid} (size {meta['size']}):")
-        for m in sorted(members):
-            marker = " <-- self" if m == cui else ""
-            print(f"      {m}  '{lbl(m)}'{marker}")
-
-    # If there are size-2 sub-topics, show a few examples
-    sz2_subs = [s for s in own_sorted if subtopic_metadata[s]["size"] == 2]
-    if sz2_subs:
-        print(f"\n  Sample size-2 sub-topics (showing first 3):")
-        for sid in sz2_subs[:3]:
-            members = subtopic_id_to_cuis[sid]
-            other = [m for m in members if m != cui]
-            other_str = ", ".join(f"'{lbl(o)}'" for o in other)
-            print(f"    {sid}: self + {other_str}")
+  Sample size-2 sub-topics (showing first 3):
+    st_ecca8ae744625f: self + 'Focal acute inflammation'
+    st_daef110cbb2a8d: self + 'Acute and chronic inflammation'
+    st_e5b7dddf657f9f: self + 'Systemic inflammatory response syndrome'
 
 
-print("\n\nDONE")
+================================================================================
+  C0024109  'Lung'
+================================================================================
+  Main topic size: 16
+  Sub-topics in this main topic: 13
+  Size breakdown:
+    size   2: 11 sub-topics
+    size   3: 2 sub-topics
+
+  Largest 4 sub-topics:
+
+    st_7711c852f399c0 (size 3):
+      C0024109  'Lung' <-- self
+      C0034051  'Pulmonary alveolar structure (body structu'
+      C0225698  'Pneumocyte (cell)'
+
+    st_f31044fd844a10 (size 3):
+      C0006255  'Bronchus'
+      C0024109  'Lung' <-- self
+      C0229962  'Body part structure (body structure)'
+
+    st_c5ae41fc219900 (size 2):
+      C0024109  'Lung' <-- self
+      C0230130  'Thoracic viscus'
+
+    st_979634eaec7d89 (size 2):
+      C0024109  'Lung' <-- self
+      C0035237  'Respiratory system'
+
+  Sample size-2 sub-topics (showing first 3):
+    st_c5ae41fc219900: self + 'Thoracic viscus'
+    st_979634eaec7d89: self + 'Respiratory system'
+    st_dfe196b7e8fb86: self + 'Entire lung'
+
+
+================================================================================
+  C0011849  'Diabetes mellitus'
+================================================================================
+  Main topic size: 41
+  Sub-topics in this main topic: 37
+  Size breakdown:
+    size   2: 14 sub-topics
+    size   3: 18 sub-topics
+    size   4: 5 sub-topics
+
+  Largest 4 sub-topics:
+
+    st_9bdf5f7fd8da2a (size 4):
+      C0011849  'Diabetes mellitus' <-- self
+      C0011881  'Diabetic nephropathy'
+      C0014136  'Endocrine structure'
+      C0342257  'Disorder associated with diabetes mellitus'
+
+    st_4347449a129f48 (size 4):
+      C0011849  'Diabetes mellitus' <-- self
+      C0014136  'Endocrine structure'
+      C0342245  'Disorder of eye due to diabetes mellitus'
+      C0342257  'Disorder associated with diabetes mellitus'
+
+    st_1e90dd281e95af (size 4):
+      C0011849  'Diabetes mellitus' <-- self
+      C0014130  'Endocrine system disease'
+      C0020456  'Hyperglycaemia'
+      C0271650  'Impaired glucose tolerance (disorder)'
+
+    st_4d7bfd94c651c4 (size 4):
+      C0011849  'Diabetes mellitus' <-- self
+      C0014130  'Endocrine system disease'
+      C0014136  'Endocrine structure'
+      C0020456  'Hyperglycaemia'
+
+  Sample size-2 sub-topics (showing first 3):
+    st_39a1f68685de65: self + 'Newly diagnosed diabetes'
+    st_d7d37ec3d09647: self + 'Alaninuria, microcephaly, dwarfism, enamel'
+    st_4f58a98cec1bc1: self + 'Pancreatic hypoplasia, diabetes mellitus, '
+
+
+================================================================================
+  C1527304  'Allergic reaction'
+================================================================================
+  Main topic size: 31
+  Sub-topics in this main topic: 29
+  Size breakdown:
+    size   2: 26 sub-topics
+    size   3: 3 sub-topics
+
+  Largest 4 sub-topics:
+
+    st_1d4410a293f695 (size 3):
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C1527304  'Allergic reaction' <-- self
+      C4082933  'Animal allergy'
+
+    st_f5ffa371fe9ad5 (size 3):
+      C0016470  'Food allergy'
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C1527304  'Allergic reaction' <-- self
+
+    st_231361dc77a525 (size 3):
+      C0013182  'Allergy to drug'
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C1527304  'Allergic reaction' <-- self
+
+    st_d851cfb53c3296 (size 2):
+      C1527304  'Allergic reaction' <-- self
+      C5397552  'Allergic reaction after allergen immunothe'
+
+  Sample size-2 sub-topics (showing first 3):
+    st_d851cfb53c3296: self + 'Allergic reaction after allergen immunothe'
+    st_2cf53a29924359: self + 'Allergic reaction to flour dust'
+    st_7738204d812898: self + 'Allergic reaction to animal'
+
+
+================================================================================
+  C0559470  'Allergy to peanut'
+================================================================================
+  Main topic size: 2
+  Sub-topics in this main topic: 1
+  Size breakdown:
+    size   2: 1 sub-topics
+
+  Largest 4 sub-topics:
+
+    st_819e94786728b3 (size 2):
+      C0559470  'Allergy to peanut' <-- self
+      C1096735  'Allergy to pulse vegetable'
+
+  Sample size-2 sub-topics (showing first 3):
+    st_819e94786728b3: self + 'Allergy to pulse vegetable'
+
+
+================================================================================
+  C0002792  'Anaphylaxis'
+================================================================================
+  Main topic size: 26
+  Sub-topics in this main topic: 23
+  Size breakdown:
+    size   2: 16 sub-topics
+    size   3: 7 sub-topics
+
+  Largest 4 sub-topics:
+
+    st_fd53433c94fa06 (size 3):
+      C0002792  'Anaphylaxis' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0020962  'Structure of immune system'
+
+    st_10454e36b534e9 (size 3):
+      C0002792  'Anaphylaxis' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0020523  'IgE-mediated allergic disorder'
+
+    st_0170430e4decfd (size 3):
+      C0002792  'Anaphylaxis' <-- self
+      C0344159  'Anaphylaxis caused by venom'
+      C4316895  'Shock due to anaphylaxis'
+
+    st_d40ffe30db5051 (size 3):
+      C0002792  'Anaphylaxis' <-- self
+      C0344168  'Drug-induced anaphylaxis'
+      C4316895  'Shock due to anaphylaxis'
+
+  Sample size-2 sub-topics (showing first 3):
+    st_003b7c40ea3d0e: self + 'Anaphylaxis caused by allergy skin test'
+    st_f43b4a9ddd64ea: self + 'Systemic illness'
+    st_982965f7a8d92b: self + 'Anaphylaxis caused by radiographic contras'
+
+
+================================================================================
+  C0013182  'Allergy to drug'
+================================================================================
+  Main topic size: 567
+  Sub-topics in this main topic: 563
+  Size breakdown:
+    size   2: 560 sub-topics
+    size   3: 3 sub-topics
+
+  Largest 4 sub-topics:
+
+    st_0e4a3b68d10635 (size 3):
+      C0013182  'Allergy to drug' <-- self
+      C0237865  'Propensity to adverse reactions to drug'
+      C0277585  'Drug intolerance'
+
+    st_1ef27b35fae029 (size 3):
+      C0011609  'Drug eruption'
+      C0013182  'Allergy to drug' <-- self
+      C0041755  'Adverse drug reaction'
+
+    st_231361dc77a525 (size 3):
+      C0013182  'Allergy to drug' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C1527304  'Allergic reaction'
+
+    st_4007b1c8792385 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571398  'Cinoxacin allergy'
+
+  Sample size-2 sub-topics (showing first 3):
+    st_4007b1c8792385: self + 'Cinoxacin allergy'
+    st_39c6b348cbf469: self + 'Allergy to ketoconazole'
+    st_35ceabc8d14508: self + 'Allergy to estrogen'
+
+
+================================================================================
+  C2142181  'Pain of left knee joint (finding)'
+================================================================================
+  Main topic size: 6
+  Sub-topics in this main topic: 4
+  Size breakdown:
+    size   2: 3 sub-topics
+    size   3: 1 sub-topics
+
+  Largest 4 sub-topics:
+
+    st_fdeef2e1130a13 (size 3):
+      C0231749  'Pain of knee region'
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C5442019  'Pain of left knee'
+
+    st_91655c7a808231 (size 2):
+      C2051306  'Patellofemoral syndrome of left knee'
+      C2142181  'Pain of left knee joint (finding)' <-- self
+
+    st_ad553a447ff300 (size 2):
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C4509797  'Chronic pain following left total knee art'
+
+    st_55de55c3cb6e29 (size 2):
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C2220048  'Pain of bilateral knee joints'
+
+  Sample size-2 sub-topics (showing first 3):
+    st_91655c7a808231: self + 'Patellofemoral syndrome of left knee'
+    st_ad553a447ff300: self + 'Chronic pain following left total knee art'
+    st_55de55c3cb6e29: self + 'Pain of bilateral knee joints'
+
+
+================================================================================
+  C1621958  'Glioblastoma multiforme'
+================================================================================
+  Main topic size: 13
+  Sub-topics in this main topic: 9
+  Size breakdown:
+    size   2: 6 sub-topics
+    size   3: 3 sub-topics
+
+  Largest 4 sub-topics:
+
+    st_889d5a7a4e174f (size 3):
+      C0349543  'Glioblastoma multiforme of brain'
+      C1621958  'Glioblastoma multiforme' <-- self
+      C4076507  'Glioblastoma multiforme of central nervous'
+
+    st_0f0e6b6e1a1c4a (size 3):
+      C0334579  'Astrocytoma, anaplastic'
+      C1621958  'Glioblastoma multiforme' <-- self
+      C4722099  'High-grade glioma'
+
+    st_3539b1d6ebfe48 (size 3):
+      C0017638  'Glioma'
+      C0206726  'Gliosarcoma (morphologic abnormality)'
+      C1621958  'Glioblastoma multiforme' <-- self
+
+    st_f2025c17a2df43 (size 2):
+      C0334588  'Giant cell glioblastoma'
+      C1621958  'Glioblastoma multiforme' <-- self
+
+  Sample size-2 sub-topics (showing first 3):
+    st_f2025c17a2df43: self + 'Giant cell glioblastoma'
+    st_846a45c6f77531: self + 'Small-cell glioblastoma'
+    st_5c5246e2225b5e: self + 'Malignant neoplasm'
+
+
+================================================================================
+  C0016470  'Food allergy'
+================================================================================
+  Main topic size: 38
+  Sub-topics in this main topic: 34
+  Size breakdown:
+    size   2: 29 sub-topics
+    size   3: 5 sub-topics
+
+  Largest 4 sub-topics:
+
+    st_d32615e50ca637 (size 3):
+      C0016470  'Food allergy' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0020962  'Structure of immune system'
+
+    st_9173ce0623e6cd (size 3):
+      C0016470  'Food allergy' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0020523  'IgE-mediated allergic disorder'
+
+    st_f5ffa371fe9ad5 (size 3):
+      C0016470  'Food allergy' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C1527304  'Allergic reaction'
+
+    st_b76b5249e60e3c (size 3):
+      C0016470  'Food allergy' <-- self
+      C0149696  'Food intolerance'
+      C1630648  'Food sensitivity'
+
+  Sample size-2 sub-topics (showing first 3):
+    st_b1cad8e6990980: self + 'Allergy to gluten'
+    st_9a79097f204c27: self + 'Allergy to nut'
+    st_23618d75e29838: self + 'Allergy to oat'
+
+
+DONE
