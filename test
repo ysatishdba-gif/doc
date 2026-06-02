@@ -1,207 +1,64 @@
 """
-lookup_topics.py
-----------------
-Production helper for unified topic + sub-topic lookups.
+inspect_topics.py
+-----------------
+Give CUIs, get their topic and sub-topic data. That's it.
 
-Usage:
-    from lookup_topics import TopicLookup
-    lookup = TopicLookup("topic_lookup.pkl")
-
-    # All CUIs in the SNOMED universe
-    all_cuis = lookup.cuis                          # set
-    for cui in lookup.iter_cuis():
-        ...
-
-    # Broad: main topic membership (CUI's neighborhood)
-    topic = lookup.topic_of("C0032285")             # set of CUIs
-
-    # Match two CUIs via main topic (broad - 2-hop reachable)
-    if lookup.match_main(cui_a, cui_b):
-        ...
-
-    # Match two CUIs via sub-topic (precise - share a tight cluster)
-    if lookup.match_sub(cui_a, cui_b):
-        ...
-    # Match by sub-topic with minimum size (precision control)
-    if lookup.match_sub(cui_a, cui_b, min_size=3):
-        ...
-
-    # Get all sub-topic IDs a CUI belongs to
-    sids = lookup.subtopic_ids_of(cui)
-
-    # Get a sub-topic's members
-    members = lookup.subtopic_members(sid)
-
-    # Trace a sub-topic back to its main topics (for "sticker" tags)
-    main_topics = lookup.main_topics_of_subtopic(sid)
+Edit CUIS list, run in notebook.
 """
 
 import pickle
 
+PICKLE_PATH = "topic_lookup.pkl"
 
-class TopicLookup:
-    def __init__(self, pickle_path):
-        with open(pickle_path, "rb") as f:
-            p = pickle.load(f)
+CUIS = [
+    "C0032285",  # Pneumonia
+    "C0013182",  # Allergy to drug
+    "C0011849",  # Diabetes
+    "C0002792",  # Anaphylaxis
+    "C2142181",  # Pain of left knee joint
+]
 
-        # Main topics
-        self.cui_topic_id        = p["cui_topic_id"]
-        self.topic_to_cuis       = p["topic_to_cuis"]
-        self.flattened_neighbors = p["flattened_neighbors"]
 
-        # Sub-topics
-        self.main_topic_to_subtopic_ids = p["main_topic_to_subtopic_ids"]
-        self.subtopic_id_to_cuis        = p["subtopic_id_to_cuis"]
-        self.subtopic_id_to_main_topics = p["subtopic_id_to_main_topics"]
-        self.cui_to_subtopic_ids        = p["cui_to_subtopic_ids"]
-        self.subtopic_metadata          = p["subtopic_metadata"]
+# Load
+with open(PICKLE_PATH, "rb") as f:
+    p = pickle.load(f)
 
-        # Metadata
-        self.labels      = p.get("labels", {})
-        self.tags        = p.get("tags", {})
-        self.snomed_cuis = p.get("snomed_cuis", set())
-        self.config      = p.get("config", {})
+topic_to_cuis              = p["topic_to_cuis"]
+main_topic_to_subtopic_ids = p["main_topic_to_subtopic_ids"]
+subtopic_id_to_cuis        = p["subtopic_id_to_cuis"]
+subtopic_metadata          = p["subtopic_metadata"]
+labels                     = p.get("labels", {})
+tags                       = p.get("tags", {})
 
-        # Internal: all CUIs we have main topics for
-        self._known_cuis = set(self.cui_topic_id.keys())
 
-    # ------------------------------------------------------------------
-    # CUI universe access
-    # ------------------------------------------------------------------
+def lbl(c):
+    return labels.get(c, "?")
 
-    @property
-    def cuis(self):
-        """The full set of SNOMED CUIs in this build.
-        Returns the same set we filtered by during construction."""
-        return self.snomed_cuis
 
-    def all_cuis(self):
-        """Alias for `cuis` property. Returns the full set of SNOMED CUIs."""
-        return self.snomed_cuis
+for cui in CUIS:
+    print(f"\n{'='*80}")
+    print(f"  {cui}  '{lbl(cui)}'")
+    print(f"{'='*80}")
 
-    def iter_cuis(self):
-        """Iterate over all CUIs (sorted for stability)."""
-        return iter(sorted(self.snomed_cuis))
+    sty = sorted(tags.get(cui, frozenset()))
+    print(f"  STY              : {sty}")
 
-    def num_cuis(self):
-        """Total CUI count."""
-        return len(self.snomed_cuis)
+    main_members = topic_to_cuis.get(cui, set())
+    print(f"  Main topic size  : {len(main_members)}")
+    print(f"  Main topic members:")
+    for m in sorted(main_members):
+        marker = " <-- self" if m == cui else ""
+        print(f"    {m}  '{lbl(m)}'{marker}")
 
-    def is_known(self, cui):
-        """Whether cui is in the SNOMED universe."""
-        return cui in self._known_cuis
+    own = list(dict.fromkeys(main_topic_to_subtopic_ids.get(cui, [])))
+    print(f"\n  Sub-topics: {len(own)}")
+    own_sorted = sorted(own, key=lambda s: -subtopic_metadata[s]["size"])
+    for sid in own_sorted:
+        meta = subtopic_metadata[sid]
+        members = subtopic_id_to_cuis[sid]
+        print(f"\n    {sid} (size {meta['size']}):")
+        for m in sorted(members):
+            marker = " <-- self" if m == cui else ""
+            print(f"      {m}  '{lbl(m)}'{marker}")
 
-    # ------------------------------------------------------------------
-    # Main topic API
-    # ------------------------------------------------------------------
-
-    def topic_of(self, cui):
-        """Set of CUIs in the main topic containing this CUI."""
-        return self.topic_to_cuis.get(cui, set())
-
-    def topic_id_of(self, cui):
-        """The main topic ID for a CUI (= the CUI itself in this build)."""
-        return self.cui_topic_id.get(cui)
-
-    def match_main(self, cui_a, cui_b):
-        """True if cui_a and cui_b share at least one main topic member.
-        Equivalent to: A and B are within 2 hops in the implication graph.
-        Broad/fuzzy matching."""
-        ta = self.topic_of(cui_a)
-        tb = self.topic_of(cui_b)
-        return bool(ta & tb)
-
-    def shared_topic_members(self, cui_a, cui_b):
-        """Set of CUIs that appear in both A's and B's main topics."""
-        return self.topic_of(cui_a) & self.topic_of(cui_b)
-
-    def neighbors_of(self, cui):
-        """Direct graph neighbors of a CUI (= topic members minus self)."""
-        return self.flattened_neighbors.get(cui, set())
-
-    # ------------------------------------------------------------------
-    # Sub-topic API
-    # ------------------------------------------------------------------
-
-    def subtopic_ids_of(self, cui, min_size=None):
-        """All sub-topic IDs that contain this CUI.
-        Optionally filter to sub-topics of at least min_size."""
-        sids = self.cui_to_subtopic_ids.get(cui, set())
-        if min_size is None:
-            return sids
-        return {s for s in sids
-                if self.subtopic_metadata.get(s, {}).get("size", 0) >= min_size}
-
-    def subtopic_members(self, sid):
-        """Set of CUIs in this sub-topic."""
-        return self.subtopic_id_to_cuis.get(sid, frozenset())
-
-    def main_topics_of_subtopic(self, sid):
-        """Set of main topic CUIs that this sub-topic appears within.
-        Useful for trace-back / sticker tags."""
-        return self.subtopic_id_to_main_topics.get(sid, set())
-
-    def subtopic_size(self, sid):
-        return self.subtopic_metadata.get(sid, {}).get("size", 0)
-
-    def match_sub(self, cui_a, cui_b, min_size=None):
-        """True if cui_a and cui_b share at least one sub-topic.
-        Optionally require sub-topic to be at least min_size members.
-        Tight/precise matching."""
-        sa = self.subtopic_ids_of(cui_a, min_size=min_size)
-        sb = self.subtopic_ids_of(cui_b, min_size=min_size)
-        return bool(sa & sb)
-
-    def shared_subtopic_ids(self, cui_a, cui_b, min_size=None):
-        """Set of sub-topic IDs that both CUIs appear in."""
-        sa = self.subtopic_ids_of(cui_a, min_size=min_size)
-        sb = self.subtopic_ids_of(cui_b, min_size=min_size)
-        return sa & sb
-
-    # ------------------------------------------------------------------
-    # Retrieval helpers
-    # ------------------------------------------------------------------
-
-    def candidates_for_query(self, query_cuis, level="main"):
-        """Given a set of query CUIs, return the candidate retrieval set.
-        level='main'  : union of main topic members (broad)
-        level='sub'   : union of sub-topic members (precise; size >= 2)
-        level='sub3+' : sub-topics of size >= 3 only (highest confidence)
-        """
-        result = set()
-        if level == "main":
-            for cui in query_cuis:
-                result |= self.topic_of(cui)
-            return result
-        if level == "sub":
-            for cui in query_cuis:
-                for sid in self.cui_to_subtopic_ids.get(cui, set()):
-                    result |= set(self.subtopic_id_to_cuis[sid])
-            return result
-        if level == "sub3+":
-            for cui in query_cuis:
-                sids = self.subtopic_ids_of(cui, min_size=3)
-                for sid in sids:
-                    result |= set(self.subtopic_id_to_cuis[sid])
-            return result
-        raise ValueError(f"Unknown level: {level!r}")
-
-    # ------------------------------------------------------------------
-    # Metadata
-    # ------------------------------------------------------------------
-
-    def label(self, cui):
-        return self.labels.get(cui, "?")
-
-    def sty_tags(self, cui):
-        return self.tags.get(cui, frozenset())
-
-    def stats(self):
-        """Summary statistics."""
-        return {
-            "main_topics":        len(self.topic_to_cuis),
-            "unique_subtopics":   len(self.subtopic_id_to_cuis),
-            "cuis_with_subtopic": len(self.cui_to_subtopic_ids),
-            "snomed_cuis":        len(self.snomed_cuis),
-            "config":             self.config,
-        }
+print("\n\nDONE")
