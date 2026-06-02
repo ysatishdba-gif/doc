@@ -1,52 +1,256 @@
-To perform Hierarchical Clustering based on Source Vocabulary Mapping, specifically focusing on SNOMED CT concepts that map to UMLS CUIs, you would follow these general steps:
+"""
+demo_external_neighbor_pneumonia.py
+-----------------------------------
+Walks through the mutual-k-rank sub-topic algorithm on Pneumonia's
+main topic (42 members), showing all intermediate steps.
 
-This approach treats the SNOMED CT hierarchy (which is deeply embedded within the UMLS structure via mappings) as the basis for creating topical clusters of CUIs.
+Steps shown:
+  1. List Pneumonia's 42 main topic members
+  2. For each member, list its EXTERNAL neighbors (outside the topic)
+  3. Show pairwise Jaccard similarity matrix (key pairs)
+  4. For each member, list its top-3 most-similar topic-mates
+  5. Identify mutual-3-rank edges (A in B's top-3 AND B in A's top-3)
+  6. Find connected components on the mutual-rank graph
+  7. Print the resulting sub-topics
 
-Steps for Hierarchical Clustering with SNOMED CT Mapping
-1. Data Preparation: CUI to SNOMED CT Mapping
-Identify Relevant CUIs: Start with the set of CUIs you are interested in analyzing.
-Map to SNOMED CT: For each CUI, determine its corresponding concept(s) in SNOMED CT. A single CUI can sometimes map to multiple SNOMED CT Concept Unique Identifiers (SNOMED CT CUIs) or have alternative mappings, but you generally focus on the preferred or most frequently used map.
-Extract SNOMED CT Relationships: For the identified SNOMED CT concepts, extract their structural relationships, primarily the Is a (subsumption) relationship. This forms a tree or Directed Acyclic Graph (DAG).
-2. Define a Distance/Similarity Metric
-Since you are using a hierarchy, you need a metric to determine how "close" two CUIs are based on their common ancestors in the SNOMED CT structure:
+Compare side-by-side with current clique-based sub-topics.
 
-Common Ancestor Distance: A very common metric in concept hierarchy analysis is:
-Distance(CUI 
-A
-​
- ,CUI 
-B
-​
- )=Depth(CUI 
-A
-​
- )+Depth(CUI 
-B
-​
- )−2×Depth(LCA(CUI 
-A
-​
- ,CUI 
-B
-​
- ))
+No production output — purely a walkthrough for evaluation.
+"""
 
-Where:
-Depth(X) is the depth of concept X in the SNOMED CT hierarchy (distance from the top-most root).
-LCA(A,B) is the Lowest Common Ancestor of concepts A and B in the SNOMED CT hierarchy.
-Concepts that share a very recent (deep) common ancestor are considered very similar (low distance/high similarity), forming a granular topic.
-3. Apply Hierarchical Clustering
-Use the calculated distance matrix from Step 2 to perform hierarchical clustering:
+import pickle
+from collections import defaultdict
 
-Agglomerative Clustering (Bottom-Up): This is the standard method for hierarchical clustering.
-Start by treating every CUI as its own cluster.
-Iteratively merge the two closest clusters (based on the distance metric and a chosen linkage criterion like Ward's, single, or complete linkage).
-Continue until all CUIs are merged into a single, large cluster.
-Dendrogram Generation: The output is a dendrogram, which visually represents the merging process.
-4. Extract Granular Topics
-The dendrogram allows you to cut the tree at different levels to extract topics of varying granularity:
 
-High Granularity (Fine Topics): Cutting the dendrogram near the leaves (short vertical lines) yields many small clusters. These clusters contain CUIs that are highly specific and share a very recent common ancestor in SNOMED CT (e.g., clustering only "Fracture of left femur" and "Fracture of right femur" under a "Femur Fracture" ancestor).
-Lower Granularity (Broad Topics): Cutting the dendrogram lower down yields fewer, larger clusters (e.g., a cluster for "All Fractures" or "All Injuries").
-Granularity Control
-The granularity of your topics is directly controlled by where you choose to "cut" the resulting dendrogram or by the linkage method and distance metric used in Step 2. A metric emphasizing the depth of the LCA will naturally lead to finer, more granular initial groupings.
+PICKLE_PATH  = "topic_lookup_final.pkl"
+FOCAL_CUI    = "C0032285"  # Pneumonia
+K            = 3            # top-k mutual rank
+
+
+# ============================================================================
+# Load
+# ============================================================================
+
+print(f"Loading {PICKLE_PATH} ...")
+with open(PICKLE_PATH, "rb") as f:
+    p = pickle.load(f)
+
+topic_to_cuis       = p["topic_to_cuis"]
+flattened_neighbors = p["flattened_neighbors"]
+labels              = p.get("labels", {})
+
+# Also load existing clique-based sub-topics for comparison
+main_topic_to_subtopic_ids = p["main_topic_to_subtopic_ids"]
+subtopic_id_to_cuis        = p["subtopic_id_to_cuis"]
+subtopic_metadata          = p["subtopic_metadata"]
+
+
+def lbl(c):
+    return labels.get(c, "?")[:42] if labels else "?"
+
+
+def short_lbl(c):
+    return labels.get(c, "?")[:24] if labels else "?"
+
+
+# ============================================================================
+# Step 1: List members
+# ============================================================================
+
+main_members = topic_to_cuis[FOCAL_CUI]
+members_list = sorted(main_members)
+
+print(f"\n{'='*80}")
+print(f"STEP 1: Pneumonia's main topic members ({len(main_members)} total)")
+print(f"{'='*80}")
+for i, m in enumerate(members_list):
+    marker = " <-- focal" if m == FOCAL_CUI else ""
+    print(f"  [{i:2d}] {m}  '{lbl(m)}'{marker}")
+
+
+# ============================================================================
+# Step 2: External neighbors per member
+# ============================================================================
+
+print(f"\n\n{'='*80}")
+print(f"STEP 2: External neighbors per member")
+print(f"  (a member's external neighbors = its graph neighbors NOT in this topic)")
+print(f"{'='*80}")
+
+external = {}  # cui -> set of external neighbor CUIs
+for m in members_list:
+    all_neighbors = flattened_neighbors.get(m, set())
+    ext = all_neighbors - main_members
+    external[m] = ext
+
+# Show external counts for all members
+print(f"\n  {'CUI':<12s}  {'Label':<26s}  {'#external':>10s}  {'Sample externals':<40s}")
+for m in members_list:
+    sample = sorted(external[m])[:3]
+    sample_lbls = ", ".join(short_lbl(x) for x in sample)
+    print(f"  {m:<12s}  {short_lbl(m):<26s}  {len(external[m]):>10d}  {sample_lbls[:40]:<40s}")
+
+
+# ============================================================================
+# Step 3: Pairwise Jaccard
+# ============================================================================
+
+print(f"\n\n{'='*80}")
+print(f"STEP 3: Pairwise Jaccard similarities on external neighbors")
+print(f"  Jaccard(A, B) = |external(A) ∩ external(B)| / |external(A) ∪ external(B)|")
+print(f"{'='*80}")
+
+def jaccard(a, b):
+    eA, eB = external[a], external[b]
+    if not eA and not eB:
+        return 0.0
+    inter = len(eA & eB)
+    union = len(eA | eB)
+    return inter / union if union else 0.0
+
+
+# Compute full matrix
+sim = {}
+for i, a in enumerate(members_list):
+    for j, b in enumerate(members_list):
+        if i < j:
+            s = jaccard(a, b)
+            if s > 0:
+                sim[(a, b)] = s
+                sim[(b, a)] = s
+
+
+# Show top-15 most-similar pairs across the whole topic
+print(f"\n  Top-15 most-similar pairs in the topic:")
+pairs = sorted(
+    ((a, b, s) for (a, b), s in sim.items() if a < b),
+    key=lambda x: -x[2],
+)[:15]
+for a, b, s in pairs:
+    print(f"    {s:.3f}  {short_lbl(a):<26s} <-> {short_lbl(b):<26s}")
+
+
+# ============================================================================
+# Step 4: For each member, top-k most similar topic-mates
+# ============================================================================
+
+print(f"\n\n{'='*80}")
+print(f"STEP 4: For each member, top-{K} most similar topic-mates")
+print(f"{'='*80}")
+
+topk = {}  # cui -> list of (other_cui, sim) sorted by sim desc
+for m in members_list:
+    others = [
+        (other, sim.get((m, other), 0.0))
+        for other in members_list if other != m
+    ]
+    others.sort(key=lambda x: -x[1])
+    topk[m] = others[:K]
+
+for m in members_list:
+    print(f"\n  {m}  '{short_lbl(m)}'")
+    for other, s in topk[m]:
+        print(f"      {s:.3f}  {other}  '{short_lbl(other)}'")
+
+
+# ============================================================================
+# Step 5: Mutual k-rank edges
+# ============================================================================
+
+print(f"\n\n{'='*80}")
+print(f"STEP 5: Mutual-{K} rank edges")
+print(f"  (A and B are linked if A is in B's top-{K} AND B is in A's top-{K})")
+print(f"{'='*80}")
+
+mutual_neighbors = defaultdict(set)  # cui -> set of mutual-k-rank neighbors
+
+# For lookup
+topk_set = {m: {x for x, s in topk[m]} for m in members_list}
+
+for a in members_list:
+    for b in topk_set[a]:
+        if a in topk_set[b]:
+            mutual_neighbors[a].add(b)
+            mutual_neighbors[b].add(a)
+
+# Display the mutual edges
+print(f"\n  Mutual-rank edges (each edge shown once):")
+edges_shown = set()
+for a in members_list:
+    for b in sorted(mutual_neighbors[a]):
+        if (b, a) in edges_shown:
+            continue
+        edges_shown.add((a, b))
+        print(f"    {short_lbl(a):<26s} <-> {short_lbl(b):<26s}  "
+              f"(sim={sim.get((a,b), 0.0):.3f})")
+
+
+# ============================================================================
+# Step 6: Connected components
+# ============================================================================
+
+print(f"\n\n{'='*80}")
+print(f"STEP 6: Connected components in the mutual-rank graph")
+print(f"{'='*80}")
+
+visited = set()
+components = []
+for start in members_list:
+    if start in visited:
+        continue
+    comp = set()
+    stack = [start]
+    while stack:
+        u = stack.pop()
+        if u in visited:
+            continue
+        visited.add(u)
+        comp.add(u)
+        for v in mutual_neighbors[u]:
+            if v not in visited:
+                stack.append(v)
+    components.append(comp)
+
+# Sort components by size descending
+components.sort(key=lambda c: -len(c))
+
+print(f"\n  Found {len(components)} sub-topics:")
+for i, comp in enumerate(components):
+    print(f"\n    Sub-topic {i+1} (size {len(comp)}):")
+    for m in sorted(comp):
+        marker = " <-- focal" if m == FOCAL_CUI else ""
+        print(f"      {m}  '{lbl(m)}'{marker}")
+
+
+# ============================================================================
+# Step 7: Compare with existing clique-based sub-topics
+# ============================================================================
+
+print(f"\n\n{'='*80}")
+print(f"STEP 7: Compare with current clique-based sub-topics")
+print(f"{'='*80}")
+
+clique_subtopics = main_topic_to_subtopic_ids.get(FOCAL_CUI, [])
+clique_subtopics = list(dict.fromkeys(clique_subtopics))
+
+print(f"\n  Current size-3+ clique sub-topics: {len(clique_subtopics)}")
+for i, sid in enumerate(clique_subtopics):
+    members = subtopic_id_to_cuis[sid]
+    print(f"\n    Clique sub-topic {i+1} (size {subtopic_metadata[sid]['size']}):")
+    for m in sorted(members):
+        marker = " <-- focal" if m == FOCAL_CUI else ""
+        print(f"      {m}  '{lbl(m)}'{marker}")
+
+
+print(f"\n\n{'='*80}")
+print(f"SUMMARY")
+print(f"{'='*80}")
+print(f"  Main topic size                       : {len(main_members)}")
+print(f"  Current size-3+ clique sub-topics     : {len(clique_subtopics)}")
+print(f"  New mutual-{K}-rank sub-topics          : {len(components)}")
+print(f"\n  Largest external-neighbor sub-topic  : "
+      f"{len(components[0]) if components else 0} CUIs")
+print(f"  Smallest                              : "
+      f"{len(components[-1]) if components else 0} CUIs")
+
+print("\n\nDONE")
