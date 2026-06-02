@@ -1,558 +1,182 @@
-Loading topic_lookup_final.pkl ...
-
-================================================================================
-STEP 1: Pneumonia's main topic members (42 total)
-================================================================================
-  [ 0] C0004626  'Bacterial pneumonia'
-  [ 1] C0006285  'Lobular pneumonia'
-  [ 2] C0024115  'Disorder of lung'
-  [ 3] C0032241  'Pleurobronchopneumonia (disorder)'
-  [ 4] C0032285  'Pneumonia (disorder)' <-- focal
-  [ 5] C0032290  'Aspiration pneumonia'
-  [ 6] C0032300  'Lobar pneumonia'
-  [ 7] C0032310  'Viral pneumonia'
-  [ 8] C0035243  'Respiratory tract infection'
-  [ 9] C0152413  'Pneumonia caused by respiratory syncytial '
-  [10] C0155870  'Pneumonia and influenza'
-  [11] C0158935  'Congenital pneumonia'
-  [12] C0206061  'Interstitial pneumonia'
-  [13] C0264377  'Peribronchial pneumonia'
-  [14] C0264381  'Unresolved pneumonia'
-  [15] C0264386  'Foreign body pneumonia'
-  [16] C0264515  'Necrotizing pneumonia'
-  [17] C0264522  'Hypostatic pneumonia'
-  [18] C0276253  'Cytomegaloviral pneumonia'
-  [19] C0276527  'Pneumonia with AIDS (acquired immunodefici'
-  [20] C0276688  'Pulmonary cryptococcosis'
-  [21] C0339961  'Fungal pneumonia'
-  [22] C0339965  'Haemorrhagic pneumonia'
-  [23] C0339968  'Neonatal pneumonia'
-  [24] C0339969  'Pneumonia due to parasitic infestation'
-  [25] C0348806  'Abscess of lung with pneumonia'
-  [26] C0694549  'Community acquired pneumonia'
-  [27] C0694550  'Recurrent pneumonia (disorder)'
-  [28] C0747674  'Cavitary pneumonia'
-  [29] C0747690  'Postobstructive pneumonia'
-  [30] C0876973  'Pulmonary infection'
-  [31] C0949083  'Nosocomial pneumonia (disorder)'
-  [32] C1112452  'Post measles pneumonia'
-  [33] C1142578  'Bilateral pneumonia'
-  [34] C1279386  'Postoperative pneumonia'
-  [35] C1290339  'Focal pneumonia'
-  [36] C1290340  'Confluent pneumonia'
-  [37] C1535939  'Pulmonary pneumocystosis'
-  [38] C1701940  'Ventilator-associated pneumonia'
-  [39] C3495445  'Toxoplasma pneumonia'
-  [40] C3714636  'Pneumonitis'
-  [41] C4039254  'Chronic pneumonia'
-
-
-================================================================================
-STEP 2: External neighbors per member
-  (a member's external neighbors = its graph neighbors NOT in this topic)
-================================================================================
-
-  CUI           Label                        #external  Sample externals                        
-  C0004626      Bacterial pneumonia                 20  Bacterial infection, Legionnaires diseas
-  C0006285      Lobular pneumonia                   13  Bronchial disorder, Bronchitis, Hemorrha
-  C0024115      Disorder of lung                    82  Pulmonary arteritis, Allergic bronchopul
-  C0032241      Pleurobronchopneumonia (             2  Pleuritis, Infective pleurisy           
-  C0032285      Pneumonia (disorder)                 0                                          
-  C0032290      Aspiration pneumonia                 8  Lipid pneumonitis, Aspiration pneumonia 
-  C0032300      Lobar pneumonia                      7  Unresolved lobar pneumon, Lung consolida
-  C0032310      Viral pneumonia                     17  Viral disease, Adenoviral pneumonia, Par
-  C0035243      Respiratory tract infect            35  Bronchitis, Common cold, Communicable di
-  C0152413      Pneumonia caused by resp             3  Respiratory syncytial vi, Lung consolida
-  C0155870      Pneumonia and influenza              6  Grippe, Respiratory disorder, Pneumococc
-  C0158935      Congenital pneumonia                10  Fetal and/or neonatal re, Congenital inf
-  C0206061      Interstitial pneumonia               3  Pittsburgh pneumonia (di, Idiopathic int
-  C0264377      Peribronchial pneumonia              1  Lung consolidation (diso                
-  C0264381      Unresolved pneumonia                 2  Unresolved lobar pneumon, Lung consolida
-  C0264386      Foreign body pneumonia               1  Pneumonitis due to forei                
-  C0264515      Necrotizing pneumonia                4  Pulmonary necrosis, Lung consolidation (
-  C0264522      Hypostatic pneumonia                 2  Hypostatic bronchopneumo, Lung consolida
-  C0276253      Cytomegaloviral pneumoni             2  Cytomegalovirus infectio, Lung consolida
-  C0276527      Pneumonia with AIDS (acq             5  Candidiasis of lung with, Bacterial pneu
-  C0276688      Pulmonary cryptococcosis             2  Busse-Buschke disease, Fungal infection 
-  C0339961      Fungal pneumonia                     8  Fungal infection of lung, Candidiasis of
-  C0339965      Haemorrhagic pneumonia               5  Pulmonary haemorrhage, Haemorrhagic pneu
-  C0339968      Neonatal pneumonia                   5  Neonatal chlamydial pneu, Neonatal aspir
-  C0339969      Pneumonia due to parasit             7  Parasitic infection of l, Leishmanial pn
-  C0348806      Abscess of lung with pne             4  Abscess of lung, Abscess of lung and med
-  C0694549      Community acquired pneum             1  Lung consolidation (diso                
-  C0694550      Recurrent pneumonia (dis             3  Recurrent aspiration pne, Recurrent bact
-  C0747674      Cavitary pneumonia                   2  Lung consolidation (diso, Cavitation of 
-  C0747690      Postobstructive pneumoni             2  Respiratory complication, Lung consolida
-  C0876973      Pulmonary infection                 23  Abscess of lung, Parasitic infection of 
-  C0949083      Nosocomial pneumonia (di             3  Cross infection, Lung consolidation (dis
-  C1112452      Post measles pneumonia               4  Morbilli, Lung consolidation (diso, Infe
-  C1142578      Bilateral pneumonia                  3  Lung consolidation (diso, Bilateral bron
-  C1279386      Postoperative pneumonia              2  Aspiration pneumonia fol, Postoperative 
-  C1290339      Focal pneumonia                      1  Lung consolidation (diso                
-  C1290340      Confluent pneumonia                  2  Lung consolidation (diso, Confluent bron
-  C1535939      Pulmonary pneumocystosis             2  Infection caused by Pneu, Infection of l
-  C1701940      Ventilator-associated pn             4  Lung consolidation (diso, Complication o
-  C3495445      Toxoplasma pneumonia                 1  Toxoplasmosis                           
-  C3714636      Pneumonitis                         36  Farmers' lung, Lipid pneumonitis, Pulmon
-  C4039254      Chronic pneumonia                    4  Chronic infectious disea, Lung consolida
-
-
-================================================================================
-STEP 3: Pairwise Jaccard similarities on external neighbors
-  Jaccard(A, B) = |external(A) ∩ external(B)| / |external(A) ∪ external(B)|
-================================================================================
-
-  Top-15 most-similar pairs in the topic:
-    1.000  Peribronchial pneumonia    <-> Community acquired pneum  
-    1.000  Peribronchial pneumonia    <-> Focal pneumonia           
-    1.000  Community acquired pneum   <-> Focal pneumonia           
-    0.500  Peribronchial pneumonia    <-> Unresolved pneumonia      
-    0.500  Peribronchial pneumonia    <-> Hypostatic pneumonia      
-    0.500  Peribronchial pneumonia    <-> Cytomegaloviral pneumoni  
-    0.500  Peribronchial pneumonia    <-> Cavitary pneumonia        
-    0.500  Peribronchial pneumonia    <-> Postobstructive pneumoni  
-    0.500  Peribronchial pneumonia    <-> Confluent pneumonia       
-    0.500  Unresolved pneumonia       <-> Community acquired pneum  
-    0.500  Unresolved pneumonia       <-> Focal pneumonia           
-    0.500  Hypostatic pneumonia       <-> Community acquired pneum  
-    0.500  Hypostatic pneumonia       <-> Focal pneumonia           
-    0.500  Cytomegaloviral pneumoni   <-> Community acquired pneum  
-    0.500  Cytomegaloviral pneumoni   <-> Focal pneumonia           
-
-
-================================================================================
-STEP 4: For each member, top-3 most similar topic-mates
-================================================================================
-
-  C0004626  'Bacterial pneumonia'
-      0.045  C0694550  'Recurrent pneumonia (dis'
-      0.045  C0949083  'Nosocomial pneumonia (di'
-      0.040  C0155870  'Pneumonia and influenza'
-
-  C0006285  'Lobular pneumonia'
-      0.154  C0264522  'Hypostatic pneumonia'
-      0.154  C1290340  'Confluent pneumonia'
-      0.143  C1142578  'Bilateral pneumonia'
-
-  C0024115  'Disorder of lung'
-      0.035  C0035243  'Respiratory tract infect'
-      0.029  C0876973  'Pulmonary infection'
-      0.024  C0348806  'Abscess of lung with pne'
-
-  C0032241  'Pleurobronchopneumonia ('
-      0.057  C0035243  'Respiratory tract infect'
-      0.000  C0004626  'Bacterial pneumonia'
-      0.000  C0006285  'Lobular pneumonia'
-
-  C0032285  'Pneumonia (disorder)'
-      0.000  C0004626  'Bacterial pneumonia'
-      0.000  C0006285  'Lobular pneumonia'
-      0.000  C0024115  'Disorder of lung'
-
-  C0032290  'Aspiration pneumonia'
-      0.100  C0694550  'Recurrent pneumonia (dis'
-      0.083  C0339968  'Neonatal pneumonia'
-      0.048  C3714636  'Pneumonitis'
-
-  C0032300  'Lobar pneumonia'
-      0.286  C0264381  'Unresolved pneumonia'
-      0.143  C0264377  'Peribronchial pneumonia'
-      0.143  C0694549  'Community acquired pneum'
-
-  C0032310  'Viral pneumonia'
-      0.048  C0276527  'Pneumonia with AIDS (acq'
-      0.045  C0155870  'Pneumonia and influenza'
-      0.038  C0158935  'Congenital pneumonia'
-
-  C0035243  'Respiratory tract infect'
-      0.074  C0876973  'Pulmonary infection'
-      0.057  C0032241  'Pleurobronchopneumonia ('
-      0.051  C0155870  'Pneumonia and influenza'
-
-  C0152413  'Pneumonia caused by resp'
-      0.333  C0264377  'Peribronchial pneumonia'
-      0.333  C0694549  'Community acquired pneum'
-      0.333  C1290339  'Focal pneumonia'
-
-  C0155870  'Pneumonia and influenza'
-      0.167  C0264377  'Peribronchial pneumonia'
-      0.167  C0694549  'Community acquired pneum'
-      0.167  C1290339  'Focal pneumonia'
-
-  C0158935  'Congenital pneumonia'
-      0.100  C0264377  'Peribronchial pneumonia'
-      0.100  C0694549  'Community acquired pneum'
-      0.100  C1290339  'Focal pneumonia'
-
-  C0206061  'Interstitial pneumonia'
-      0.026  C3714636  'Pneumonitis'
-      0.000  C0004626  'Bacterial pneumonia'
-      0.000  C0006285  'Lobular pneumonia'
-
-  C0264377  'Peribronchial pneumonia'
-      1.000  C0694549  'Community acquired pneum'
-      1.000  C1290339  'Focal pneumonia'
-      0.500  C0264381  'Unresolved pneumonia'
-
-  C0264381  'Unresolved pneumonia'
-      0.500  C0264377  'Peribronchial pneumonia'
-      0.500  C0694549  'Community acquired pneum'
-      0.500  C1290339  'Focal pneumonia'
-
-  C0264386  'Foreign body pneumonia'
-      0.028  C3714636  'Pneumonitis'
-      0.000  C0004626  'Bacterial pneumonia'
-      0.000  C0006285  'Lobular pneumonia'
-
-  C0264515  'Necrotizing pneumonia'
-      0.250  C0264377  'Peribronchial pneumonia'
-      0.250  C0694549  'Community acquired pneum'
-      0.250  C1290339  'Focal pneumonia'
-
-  C0264522  'Hypostatic pneumonia'
-      0.500  C0264377  'Peribronchial pneumonia'
-      0.500  C0694549  'Community acquired pneum'
-      0.500  C1290339  'Focal pneumonia'
-
-  C0276253  'Cytomegaloviral pneumoni'
-      0.500  C0264377  'Peribronchial pneumonia'
-      0.500  C0694549  'Community acquired pneum'
-      0.500  C1290339  'Focal pneumonia'
-
-  C0276527  'Pneumonia with AIDS (acq'
-      0.200  C0264377  'Peribronchial pneumonia'
-      0.200  C0694549  'Community acquired pneum'
-      0.200  C1290339  'Focal pneumonia'
-
-  C0276688  'Pulmonary cryptococcosis'
-      0.111  C0339961  'Fungal pneumonia'
-      0.042  C0876973  'Pulmonary infection'
-      0.000  C0004626  'Bacterial pneumonia'
-
-  C0339961  'Fungal pneumonia'
-      0.125  C0264377  'Peribronchial pneumonia'
-      0.125  C0694549  'Community acquired pneum'
-      0.125  C1290339  'Focal pneumonia'
-
-  C0339965  'Haemorrhagic pneumonia'
-      0.200  C0264377  'Peribronchial pneumonia'
-      0.200  C0694549  'Community acquired pneum'
-      0.200  C1290339  'Focal pneumonia'
-
-  C0339968  'Neonatal pneumonia'
-      0.200  C0264377  'Peribronchial pneumonia'
-      0.200  C0694549  'Community acquired pneum'
-      0.200  C1290339  'Focal pneumonia'
-
-  C0339969  'Pneumonia due to parasit'
-      0.143  C0264377  'Peribronchial pneumonia'
-      0.143  C0694549  'Community acquired pneum'
-      0.143  C1290339  'Focal pneumonia'
-
-  C0348806  'Abscess of lung with pne'
-      0.500  C1290340  'Confluent pneumonia'
-      0.250  C0264377  'Peribronchial pneumonia'
-      0.250  C0694549  'Community acquired pneum'
-
-  C0694549  'Community acquired pneum'
-      1.000  C0264377  'Peribronchial pneumonia'
-      1.000  C1290339  'Focal pneumonia'
-      0.500  C0264381  'Unresolved pneumonia'
-
-  C0694550  'Recurrent pneumonia (dis'
-      0.100  C0032290  'Aspiration pneumonia'
-      0.045  C0004626  'Bacterial pneumonia'
-      0.000  C0006285  'Lobular pneumonia'
-
-  C0747674  'Cavitary pneumonia'
-      0.500  C0264377  'Peribronchial pneumonia'
-      0.500  C0694549  'Community acquired pneum'
-      0.500  C1290339  'Focal pneumonia'
-
-  C0747690  'Postobstructive pneumoni'
-      0.500  C0264377  'Peribronchial pneumonia'
-      0.500  C0694549  'Community acquired pneum'
-      0.500  C1290339  'Focal pneumonia'
-
-  C0876973  'Pulmonary infection'
-      0.074  C0035243  'Respiratory tract infect'
-      0.042  C0276688  'Pulmonary cryptococcosis'
-      0.038  C0348806  'Abscess of lung with pne'
-
-  C0949083  'Nosocomial pneumonia (di'
-      0.333  C0264377  'Peribronchial pneumonia'
-      0.333  C0694549  'Community acquired pneum'
-      0.333  C1290339  'Focal pneumonia'
-
-  C1112452  'Post measles pneumonia'
-      0.250  C0264377  'Peribronchial pneumonia'
-      0.250  C0694549  'Community acquired pneum'
-      0.250  C1290339  'Focal pneumonia'
-
-  C1142578  'Bilateral pneumonia'
-      0.333  C0264377  'Peribronchial pneumonia'
-      0.333  C0694549  'Community acquired pneum'
-      0.333  C1290339  'Focal pneumonia'
-
-  C1279386  'Postoperative pneumonia'
-      0.000  C0004626  'Bacterial pneumonia'
-      0.000  C0006285  'Lobular pneumonia'
-      0.000  C0024115  'Disorder of lung'
-
-  C1290339  'Focal pneumonia'
-      1.000  C0264377  'Peribronchial pneumonia'
-      1.000  C0694549  'Community acquired pneum'
-      0.500  C0264381  'Unresolved pneumonia'
-
-  C1290340  'Confluent pneumonia'
-      0.500  C0264377  'Peribronchial pneumonia'
-      0.500  C0348806  'Abscess of lung with pne'
-      0.500  C0694549  'Community acquired pneum'
-
-  C1535939  'Pulmonary pneumocystosis'
-      0.000  C0004626  'Bacterial pneumonia'
-      0.000  C0006285  'Lobular pneumonia'
-      0.000  C0024115  'Disorder of lung'
-
-  C1701940  'Ventilator-associated pn'
-      0.250  C0264377  'Peribronchial pneumonia'
-      0.250  C0694549  'Community acquired pneum'
-      0.250  C1290339  'Focal pneumonia'
-
-  C3495445  'Toxoplasma pneumonia'
-      0.000  C0004626  'Bacterial pneumonia'
-      0.000  C0006285  'Lobular pneumonia'
-      0.000  C0024115  'Disorder of lung'
-
-  C3714636  'Pneumonitis'
-      0.048  C0032290  'Aspiration pneumonia'
-      0.028  C0264386  'Foreign body pneumonia'
-      0.026  C0206061  'Interstitial pneumonia'
-
-  C4039254  'Chronic pneumonia'
-      0.250  C0264377  'Peribronchial pneumonia'
-      0.250  C0694549  'Community acquired pneum'
-      0.250  C1290339  'Focal pneumonia'
-
-
-================================================================================
-STEP 5: Mutual-3 rank edges
-  (A and B are linked if A is in B's top-3 AND B is in A's top-3)
-================================================================================
-
-  Mutual-rank edges (each edge shown once):
-    Bacterial pneumonia        <-> Recurrent pneumonia (dis    (sim=0.045)
-    Pleurobronchopneumonia (   <-> Respiratory tract infect    (sim=0.057)
-    Aspiration pneumonia       <-> Recurrent pneumonia (dis    (sim=0.100)
-    Aspiration pneumonia       <-> Pneumonitis                 (sim=0.048)
-    Respiratory tract infect   <-> Pulmonary infection         (sim=0.074)
-    Interstitial pneumonia     <-> Pneumonitis                 (sim=0.026)
-    Peribronchial pneumonia    <-> Unresolved pneumonia        (sim=0.500)
-    Peribronchial pneumonia    <-> Community acquired pneum    (sim=1.000)
-    Peribronchial pneumonia    <-> Focal pneumonia             (sim=1.000)
-    Unresolved pneumonia       <-> Community acquired pneum    (sim=0.500)
-    Unresolved pneumonia       <-> Focal pneumonia             (sim=0.500)
-    Foreign body pneumonia     <-> Pneumonitis                 (sim=0.028)
-    Pulmonary cryptococcosis   <-> Pulmonary infection         (sim=0.042)
-    Abscess of lung with pne   <-> Confluent pneumonia         (sim=0.500)
-    Community acquired pneum   <-> Focal pneumonia             (sim=1.000)
-
-
-================================================================================
-STEP 6: Connected components in the mutual-rank graph
-================================================================================
-
-  Found 30 sub-topics:
-
-    Sub-topic 1 (size 6):
-      C0004626  'Bacterial pneumonia'
-      C0032290  'Aspiration pneumonia'
-      C0206061  'Interstitial pneumonia'
-      C0264386  'Foreign body pneumonia'
-      C0694550  'Recurrent pneumonia (disorder)'
-      C3714636  'Pneumonitis'
-
-    Sub-topic 2 (size 4):
-      C0032241  'Pleurobronchopneumonia (disorder)'
-      C0035243  'Respiratory tract infection'
-      C0276688  'Pulmonary cryptococcosis'
-      C0876973  'Pulmonary infection'
-
-    Sub-topic 3 (size 4):
-      C0264377  'Peribronchial pneumonia'
-      C0264381  'Unresolved pneumonia'
-      C0694549  'Community acquired pneumonia'
-      C1290339  'Focal pneumonia'
-
-    Sub-topic 4 (size 2):
-      C0348806  'Abscess of lung with pneumonia'
-      C1290340  'Confluent pneumonia'
-
-    Sub-topic 5 (size 1):
-      C0006285  'Lobular pneumonia'
-
-    Sub-topic 6 (size 1):
-      C0024115  'Disorder of lung'
-
-    Sub-topic 7 (size 1):
-      C0032285  'Pneumonia (disorder)' <-- focal
-
-    Sub-topic 8 (size 1):
-      C0032300  'Lobar pneumonia'
-
-    Sub-topic 9 (size 1):
-      C0032310  'Viral pneumonia'
-
-    Sub-topic 10 (size 1):
-      C0152413  'Pneumonia caused by respiratory syncytial '
-
-    Sub-topic 11 (size 1):
-      C0155870  'Pneumonia and influenza'
-
-    Sub-topic 12 (size 1):
-      C0158935  'Congenital pneumonia'
-
-    Sub-topic 13 (size 1):
-      C0264515  'Necrotizing pneumonia'
-
-    Sub-topic 14 (size 1):
-      C0264522  'Hypostatic pneumonia'
-
-    Sub-topic 15 (size 1):
-      C0276253  'Cytomegaloviral pneumonia'
-
-    Sub-topic 16 (size 1):
-      C0276527  'Pneumonia with AIDS (acquired immunodefici'
-
-    Sub-topic 17 (size 1):
-      C0339961  'Fungal pneumonia'
-
-    Sub-topic 18 (size 1):
-      C0339965  'Haemorrhagic pneumonia'
-
-    Sub-topic 19 (size 1):
-      C0339968  'Neonatal pneumonia'
-
-    Sub-topic 20 (size 1):
-      C0339969  'Pneumonia due to parasitic infestation'
-
-    Sub-topic 21 (size 1):
-      C0747674  'Cavitary pneumonia'
-
-    Sub-topic 22 (size 1):
-      C0747690  'Postobstructive pneumonia'
-
-    Sub-topic 23 (size 1):
-      C0949083  'Nosocomial pneumonia (disorder)'
-
-    Sub-topic 24 (size 1):
-      C1112452  'Post measles pneumonia'
-
-    Sub-topic 25 (size 1):
-      C1142578  'Bilateral pneumonia'
-
-    Sub-topic 26 (size 1):
-      C1279386  'Postoperative pneumonia'
-
-    Sub-topic 27 (size 1):
-      C1535939  'Pulmonary pneumocystosis'
-
-    Sub-topic 28 (size 1):
-      C1701940  'Ventilator-associated pneumonia'
-
-    Sub-topic 29 (size 1):
-      C3495445  'Toxoplasma pneumonia'
-
-    Sub-topic 30 (size 1):
-      C4039254  'Chronic pneumonia'
-
-
-================================================================================
-STEP 7: Compare with current clique-based sub-topics
-================================================================================
-
-  Current size-3+ clique sub-topics: 14
-
-    Clique sub-topic 1 (size 3):
-      C0032285  'Pneumonia (disorder)' <-- focal
-      C0032310  'Viral pneumonia'
-      C0276253  'Cytomegaloviral pneumonia'
-
-    Clique sub-topic 2 (size 3):
-      C0032285  'Pneumonia (disorder)' <-- focal
-      C0032310  'Viral pneumonia'
-      C0155870  'Pneumonia and influenza'
-
-    Clique sub-topic 3 (size 3):
-      C0032285  'Pneumonia (disorder)' <-- focal
-      C0032310  'Viral pneumonia'
-      C0152413  'Pneumonia caused by respiratory syncytial '
-
-    Clique sub-topic 4 (size 3):
-      C0032285  'Pneumonia (disorder)' <-- focal
-      C0876973  'Pulmonary infection'
-      C0949083  'Nosocomial pneumonia (disorder)'
-
-    Clique sub-topic 5 (size 3):
-      C0032285  'Pneumonia (disorder)' <-- focal
-      C0276688  'Pulmonary cryptococcosis'
-      C0876973  'Pulmonary infection'
-
-    Clique sub-topic 6 (size 3):
-      C0024115  'Disorder of lung'
-      C0032285  'Pneumonia (disorder)' <-- focal
-      C3714636  'Pneumonitis'
-
-    Clique sub-topic 7 (size 3):
-      C0006285  'Lobular pneumonia'
-      C0032285  'Pneumonia (disorder)' <-- focal
-      C0155870  'Pneumonia and influenza'
-
-    Clique sub-topic 8 (size 3):
-      C0032285  'Pneumonia (disorder)' <-- focal
-      C0339969  'Pneumonia due to parasitic infestation'
-      C3495445  'Toxoplasma pneumonia'
-
-    Clique sub-topic 9 (size 3):
-      C0032285  'Pneumonia (disorder)' <-- focal
-      C0876973  'Pulmonary infection'
-      C3495445  'Toxoplasma pneumonia'
-
-    Clique sub-topic 10 (size 3):
-      C0004626  'Bacterial pneumonia'
-      C0032285  'Pneumonia (disorder)' <-- focal
-      C0876973  'Pulmonary infection'
-
-    Clique sub-topic 11 (size 3):
-      C0024115  'Disorder of lung'
-      C0032285  'Pneumonia (disorder)' <-- focal
-      C0876973  'Pulmonary infection'
-
-    Clique sub-topic 12 (size 3):
-      C0032285  'Pneumonia (disorder)' <-- focal
-      C0876973  'Pulmonary infection'
-      C1535939  'Pulmonary pneumocystosis'
-
-    Clique sub-topic 13 (size 3):
-      C0006285  'Lobular pneumonia'
-      C0032241  'Pleurobronchopneumonia (disorder)'
-      C0032285  'Pneumonia (disorder)' <-- focal
-
-    Clique sub-topic 14 (size 3):
-      C0032285  'Pneumonia (disorder)' <-- focal
-      C0339961  'Fungal pneumonia'
-      C1535939  'Pulmonary pneumocystosis'
-
-
-================================================================================
-SUMMARY
-================================================================================
-  Main topic size                       : 42
-  Current size-3+ clique sub-topics     : 14
-  New mutual-3-rank sub-topics          : 30
-
-  Largest external-neighbor sub-topic  : 6 CUIs
-  Smallest                              : 1 CUIs
-
-
-DONE
+"""
+build_subtopics_all_cliques.py
+------------------------------
+Final sub-topic build: keep ALL maximal cliques of size >= 2.
+
+Drops:
+  - Component sub-topics (they duplicate the main topic — no info added)
+
+Keeps:
+  - Size-2 cliques (edge pairs — give leaf-CUI precision)
+  - Size-3+ cliques (tight clinical clusters)
+
+Each unique sub-topic gets a stable hashed ID.
+Bidirectional indexing for forward (main->subs) and reverse (sub->mains) lookup.
+
+Reads:  topic_lookup_neighborhoods.pkl
+Writes: topic_lookup_all_cliques.pkl
+"""
+
+import pickle
+import datetime
+import hashlib
+import time
+import os
+from collections import defaultdict
+
+
+INPUT_PATH      = "topic_lookup_neighborhoods.pkl"
+OUTPUT_PATH     = "topic_lookup_all_cliques.pkl"
+MIN_CLIQUE_SIZE = 2     # keep size-2 cliques (was 3 in previous build)
+MAX_CLIQUES_PER_TOPIC = 1000  # safety cap for very dense topics
+
+
+# ============================================================================
+# Helpers
+# ============================================================================
+
+def subtopic_id(members_frozenset):
+    """Stable ID hashed from sorted member CUIs."""
+    sorted_members = "|".join(sorted(members_frozenset))
+    h = hashlib.sha1(sorted_members.encode()).hexdigest()[:14]
+    return f"st_{h}"
+
+
+def induced_subgraph(members, neighbors):
+    """Adjacency dict for the induced subgraph on these members."""
+    members_set = set(members)
+    return {cui: neighbors.get(cui, set()) & members_set for cui in members}
+
+
+def bron_kerbosch(R, P, X, sub_adj, results, min_size, max_results):
+    """Maximal cliques of size >= min_size, capped at max_results."""
+    if len(results) >= max_results:
+        return
+    if not P and not X:
+        if len(R) >= min_size:
+            results.append(frozenset(R))
+        return
+    for v in list(P):
+        if len(results) >= max_results:
+            return
+        Nv = sub_adj.get(v, set())
+        bron_kerbosch(R | {v}, P & Nv, X & Nv, sub_adj, results,
+                      min_size, max_results)
+        P = P - {v}
+        X = X | {v}
+
+
+def find_cliques(sub_adj, min_size, max_results):
+    results = []
+    bron_kerbosch(set(), set(sub_adj.keys()), set(), sub_adj, results,
+                  min_size=min_size, max_results=max_results)
+    return results
+
+
+# ============================================================================
+# Main build
+# ============================================================================
+
+def build(payload):
+    topic_to_cuis       = payload["topic_to_cuis"]
+    flattened_neighbors = payload["flattened_neighbors"]
+
+    print(f"  Main topics to process: {len(topic_to_cuis):,}")
+
+    main_topic_to_subtopic_ids = defaultdict(list)
+    subtopic_id_to_cuis        = {}
+    subtopic_id_to_main_topics = defaultdict(set)
+    cui_to_subtopic_ids        = defaultdict(set)
+    subtopic_metadata          = {}
+
+    n_processed = 0
+    n_topics_with_subs = 0
+    n_capped = 0
+    size_distribution = defaultdict(int)
+    t0 = time.time()
+
+    for main_topic, members in topic_to_cuis.items():
+        n_processed += 1
+
+        if len(members) < MIN_CLIQUE_SIZE:
+            continue
+
+        sub_adj = induced_subgraph(members, flattened_neighbors)
+        cliques = find_cliques(sub_adj, min_size=MIN_CLIQUE_SIZE,
+                               max_results=MAX_CLIQUES_PER_TOPIC)
+
+        if len(cliques) == MAX_CLIQUES_PER_TOPIC:
+            n_capped += 1
+
+        if not cliques:
+            continue
+
+        n_topics_with_subs += 1
+        for clq in cliques:
+            sid = subtopic_id(clq)
+            if sid not in subtopic_id_to_cuis:
+                subtopic_id_to_cuis[sid] = clq
+                subtopic_metadata[sid] = {"size": len(clq)}
+                size_distribution[len(clq)] += 1
+            main_topic_to_subtopic_ids[main_topic].append(sid)
+            subtopic_id_to_main_topics[sid].add(main_topic)
+            for c in clq:
+                cui_to_subtopic_ids[c].add(sid)
+
+        if n_processed % 50000 == 0:
+            print(f"    processed {n_processed:,}/{len(topic_to_cuis):,} "
+                  f"(unique subs so far: {len(subtopic_id_to_cuis):,}, "
+                  f"{time.time()-t0:.0f}s)")
+
+    print(f"  done in {time.time()-t0:.0f}s")
+
+    print(f"\n  Results:")
+    print(f"    Unique sub-topics                 : {len(subtopic_id_to_cuis):,}")
+    print(f"    Main topics with at least 1 sub   : {n_topics_with_subs:,}")
+    print(f"    CUIs appearing in at least 1 sub  : {len(cui_to_subtopic_ids):,}")
+    print(f"    Topics hitting clique cap         : {n_capped:,} "
+          f"(of {MAX_CLIQUES_PER_TOPIC} each)")
+
+    print(f"\n  Sub-topic size distribution:")
+    for size in sorted(size_distribution):
+        count = size_distribution[size]
+        bar = "#" * min(50, count * 50 // max(size_distribution.values()))
+        print(f"    size {size:>3d} : {count:>8,d}  {bar}")
+
+    return {
+        "main_topic_to_subtopic_ids": dict(main_topic_to_subtopic_ids),
+        "subtopic_id_to_cuis":        subtopic_id_to_cuis,
+        "subtopic_id_to_main_topics": dict(subtopic_id_to_main_topics),
+        "cui_to_subtopic_ids":        dict(cui_to_subtopic_ids),
+        "subtopic_metadata":          subtopic_metadata,
+    }
+
+
+def main():
+    print(f"Loading {INPUT_PATH} ...")
+    with open(INPUT_PATH, "rb") as f:
+        payload = pickle.load(f)
+    print(f"  Main topics: {len(payload['topic_to_cuis']):,}")
+
+    print(f"\n[1] Building sub-topics (cliques size >= {MIN_CLIQUE_SIZE}, "
+          f"capped {MAX_CLIQUES_PER_TOPIC}/topic) ...")
+    sub_data = build(payload)
+
+    out = dict(payload)
+    out.update(sub_data)
+    out["subtopic_built_at"] = datetime.datetime.now().isoformat()
+    out["subtopic_config"] = {
+        "min_clique_size":       MIN_CLIQUE_SIZE,
+        "max_cliques_per_topic": MAX_CLIQUES_PER_TOPIC,
+        "method":                "maximal cliques only, no component duplicates",
+    }
+
+    print(f"\n[Saving] {OUTPUT_PATH}")
+    with open(OUTPUT_PATH, "wb") as f:
+        pickle.dump(out, f, protocol=pickle.HIGHEST_PROTOCOL)
+    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
+    print(f"  wrote {size_mb:.1f} MB")
+    print("\nDONE")
+
+
+main()
