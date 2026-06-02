@@ -1,182 +1,115 @@
 """
-build_subtopics_all_cliques.py
-------------------------------
-Final sub-topic build: keep ALL maximal cliques of size >= 2.
+test_all_cliques.py
+-------------------
+Test the all-cliques sub-topic build. Loads topic_lookup_all_cliques.pkl.
+Edit CUIS_TO_TEST as needed.
 
-Drops:
-  - Component sub-topics (they duplicate the main topic — no info added)
-
-Keeps:
-  - Size-2 cliques (edge pairs — give leaf-CUI precision)
-  - Size-3+ cliques (tight clinical clusters)
-
-Each unique sub-topic gets a stable hashed ID.
-Bidirectional indexing for forward (main->subs) and reverse (sub->mains) lookup.
-
-Reads:  topic_lookup_neighborhoods.pkl
-Writes: topic_lookup_all_cliques.pkl
+Shows size breakdown (size-2 vs size-3+) per CUI so you can see how
+much leaf-CUI precision was added back.
 """
 
 import pickle
-import datetime
-import hashlib
-import time
-import os
-from collections import defaultdict
+from collections import Counter
 
 
-INPUT_PATH      = "topic_lookup_neighborhoods.pkl"
-OUTPUT_PATH     = "topic_lookup_all_cliques.pkl"
-MIN_CLIQUE_SIZE = 2     # keep size-2 cliques (was 3 in previous build)
-MAX_CLIQUES_PER_TOPIC = 1000  # safety cap for very dense topics
+PICKLE_PATH = "topic_lookup_all_cliques.pkl"
+
+CUIS_TO_TEST = [
+    "C0032285",  # Pneumonia
+    "C0021368",  # Inflammation
+    "C0024109",  # Lung
+    "C0011849",  # Diabetes
+    "C1527304",  # Allergic reaction
+    "C0559470",  # Allergy to peanut
+    "C0002792",  # Anaphylaxis
+    "C0013182",  # Allergy to drug    <-- the big test, was only 3 size-3+ subs
+    "C2142181",  # Pain of left knee joint
+    "C1621958",  # Glioblastoma multiforme
+    "C0016470",  # Food allergy
+]
 
 
-# ============================================================================
-# Helpers
-# ============================================================================
+print(f"Loading {PICKLE_PATH} ...")
+with open(PICKLE_PATH, "rb") as f:
+    p = pickle.load(f)
 
-def subtopic_id(members_frozenset):
-    """Stable ID hashed from sorted member CUIs."""
-    sorted_members = "|".join(sorted(members_frozenset))
-    h = hashlib.sha1(sorted_members.encode()).hexdigest()[:14]
-    return f"st_{h}"
-
-
-def induced_subgraph(members, neighbors):
-    """Adjacency dict for the induced subgraph on these members."""
-    members_set = set(members)
-    return {cui: neighbors.get(cui, set()) & members_set for cui in members}
+topic_to_cuis              = p["topic_to_cuis"]
+main_topic_to_subtopic_ids = p["main_topic_to_subtopic_ids"]
+subtopic_id_to_cuis        = p["subtopic_id_to_cuis"]
+subtopic_id_to_main_topics = p["subtopic_id_to_main_topics"]
+cui_to_subtopic_ids        = p["cui_to_subtopic_ids"]
+subtopic_metadata          = p["subtopic_metadata"]
+labels                     = p.get("labels", {})
 
 
-def bron_kerbosch(R, P, X, sub_adj, results, min_size, max_results):
-    """Maximal cliques of size >= min_size, capped at max_results."""
-    if len(results) >= max_results:
-        return
-    if not P and not X:
-        if len(R) >= min_size:
-            results.append(frozenset(R))
-        return
-    for v in list(P):
-        if len(results) >= max_results:
-            return
-        Nv = sub_adj.get(v, set())
-        bron_kerbosch(R | {v}, P & Nv, X & Nv, sub_adj, results,
-                      min_size, max_results)
-        P = P - {v}
-        X = X | {v}
+def lbl(c):
+    return labels.get(c, "?")[:42] if labels else "?"
 
 
-def find_cliques(sub_adj, min_size, max_results):
-    results = []
-    bron_kerbosch(set(), set(sub_adj.keys()), set(), sub_adj, results,
-                  min_size=min_size, max_results=max_results)
-    return results
+print(f"  Main topics                     : {len(topic_to_cuis):,}")
+print(f"  Unique sub-topics (size>=2)     : {len(subtopic_id_to_cuis):,}")
+print(f"  Ratio                           : "
+      f"{len(subtopic_id_to_cuis)/max(len(topic_to_cuis),1):.2f} "
+      f"sub-topics per main topic")
+
+# Summary table
+print(f"\n\n{'='*90}")
+print(f"  SUMMARY TABLE")
+print(f"{'='*90}")
+print(f"  {'CUI':<12s}  {'Label':<28s}  {'Main':>5s}  {'Subs':>5s}  "
+      f"{'sz2':>5s}  {'sz3+':>5s}")
+
+for cui in CUIS_TO_TEST:
+    main_sz = len(topic_to_cuis.get(cui, set()))
+    own = list(dict.fromkeys(main_topic_to_subtopic_ids.get(cui, [])))
+    sz2 = sum(1 for s in own if subtopic_metadata[s]["size"] == 2)
+    sz3plus = sum(1 for s in own if subtopic_metadata[s]["size"] >= 3)
+    print(f"  {cui:<12s}  {lbl(cui)[:28]:<28s}  "
+          f"{main_sz:>5d}  {len(own):>5d}  {sz2:>5d}  {sz3plus:>5d}")
 
 
-# ============================================================================
-# Main build
-# ============================================================================
+# Detailed per CUI
+for cui in CUIS_TO_TEST:
+    print(f"\n\n{'='*80}")
+    print(f"  {cui}  '{lbl(cui)}'")
+    print(f"{'='*80}")
 
-def build(payload):
-    topic_to_cuis       = payload["topic_to_cuis"]
-    flattened_neighbors = payload["flattened_neighbors"]
+    main_members = topic_to_cuis.get(cui, set())
+    print(f"  Main topic size: {len(main_members)}")
 
-    print(f"  Main topics to process: {len(topic_to_cuis):,}")
+    own = list(dict.fromkeys(main_topic_to_subtopic_ids.get(cui, [])))
+    print(f"  Sub-topics in this main topic: {len(own)}")
 
-    main_topic_to_subtopic_ids = defaultdict(list)
-    subtopic_id_to_cuis        = {}
-    subtopic_id_to_main_topics = defaultdict(set)
-    cui_to_subtopic_ids        = defaultdict(set)
-    subtopic_metadata          = {}
+    if not own:
+        print(f"    (none — main topic < 2 members or no edges)")
+        continue
 
-    n_processed = 0
-    n_topics_with_subs = 0
-    n_capped = 0
-    size_distribution = defaultdict(int)
-    t0 = time.time()
+    # Size distribution
+    by_size = Counter(subtopic_metadata[s]["size"] for s in own)
+    print(f"  Size breakdown:")
+    for size in sorted(by_size):
+        print(f"    size {size:>3d}: {by_size[size]} sub-topics")
 
-    for main_topic, members in topic_to_cuis.items():
-        n_processed += 1
+    # Show the largest 4 sub-topics
+    own_sorted = sorted(own, key=lambda s: -subtopic_metadata[s]["size"])
+    print(f"\n  Largest 4 sub-topics:")
+    for sid in own_sorted[:4]:
+        meta = subtopic_metadata[sid]
+        members = subtopic_id_to_cuis[sid]
+        print(f"\n    {sid} (size {meta['size']}):")
+        for m in sorted(members):
+            marker = " <-- self" if m == cui else ""
+            print(f"      {m}  '{lbl(m)}'{marker}")
 
-        if len(members) < MIN_CLIQUE_SIZE:
-            continue
-
-        sub_adj = induced_subgraph(members, flattened_neighbors)
-        cliques = find_cliques(sub_adj, min_size=MIN_CLIQUE_SIZE,
-                               max_results=MAX_CLIQUES_PER_TOPIC)
-
-        if len(cliques) == MAX_CLIQUES_PER_TOPIC:
-            n_capped += 1
-
-        if not cliques:
-            continue
-
-        n_topics_with_subs += 1
-        for clq in cliques:
-            sid = subtopic_id(clq)
-            if sid not in subtopic_id_to_cuis:
-                subtopic_id_to_cuis[sid] = clq
-                subtopic_metadata[sid] = {"size": len(clq)}
-                size_distribution[len(clq)] += 1
-            main_topic_to_subtopic_ids[main_topic].append(sid)
-            subtopic_id_to_main_topics[sid].add(main_topic)
-            for c in clq:
-                cui_to_subtopic_ids[c].add(sid)
-
-        if n_processed % 50000 == 0:
-            print(f"    processed {n_processed:,}/{len(topic_to_cuis):,} "
-                  f"(unique subs so far: {len(subtopic_id_to_cuis):,}, "
-                  f"{time.time()-t0:.0f}s)")
-
-    print(f"  done in {time.time()-t0:.0f}s")
-
-    print(f"\n  Results:")
-    print(f"    Unique sub-topics                 : {len(subtopic_id_to_cuis):,}")
-    print(f"    Main topics with at least 1 sub   : {n_topics_with_subs:,}")
-    print(f"    CUIs appearing in at least 1 sub  : {len(cui_to_subtopic_ids):,}")
-    print(f"    Topics hitting clique cap         : {n_capped:,} "
-          f"(of {MAX_CLIQUES_PER_TOPIC} each)")
-
-    print(f"\n  Sub-topic size distribution:")
-    for size in sorted(size_distribution):
-        count = size_distribution[size]
-        bar = "#" * min(50, count * 50 // max(size_distribution.values()))
-        print(f"    size {size:>3d} : {count:>8,d}  {bar}")
-
-    return {
-        "main_topic_to_subtopic_ids": dict(main_topic_to_subtopic_ids),
-        "subtopic_id_to_cuis":        subtopic_id_to_cuis,
-        "subtopic_id_to_main_topics": dict(subtopic_id_to_main_topics),
-        "cui_to_subtopic_ids":        dict(cui_to_subtopic_ids),
-        "subtopic_metadata":          subtopic_metadata,
-    }
+    # If there are size-2 sub-topics, show a few examples
+    sz2_subs = [s for s in own_sorted if subtopic_metadata[s]["size"] == 2]
+    if sz2_subs:
+        print(f"\n  Sample size-2 sub-topics (showing first 3):")
+        for sid in sz2_subs[:3]:
+            members = subtopic_id_to_cuis[sid]
+            other = [m for m in members if m != cui]
+            other_str = ", ".join(f"'{lbl(o)}'" for o in other)
+            print(f"    {sid}: self + {other_str}")
 
 
-def main():
-    print(f"Loading {INPUT_PATH} ...")
-    with open(INPUT_PATH, "rb") as f:
-        payload = pickle.load(f)
-    print(f"  Main topics: {len(payload['topic_to_cuis']):,}")
-
-    print(f"\n[1] Building sub-topics (cliques size >= {MIN_CLIQUE_SIZE}, "
-          f"capped {MAX_CLIQUES_PER_TOPIC}/topic) ...")
-    sub_data = build(payload)
-
-    out = dict(payload)
-    out.update(sub_data)
-    out["subtopic_built_at"] = datetime.datetime.now().isoformat()
-    out["subtopic_config"] = {
-        "min_clique_size":       MIN_CLIQUE_SIZE,
-        "max_cliques_per_topic": MAX_CLIQUES_PER_TOPIC,
-        "method":                "maximal cliques only, no component duplicates",
-    }
-
-    print(f"\n[Saving] {OUTPUT_PATH}")
-    with open(OUTPUT_PATH, "wb") as f:
-        pickle.dump(out, f, protocol=pickle.HIGHEST_PROTOCOL)
-    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
-    print(f"  wrote {size_mb:.1f} MB")
-    print("\nDONE")
-
-
-main()
+print("\n\nDONE")
