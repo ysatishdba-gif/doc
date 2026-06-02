@@ -1,192 +1,52 @@
-"""
-spot_check_round2.py
---------------------
-Second round of stratified spot-checks targeting:
-- Rare diseases
-- Cross-system symptoms
-- Modifier CUIs
-- Pharmaceutical classes
-- Mental health / psychiatry
-- Pregnancy / pediatric
-- Ophthalmology / ENT / Dermatology
+To perform Hierarchical Clustering based on Source Vocabulary Mapping, specifically focusing on SNOMED CT concepts that map to UMLS CUIs, you would follow these general steps:
 
-Same load + display logic as round 1.
-"""
+This approach treats the SNOMED CT hierarchy (which is deeply embedded within the UMLS structure via mappings) as the basis for creating topical clusters of CUIs.
 
-import pickle
+Steps for Hierarchical Clustering with SNOMED CT Mapping
+1. Data Preparation: CUI to SNOMED CT Mapping
+Identify Relevant CUIs: Start with the set of CUIs you are interested in analyzing.
+Map to SNOMED CT: For each CUI, determine its corresponding concept(s) in SNOMED CT. A single CUI can sometimes map to multiple SNOMED CT Concept Unique Identifiers (SNOMED CT CUIs) or have alternative mappings, but you generally focus on the preferred or most frequently used map.
+Extract SNOMED CT Relationships: For the identified SNOMED CT concepts, extract their structural relationships, primarily the Is a (subsumption) relationship. This forms a tree or Directed Acyclic Graph (DAG).
+2. Define a Distance/Similarity Metric
+Since you are using a hierarchy, you need a metric to determine how "close" two CUIs are based on their common ancestors in the SNOMED CT structure:
 
-PICKLE_PATH = "topic_lookup_final.pkl"
+Common Ancestor Distance: A very common metric in concept hierarchy analysis is:
+Distance(CUI 
+A
+​
+ ,CUI 
+B
+​
+ )=Depth(CUI 
+A
+​
+ )+Depth(CUI 
+B
+​
+ )−2×Depth(LCA(CUI 
+A
+​
+ ,CUI 
+B
+​
+ ))
 
-CUIS_TO_TEST = [
-    # ---- RARE / GENETIC ----
-    ("C0008312", "Primary biliary cholangitis"),
-    ("C0036161", "Sarcoidosis"),
-    ("C0024301", "Lymphoma"),
-    ("C0023467", "Acute myeloid leukemia"),
-    ("C0027765", "Nervous system disorder"),
-    ("C0027859", "Acoustic neuroma"),
-    ("C0008733", "Chronic granulomatous disease"),
+Where:
+Depth(X) is the depth of concept X in the SNOMED CT hierarchy (distance from the top-most root).
+LCA(A,B) is the Lowest Common Ancestor of concepts A and B in the SNOMED CT hierarchy.
+Concepts that share a very recent (deep) common ancestor are considered very similar (low distance/high similarity), forming a granular topic.
+3. Apply Hierarchical Clustering
+Use the calculated distance matrix from Step 2 to perform hierarchical clustering:
 
-    # ---- PSYCHIATRY / MENTAL HEALTH ----
-    ("C0011570", "Mental depression"),
-    ("C0011581", "Major depressive disorder"),
-    ("C0004936", "Mental disorder"),
-    ("C0001973", "Alcoholic intoxication, chronic"),
-    ("C0036341", "Schizophrenia"),
-    ("C0003469", "Anxiety disorder"),
-    ("C0038587", "Substance-related disorder"),
-    ("C0085159", "Seasonal affective disorder"),
+Agglomerative Clustering (Bottom-Up): This is the standard method for hierarchical clustering.
+Start by treating every CUI as its own cluster.
+Iteratively merge the two closest clusters (based on the distance metric and a chosen linkage criterion like Ward's, single, or complete linkage).
+Continue until all CUIs are merged into a single, large cluster.
+Dendrogram Generation: The output is a dendrogram, which visually represents the merging process.
+4. Extract Granular Topics
+The dendrogram allows you to cut the tree at different levels to extract topics of varying granularity:
 
-    # ---- OPHTHALMOLOGY ----
-    ("C0017601", "Glaucoma"),
-    ("C0011053", "Cataract"),
-    ("C0271051", "Diabetic retinopathy"),
-    ("C0271183", "Macular degeneration"),
-    ("C0040855", "Trachoma"),
-
-    # ---- ENT ----
-    ("C0027424", "Allergic rhinitis"),
-    ("C0029445", "Otitis media"),
-    ("C0040264", "Tinnitus"),
-    ("C0023520", "Hearing loss"),
-
-    # ---- DERMATOLOGY ----
-    ("C0030246", "Psoriasis"),
-    ("C0021345", "Infectious mononucleosis"),
-    ("C0011615", "Atopic dermatitis"),
-    ("C0014457", "Erythema"),
-    ("C0010404", "Cryptococcosis"),
-
-    # ---- ENDOCRINE (beyond diabetes) ----
-    ("C0020676", "Hypothyroidism"),
-    ("C0020550", "Hyperthyroidism"),
-    ("C0001627", "Adrenal cortical hypofunction"),
-    ("C0001624", "Adrenal gland disorder"),
-    ("C0001403", "Addison's disease"),
-    ("C0020538", "Hypertensive disease"),  # for cross-check
-
-    # ---- PEDIATRIC SPECIFIC ----
-    ("C0008066", "Childhood asthma"),
-    ("C0008936", "Cystic fibrosis"),
-    ("C0019207", "Hereditary disease"),
-    ("C0265344", "Donohue's syndrome"),
-    ("C0023786", "Mucolipidosis"),
-
-    # ---- MODIFIER CUIs (these are often tricky) ----
-    ("C0205082", "Severe"),
-    ("C0205390", "Severity grade"),
-    ("C0205202", "Acute"),
-    ("C0205191", "Chronic"),
-    ("C0205095", "Bilateral"),
-    ("C0205089", "Left"),
-    ("C0205090", "Right"),
-
-    # ---- PHARMACEUTICAL CLASSES ----
-    ("C0003364", "Antibacterial agent"),
-    ("C0003243", "Antihistamines"),
-    ("C0006400", "Bronchodilator agent"),
-    ("C0020261", "Hydrocortisone"),
-    ("C0017725", "Glucose"),
-    ("C0028978", "Oxytocin"),
-
-    # ---- SYMPTOMS THAT SPAN SYSTEMS ----
-    ("C0015672", "Fatigue"),
-    ("C0277994", "Weight loss"),
-    ("C0042963", "Vomiting (NOT volvulus)"),
-    ("C0019825", "Persistent hoarseness"),
-    ("C0030554", "Paresthesia"),
-
-    # ---- PREGNANCY SPECIFIC ----
-    ("C0032961", "Pregnancy"),
-    ("C0033119", "Premature labor"),
-    ("C0085639", "Multiple pregnancy"),
-    ("C3838788", "Preeclampsia"),
-    ("C0021359", "Infertility"),
-
-    # ---- HEMATOLOGY ----
-    ("C0002871", "Anemia"),
-    ("C0002878", "Iron deficiency anemia"),
-    ("C0040034", "Thrombocytopenia"),
-    ("C0023418", "Leukemia"),
-
-    # ---- VITAL SIGNS / FINDINGS ----
-    ("C0034107", "Pulse taking"),
-    ("C0005824", "Blood pressure"),
-    ("C0428977", "Bradycardia"),
-    ("C0020649", "Hypopiesis"),
-    ("C0020538", "Hypertension"),  # cross-check
-]
-
-
-print(f"Loading {PICKLE_PATH} ...")
-with open(PICKLE_PATH, "rb") as f:
-    p = pickle.load(f)
-
-topic_to_cuis              = p["topic_to_cuis"]
-main_topic_to_subtopic_ids = p["main_topic_to_subtopic_ids"]
-subtopic_id_to_cuis        = p["subtopic_id_to_cuis"]
-cui_to_subtopic_ids        = p["cui_to_subtopic_ids"]
-subtopic_metadata          = p["subtopic_metadata"]
-labels                     = p.get("labels", {})
-
-
-def lbl(c):
-    return labels.get(c, "?")[:45] if labels else "?"
-
-
-# Summary table
-print(f"\n{'='*100}")
-print(f"  SUMMARY TABLE")
-print(f"{'='*100}")
-print(f"  {'CUI':<12s}  {'Expected':<32s}  {'Real label':<35s}  {'Main':>5s}  {'Subs':>5s}")
-
-for cui, expected in CUIS_TO_TEST:
-    actual = lbl(cui)
-    main_sz = len(topic_to_cuis.get(cui, set()))
-    sub_count = len(dict.fromkeys(main_topic_to_subtopic_ids.get(cui, [])))
-    missing = "?" if cui not in topic_to_cuis else ""
-    print(f"  {cui:<12s}  {expected[:32]:<32s}  {actual[:35]:<35s}  "
-          f"{main_sz:>5d}  {sub_count:>5d}  {missing}")
-
-
-# Detailed per CUI
-for cui, expected in CUIS_TO_TEST:
-    print(f"\n\n{'='*80}")
-    print(f"  {cui}  expected: '{expected}'  actual: '{lbl(cui)}'")
-    print(f"{'='*80}")
-
-    main_members = topic_to_cuis.get(cui, set())
-    print(f"  Main topic size: {len(main_members)}")
-
-    if not main_members:
-        print(f"  ⚠️ NOT IN SNOMED UNIVERSE")
-        continue
-
-    # First 6 main topic members
-    print(f"  Main topic members (first 6):")
-    for m in sorted(main_members)[:6]:
-        marker = " <-- self" if m == cui else ""
-        print(f"    {m}  '{lbl(m)}'{marker}")
-    if len(main_members) > 6:
-        print(f"    ... +{len(main_members)-6} more")
-
-    own = list(dict.fromkeys(main_topic_to_subtopic_ids.get(cui, [])))
-    print(f"\n  Sub-topics within this main topic: {len(own)}")
-    if not own:
-        print(f"    (none — star-shaped or topic < 3 members)")
-        continue
-
-    # Show up to 4 sub-topics, largest first
-    own_sorted = sorted(own, key=lambda s: -subtopic_metadata[s]["size"])
-    for sid in own_sorted[:4]:
-        meta = subtopic_metadata[sid]
-        members = subtopic_id_to_cuis[sid]
-        print(f"\n    {sid} (size {meta['size']}):")
-        for m in sorted(members):
-            marker = " <-- self" if m == cui else ""
-            print(f"      {m}  '{lbl(m)}'{marker}")
-    if len(own_sorted) > 4:
-        print(f"\n    ... +{len(own_sorted)-4} more sub-topics")
-
-
-print("\n\nDONE")
+High Granularity (Fine Topics): Cutting the dendrogram near the leaves (short vertical lines) yields many small clusters. These clusters contain CUIs that are highly specific and share a very recent common ancestor in SNOMED CT (e.g., clustering only "Fracture of left femur" and "Fracture of right femur" under a "Femur Fracture" ancestor).
+Lower Granularity (Broad Topics): Cutting the dendrogram lower down yields fewer, larger clusters (e.g., a cluster for "All Fractures" or "All Injuries").
+Granularity Control
+The granularity of your topics is directly controlled by where you choose to "cut" the resulting dendrogram or by the linkage method and distance metric used in Step 2. A metric emphasizing the depth of the LCA will naturally lead to finer, more granular initial groupings.
