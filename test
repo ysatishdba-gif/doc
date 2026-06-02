@@ -1,64 +1,3447 @@
-"""
-inspect_topics.py
------------------
-Give CUIs, get their topic and sub-topic data. That's it.
 
-Edit CUIS list, run in notebook.
-"""
+================================================================================
+  C0032285  'Pneumonia (disorder)'
+================================================================================
+  STY              : ['Disease or Syndrome']
+  Main topic size  : 42
+  Main topic members:
+    C0004626  'Bacterial pneumonia'
+    C0006285  'Lobular pneumonia'
+    C0024115  'Disorder of lung'
+    C0032241  'Pleurobronchopneumonia (disorder)'
+    C0032285  'Pneumonia (disorder)' <-- self
+    C0032290  'Aspiration pneumonia'
+    C0032300  'Lobar pneumonia'
+    C0032310  'Viral pneumonia'
+    C0035243  'Respiratory tract infection'
+    C0152413  'Pneumonia caused by respiratory syncytial virus'
+    C0155870  'Pneumonia and influenza'
+    C0158935  'Congenital pneumonia'
+    C0206061  'Interstitial pneumonia'
+    C0264377  'Peribronchial pneumonia'
+    C0264381  'Unresolved pneumonia'
+    C0264386  'Foreign body pneumonia'
+    C0264515  'Necrotizing pneumonia'
+    C0264522  'Hypostatic pneumonia'
+    C0276253  'Cytomegaloviral pneumonia'
+    C0276527  'Pneumonia with AIDS (acquired immunodeficiency syndrome)'
+    C0276688  'Pulmonary cryptococcosis'
+    C0339961  'Fungal pneumonia'
+    C0339965  'Haemorrhagic pneumonia'
+    C0339968  'Neonatal pneumonia'
+    C0339969  'Pneumonia due to parasitic infestation'
+    C0348806  'Abscess of lung with pneumonia'
+    C0694549  'Community acquired pneumonia'
+    C0694550  'Recurrent pneumonia (disorder)'
+    C0747674  'Cavitary pneumonia'
+    C0747690  'Postobstructive pneumonia'
+    C0876973  'Pulmonary infection'
+    C0949083  'Nosocomial pneumonia (disorder)'
+    C1112452  'Post measles pneumonia'
+    C1142578  'Bilateral pneumonia'
+    C1279386  'Postoperative pneumonia'
+    C1290339  'Focal pneumonia'
+    C1290340  'Confluent pneumonia'
+    C1535939  'Pulmonary pneumocystosis'
+    C1701940  'Ventilator-associated pneumonia'
+    C3495445  'Toxoplasma pneumonia'
+    C3714636  'Pneumonitis'
+    C4039254  'Chronic pneumonia'
 
-import pickle
+  Sub-topics: 39
 
-PICKLE_PATH = "topic_lookup.pkl"
+    st_011c53c15689ff (size 3):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0032310  'Viral pneumonia'
+      C0155870  'Pneumonia and influenza'
 
-CUIS = [
-    "C0032285",  # Pneumonia
-    "C0013182",  # Allergy to drug
-    "C0011849",  # Diabetes
-    "C0002792",  # Anaphylaxis
-    "C2142181",  # Pain of left knee joint
-]
+    st_5c82e510b45507 (size 3):
+      C0006285  'Lobular pneumonia'
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0155870  'Pneumonia and influenza'
+
+    st_9cfb6e3d29ccaf (size 3):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0339961  'Fungal pneumonia'
+      C1535939  'Pulmonary pneumocystosis'
+
+    st_e88dab374989f2 (size 3):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0876973  'Pulmonary infection'
+      C1535939  'Pulmonary pneumocystosis'
+
+    st_24618dd4036963 (size 3):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0032310  'Viral pneumonia'
+      C0152413  'Pneumonia caused by respiratory syncytial virus'
+
+    st_5a9eb227a11b2a (size 3):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0876973  'Pulmonary infection'
+      C0949083  'Nosocomial pneumonia (disorder)'
+
+    st_247d83b6701ece (size 3):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0032310  'Viral pneumonia'
+      C0276253  'Cytomegaloviral pneumonia'
+
+    st_a69ee9e46acfc7 (size 3):
+      C0006285  'Lobular pneumonia'
+      C0032241  'Pleurobronchopneumonia (disorder)'
+      C0032285  'Pneumonia (disorder)' <-- self
+
+    st_e5bce8498006fc (size 3):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0276688  'Pulmonary cryptococcosis'
+      C0876973  'Pulmonary infection'
+
+    st_3fc95adc8b70eb (size 3):
+      C0024115  'Disorder of lung'
+      C0032285  'Pneumonia (disorder)' <-- self
+      C3714636  'Pneumonitis'
+
+    st_a0c8a367e971fe (size 3):
+      C0004626  'Bacterial pneumonia'
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0876973  'Pulmonary infection'
+
+    st_6fa7d6ff9a5b24 (size 3):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0876973  'Pulmonary infection'
+      C3495445  'Toxoplasma pneumonia'
+
+    st_6c5403baad6fb5 (size 3):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0339969  'Pneumonia due to parasitic infestation'
+      C3495445  'Toxoplasma pneumonia'
+
+    st_eb576a8b3c3711 (size 3):
+      C0024115  'Disorder of lung'
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0876973  'Pulmonary infection'
+
+    st_54d075d661c37a (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0035243  'Respiratory tract infection'
+
+    st_f2f290cc5163c1 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C1279386  'Postoperative pneumonia'
+
+    st_7c09a57a1dbe96 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0276527  'Pneumonia with AIDS (acquired immunodeficiency syndrome)'
+
+    st_fca1af4e5be738 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0264381  'Unresolved pneumonia'
+
+    st_6355e57a9d01ce (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0348806  'Abscess of lung with pneumonia'
+
+    st_a127812ce59e0e (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0339965  'Haemorrhagic pneumonia'
+
+    st_0b5cf53b02e9e1 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0694550  'Recurrent pneumonia (disorder)'
+
+    st_bbbd14e1ede3fe (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C1290339  'Focal pneumonia'
+
+    st_bd09c95166ce0c (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0747690  'Postobstructive pneumonia'
+
+    st_d649b29dbe9036 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0264386  'Foreign body pneumonia'
+
+    st_bc0145baf519e9 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0206061  'Interstitial pneumonia'
+
+    st_510c88da8314c3 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C4039254  'Chronic pneumonia'
+
+    st_d02640b69d3c8f (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C1142578  'Bilateral pneumonia'
+
+    st_1c061e214c078e (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C1290340  'Confluent pneumonia'
+
+    st_c263adfb9f7a27 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0747674  'Cavitary pneumonia'
+
+    st_ee473504114197 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0694549  'Community acquired pneumonia'
+
+    st_4882e3608725aa (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0032290  'Aspiration pneumonia'
+
+    st_84f6d817e3648c (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0032300  'Lobar pneumonia'
+
+    st_2b2d09201ef8d1 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0264377  'Peribronchial pneumonia'
+
+    st_37b03e5073ded0 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0264522  'Hypostatic pneumonia'
+
+    st_58554c5e3b637b (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0264515  'Necrotizing pneumonia'
+
+    st_3ad8ced2f55208 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C1112452  'Post measles pneumonia'
+
+    st_3c61dfd10bb5e9 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0158935  'Congenital pneumonia'
+
+    st_4941fe3bef94b7 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C0339968  'Neonatal pneumonia'
+
+    st_06107f7ea77530 (size 2):
+      C0032285  'Pneumonia (disorder)' <-- self
+      C1701940  'Ventilator-associated pneumonia'
+
+================================================================================
+  C0013182  'Allergy to drug'
+================================================================================
+  STY              : ['Pathologic Function']
+  Main topic size  : 567
+  Main topic members:
+    C0011609  'Drug eruption'
+    C0013182  'Allergy to drug' <-- self
+    C0014808  'Allergy to erythromycin'
+    C0020517  'Hypersensitivity reaction (disorder)'
+    C0030824  'Penicillin allergy'
+    C0039645  'Tetracycline allergy'
+    C0041755  'Adverse drug reaction'
+    C0237865  'Propensity to adverse reactions to drug'
+    C0277585  'Drug intolerance'
+    C0344168  'Drug-induced anaphylaxis'
+    C0570513  'Acetaminophen allergy'
+    C0570514  'Salicylate allergy'
+    C0570537  'Allergy to non-steroidal anti-inflammatory agent'
+    C0570569  'Allergy to tripotassium dicitratobismuthate'
+    C0570570  'Sucralfate allergy'
+    C0570573  'Allergy to histamine H2 receptor antagonist'
+    C0570578  'Allergy to H+/K+-exchanging ATPase inhibitor'
+    C0570581  'Carbenoxolone allergy'
+    C0570582  'Allergy to pirenzepine'
+    C0570583  'Pancreatin allergy'
+    C0570589  'Allergy to magnesium trisilicate'
+    C0570590  'Allergy to aluminum hydroxide'
+    C0570592  'Allergy to loperamide'
+    C0570595  'Cisapride allergy'
+    C0570597  'Nabilone allergy'
+    C0570598  'Allergy to domperidone'
+    C0570599  'Metoclopramide allergy'
+    C0570600  'Allergy to 5-hydroxytryptamine-3-receptor antagonist'
+    C0570602  'Bisacodyl allergy'
+    C0570603  'Allergy to danthron'
+    C0570604  'Sodium picosulphate allergy'
+    C0570605  'Allergy to lactulose'
+    C0570606  'Magnesium sulphate allergy'
+    C0570609  'Cascara allergy'
+    C0570610  'Allergy to senna'
+    C0570611  'Allergy to docusate'
+    C0570614  'Peppermint oil allergy'
+    C0570615  'Allergy to alverine'
+    C0570616  'Allergy to mebeverine'
+    C0570617  'Allergy to dicyclomine'
+    C0570618  'Mepenzolate allergy'
+    C0570619  'Pipenzolate allergy'
+    C0570620  'Allergy to poldine'
+    C0570621  'Propantheline allergy'
+    C0570624  'Dehydrocholic acid allergy'
+    C0570630  'Etomidate allergy'
+    C0570631  'Ketamine allergy'
+    C0570632  'Propofol allergy'
+    C0570636  'Enflurane allergy'
+    C0570638  'Halothane allergy'
+    C0570639  'Isoflurane allergy'
+    C0570640  'Trichloroethylene allergy'
+    C0570641  'Desflurane allergy'
+    C0570642  'Allergy to local anaesthetic'
+    C0570655  'Allergy to amifostine'
+    C0570656  'Allergy to aldesleukin'
+    C0570658  'Molgramostim allergy'
+    C0570659  'Allergy to lenograstim'
+    C0570660  'Allergy to filgrastim'
+    C0570661  'Levamisole allergy'
+    C0570663  'Allergy to alkylating agent'
+    C0570666  'Treosulfan allergy'
+    C0570682  'Dactinomycin allergy'
+    C0570683  'Bleomycin allergy'
+    C0570684  'Allergy to mitomycin'
+    C0570685  'Plicamycin allergy'
+    C0570686  'Allergy to aclarubicin'
+    C0570688  'Doxorubicin allergy'
+    C0570689  'Allergy to epirubicin'
+    C0570690  'Idarubicin allergy'
+    C0570692  'Allergy to mercuric oxide'
+    C0570693  'Methotrexate allergy'
+    C0570694  'Allergy to mercaptopurine'
+    C0570695  'Allergy to thioguanine'
+    C0570696  'Allergy to pentostatin'
+    C0570697  'Cytarabine allergy'
+    C0570698  'Allergy to fluorouracil'
+    C0570699  'Allergy to etoposide'
+    C0570700  'Allergy to amsacrine'
+    C0570701  'Carboplatin allergy'
+    C0570702  'Cisplatin allergy'
+    C0570703  'Hydroxyurea allergy'
+    C0570704  'Allergy to procarbazine'
+    C0570705  'Razoxane allergy'
+    C0570706  'Crisantaspase allergy'
+    C0570707  'Paclitaxel allergy'
+    C0570708  'Allergy to fludarabine'
+    C0570709  'Allergy to aminoglutethimide'
+    C0570710  'Allergy to estrogen receptor antagonist'
+    C0570714  'Vinca alkaloid allergy'
+    C0570718  'Allergy to dimethyl sulfoxide'
+    C0570720  'Allergy to cyclosporine'
+    C0570721  'Allergy to azathioprine'
+    C0570724  'Allergy to mazindol'
+    C0570727  'Allergy to diethylpropion'
+    C0570733  'Amantadine allergy'
+    C0570734  'Apomorphine allergy'
+    C0570743  'Butriptyline allergy'
+    C0570744  'Doxepin allergy'
+    C0570745  'Iprindole allergy'
+    C0570746  'Lofepramine allergy'
+    C0570747  'Nortriptyline allergy'
+    C0570748  'Allergy to trimipramine'
+    C0570749  'Amoxapine allergy'
+    C0570750  'Amitriptyline allergy'
+    C0570751  'Clomipramine allergy'
+    C0570752  'Allergy to desipramine'
+    C0570753  'Allergy to dothiepin'
+    C0570754  'Imipramine allergy'
+    C0570755  'Allergy to protriptyline'
+    C0570756  'Allergy to monoamine oxidase inhibitor'
+    C0570765  'Allergy to selective serotonin re-uptake inhibitor'
+    C0570773  'Allergy to maprotiline'
+    C0570775  'Allergy to trazodone'
+    C0570776  'Allergy to viloxazine'
+    C0570778  'Allergy to beclamide'
+    C0570779  'Lamotrigine allergy'
+    C0570780  'Piracetam allergy'
+    C0570781  'Allergy to gabapentin'
+    C0570787  'Allergy to carbamazepine'
+    C0570788  'Allergy to vigabatrin'
+    C0570789  'Phenytoin allergy'
+    C0570790  'Ethosuximide allergy'
+    C0570794  'Zopiclone allergy'
+    C0570795  'Allergy to zolpidem'
+    C0570796  'Allergy to chlormezanone'
+    C0570797  'Allergy to methyprylon'
+    C0570798  'Allergy to paraldehyde'
+    C0570826  'Meprobamate allergy'
+    C0570831  'Buspirone allergy'
+    C0570832  'Chlormethiazole allergy'
+    C0570834  'Allergy to sulpiride'
+    C0570835  'Loxapine allergy'
+    C0570836  'Allergy to clozapine'
+    C0570837  'Risperidone allergy'
+    C0570838  'Tetrabenazine allergy'
+    C0570839  'Allergy to butyrophenone derivative'
+    C0570845  'Diphenylbutylpiperidine allergy'
+    C0570848  'Allergy to phenothiazine'
+    C0570853  'Allergy to thiethylperazine'
+    C0570862  'Allergy to thioxanthene'
+    C0570868  'Allergy to oxypertine'
+    C0570869  'Allergy to remoxipride'
+    C0570873  'Allergy to pemoline'
+    C0570874  'Allergy to methylphenidate'
+    C0570876  'Allergy to amfetamine and/or amfetamine derivative'
+    C0570881  'Allergy to beta adrenergic receptor antagonist'
+    C0570904  'Allergy to alpha adrenergic receptor antagonist'
+    C0570912  'Allergy to nicotine'
+    C0570914  'Allergy to lidoflazine'
+    C0570915  'Nifedipine allergy'
+    C0570916  'Prenylamine allergy'
+    C0570917  'Isradipine allergy'
+    C0570918  'Allergy to felodipine'
+    C0570919  'Allergy to lacidipine'
+    C0570920  'Nimodipine allergy'
+    C0570921  'Amlodipine allergy'
+    C0570922  'Diltiazem allergy'
+    C0570923  'Nicardipine allergy'
+    C0570924  'Allergy to verapamil'
+    C0570926  'Pilocarpine allergy'
+    C0570928  'Allergy to methacholine'
+    C0570929  'Allergy to acetylcholinesterase inhibitor'
+    C0570937  'Bethanechol allergy'
+    C0570938  'Allergy to carbachol'
+    C0570943  'Allergy to alpha adrenergic receptor agonist'
+    C0570952  'Allergy to beta-2 adrenergic receptor agonist'
+    C0570958  'Allergy to metaproterenol'
+    C0570961  'Allergy to ritodrine'
+    C0570963  'Allergy to tulobuterol'
+    C0570965  'Allergy to dobutamine'
+    C0570966  'Allergy to dopexamine'
+    C0570967  'Allergy to isoproterenol'
+    C0570977  'Allergy to dipivefrin'
+    C0570978  'Allergy to dopamine'
+    C0570981  'Allergy to xamoterol'
+    C0570984  'Allergy to belladonna alkaloid'
+    C0570986  'Biperiden allergy'
+    C0570990  'Tropicamide allergy'
+    C0570991  'Allergy to scopolamine'
+    C0570993  'Atropine allergy'
+    C0570994  'Trihexyphenidyl allergy'
+    C0570995  'Allergy to benztropine'
+    C0570996  'Cyclopentolate allergy'
+    C0570997  'Glycopyrronium allergy'
+    C0570998  'Allergy to homatropine'
+    C0570999  'Allergy to ipratropium'
+    C0571000  'Allergy to methixene'
+    C0571001  'Allergy to orphenadrine'
+    C0571004  'Oxitropium allergy'
+    C0571005  'Allergy to oxybutynin'
+    C0571006  'Allergy to procyclidine'
+    C0571008  'Allergy to dornase alfa'
+    C0571010  'Tyloxapol allergy'
+    C0571012  'Allergy to carbocisteine'
+    C0571013  'Methylcysteine allergy'
+    C0571014  'Acetylcysteine allergy'
+    C0571018  'Allergy to doxapram'
+    C0571020  'Allergy to beractant'
+    C0571022  'Allergy to pumactant'
+    C0571023  'Colfosceril allergy'
+    C0571031  'Loratadine allergy'
+    C0571032  'Allergy to azelastine'
+    C0571033  'Cetirizine allergy'
+    C0571035  'Allergy to clemastine'
+    C0571040  'Allergy to dimenhydrinate'
+    C0571042  'Antazoline allergy'
+    C0571043  'Promethazine allergy'
+    C0571044  'Azatadine allergy'
+    C0571046  'Allergy to chlorpheniramine'
+    C0571048  'Cyproheptadine allergy'
+    C0571050  'Diphenhydramine allergy'
+    C0571051  'Diphenylpyraline allergy'
+    C0571052  'Hydroxyzine allergy'
+    C0571055  'Pheniramine allergy'
+    C0571061  'Ketotifen allergy'
+    C0571062  'Allergy to lodoxamide'
+    C0571065  'Allergy to isoaminile'
+    C0571074  'Aminophylline allergy'
+    C0571076  'Theophylline allergy'
+    C0571085  'Allergy to coal tar'
+    C0571099  'Allergy to podophyllotoxin'
+    C0571123  'Retinoid allergy'
+    C0571133  'Probenecid allergy'
+    C0571134  'Sulfinpyrazone allergy'
+    C0571136  'Allopurinol allergy'
+    C0571140  'Allergy to succinylcholine'
+    C0571141  'Allergy to nondepolarising agent'
+    C0571147  'Allergy to tubocurarine'
+    C0571150  'Baclofen allergy'
+    C0571151  'Carisoprodol allergy'
+    C0571152  'Allergy to methocarbamol'
+    C0571153  'Allergy to dantrolene'
+    C0571156  'Allergy to auranofin'
+    C0571158  'Allergy to papaverine'
+    C0571159  'Flavoxate allergy'
+    C0571161  'Mifepristone allergy'
+    C0571165  'Prostaglandin allergy'
+    C0571179  'Allergy to ipecacuanha'
+    C0571180  'Charcoal-activated allergy'
+    C0571181  'Allergy to sodium nitrite'
+    C0571183  'Allergy to digoxin immune fab'
+    C0571184  'Mesna allergy'
+    C0571185  'Allergy to benzodiazepine receptor antagonist'
+    C0571188  'Allergy to pralidoxime'
+    C0571191  'Allergy to naltrexone'
+    C0571192  'Allergy to naloxone'
+    C0571193  'Protamine allergy'
+    C0571195  'Allergy to Fuller's earth'
+    C0571196  'Allergy to bentonite'
+    C0571198  'Allergy to dimercaprol'
+    C0571199  'Allergy to deferoxamine'
+    C0571206  'Allergy to penicillamine'
+    C0571232  'Allergy to castor oil'
+    C0571234  'Allergy to glycerin'
+    C0571241  'Allergy to mineral oil'
+    C0571256  'Flucytosine allergy'
+    C0571257  'Terbinafine allergy'
+    C0571258  'Nitrophenol allergy'
+    C0571259  'Tolnaftate allergy'
+    C0571260  'Allergy to amorolfine'
+    C0571262  'Allergy to griseofulvin'
+    C0571263  'Allergy to amphotericin'
+    C0571264  'Natamycin allergy'
+    C0571265  'Allergy to nystatin'
+    C0571269  'Allergy to clotrimazole'
+    C0571270  'Allergy to fenticonazole'
+    C0571271  'Tioconazole allergy'
+    C0571272  'Allergy to econazole'
+    C0571273  'Isoconazole allergy'
+    C0571274  'Allergy to sulconazole'
+    C0571275  'Allergy to ketoconazole'
+    C0571276  'Allergy to miconazole'
+    C0571278  'Fluconazole allergy'
+    C0571279  'Itraconazole allergy'
+    C0571281  'Allergy to inosine pranobex'
+    C0571283  'Ganciclovir allergy'
+    C0571284  'Famciclovir allergy'
+    C0571287  'Valaciclovir allergy'
+    C0571288  'Interferons allergy'
+    C0571293  'Allergy to ribavirin'
+    C0571294  'Allergy to trifluridine'
+    C0571295  'Foscarnet allergy'
+    C0571296  'Vidarabine allergy'
+    C0571297  'Allergy to aciclovir'
+    C0571298  'Idoxuridine allergy'
+    C0571301  'Pyrimethamine allergy'
+    C0571309  'Allergy to proguanil'
+    C0571311  'Quinine allergy'
+    C0571312  'Allergy to halofantrine'
+    C0571313  'Allergy to quinacrine'
+    C0571317  'Acetic acid allergy'
+    C0571318  'Hydrargaphen allergy'
+    C0571319  'Allergy to polynoxylin'
+    C0571320  'Allergy to hexetidine'
+    C0571321  'Allergy to sodium perborate'
+    C0571328  'Allergy to chloroxylenol'
+    C0571330  'Allergy to triclosan'
+    C0571336  'Glutaraldehyde allergy'
+    C0571338  'Noxythiolin allergy'
+    C0571339  'Allergy to formaldehyde'
+    C0571344  'Allergy to chlorhexidine'
+    C0571347  'Boric acid allergy'
+    C0571349  'Quaternary ammonium surfactant allergy'
+    C0571353  'Allergy to quaternary pyridinium surfactant'
+    C0571354  'Allergy to cetylpyridinium'
+    C0571355  'Allergy to quaternary quinolinium surfactant'
+    C0571360  'Allergy to gentian violet'
+    C0571361  'Allergy to brilliant green'
+    C0571362  'Hydrogen peroxide allergy'
+    C0571364  'Piperazine allergy'
+    C0571365  'Pyrantel allergy'
+    C0571366  'Allergy to niclosamide'
+    C0571367  'Bephenium allergy'
+    C0571368  'Allergy to diethylcarbamazine'
+    C0571370  'Mebendazole allergy'
+    C0571371  'Allergy to albendazole'
+    C0571372  'Thiabendazole allergy'
+    C0571375  'Amikacin allergy'
+    C0571376  'Allergy to kanamycin'
+    C0571377  'Netilmicin allergy'
+    C0571378  'Allergy to streptomycin'
+    C0571379  'Framycetin allergy'
+    C0571380  'Neomycin allergy'
+    C0571381  'Allergy to gentamicin'
+    C0571382  'Tobramycin allergy'
+    C0571384  'Allergy to clarithromycin'
+    C0571385  'Allergy to azithromycin'
+    C0571387  'Spectinomycin allergy'
+    C0571388  'Vancomycin allergy'
+    C0571389  'Teicoplanin allergy'
+    C0571390  'Allergy to trimethoprim'
+    C0571391  'Nitrofurantoin allergy'
+    C0571393  'Allergy to mupirocin'
+    C0571394  'Nitrofurazone allergy'
+    C0571395  'Allergy to fusidic acid'
+    C0571397  'Allergy to rosoxacin'
+    C0571398  'Cinoxacin allergy'
+    C0571399  'Allergy to nalidixic acid'
+    C0571440  'Polymyxins allergy'
+    C0571444  'Allergy to cephalosporin'
+    C0571470  'Fosfomycin allergy'
+    C0571472  'Clindamycin allergy'
+    C0571473  'Allergy to lincomycin'
+    C0571474  'Mandelic acid allergy'
+    C0571476  'Allergy to aztreonam'
+    C0571477  'Nitroimidazole allergy'
+    C0571495  'Allergy to clomocycline'
+    C0571496  'Allergy to doxycycline'
+    C0571497  'Lymecycline allergy'
+    C0571498  'Allergy to minocycline'
+    C0571499  'Allergy to oxytetracycline'
+    C0571501  'Allergy to chlortetracycline'
+    C0571502  'Allergy to demeclocycline'
+    C0571503  'Chloramphenicol allergy'
+    C0571506  'Atovaquone allergy'
+    C0571508  'Sodium stibogluconate allergy'
+    C0571510  'Pentamidine allergy'
+    C0571512  'Allergy to diloxanide'
+    C0571517  'Pyrazinamide allergy'
+    C0571519  'Allergy to capreomycin'
+    C0571520  'Cycloserine allergy'
+    C0571521  'Allergy to rifampin'
+    C0571522  'Allergy to rifabutin'
+    C0571524  'Allergy to isoniazid'
+    C0571525  'Allergy to ethambutol'
+    C0571527  'Allergy to dapsone'
+    C0571528  'Allergy to clofazimine'
+    C0571530  'Allergy to benzyl benzoate'
+    C0571531  'Allergy to monosulfiram'
+    C0571543  'Allergy to human immunoglobulin'
+    C0571548  'Allergy to tetanus immunoglobulin'
+    C0571549  'Allergy to Varicella-zoster virus antibody'
+    C0571577  'Allergy to botulinum antitoxin'
+    C0571578  'Diphtheria antitoxin allergy'
+    C0571580  'Glucagon allergy'
+    C0571585  'Allergy to propylthiouracil'
+    C0571586  'Allergy to corticosteroid and/or corticosteroid derivative'
+    C0571622  'Insulin allergy'
+    C0571637  'Allergy to acetohexamide'
+    C0571638  'Chlorpropamide allergy'
+    C0571639  'Allergy to glyburide'
+    C0571640  'Allergy to glibornuride'
+    C0571641  'Allergy to gliclazide'
+    C0571642  'Allergy to glipizide'
+    C0571643  'Allergy to gliquidone'
+    C0571645  'Tolazamide allergy'
+    C0571646  'Tolbutamide allergy'
+    C0571648  'Metformin allergy'
+    C0571650  'Allergy to acarbose'
+    C0571652  'Allergy to progestational hormone'
+    C0571669  'Cyclofenil allergy'
+    C0571673  'Allergy to finasteride'
+    C0571674  'Allergy to flutamide'
+    C0571675  'Allergy to bicalutamide'
+    C0571677  'Allergy to cyproterone'
+    C0571679  'Androgen allergy'
+    C0571687  'Allergy to estrogen'
+    C0571705  'Allergy to ergoline derivative'
+    C0571713  'Desmopressin allergy'
+    C0571720  'Allergy to gonad regulating hormone agent'
+    C0571732  'Octreotide allergy'
+    C0571734  'Allergy to thyrotropin releasing factor'
+    C0571735  'Protirelin allergy'
+    C0571738  'Allergy to bisphosphonate'
+    C0571743  'Calcium regulating hormone allergy'
+    C0571752  'Allergy to gelatin'
+    C0571760  'Antithrombin III allergy'
+    C0571769  'Allergy to anti-inhibitor coagulant complex'
+    C0571775  'Ancrod allergy'
+    C0571776  'Allergy to heparin'
+    C0571777  'Allergy to enoxaparin'
+    C0571778  'Allergy to dalteparin'
+    C0571779  'Allergy to tinzaparin'
+    C0571780  'Allergy to heparinoid'
+    C0571784  'Allergy to acenocoumarol'
+    C0571785  'Warfarin allergy'
+    C0571789  'Allergy to etamsylate'
+    C0571791  'Tranexamic acid allergy'
+    C0571792  'Collagen allergy'
+    C0571793  'Aprotinin allergy'
+    C0571816  'Allergy to levocarnitine'
+    C0571828  'Allergy to vitamin D and/or vitamin D derivative'
+    C0571829  'Allergy to vitamin K and/or vitamin K derivative'
+    C0571830  'Allergy to alpha-tocopherol'
+    C0571833  'Allergy to niacin'
+    C0571834  'Allergy to folic acid'
+    C0571835  'Allergy to folinic acid'
+    C0571841  'Inositol allergy'
+    C0571844  'Ascorbic acid allergy'
+    C0571861  'Probucol allergy'
+    C0571862  'Allergy to acipimox'
+    C0571864  'Allergy to colestipol'
+    C0571865  'Cholestyramine allergy'
+    C0571868  'Allergy to clofibrate'
+    C0571869  'Allergy to fenofibrate'
+    C0571873  'Allergy to 3-hydroxy-3-methylglutaryl-coenzyme A reductase inhibitor'
+    C0571878  'Allergy to adenosine'
+    C0571880  'Disopyramide allergy'
+    C0571881  'Quinidine allergy'
+    C0571882  'Allergy to flecainide'
+    C0571883  'Allergy to mexiletine'
+    C0571884  'Allergy to moricizine'
+    C0571885  'Allergy to procainamide'
+    C0571886  'Propafenone allergy'
+    C0571887  'Tocainide allergy'
+    C0571889  'Bretylium allergy'
+    C0571891  'Amiodarone allergy'
+    C0571895  'Allergy to bendroflumethiazide'
+    C0571896  'Allergy to chlorothiazide'
+    C0571897  'Cyclopenthiazide allergy'
+    C0571898  'Allergy to hydrochlorothiazide'
+    C0571899  'Hydroflumethiazide allergy'
+    C0571900  'Allergy to methyclothiazide'
+    C0571901  'Allergy to polythiazide'
+    C0571905  'Allergy to ethacrynic acid'
+    C0571906  'Allergy to piretanide'
+    C0571907  'Allergy to torsemide'
+    C0571909  'Triamterene allergy'
+    C0571910  'Allergy to aldosterone receptor antagonist'
+    C0571913  'Allergy to amiloride'
+    C0571922  'Mannitol allergy'
+    C0571924  'Mersalyl allergy'
+    C0571933  'Allergy to acetazolamide'
+    C0571936  'Bethanidine allergy'
+    C0571937  'Debrisoquine allergy'
+    C0571938  'Guanethidine allergy'
+    C0571950  'Allergy to trimetaphan'
+    C0571951  'Allergy to metyrosine'
+    C0571962  'Enoximone allergy'
+    C0571963  'Allergy to milrinone'
+    C0571967  'Ergot alkaloid allergy'
+    C0571972  'Allergy to minoxidil'
+    C0571974  'Flosequinan allergy'
+    C0571975  'Diazoxide allergy'
+    C0571976  'Allergy to hydralazine'
+    C0571977  'Allergy to nicorandil'
+    C0571978  'Dipyridamole allergy'
+    C0571980  'Allergy to nitroglycerin'
+    C0571992  'Allergy to pentaerythritol tetranitrate'
+    C0571995  'Pentoxifylline allergy'
+    C0571996  'Cyclandelate allergy'
+    C0571997  'Allergy to nicofuranose'
+    C0571999  'Isoxsuprine allergy'
+    C0572000  'Allergy to nafronyl'
+    C0572001  'Nicotinyl alcohol allergy'
+    C0572004  'Betahistine allergy'
+    C0572009  'Streptokinase allergy'
+    C0572010  'Allergy to urokinase'
+    C0572011  'Allergy to alteplase'
+    C0572012  'Anistreplase allergy'
+    C0740909  'Allergy to ethanol'
+    C0741440  'Barbiturate allergy'
+    C0741856  'Allergy to caffeine'
+    C0746910  'Allergy to nitroprusside'
+    C1319853  'Aspirin-induced asthma'
+    C1320835  'Drug fever'
+    C1527304  'Allergic reaction'
+    C1629019  'Allergy to phenothiazine derivative'
+    C1640722  'Allergic reaction to colophony'
+    C1640727  'Sulphonamide diuretic allergy'
+    C1998306  'Allergy to sulphonamide antibiotic'
+    C2584599  'Allergy to thiazolidinedione'
+    C2711220  'Allergy to meropenem'
+    C2711572  'Sevoflurane allergy'
+    C2711594  'Allergy to imipenem'
+    C2711902  'Allergy to ertapenem'
+    C3539909  'Allergic disposition'
+    C4076266  'Allergy to protease inhibitor'
+    C4076278  'Allergy to reverse transcriptase inhibitor'
+    C4303914  'Allergy to bile acid'
+    C4316577  'Allergy to opiate agonist'
+    C4545176  'Allergy to denosumab'
+    C4707910  'Hypothalamic hormone allergy'
+    C4707911  'Pituitary hormone allergy'
+    C4707986  'Allergy to diethyl ether (finding)'
+    C4707989  'Allergy to cromolyn'
+    C4708096  'Allergy to urea'
+    C4708098  'Vitamin B12 and/or vitamin B12 derivative allergy'
+    C4708099  'Thiamine allergy'
+    C4708100  'Allergy to pyridoxine'
+    C4708163  'Allergy to benzodiazepine'
+    C4749576  'Allergy to coagulation protein'
+    C4750836  'Allergy to acetylcholine'
+    C4750852  'Bamethan allergy'
+    C4750860  'Allergy to isosorbide'
+    C4750901  'Hyaluronic acid allergy'
+    C4750903  'Allergy to valproic acid'
+    C4750905  'Allergy to dibromopropamidine'
+    C4750916  'Allergy to emepronium'
+    C4750919  'Propamidine allergy'
+    C4750932  'Allergy to phenylpropanolamine'
+    C4758633  'Allergy to Digitalis glycoside'
+    C4758634  'Allergy to chloral derivative'
+    C4758641  'Allergy to indanedione'
+    C4758644  'Allergy to lithium compound'
+    C4758652  'Allergy to acridine derivative azo'
+    C4758658  'Allergy to rauwolfia alkaloid'
+    C4758661  'Allergy to thiouracil'
+    C4758662  'Allergy to thiourea'
+    C4758663  'Allergy to thyroid hormone'
+    C4758664  'Allergy to triphenylmethane triisocyanate'
+    C5240002  'Meclizine allergy'
+    C5394741  'Allergy to bromhexine'
+    C5394788  'Polystyrene sulfonate allergy'
+    C5394792  'Lachesine allergy'
+    C5394793  'Metamizole allergy'
+    C5394794  'Allergy to methenamine'
+    C5394796  'Allergy to piperidolate'
+    C5394798  'Sodium sulfate allergy'
+    C5394799  'Allergy to terodiline'
+    C5394818  'Balsam of Peru allergy'
+    C5394838  'Aldehyde dehydrogenase inhibitor allergy'
+    C5395046  'Fluoroquinolone allergy'
+    C5395879  'Allergy to oxyquinoline'
+    C5395979  'Aminoquinoline allergy'
+    C5397081  'Carbidopa and/or levodopa allergy'
+    C5548169  'Allergy to erythropoietin receptor agonist'
+    C5566590  'Allergic reaction caused by analgesic'
+    C5566611  'Allergic reaction caused by anaesthetic'
+    C5687061  'Allergy to dapagliflozin'
+    C5687062  'Allergy to ertugliflozin'
+    C5687063  'Allergy to canagliflozin'
+    C5817138  'Allergic reaction caused by antiinfective agent'
+    C5921987  'Allergy to reteplase'
+    C5921988  'Allergy to tenecteplase'
+    C5923088  'Allergy to cetuximab due to alpha-gal syndrome'
+
+  Sub-topics: 563
+
+    st_0e4a3b68d10635 (size 3):
+      C0013182  'Allergy to drug' <-- self
+      C0237865  'Propensity to adverse reactions to drug'
+      C0277585  'Drug intolerance'
+
+    st_1ef27b35fae029 (size 3):
+      C0011609  'Drug eruption'
+      C0013182  'Allergy to drug' <-- self
+      C0041755  'Adverse drug reaction'
+
+    st_231361dc77a525 (size 3):
+      C0013182  'Allergy to drug' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C1527304  'Allergic reaction'
+
+    st_c692606e1393f9 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571379  'Framycetin allergy'
+
+    st_915c85f1eed9c5 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570661  'Levamisole allergy'
+
+    st_95ebc068009952 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571521  'Allergy to rifampin'
+
+    st_bd5371cc95b1eb (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570599  'Metoclopramide allergy'
+
+    st_6b5d02294f90ca (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4707910  'Hypothalamic hormone allergy'
+
+    st_d3c1281a89a41b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571319  'Allergy to polynoxylin'
+
+    st_cf6b6d76a57788 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571922  'Mannitol allergy'
+
+    st_4a8d162401ca35 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570790  'Ethosuximide allergy'
+
+    st_eeaf98ee9f85af (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571010  'Tyloxapol allergy'
+
+    st_1cd919927b72ee (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570780  'Piracetam allergy'
+
+    st_764857fef304e3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C2584599  'Allergy to thiazolidinedione'
+
+    st_83370076829147 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571271  'Tioconazole allergy'
+
+    st_2772b32338225b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571512  'Allergy to diloxanide'
+
+    st_fd70e1c65771c8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570999  'Allergy to ipratropium'
+
+    st_dd2bff30bb8f6a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571645  'Tolazamide allergy'
+
+    st_5d97c09e03078d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C1629019  'Allergy to phenothiazine derivative'
+
+    st_cf720d4bf66ccc (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570638  'Halothane allergy'
+
+    st_44fc5d26b16b54 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571784  'Allergy to acenocoumarol'
+
+    st_8c01aba42445a9 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C2711594  'Allergy to imipenem'
+
+    st_4cc1f997856d44 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5566611  'Allergic reaction caused by anaesthetic'
+
+    st_7a5d18530e4e80 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571005  'Allergy to oxybutynin'
+
+    st_c424446565d98f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571183  'Allergy to digoxin immune fab'
+
+    st_a37aaaa05ca003 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571473  'Allergy to lincomycin'
+
+    st_e3b400b7afed61 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5566590  'Allergic reaction caused by analgesic'
+
+    st_383e6785a4eb15 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571241  'Allergy to mineral oil'
+
+    st_1a1e9c70d9ffa0 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570869  'Allergy to remoxipride'
+
+    st_45e479e8234e47 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571470  'Fosfomycin allergy'
+
+    st_7ad07a2a0aaa8c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0572004  'Betahistine allergy'
+
+    st_42ce2230276e51 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571000  'Allergy to methixene'
+
+    st_129bc3c4733cee (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571258  'Nitrophenol allergy'
+
+    st_eb2ad03fa140f3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571347  'Boric acid allergy'
+
+    st_347364873c376a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571366  'Allergy to niclosamide'
+
+    st_fca35cf460eab0 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571828  'Allergy to vitamin D and/or vitamin D derivative'
+
+    st_50ff0a0b2570c7 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570832  'Chlormethiazole allergy'
+
+    st_78dd0952ef8562 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570589  'Allergy to magnesium trisilicate'
+
+    st_cc4107e6e3ee7a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570718  'Allergy to dimethyl sulfoxide'
+
+    st_12892e74947668 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571776  'Allergy to heparin'
+
+    st_8932c813baa054 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571387  'Spectinomycin allergy'
+
+    st_20588a6effff37 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570845  'Diphenylbutylpiperidine allergy'
+
+    st_d2016fda20d490 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570707  'Paclitaxel allergy'
+
+    st_fbe96c323e17e9 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571495  'Allergy to clomocycline'
+
+    st_40d1e82055c08b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571909  'Triamterene allergy'
+
+    st_68bf98503dfd82 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570796  'Allergy to chlormezanone'
+
+    st_a4f76ad16fa7bd (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570721  'Allergy to azathioprine'
+
+    st_0163bfd2246572 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571980  'Allergy to nitroglycerin'
+
+    st_47f21921e1e340 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571962  'Enoximone allergy'
+
+    st_6b8e23835d8f69 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571963  'Allergy to milrinone'
+
+    st_e8d2a1b9a74416 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571510  'Pentamidine allergy'
+
+    st_d7048da7237ee3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571527  'Allergy to dapsone'
+
+    st_68468818cd8884 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571159  'Flavoxate allergy'
+
+    st_9b118621d96f25 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570602  'Bisacodyl allergy'
+
+    st_e50c2ac9aa47ee (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571317  'Acetic acid allergy'
+
+    st_d8a843de8dbe8d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570981  'Allergy to xamoterol'
+
+    st_02cdcbd1bc4896 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4316577  'Allergy to opiate agonist'
+
+    st_ac05fa949f5b58 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571376  'Allergy to kanamycin'
+
+    st_2260aa7f960d24 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571018  'Allergy to doxapram'
+
+    st_10898170112b90 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570666  'Treosulfan allergy'
+
+    st_af13636a43aac2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571508  'Sodium stibogluconate allergy'
+
+    st_2250ed43d9bff1 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571273  'Isoconazole allergy'
+
+    st_bfcc0b41c64c59 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571829  'Allergy to vitamin K and/or vitamin K derivative'
+
+    st_c19360ff0cc4c3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0572000  'Allergy to nafronyl'
+
+    st_951e33f82e0bbb (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571548  'Allergy to tetanus immunoglobulin'
+
+    st_6ecd7c7c5a14c6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571792  'Collagen allergy'
+
+    st_dbe90ab80d4e51 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571198  'Allergy to dimercaprol'
+
+    st_25b18ce94e689d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5394796  'Allergy to piperidolate'
+
+    st_f6fe8d4aa7d7fb (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571586  'Allergy to corticosteroid and/or corticosteroid derivative'
+
+    st_edaa18475b4457 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0572001  'Nicotinyl alcohol allergy'
+
+    st_2202ab0017a7de (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571085  'Allergy to coal tar'
+
+    st_3fc0c03c9214b2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570620  'Allergy to poldine'
+
+    st_c833fc9ecf40c6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C1319853  'Aspirin-induced asthma'
+
+    st_225040c6b516bd (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570690  'Idarubicin allergy'
+
+    st_28b9775e968993 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0014808  'Allergy to erythromycin'
+
+    st_18ba1a644701e3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570699  'Allergy to etoposide'
+
+    st_47d123759959e1 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570614  'Peppermint oil allergy'
+
+    st_25674b22d1b057 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570963  'Allergy to tulobuterol'
+
+    st_d3c67e7392edc7 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571785  'Warfarin allergy'
+
+    st_5f33d87f99cd53 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571179  'Allergy to ipecacuanha'
+
+    st_ab6461aab189df (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571265  'Allergy to nystatin'
+
+    st_7f7427439101e1 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570914  'Allergy to lidoflazine'
+
+    st_0224dcaf6ce323 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570754  'Imipramine allergy'
+
+    st_39c6b348cbf469 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571275  'Allergy to ketoconazole'
+
+    st_ce87f34bf7c331 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571477  'Nitroimidazole allergy'
+
+    st_bc17767f24ae29 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4707911  'Pituitary hormone allergy'
+
+    st_81f29ff1bd421f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571977  'Allergy to nicorandil'
+
+    st_9ddb8294b36084 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571995  'Pentoxifylline allergy'
+
+    st_e2cbdd0d82dde6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570684  'Allergy to mitomycin'
+
+    st_941b4dd5fcf1b5 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571367  'Bephenium allergy'
+
+    st_6813e1fa1b2e53 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571530  'Allergy to benzyl benzoate'
+
+    st_cc688be94c7f37 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570756  'Allergy to monoamine oxidase inhibitor'
+
+    st_4007b1c8792385 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571398  'Cinoxacin allergy'
+
+    st_5f34187886e6f2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571368  'Allergy to diethylcarbamazine'
+
+    st_7a5812b9dd8867 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4750916  'Allergy to emepronium'
+
+    st_e32a63f688648f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C1640727  'Sulphonamide diuretic allergy'
+
+    st_628695dc0f125e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571385  'Allergy to azithromycin'
+
+    st_c1e672d2ca1396 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571272  'Allergy to econazole'
+
+    st_8573e28beb5db6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5395879  'Allergy to oxyquinoline'
+
+    st_81d418c5bf404e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571365  'Pyrantel allergy'
+
+    st_aea750f3f15174 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570697  'Cytarabine allergy'
+
+    st_855de4d798ecef (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570604  'Sodium picosulphate allergy'
+
+    st_dfd51e0bf3c215 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571278  'Fluconazole allergy'
+
+    st_c57640c3d35d2d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571192  'Allergy to naloxone'
+
+    st_2798759b5f31b2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571014  'Acetylcysteine allergy'
+
+    st_0cf91c8028d68f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0746910  'Allergy to nitroprusside'
+
+    st_9184d2dfa2507a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571378  'Allergy to streptomycin'
+
+    st_0c38a9ca42de8e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571263  'Allergy to amphotericin'
+
+    st_2c4a21742ef2a8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570689  'Allergy to epirubicin'
+
+    st_fe198d02bfbff3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0572011  'Allergy to alteplase'
+
+    st_b40f49e167c124 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5394799  'Allergy to terodiline'
+
+    st_40f64fcdb8acbe (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C2711902  'Allergy to ertapenem'
+
+    st_4faea4e4fe5c8f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571476  'Allergy to aztreonam'
+
+    st_5da3249d17dd7a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571637  'Allergy to acetohexamide'
+
+    st_aaa061695203a8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571048  'Cyproheptadine allergy'
+
+    st_393896bb70bd59 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570994  'Trihexyphenidyl allergy'
+
+    st_6ab12f4ae976b8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571752  'Allergy to gelatin'
+
+    st_6e7610440ef2cc (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571674  'Allergy to flutamide'
+
+    st_7ad5ff907dcd4a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571393  'Allergy to mupirocin'
+
+    st_673b788052f529 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570921  'Amlodipine allergy'
+
+    st_c7ac25b154ff19 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570853  'Allergy to thiethylperazine'
+
+    st_1c035f46b18c6d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571519  'Allergy to capreomycin'
+
+    st_55761daa8f1f49 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C2711572  'Sevoflurane allergy'
+
+    st_66238b319c02ad (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571052  'Hydroxyzine allergy'
+
+    st_daa047039d2096 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571044  'Azatadine allergy'
+
+    st_f43cf4e43ad6b8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571390  'Allergy to trimethoprim'
+
+    st_ef494826fdc044 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571864  'Allergy to colestipol'
+
+    st_0c469e4de4eba3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571232  'Allergy to castor oil'
+
+    st_04b1d7178f689f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571388  'Vancomycin allergy'
+
+    st_ac462066fdd58a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4750901  'Hyaluronic acid allergy'
+
+    st_7f0006e7f61b2c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571886  'Propafenone allergy'
+
+    st_0c5e53afc024b8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571861  'Probucol allergy'
+
+    st_ed131438443f41 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570616  'Allergy to mebeverine'
+
+    st_e7c33f3a08b0bb (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570996  'Cyclopentolate allergy'
+
+    st_44b4dbcd0b0029 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570706  'Crisantaspase allergy'
+
+    st_5c1cf03687ae7d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570993  'Atropine allergy'
+
+    st_c4d9f084a16778 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571043  'Promethazine allergy'
+
+    st_679a3965beb2e8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571525  'Allergy to ethambutol'
+
+    st_cdd221c2093445 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570695  'Allergy to thioguanine'
+
+    st_94946e05ff4adb (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C1998306  'Allergy to sulphonamide antibiotic'
+
+    st_e4b7c80e728f86 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570658  'Molgramostim allergy'
+
+    st_c61816e0f59991 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5548169  'Allergy to erythropoietin receptor agonist'
+
+    st_9e3366320c7705 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570751  'Clomipramine allergy'
+
+    st_95e765d08668d6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571834  'Allergy to folic acid'
+
+    st_48da007e86fc3e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571375  'Amikacin allergy'
+
+    st_fde15973e31631 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571652  'Allergy to progestational hormone'
+
+    st_32eb406e1bde93 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570795  'Allergy to zolpidem'
+
+    st_290e8cb476868b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571022  'Allergy to pumactant'
+
+    st_6aec17bb684ed8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571502  'Allergy to demeclocycline'
+
+    st_fd536b8db0df2b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570920  'Nimodipine allergy'
+
+    st_394ca2daef2af5 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571775  'Ancrod allergy'
+
+    st_0e5518aff7d732 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571734  'Allergy to thyrotropin releasing factor'
+
+    st_3423ecdb278e39 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571950  'Allergy to trimetaphan'
+
+    st_00bf3d9834e758 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571150  'Baclofen allergy'
+
+    st_45f24c1107f769 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571679  'Androgen allergy'
+
+    st_faa10dc39c810b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570748  'Allergy to trimipramine'
+
+    st_d9507963ee348e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571311  'Quinine allergy'
+
+    st_20fb90194fc722 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0039645  'Tetracycline allergy'
+
+    st_f6a8aa36c7ddbc (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571503  'Chloramphenicol allergy'
+
+    st_017830e21cf2f6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571032  'Allergy to azelastine'
+
+    st_75addbc15ee717 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570797  'Allergy to methyprylon'
+
+    st_09b008ceb6d8fa (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571895  'Allergy to bendroflumethiazide'
+
+    st_b605974ad87b74 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571384  'Allergy to clarithromycin'
+
+    st_dedb2a71ede0d6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571501  'Allergy to chlortetracycline'
+
+    st_953ef6c92ff353 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571050  'Diphenhydramine allergy'
+
+    st_18e4fcfffbb729 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570943  'Allergy to alpha adrenergic receptor agonist'
+
+    st_df88925d032024 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571997  'Allergy to nicofuranose'
+
+    st_d1272de3ab495b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571295  'Foscarnet allergy'
+
+    st_4dd09337528cde (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571257  'Terbinafine allergy'
+
+    st_afe3aae2d862d2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571951  'Allergy to metyrosine'
+
+    st_b891fb003eea15 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570831  'Buspirone allergy'
+
+    st_4a97a21ada3aab (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570794  'Zopiclone allergy'
+
+    st_6f0167f78ef35c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571260  'Allergy to amorolfine'
+
+    st_e43b977dbe3f10 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5921988  'Allergy to tenecteplase'
+
+    st_4a1df90b0a8a6b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571543  'Allergy to human immunoglobulin'
+
+    st_a99a6fa045b3ce (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571524  'Allergy to isoniazid'
+
+    st_b9284045bfe6d4 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571669  'Cyclofenil allergy'
+
+    st_e28808c50cc4aa (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570835  'Loxapine allergy'
+
+    st_1f19bfd1b75c29 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571780  'Allergy to heparinoid'
+
+    st_31f11a9557a572 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4758634  'Allergy to chloral derivative'
+
+    st_6eb785eb167b5f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571901  'Allergy to polythiazide'
+
+    st_9029f7d118bcff (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570937  'Bethanechol allergy'
+
+    st_63b21d05bd646d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571013  'Methylcysteine allergy'
+
+    st_09ceffb5cb9c14 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570922  'Diltiazem allergy'
+
+    st_9f7258e785fa5d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571881  'Quinidine allergy'
+
+    st_031894bf2c441a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571976  'Allergy to hydralazine'
+
+    st_1780abfeec108d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0572012  'Anistreplase allergy'
+
+    st_7624bd70fd99d0 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4708100  'Allergy to pyridoxine'
+
+    st_f76df65f645bfb (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571677  'Allergy to cyproterone'
+
+    st_aef76554cba28b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571294  'Allergy to trifluridine'
+
+    st_6191f744880d02 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571377  'Netilmicin allergy'
+
+    st_3517c0e7932c1f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571397  'Allergy to rosoxacin'
+
+    st_3d4641b28fb5d6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571528  'Allergy to clofazimine'
+
+    st_bd4d703b287954 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571195  'Allergy to Fuller's earth'
+
+    st_2ff9b6c62a1c44 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571336  'Glutaraldehyde allergy'
+
+    st_da2ccb27a89f75 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571206  'Allergy to penicillamine'
+
+    st_9186fe89d53e9f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571738  'Allergy to bisphosphonate'
+
+    st_b9089396ba650c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570966  'Allergy to dopexamine'
+
+    st_0d4a4cf8523511 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571033  'Cetirizine allergy'
+
+    st_f63ab074f096d7 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4758644  'Allergy to lithium compound'
+
+    st_22a57e36c12b0c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571996  'Cyclandelate allergy'
+
+    st_0a144347ac4daf (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571313  'Allergy to quinacrine'
+
+    st_cde18ea164d192 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570789  'Phenytoin allergy'
+
+    st_5dc890b8178f1a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571151  'Carisoprodol allergy'
+
+    st_4d51b7253ef916 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571309  'Allergy to proguanil'
+
+    st_cab17d85835ca0 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571972  'Allergy to minoxidil'
+
+    st_e536ef7b45b70f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570615  'Allergy to alverine'
+
+    st_b6ba704baa3161 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570693  'Methotrexate allergy'
+
+    st_2ff751c825c506 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570694  'Allergy to mercaptopurine'
+
+    st_23cb7d3323eb40 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571578  'Diphtheria antitoxin allergy'
+
+    st_01965c47d46790 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571264  'Natamycin allergy'
+
+    st_149cc08b7bffb0 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570701  'Carboplatin allergy'
+
+    st_74b6379080ce01 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571499  'Allergy to oxytetracycline'
+
+    st_500b0d2f99e51c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570656  'Allergy to aldesleukin'
+
+    st_d13ed464646425 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571362  'Hydrogen peroxide allergy'
+
+    st_c9705becf796f9 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570655  'Allergy to amifostine'
+
+    st_b9cbc7b87869b3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4545176  'Allergy to denosumab'
+
+    st_c50da5a10fbf0e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C1640722  'Allergic reaction to colophony'
+
+    st_c6d1838bc6257c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570923  'Nicardipine allergy'
+
+    st_43742cd189dc0b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571897  'Cyclopenthiazide allergy'
+
+    st_72bc468061377c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570708  'Allergy to fludarabine'
+
+    st_ddae2e607ee145 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571898  'Allergy to hydrochlorothiazide'
+
+    st_8f6aa8aaf2bc0f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571339  'Allergy to formaldehyde'
+
+    st_759418c103ec58 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571353  'Allergy to quaternary pyridinium surfactant'
+
+    st_aba0e64a15970c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570961  'Allergy to ritodrine'
+
+    st_70b983cd14a4ca (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571389  'Teicoplanin allergy'
+
+    st_fe13c030d771df (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570692  'Allergy to mercuric oxide'
+
+    st_4af1cef9dc9fd1 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571381  'Allergy to gentamicin'
+
+    st_1885e7793e3bc7 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571642  'Allergy to glipizide'
+
+    st_26929bbfc853a8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570781  'Allergy to gabapentin'
+
+    st_64831ebb8bcfeb (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4708096  'Allergy to urea'
+
+    st_cf3f2d659f4a39 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571391  'Nitrofurantoin allergy'
+
+    st_b999f2299daff0 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571284  'Famciclovir allergy'
+
+    st_cc6c8d947ec275 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571444  'Allergy to cephalosporin'
+
+    st_468db27fc254ef (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571937  'Debrisoquine allergy'
+
+    st_3ec45f8ebf288a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570752  'Allergy to desipramine'
+
+    st_2d8a32b5513212 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571312  'Allergy to halofantrine'
+
+    st_2c7e1e60ca6de9 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570685  'Plicamycin allergy'
+
+    st_ddbe8cec8bea6f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570928  'Allergy to methacholine'
+
+    st_4551a1aede4510 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571907  'Allergy to torsemide'
+
+    st_6cb75f07023f46 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571835  'Allergy to folinic acid'
+
+    st_01372fc1f082ef (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571585  'Allergy to propylthiouracil'
+
+    st_3c4155fdac6333 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570826  'Meprobamate allergy'
+
+    st_88b8b782602c42 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571349  'Quaternary ammonium surfactant allergy'
+
+    st_5886f13d8ffb97 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571361  'Allergy to brilliant green'
+
+    st_122f595ab1dc62 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570618  'Mepenzolate allergy'
+
+    st_faacd101d5e8d2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570904  'Allergy to alpha adrenergic receptor antagonist'
+
+    st_9a22d93dddf90b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570977  'Allergy to dipivefrin'
+
+    st_6f29603174a89f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571580  'Glucagon allergy'
+
+    st_09405c869fb868 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4750932  'Allergy to phenylpropanolamine'
+
+    st_7f9da990cb240f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570984  'Allergy to belladonna alkaloid'
+
+    st_75dfc71d96346c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C1320835  'Drug fever'
+
+    st_2e1d60d69061d0 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570744  'Doxepin allergy'
+
+    st_8372352368b378 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571276  'Allergy to miconazole'
+
+    st_1221c4c00aefab (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570929  'Allergy to acetylcholinesterase inhibitor'
+
+    st_2fd4082b56c76f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570704  'Allergy to procarbazine'
+
+    st_bf0bc88941c5f1 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4708099  'Thiamine allergy'
+
+    st_0ca1015eca30a2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570938  'Allergy to carbachol'
+
+    st_6fbe048ca5b0b2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570919  'Allergy to lacidipine'
+
+    st_891fd4f65f4820 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571035  'Allergy to clemastine'
+
+    st_9e3598e212388e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571673  'Allergy to finasteride'
+
+    st_52688067140067 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570606  'Magnesium sulphate allergy'
+
+    st_34b261514df791 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571293  'Allergy to ribavirin'
+
+    st_b0b8726c20b79d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570640  'Trichloroethylene allergy'
+
+    st_1d3f056aba1d06 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570609  'Cascara allergy'
+
+    st_98d115a010e658 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4758661  'Allergy to thiouracil'
+
+    st_7987d7eaa5b7c6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571274  'Allergy to sulconazole'
+
+    st_be03ecce41f89c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570837  'Risperidone allergy'
+
+    st_39e27a5e3cc818 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570600  'Allergy to 5-hydroxytryptamine-3-receptor antagonist'
+
+    st_6bbee30cc9b9c1 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570997  'Glycopyrronium allergy'
+
+    st_1e6751d67cbf8f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4758662  'Allergy to thiourea'
+
+    st_71e9a517007b4e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571975  'Diazoxide allergy'
+
+    st_fdedddcf403eef (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571279  'Itraconazole allergy'
+
+    st_600e51975f3c90 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570639  'Isoflurane allergy'
+
+    st_2484dc0ab97ee3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571882  'Allergy to flecainide'
+
+    st_7496e7eafdcfab (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571156  'Allergy to auranofin'
+
+    st_2a85fdc36a91d2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570755  'Allergy to protriptyline'
+
+    st_3186691b4fc787 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4758663  'Allergy to thyroid hormone'
+
+    st_400ae153806eea (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571180  'Charcoal-activated allergy'
+
+    st_c03c15177d65cb (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571830  'Allergy to alpha-tocopherol'
+
+    st_2d32ebeb6759d5 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5394793  'Metamizole allergy'
+
+    st_d22597b6104fb1 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570967  'Allergy to isoproterenol'
+
+    st_bbee9e5ded0101 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4707986  'Allergy to diethyl ether (finding)'
+
+    st_f56402563290c3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4758633  'Allergy to Digitalis glycoside'
+
+    st_632e6be97b7dac (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571936  'Bethanidine allergy'
+
+    st_99ac32b2903a4e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571906  'Allergy to piretanide'
+
+    st_baf52fc9da2035 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571191  'Allergy to naltrexone'
+
+    st_fcb2f105f1256a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571099  'Allergy to podophyllotoxin'
+
+    st_af583473553115 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571065  'Allergy to isoaminile'
+
+    st_f2059ac1e4d2e8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571896  'Allergy to chlorothiazide'
+
+    st_94e091728f605a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571004  'Oxitropium allergy'
+
+    st_57d04655541146 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571868  'Allergy to clofibrate'
+
+    st_6f954f2bb22eb6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571778  'Allergy to dalteparin'
+
+    st_09bb813305af57 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0741440  'Barbiturate allergy'
+
+    st_754d87c1325472 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5394792  'Lachesine allergy'
+
+    st_a57b4a454dd317 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571134  'Sulfinpyrazone allergy'
+
+    st_60ea7ab8fb16d3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571382  'Tobramycin allergy'
+
+    st_0a86ca2870870b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0740909  'Allergy to ethanol'
+
+    st_9654aae2839b98 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570705  'Razoxane allergy'
+
+    st_139fb962116567 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0572010  'Allergy to urokinase'
+
+    st_9b663886757966 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571899  'Hydroflumethiazide allergy'
+
+    st_9b72ce1f1c5e3c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570710  'Allergy to estrogen receptor antagonist'
+
+    st_f2af45fbde2045 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571161  'Mifepristone allergy'
+
+    st_8aa9542d67e4c3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570876  'Allergy to amfetamine and/or amfetamine derivative'
+
+    st_5ed13d625f77d4 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4758652  'Allergy to acridine derivative azo'
+
+    st_d400c2edd1eb27 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571974  'Flosequinan allergy'
+
+    st_211893cffad6e8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571328  'Allergy to chloroxylenol'
+
+    st_b20e7b6cd1d267 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570724  'Allergy to mazindol'
+
+    st_c253c04824276e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4750836  'Allergy to acetylcholine'
+
+    st_ad7b01dc55fcc8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571283  'Ganciclovir allergy'
+
+    st_af2778901d56f3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570590  'Allergy to aluminum hydroxide'
+
+    st_6ad82943e1705f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571051  'Diphenylpyraline allergy'
+
+    st_864e77f4bde0d2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570597  'Nabilone allergy'
+
+    st_d2d8cfa6016542 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571042  'Antazoline allergy'
+
+    st_41f9b7101e493d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570978  'Allergy to dopamine'
+
+    st_0dc93c29d73664 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571158  'Allergy to papaverine'
+
+    st_6c44988a6acee0 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570753  'Allergy to dothiepin'
+
+    st_3ee96d1a01df75 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571650  'Allergy to acarbose'
+
+    st_d82d39708944ba (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571380  'Neomycin allergy'
+
+    st_d9ac5c3e9a8c59 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5687062  'Allergy to ertugliflozin'
+
+    st_97cf066b3f04fe (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570642  'Allergy to local anaesthetic'
+
+    st_b17195f74ecfaf (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571640  'Allergy to glibornuride'
+
+    st_4eaee22c3253c9 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571188  'Allergy to pralidoxime'
+
+    st_ce504fcc5d9915 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571497  'Lymecycline allergy'
+
+    st_266716b5925c07 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571639  'Allergy to glyburide'
+
+    st_3f53d617d3411b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571865  'Cholestyramine allergy'
+
+    st_cdbfe14a0f136a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571675  'Allergy to bicalutamide'
+
+    st_6b907ed1bbd2a2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571900  'Allergy to methyclothiazide'
+
+    st_d414eed4216028 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570709  'Allergy to aminoglutethimide'
+
+    st_398179b8b0861f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570747  'Nortriptyline allergy'
+
+    st_9194b43db34a2a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571913  'Allergy to amiloride'
+
+    st_f17d1990320e3f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571992  'Allergy to pentaerythritol tetranitrate'
+
+    st_8f29107fc6ba44 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571833  'Allergy to niacin'
+
+    st_a7662bf49bc153 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571262  'Allergy to griseofulvin'
+
+    st_d6cf4ead93abfb (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570595  'Cisapride allergy'
+
+    st_9c263d888107e4 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570998  'Allergy to homatropine'
+
+    st_b49c9148202bbe (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571318  'Hydrargaphen allergy'
+
+    st_fd886caa56a11b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571643  'Allergy to gliquidone'
+
+    st_b084225b558056 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571760  'Antithrombin III allergy'
+
+    st_7aa8c380814949 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571165  'Prostaglandin allergy'
+
+    st_1afb180b8aa1b6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4750860  'Allergy to isosorbide'
+
+    st_845ed960ea09e3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570798  'Allergy to paraldehyde'
+
+    st_e4cfe77eb05e13 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571008  'Allergy to dornase alfa'
+
+    st_8405f08c3c0536 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570776  'Allergy to viloxazine'
+
+    st_e4e5d20d3ac7f7 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570778  'Allergy to beclamide'
+
+    st_77122a37778983 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570582  'Allergy to pirenzepine'
+
+    st_b876e896fef067 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4707989  'Allergy to cromolyn'
+
+    st_acf57c0303a839 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570702  'Cisplatin allergy'
+
+    st_b4f7b2de1301fe (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571816  'Allergy to levocarnitine'
+
+    st_78514e313e5058 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571440  'Polymyxins allergy'
+
+    st_4687894887ad03 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571184  'Mesna allergy'
+
+    st_62a67e29560e84 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571873  'Allergy to 3-hydroxy-3-methylglutaryl-coenzyme A reductase inhibitor'
+
+    st_815b86786b46ae (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570641  'Desflurane allergy'
+
+    st_98c26af14ffa05 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570838  'Tetrabenazine allergy'
+
+    st_e738842be01ac3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570630  'Etomidate allergy'
+
+    st_c736b1ecbdd66e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571234  'Allergy to glycerin'
+
+    st_c8e1f253b88d5a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0344168  'Drug-induced anaphylaxis'
+
+    st_993678b9a90fd2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570727  'Allergy to diethylpropion'
+
+    st_e68952bc60028c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570915  'Nifedipine allergy'
+
+    st_c5497a97a2e06e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570659  'Allergy to lenograstim'
+
+    st_baf120410ab99e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571641  'Allergy to gliclazide'
+
+    st_432fa900623e08 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571910  'Allergy to aldosterone receptor antagonist'
+
+    st_d6b37250253e2b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571062  'Allergy to lodoxamide'
+
+    st_4140ed97c316cd (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570621  'Propantheline allergy'
+
+    st_e9829abc243b55 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570611  'Allergy to docusate'
+
+    st_60d9eeb2b2ee2f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570952  'Allergy to beta-2 adrenergic receptor agonist'
+
+    st_7d69b8a5a79a43 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4750852  'Bamethan allergy'
+
+    st_c25b99afbb878c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571878  'Allergy to adenosine'
+
+    st_dc2937431626c6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571472  'Clindamycin allergy'
+
+    st_b2bf7f402d8781 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571123  'Retinoid allergy'
+
+    st_8fdd3780186ab2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570788  'Allergy to vigabatrin'
+
+    st_a8a22b436d5efe (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4758641  'Allergy to indanedione'
+
+    st_bdc3f8e92b9e8e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571705  'Allergy to ergoline derivative'
+
+    st_b3115507219b7d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571779  'Allergy to tinzaparin'
+
+    st_85b6a53203fd54 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571743  'Calcium regulating hormone allergy'
+
+    st_e037804c248dc9 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5394818  'Balsam of Peru allergy'
+
+    st_a6131fdcf45e33 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4076278  'Allergy to reverse transcriptase inhibitor'
+
+    st_9ef4e89fabab60 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4750919  'Propamidine allergy'
+
+    st_1143e31904093c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4076266  'Allergy to protease inhibitor'
+
+    st_7452b6050bcc90 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571646  'Tolbutamide allergy'
+
+    st_167e5a3b47a0b8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570573  'Allergy to histamine H2 receptor antagonist'
+
+    st_3561c1a51f8bfc (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570700  'Allergy to amsacrine'
+
+    st_06a2449e2575c7 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571869  'Allergy to fenofibrate'
+
+    st_005ea44692b579 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5394741  'Allergy to bromhexine'
+
+    st_460d84337b71bf (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571185  'Allergy to benzodiazepine receptor antagonist'
+
+    st_eec477247c87aa (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571270  'Allergy to fenticonazole'
+
+    st_4bc93756fab4b6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570924  'Allergy to verapamil'
+
+    st_e135e6d93d72db (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571883  'Allergy to mexiletine'
+
+    st_dbeabd0ec64026 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571531  'Allergy to monosulfiram'
+
+    st_47a3144a4852b3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571841  'Inositol allergy'
+
+    st_67450273fcf861 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571193  'Protamine allergy'
+
+    st_b36dfcc81a77e3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570537  'Allergy to non-steroidal anti-inflammatory agent'
+
+    st_fbb469da205f7b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571999  'Isoxsuprine allergy'
+
+    st_8bcac528ef90d3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571055  'Pheniramine allergy'
+
+    st_782f5ec3424026 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C2711220  'Allergy to meropenem'
+
+    st_cd09b6a7c85eac (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571136  'Allopurinol allergy'
+
+    st_fa93b01f527d85 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570636  'Enflurane allergy'
+
+    st_363d932de6d2bf (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5687061  'Allergy to dapagliflozin'
+
+    st_d5f705253795fa (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570682  'Dactinomycin allergy'
+
+    st_a1224f4c920db1 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571938  'Guanethidine allergy'
+
+    st_fe84d8fa635c46 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570734  'Apomorphine allergy'
+
+    st_feda8d7d4cf0eb (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571147  'Allergy to tubocurarine'
+
+    st_1db7c3522e16d7 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570862  'Allergy to thioxanthene'
+
+    st_aedfb066b6caaf (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570918  'Allergy to felodipine'
+
+    st_b7121860628429 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571338  'Noxythiolin allergy'
+
+    st_b2c6c39f3428ae (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570775  'Allergy to trazodone'
+
+    st_b173cc0bce0eca (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570868  'Allergy to oxypertine'
+
+    st_34ccf6f20ff64d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571320  'Allergy to hexetidine'
+
+    st_488548ad44b2c1 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571370  'Mebendazole allergy'
+
+    st_1df521fe299af6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571880  'Disopyramide allergy'
+
+    st_eaa4bb8f3b4554 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571301  'Pyrimethamine allergy'
+
+    st_0dd37203d5e485 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571269  'Allergy to clotrimazole'
+
+    st_af1928cc2912c5 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571074  'Aminophylline allergy'
+
+    st_df8886468a8021 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570598  'Allergy to domperidone'
+
+    st_5411d273a59422 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571506  'Atovaquone allergy'
+
+    st_68891eea3b5033 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571769  'Allergy to anti-inhibitor coagulant complex'
+
+    st_e9f81f3d050bd4 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570619  'Pipenzolate allergy'
+
+    st_9ee027bf75e3a7 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571344  'Allergy to chlorhexidine'
+
+    st_ea9ded8fe300df (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5394798  'Sodium sulfate allergy'
+
+    st_e2a182eb45eb37 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570965  'Allergy to dobutamine'
+
+    st_0ac86cc2892d74 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570703  'Hydroxyurea allergy'
+
+    st_8a37f276220810 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570583  'Pancreatin allergy'
+
+    st_b079b58715974c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571399  'Allergy to nalidixic acid'
+
+    st_29a9d049693e77 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571001  'Allergy to orphenadrine'
+
+    st_a97d9bde346628 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571496  'Allergy to doxycycline'
+
+    st_713387604ceb24 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571862  'Allergy to acipimox'
+
+    st_af61c460f48e30 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570990  'Tropicamide allergy'
+
+    st_791ec70b2ac5a9 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570912  'Allergy to nicotine'
+
+    st_24381720877123 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571181  'Allergy to sodium nitrite'
+
+    st_57658ae8f50170 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570834  'Allergy to sulpiride'
+
+    st_514f55e89a5169 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5921987  'Allergy to reteplase'
+
+    st_6903b33deeb7b9 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571281  'Allergy to inosine pranobex'
+
+    st_6536438722d324 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571061  'Ketotifen allergy'
+
+    st_fea62d5a795964 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571577  'Allergy to botulinum antitoxin'
+
+    st_d79973920bf2ae (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570592  'Allergy to loperamide'
+
+    st_d19809cb2194d6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571777  'Allergy to enoxaparin'
+
+    st_da575995f483c1 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570773  'Allergy to maprotiline'
+
+    st_35ceabc8d14508 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571687  'Allergy to estrogen'
+
+    st_ebfc6457cc1a20 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570714  'Vinca alkaloid allergy'
+
+    st_e81477a2b51914 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570605  'Allergy to lactulose'
+
+    st_cb5a64ba8dd47c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571735  'Protirelin allergy'
+
+    st_215510846abca5 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570663  'Allergy to alkylating agent'
+
+    st_45770320fceb5d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5397081  'Carbidopa and/or levodopa allergy'
+
+    st_2e4c306dcbdf13 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571498  'Allergy to minocycline'
+
+    st_11c02e8f801e5d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570632  'Propofol allergy'
+
+    st_dbd99dd5ceccf9 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570733  'Amantadine allergy'
+
+    st_f02459b2f433eb (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571296  'Vidarabine allergy'
+
+    st_b1b4f33b77fd7f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570686  'Allergy to aclarubicin'
+
+    st_97bb2fc8c625f4 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571791  'Tranexamic acid allergy'
+
+    st_f45ba64cd2d545 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571395  'Allergy to fusidic acid'
+
+    st_1bd5d254351dda (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571720  'Allergy to gonad regulating hormone agent'
+
+    st_bb6e0c4cc1b076 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571520  'Cycloserine allergy'
+
+    st_9b262c3d4a7017 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571259  'Tolnaftate allergy'
+
+    st_188d4cbe35f3ba (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570743  'Butriptyline allergy'
+
+    st_78cdf3144911d9 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570570  'Sucralfate allergy'
+
+    st_d63725f7b9e63f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570765  'Allergy to selective serotonin re-uptake inhibitor'
+
+    st_5f988a9b844ed7 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C3539909  'Allergic disposition'
+
+    st_640ad7d5ab2dd2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571133  'Probenecid allergy'
+
+    st_26fbb51fb9a927 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4303914  'Allergy to bile acid'
+
+    st_7c76ec06898c5b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4750903  'Allergy to valproic acid'
+
+    st_09ee0210e85d47 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570514  'Salicylate allergy'
+
+    st_d91273a3c4fe20 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571517  'Pyrazinamide allergy'
+
+    st_fb4a457c9abcfa (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570683  'Bleomycin allergy'
+
+    st_641e231034991a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571371  'Allergy to albendazole'
+
+    st_d34e5dca2c3c61 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571713  'Desmopressin allergy'
+
+    st_00888b9035825c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5687063  'Allergy to canagliflozin'
+
+    st_295a1c3cd90e5c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571905  'Allergy to ethacrynic acid'
+
+    st_cca15d370e3089 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571298  'Idoxuridine allergy'
+
+    st_20644b1c521324 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571622  'Insulin allergy'
+
+    st_02a9a8a03f3c91 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5394794  'Allergy to methenamine'
+
+    st_d368665126dd3d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570995  'Allergy to benztropine'
+
+    st_277a926b9ebcd4 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570720  'Allergy to cyclosporine'
+
+    st_935354a52e9b53 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4758658  'Allergy to rauwolfia alkaloid'
+
+    st_255fd51e995b60 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571522  'Allergy to rifabutin'
+
+    st_4b04e2311c6d8e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571006  'Allergy to procyclidine'
+
+    st_aa258a3fb2dffa (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570569  'Allergy to tripotassium dicitratobismuthate'
+
+    st_8d4bb97bd13bef (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571297  'Allergy to aciclovir'
+
+    st_ca5ca9eb5207bd (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4708163  'Allergy to benzodiazepine'
+
+    st_299f6d2f0ce0de (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571196  'Allergy to bentonite'
+
+    st_ff95d09c5672be (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570848  'Allergy to phenothiazine'
+
+    st_ef4e0cf0ba4a92 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5923088  'Allergy to cetuximab due to alpha-gal syndrome'
+
+    st_7c07508a34bd27 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570787  'Allergy to carbamazepine'
+
+    st_0395b17a490d83 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570610  'Allergy to senna'
+
+    st_90ec1f356250a0 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571012  'Allergy to carbocisteine'
+
+    st_b9193ddce92c1a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571933  'Allergy to acetazolamide'
+
+    st_c618213233bac1 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570660  'Allergy to filgrastim'
+
+    st_29504cdccffffc (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4708098  'Vitamin B12 and/or vitamin B12 derivative allergy'
+
+    st_83a85b77826fa7 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571474  'Mandelic acid allergy'
+
+    st_c0220690f54251 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5394788  'Polystyrene sulfonate allergy'
+
+    st_add051976ac56b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571140  'Allergy to succinylcholine'
+
+    st_8211d707acfbee (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570746  'Lofepramine allergy'
+
+    st_4c425b0ee29e24 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571288  'Interferons allergy'
+
+    st_5c00abf3fd8cd8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570836  'Allergy to clozapine'
+
+    st_151449a20815c4 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571844  'Ascorbic acid allergy'
+
+    st_d29dffd1d1a751 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571040  'Allergy to dimenhydrinate'
+
+    st_6fa37c81e6318c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570916  'Prenylamine allergy'
+
+    st_2c852573e0b120 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570698  'Allergy to fluorouracil'
+
+    st_25ced128e158b9 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571967  'Ergot alkaloid allergy'
+
+    st_b203357608998f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570881  'Allergy to beta adrenergic receptor antagonist'
+
+    st_4e1e9d31755437 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571364  'Piperazine allergy'
+
+    st_0adaf2c03dff97 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571889  'Bretylium allergy'
+
+    st_b3dbc0abb2585e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570873  'Allergy to pemoline'
+
+    st_23c92b6c5cf729 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571793  'Aprotinin allergy'
+
+    st_37323a8bc07e78 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571887  'Tocainide allergy'
+
+    st_91e3867c25d3e4 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571891  'Amiodarone allergy'
+
+    st_f702191d498f5a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570688  'Doxorubicin allergy'
+
+    st_0e0324c6c21122 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5394838  'Aldehyde dehydrogenase inhibitor allergy'
+
+    st_e64d41e812e73d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571321  'Allergy to sodium perborate'
+
+    st_573d4a60d6f0b6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571152  'Allergy to methocarbamol'
+
+    st_549eaf94aa135b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571924  'Mersalyl allergy'
+
+    st_3a3ca1a6ab0d2e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570603  'Allergy to danthron'
+
+    st_f7d1d08cee9f2c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571732  'Octreotide allergy'
+
+    st_2385d0278d89c8 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571360  'Allergy to gentian violet'
+
+    st_8963ea5777a0cd (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570696  'Allergy to pentostatin'
+
+    st_ce355f8ef58d3e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571885  'Allergy to procainamide'
+
+    st_379424c2d37793 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570578  'Allergy to H+/K+-exchanging ATPase inhibitor'
+
+    st_b609b2cd9efdbd (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571549  'Allergy to Varicella-zoster virus antibody'
+
+    st_e44ee0c30fdbaf (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570624  'Dehydrocholic acid allergy'
+
+    st_a4b6d7cb57414d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571256  'Flucytosine allergy'
+
+    st_d3b5750bad2ba2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571023  'Colfosceril allergy'
+
+    st_d3ca3da5cb0912 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5817138  'Allergic reaction caused by antiinfective agent'
+
+    st_28024c1833f114 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571638  'Chlorpropamide allergy'
+
+    st_24b7c2cfb2f8f5 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570779  'Lamotrigine allergy'
+
+    st_92e54a596f1d8d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571199  'Allergy to deferoxamine'
+
+    st_4b669b80b15620 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570991  'Allergy to scopolamine'
+
+    st_a0eeac402b70ba (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571648  'Metformin allergy'
+
+    st_b7ebf42013a3ce (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4749576  'Allergy to coagulation protein'
+
+    st_ea682ceb71104e (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570839  'Allergy to butyrophenone derivative'
+
+    st_1a51fd4c4587dd (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5240002  'Meclizine allergy'
+
+    st_2c3d6f4f3cb210 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5395979  'Aminoquinoline allergy'
+
+    st_85f6dd8f3545d2 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571287  'Valaciclovir allergy'
+
+    st_31fb68546218a5 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4758664  'Allergy to triphenylmethane triisocyanate'
+
+    st_4975cc2b23fb2f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571031  'Loratadine allergy'
+
+    st_5e29d58cce7336 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0741856  'Allergy to caffeine'
+
+    st_4ae61f61346a3f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570749  'Amoxapine allergy'
+
+    st_c02c091600abc6 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571330  'Allergy to triclosan'
+
+    st_8149fb7f5cda9c (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570513  'Acetaminophen allergy'
+
+    st_2ce897109368f7 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0030824  'Penicillin allergy'
+
+    st_3abdc7bddebc43 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570631  'Ketamine allergy'
+
+    st_63e67c05bfcb8d (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C5395046  'Fluoroquinolone allergy'
+
+    st_12053862cc7628 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570750  'Amitriptyline allergy'
+
+    st_94e51e589acbe9 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571355  'Allergy to quaternary quinolinium surfactant'
+
+    st_2d20e330ad4b92 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571394  'Nitrofurazone allergy'
+
+    st_adcb2e71e8f3c3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570986  'Biperiden allergy'
+
+    st_e65db3900cf263 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C4750905  'Allergy to dibromopropamidine'
+
+    st_d726e244636b78 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571020  'Allergy to beractant'
+
+    st_0af632756e6991 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571076  'Theophylline allergy'
+
+    st_db21e7eccca9bb (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570617  'Allergy to dicyclomine'
+
+    st_830940619040eb (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570745  'Iprindole allergy'
+
+    st_e73dba639a5685 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0572009  'Streptokinase allergy'
+
+    st_4638e975fcd92f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570926  'Pilocarpine allergy'
+
+    st_852b3363285767 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571884  'Allergy to moricizine'
+
+    st_22504eca1dc12b (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570874  'Allergy to methylphenidate'
+
+    st_b8ddfb82780774 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570581  'Carbenoxolone allergy'
+
+    st_301d52088f4e1f (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571978  'Dipyridamole allergy'
+
+    st_c673a36d8acb51 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571046  'Allergy to chlorpheniramine'
+
+    st_5f33e9760cf777 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571153  'Allergy to dantrolene'
+
+    st_8803af0deeecea (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571789  'Allergy to etamsylate'
+
+    st_b5323c0f53ed0a (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570958  'Allergy to metaproterenol'
+
+    st_82cab43dc26ec5 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571354  'Allergy to cetylpyridinium'
+
+    st_fc8ea1703acf37 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571372  'Thiabendazole allergy'
+
+    st_5dbdd84388d1a3 (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0570917  'Isradipine allergy'
+
+    st_242827c30336fa (size 2):
+      C0013182  'Allergy to drug' <-- self
+      C0571141  'Allergy to nondepolarising agent'
+
+================================================================================
+  C0011849  'Diabetes mellitus'
+================================================================================
+  STY              : ['Disease or Syndrome']
+  Main topic size  : 41
+  Main topic members:
+    C0001792  'Advanced age'
+    C0011849  'Diabetes mellitus' <-- self
+    C0011854  'Diabetes mellitus type 1'
+    C0011859  'Lipodystrophic diabetes'
+    C0011860  'Type II diabetes mellitus'
+    C0011871  'Peripheral angiopathy due to diabetes mellitus'
+    C0011878  'Diabetic diet'
+    C0011880  'Diabetic ketoacidosis'
+    C0011881  'Diabetic nephropathy'
+    C0011882  'Diabetic neuropathy'
+    C0014130  'Endocrine system disease'
+    C0014136  'Endocrine structure'
+    C0020456  'Hyperglycaemia'
+    C0085207  'Gestational diabetes'
+    C0206172  'Diabetic foot'
+    C0265344  'Donohue's syndrome'
+    C0271640  'Secondary diabetes mellitus'
+    C0271641  'Malnutrition related diabetes mellitus'
+    C0271650  'Impaired glucose tolerance (disorder)'
+    C0341893  'Diabetes mellitus in mother complicating pregnancy, childbirth AND/OR puerperium'
+    C0342245  'Disorder of eye due to diabetes mellitus'
+    C0342257  'Disorder associated with diabetes mellitus'
+    C0342276  'Maturity-onset diabetes of the young'
+    C0342302  'Brittle diabetes mellitus (disorder)'
+    C0362046  'Prediabetes (finding)'
+    C0392201  'Glucose measurement, blood'
+    C0474680  'Haemoglobin A1c measurement'
+    C0524620  'Metabolic syndrome X'
+    C0694452  'Endocrine / nutritional / metabolic disorder'
+    C1257958  'Disorder of glucose metabolism'
+    C1263962  'Houssay syndrome'
+    C1320655  'Newly diagnosed diabetes'
+    C1859965  'Alaninuria, microcephaly, dwarfism, enamel hypoplasia, diabetes mellitus syndrome'
+    C2874124  'Diabetes mellitus due to genetic defect in insulin action'
+    C2874125  'Diabetes mellitus due to genetic defect in beta cell function'
+    C2931296  'Pancreatic hypoplasia, diabetes mellitus, congenital heart disease syndrome'
+    C3837958  'Ketosis-prone diabetes mellitus'
+    C3839440  'Diabetes mellitus in remission'
+    C3875503  'Diabetes mellitus due to pancreatic injury'
+    C4274674  'Gingival disease co-occurrent with diabetes mellitus'
+    C4302120  'Atypical diabetes mellitus'
+
+  Sub-topics: 37
+
+    st_1e90dd281e95af (size 4):
+      C0011849  'Diabetes mellitus' <-- self
+      C0014130  'Endocrine system disease'
+      C0020456  'Hyperglycaemia'
+      C0271650  'Impaired glucose tolerance (disorder)'
+
+    st_214e5b05f24db2 (size 4):
+      C0011849  'Diabetes mellitus' <-- self
+      C0020456  'Hyperglycaemia'
+      C0271650  'Impaired glucose tolerance (disorder)'
+      C1257958  'Disorder of glucose metabolism'
+
+    st_9bdf5f7fd8da2a (size 4):
+      C0011849  'Diabetes mellitus' <-- self
+      C0011881  'Diabetic nephropathy'
+      C0014136  'Endocrine structure'
+      C0342257  'Disorder associated with diabetes mellitus'
+
+    st_4347449a129f48 (size 4):
+      C0011849  'Diabetes mellitus' <-- self
+      C0014136  'Endocrine structure'
+      C0342245  'Disorder of eye due to diabetes mellitus'
+      C0342257  'Disorder associated with diabetes mellitus'
+
+    st_4d7bfd94c651c4 (size 4):
+      C0011849  'Diabetes mellitus' <-- self
+      C0014130  'Endocrine system disease'
+      C0014136  'Endocrine structure'
+      C0020456  'Hyperglycaemia'
+
+    st_5f05944f6350b1 (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0014136  'Endocrine structure'
+      C0392201  'Glucose measurement, blood'
+
+    st_0aa76c429b281f (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0011854  'Diabetes mellitus type 1'
+      C0014136  'Endocrine structure'
+
+    st_c09c3f728cf1f1 (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0342276  'Maturity-onset diabetes of the young'
+      C2874125  'Diabetes mellitus due to genetic defect in beta cell function'
+
+    st_635e8565322606 (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0011878  'Diabetic diet'
+      C0014136  'Endocrine structure'
+
+    st_360dce4962e733 (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0011880  'Diabetic ketoacidosis'
+      C0342257  'Disorder associated with diabetes mellitus'
+
+    st_0f0e08213ec6c7 (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0011882  'Diabetic neuropathy'
+      C0342257  'Disorder associated with diabetes mellitus'
+
+    st_a1a3f341a96396 (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0011882  'Diabetic neuropathy'
+      C0206172  'Diabetic foot'
+
+    st_cc6db661ccae30 (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0271640  'Secondary diabetes mellitus'
+      C0271641  'Malnutrition related diabetes mellitus'
+
+    st_4e34b4c362fb1a (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0265344  'Donohue's syndrome'
+      C2874124  'Diabetes mellitus due to genetic defect in insulin action'
+
+    st_a4aa86a2703567 (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0014136  'Endocrine structure'
+      C0206172  'Diabetic foot'
+
+    st_c930a01ec78400 (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0011860  'Type II diabetes mellitus'
+      C0014136  'Endocrine structure'
+
+    st_19d200dd13ba1a (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0011859  'Lipodystrophic diabetes'
+      C0011860  'Type II diabetes mellitus'
+
+    st_a3fdb274af0cab (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0014136  'Endocrine structure'
+      C0362046  'Prediabetes (finding)'
+
+    st_526a969f132f7f (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0362046  'Prediabetes (finding)'
+      C1257958  'Disorder of glucose metabolism'
+
+    st_2fa9fa92db1b7d (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0011859  'Lipodystrophic diabetes'
+      C2874124  'Diabetes mellitus due to genetic defect in insulin action'
+
+    st_ca821e73f52f58 (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0085207  'Gestational diabetes'
+      C0341893  'Diabetes mellitus in mother complicating pregnancy, childbirth AND/OR puerperium'
+
+    st_efd3e9261195e1 (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0014136  'Endocrine structure'
+      C0524620  'Metabolic syndrome X'
+
+    st_b622bb702e74e9 (size 3):
+      C0011849  'Diabetes mellitus' <-- self
+      C0014136  'Endocrine structure'
+      C0085207  'Gestational diabetes'
+
+    st_d7d37ec3d09647 (size 2):
+      C0011849  'Diabetes mellitus' <-- self
+      C1859965  'Alaninuria, microcephaly, dwarfism, enamel hypoplasia, diabetes mellitus syndrome'
+
+    st_10b2b6e58d7e75 (size 2):
+      C0011849  'Diabetes mellitus' <-- self
+      C4274674  'Gingival disease co-occurrent with diabetes mellitus'
+
+    st_6ae527e70b22dd (size 2):
+      C0011849  'Diabetes mellitus' <-- self
+      C0011871  'Peripheral angiopathy due to diabetes mellitus'
+
+    st_59e94f1c9c913c (size 2):
+      C0011849  'Diabetes mellitus' <-- self
+      C3875503  'Diabetes mellitus due to pancreatic injury'
+
+    st_1a637c38f7289e (size 2):
+      C0011849  'Diabetes mellitus' <-- self
+      C0342302  'Brittle diabetes mellitus (disorder)'
+
+    st_34749ffce4260f (size 2):
+      C0011849  'Diabetes mellitus' <-- self
+      C3837958  'Ketosis-prone diabetes mellitus'
+
+    st_d5d65d69661946 (size 2):
+      C0001792  'Advanced age'
+      C0011849  'Diabetes mellitus' <-- self
+
+    st_4f58a98cec1bc1 (size 2):
+      C0011849  'Diabetes mellitus' <-- self
+      C2931296  'Pancreatic hypoplasia, diabetes mellitus, congenital heart disease syndrome'
+
+    st_a3b81ab9781f01 (size 2):
+      C0011849  'Diabetes mellitus' <-- self
+      C0474680  'Haemoglobin A1c measurement'
+
+    st_cc59e2c2579498 (size 2):
+      C0011849  'Diabetes mellitus' <-- self
+      C4302120  'Atypical diabetes mellitus'
+
+    st_2e1b9c15136013 (size 2):
+      C0011849  'Diabetes mellitus' <-- self
+      C0694452  'Endocrine / nutritional / metabolic disorder'
+
+    st_39a1f68685de65 (size 2):
+      C0011849  'Diabetes mellitus' <-- self
+      C1320655  'Newly diagnosed diabetes'
+
+    st_2cda35979ee89b (size 2):
+      C0011849  'Diabetes mellitus' <-- self
+      C3839440  'Diabetes mellitus in remission'
+
+    st_1ed774cc156f4c (size 2):
+      C0011849  'Diabetes mellitus' <-- self
+      C1263962  'Houssay syndrome'
+
+================================================================================
+  C0002792  'Anaphylaxis'
+================================================================================
+  STY              : ['Pathologic Function']
+  Main topic size  : 26
+  Main topic members:
+    C0002792  'Anaphylaxis' <-- self
+    C0020517  'Hypersensitivity reaction (disorder)'
+    C0020523  'IgE-mediated allergic disorder'
+    C0020962  'Structure of immune system'
+    C0161840  'Anaphylactic transfusion reaction'
+    C0274305  'Localized anaphylaxis'
+    C0344159  'Anaphylaxis caused by venom'
+    C0344168  'Drug-induced anaphylaxis'
+    C0344172  'Seminal fluid-induced anaphylaxis'
+    C0344183  'Exercise-induced anaphylaxis'
+    C0413234  'Acute allergic reaction'
+    C0413235  'Idiopathic anaphylaxis'
+    C0442893  'Systemic illness'
+    C0685898  'Food anaphylaxis'
+    C4316895  'Shock due to anaphylaxis'
+    C4543745  'Anaphylaxis due to mast cell disorder'
+    C4546212  'Anaphylaxis caused by low temperature'
+    C5192386  'Anaphylaxis after allergen immunotherapy'
+    C5397548  'Anaphylaxis caused by insect bite and/or insect sting'
+    C5438739  'Anaphylaxis caused by Hevea brasiliensis latex protein'
+    C5549840  'Anaphylaxis caused by component of vaccine product'
+    C5687621  'Anaphylaxis caused by allergy skin test'
+    C5788565  'Postoperative anaphylaxis'
+    C5817050  'Anaphylaxis caused by radiographic contrast media'
+    C5817051  'Anaphylaxis caused by sulfonamide'
+    C5817053  'Anaphylaxis caused by food additive'
+
+  Sub-topics: 23
+
+    st_10454e36b534e9 (size 3):
+      C0002792  'Anaphylaxis' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0020523  'IgE-mediated allergic disorder'
+
+    st_1f52c458a0fea6 (size 3):
+      C0002792  'Anaphylaxis' <-- self
+      C0685898  'Food anaphylaxis'
+      C4316895  'Shock due to anaphylaxis'
+
+    st_fd53433c94fa06 (size 3):
+      C0002792  'Anaphylaxis' <-- self
+      C0020517  'Hypersensitivity reaction (disorder)'
+      C0020962  'Structure of immune system'
+
+    st_d40ffe30db5051 (size 3):
+      C0002792  'Anaphylaxis' <-- self
+      C0344168  'Drug-induced anaphylaxis'
+      C4316895  'Shock due to anaphylaxis'
+
+    st_ab6c470be6ada4 (size 3):
+      C0002792  'Anaphylaxis' <-- self
+      C0344183  'Exercise-induced anaphylaxis'
+      C4316895  'Shock due to anaphylaxis'
+
+    st_c92b467733838a (size 3):
+      C0002792  'Anaphylaxis' <-- self
+      C0413235  'Idiopathic anaphylaxis'
+      C4316895  'Shock due to anaphylaxis'
+
+    st_0170430e4decfd (size 3):
+      C0002792  'Anaphylaxis' <-- self
+      C0344159  'Anaphylaxis caused by venom'
+      C4316895  'Shock due to anaphylaxis'
+
+    st_c682147f3f0788 (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C4546212  'Anaphylaxis caused by low temperature'
+
+    st_b5ba5fce294e07 (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C0344172  'Seminal fluid-induced anaphylaxis'
+
+    st_11846f8bcb66be (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C0413234  'Acute allergic reaction'
+
+    st_93a6ca503ec051 (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C5817051  'Anaphylaxis caused by sulfonamide'
+
+    st_982965f7a8d92b (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C5817050  'Anaphylaxis caused by radiographic contrast media'
+
+    st_09d9af2c5efa88 (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C4543745  'Anaphylaxis due to mast cell disorder'
+
+    st_99cc5a46ac7fcc (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C5817053  'Anaphylaxis caused by food additive'
+
+    st_d266ed5b57770b (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C5788565  'Postoperative anaphylaxis'
+
+    st_f43b4a9ddd64ea (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C0442893  'Systemic illness'
+
+    st_edfc338137eb14 (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C0161840  'Anaphylactic transfusion reaction'
+
+    st_aa5c8af3a586f5 (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C5549840  'Anaphylaxis caused by component of vaccine product'
+
+    st_f21b0979209d1c (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C0274305  'Localized anaphylaxis'
+
+    st_1ba5b5556c52a8 (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C5438739  'Anaphylaxis caused by Hevea brasiliensis latex protein'
+
+    st_003b7c40ea3d0e (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C5687621  'Anaphylaxis caused by allergy skin test'
+
+    st_2077000ef427a6 (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C5397548  'Anaphylaxis caused by insect bite and/or insect sting'
+
+    st_e2e3bdeb63d6d6 (size 2):
+      C0002792  'Anaphylaxis' <-- self
+      C5192386  'Anaphylaxis after allergen immunotherapy'
+
+================================================================================
+  C2142181  'Pain of left knee joint (finding)'
+================================================================================
+  STY              : ['Sign or Symptom']
+  Main topic size  : 6
+  Main topic members:
+    C0231749  'Pain of knee region'
+    C2051306  'Patellofemoral syndrome of left knee'
+    C2142181  'Pain of left knee joint (finding)' <-- self
+    C2220048  'Pain of bilateral knee joints'
+    C4509797  'Chronic pain following left total knee arthroplasty'
+    C5442019  'Pain of left knee'
+
+  Sub-topics: 4
+
+    st_fdeef2e1130a13 (size 3):
+      C0231749  'Pain of knee region'
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C5442019  'Pain of left knee'
+
+    st_91655c7a808231 (size 2):
+      C2051306  'Patellofemoral syndrome of left knee'
+      C2142181  'Pain of left knee joint (finding)' <-- self
+
+    st_55de55c3cb6e29 (size 2):
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C2220048  'Pain of bilateral knee joints'
+
+    st_ad553a447ff300 (size 2):
+      C2142181  'Pain of left knee joint (finding)' <-- self
+      C4509797  'Chronic pain following left total knee arthroplasty'
 
 
-# Load
-with open(PICKLE_PATH, "rb") as f:
-    p = pickle.load(f)
-
-topic_to_cuis              = p["topic_to_cuis"]
-main_topic_to_subtopic_ids = p["main_topic_to_subtopic_ids"]
-subtopic_id_to_cuis        = p["subtopic_id_to_cuis"]
-subtopic_metadata          = p["subtopic_metadata"]
-labels                     = p.get("labels", {})
-tags                       = p.get("tags", {})
-
-
-def lbl(c):
-    return labels.get(c, "?")
-
-
-for cui in CUIS:
-    print(f"\n{'='*80}")
-    print(f"  {cui}  '{lbl(cui)}'")
-    print(f"{'='*80}")
-
-    sty = sorted(tags.get(cui, frozenset()))
-    print(f"  STY              : {sty}")
-
-    main_members = topic_to_cuis.get(cui, set())
-    print(f"  Main topic size  : {len(main_members)}")
-    print(f"  Main topic members:")
-    for m in sorted(main_members):
-        marker = " <-- self" if m == cui else ""
-        print(f"    {m}  '{lbl(m)}'{marker}")
-
-    own = list(dict.fromkeys(main_topic_to_subtopic_ids.get(cui, [])))
-    print(f"\n  Sub-topics: {len(own)}")
-    own_sorted = sorted(own, key=lambda s: -subtopic_metadata[s]["size"])
-    for sid in own_sorted:
-        meta = subtopic_metadata[sid]
-        members = subtopic_id_to_cuis[sid]
-        print(f"\n    {sid} (size {meta['size']}):")
-        for m in sorted(members):
-            marker = " <-- self" if m == cui else ""
-            print(f"      {m}  '{lbl(m)}'{marker}")
-
-print("\n\nDONE")
+DONE
