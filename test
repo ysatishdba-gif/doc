@@ -1,357 +1,180 @@
-Loading topic_lookup_final.pkl ...
-  Main topics: 374,538
-  Unique sub-topics (size>=3): 34,917
-  Ratio: 0.09 sub-topics per main topic
-
-
-================================================================================
-  C0032285  'Pneumonia (disorder)'
-================================================================================
-  Main topic size  : 42
-  In total 14 sub-topics (across all main topics)
-
-  SUB-TOPICS within this main topic (14):
-
-    st_247d83b6701ece  size=3  appears_in_main_topics=3
-      C0032285  'Pneumonia (disorder)' <-- self
-      C0032310  'Viral pneumonia'
-      C0276253  'Cytomegaloviral pneumonia'
-
-    st_011c53c15689ff  size=3  appears_in_main_topics=3
-      C0032285  'Pneumonia (disorder)' <-- self
-      C0032310  'Viral pneumonia'
-      C0155870  'Pneumonia and influenza'
-
-    st_24618dd4036963  size=3  appears_in_main_topics=3
-      C0032285  'Pneumonia (disorder)' <-- self
-      C0032310  'Viral pneumonia'
-      C0152413  'Pneumonia caused by respiratory syncytial vir'
-
-    st_5a9eb227a11b2a  size=3  appears_in_main_topics=3
-      C0032285  'Pneumonia (disorder)' <-- self
-      C0876973  'Pulmonary infection'
-      C0949083  'Nosocomial pneumonia (disorder)'
-
-    st_e5bce8498006fc  size=3  appears_in_main_topics=3
-      C0032285  'Pneumonia (disorder)' <-- self
-      C0276688  'Pulmonary cryptococcosis'
-      C0876973  'Pulmonary infection'
-
-    st_3fc95adc8b70eb  size=3  appears_in_main_topics=3
-      C0024115  'Disorder of lung'
-      C0032285  'Pneumonia (disorder)' <-- self
-      C3714636  'Pneumonitis'
-
-    st_5c82e510b45507  size=3  appears_in_main_topics=3
-      C0006285  'Lobular pneumonia'
-      C0032285  'Pneumonia (disorder)' <-- self
-      C0155870  'Pneumonia and influenza'
-
-    st_6c5403baad6fb5  size=3  appears_in_main_topics=3
-      C0032285  'Pneumonia (disorder)' <-- self
-      C0339969  'Pneumonia due to parasitic infestation'
-      C3495445  'Toxoplasma pneumonia'
-
-    ... +6 more sub-topics
-
-
-================================================================================
-  C0021368  'Inflammation'
-================================================================================
-  Main topic size  : 9
-  In total 0 sub-topics (across all main topics)
-
-  SUB-TOPICS within this main topic (0):
-    (no sub-topics — main topic is too small or graph is star-shaped)
-
-
-================================================================================
-  C0024109  'Lung'
-================================================================================
-  Main topic size  : 16
-  In total 2 sub-topics (across all main topics)
-
-  SUB-TOPICS within this main topic (2):
-
-    st_7711c852f399c0  size=3  appears_in_main_topics=3
-      C0024109  'Lung' <-- self
-      C0034051  'Pulmonary alveolar structure (body structure)'
-      C0225698  'Pneumocyte (cell)'
-
-    st_f31044fd844a10  size=3  appears_in_main_topics=3
-      C0006255  'Bronchus'
-      C0024109  'Lung' <-- self
-      C0229962  'Body part structure (body structure)'
-
-
-================================================================================
-  C0011849  'Diabetes mellitus'
-================================================================================
-  Main topic size  : 41
-  In total 23 sub-topics (across all main topics)
-
-  SUB-TOPICS within this main topic (23):
-
-    st_9bdf5f7fd8da2a  size=4  appears_in_main_topics=4
-      C0011849  'Diabetes mellitus' <-- self
-      C0011881  'Diabetic nephropathy'
-      C0014136  'Endocrine structure'
-      C0342257  'Disorder associated with diabetes mellitus'
-
-    st_4347449a129f48  size=4  appears_in_main_topics=4
-      C0011849  'Diabetes mellitus' <-- self
-      C0014136  'Endocrine structure'
-      C0342245  'Disorder of eye due to diabetes mellitus'
-      C0342257  'Disorder associated with diabetes mellitus'
-
-    st_1e90dd281e95af  size=4  appears_in_main_topics=4
-      C0011849  'Diabetes mellitus' <-- self
-      C0014130  'Endocrine system disease'
-      C0020456  'Hyperglycaemia'
-      C0271650  'Impaired glucose tolerance (disorder)'
-
-    st_4d7bfd94c651c4  size=4  appears_in_main_topics=4
-      C0011849  'Diabetes mellitus' <-- self
-      C0014130  'Endocrine system disease'
-      C0014136  'Endocrine structure'
-      C0020456  'Hyperglycaemia'
-
-    st_214e5b05f24db2  size=4  appears_in_main_topics=4
-      C0011849  'Diabetes mellitus' <-- self
-      C0020456  'Hyperglycaemia'
-      C0271650  'Impaired glucose tolerance (disorder)'
-      C1257958  'Disorder of glucose metabolism'
-
-    st_19d200dd13ba1a  size=3  appears_in_main_topics=3
-      C0011849  'Diabetes mellitus' <-- self
-      C0011859  'Lipodystrophic diabetes'
-      C0011860  'Type II diabetes mellitus'
-
-    st_2fa9fa92db1b7d  size=3  appears_in_main_topics=3
-      C0011849  'Diabetes mellitus' <-- self
-      C0011859  'Lipodystrophic diabetes'
-      C2874124  'Diabetes mellitus due to genetic defect in in'
-
-    st_0f0e08213ec6c7  size=3  appears_in_main_topics=3
-      C0011849  'Diabetes mellitus' <-- self
-      C0011882  'Diabetic neuropathy'
-      C0342257  'Disorder associated with diabetes mellitus'
-
-    ... +15 more sub-topics
-
-
-================================================================================
-  C1527304  'Allergic reaction'
-================================================================================
-  Main topic size  : 31
-  In total 3 sub-topics (across all main topics)
-
-  SUB-TOPICS within this main topic (3):
-
-    st_1d4410a293f695  size=3  appears_in_main_topics=3
-      C0020517  'Hypersensitivity reaction (disorder)'
-      C1527304  'Allergic reaction' <-- self
-      C4082933  'Animal allergy'
-
-    st_f5ffa371fe9ad5  size=3  appears_in_main_topics=3
-      C0016470  'Food allergy'
-      C0020517  'Hypersensitivity reaction (disorder)'
-      C1527304  'Allergic reaction' <-- self
-
-    st_231361dc77a525  size=3  appears_in_main_topics=3
-      C0013182  'Allergy to drug'
-      C0020517  'Hypersensitivity reaction (disorder)'
-      C1527304  'Allergic reaction' <-- self
-
-
-================================================================================
-  C0559470  'Allergy to peanut'
-================================================================================
-  Main topic size  : 2
-  In total 0 sub-topics (across all main topics)
-
-  SUB-TOPICS within this main topic (0):
-    (no sub-topics — main topic is too small or graph is star-shaped)
-
-
-================================================================================
-  C0002792  'Anaphylaxis'
-================================================================================
-  Main topic size  : 26
-  In total 7 sub-topics (across all main topics)
-
-  SUB-TOPICS within this main topic (7):
-
-    st_fd53433c94fa06  size=3  appears_in_main_topics=3
-      C0002792  'Anaphylaxis' <-- self
-      C0020517  'Hypersensitivity reaction (disorder)'
-      C0020962  'Structure of immune system'
-
-    st_10454e36b534e9  size=3  appears_in_main_topics=3
-      C0002792  'Anaphylaxis' <-- self
-      C0020517  'Hypersensitivity reaction (disorder)'
-      C0020523  'IgE-mediated allergic disorder'
-
-    st_0170430e4decfd  size=3  appears_in_main_topics=3
-      C0002792  'Anaphylaxis' <-- self
-      C0344159  'Anaphylaxis caused by venom'
-      C4316895  'Shock due to anaphylaxis'
-
-    st_d40ffe30db5051  size=3  appears_in_main_topics=3
-      C0002792  'Anaphylaxis' <-- self
-      C0344168  'Drug-induced anaphylaxis'
-      C4316895  'Shock due to anaphylaxis'
-
-    st_ab6c470be6ada4  size=3  appears_in_main_topics=3
-      C0002792  'Anaphylaxis' <-- self
-      C0344183  'Exercise-induced anaphylaxis'
-      C4316895  'Shock due to anaphylaxis'
-
-    st_c92b467733838a  size=3  appears_in_main_topics=3
-      C0002792  'Anaphylaxis' <-- self
-      C0413235  'Idiopathic anaphylaxis'
-      C4316895  'Shock due to anaphylaxis'
-
-    st_1f52c458a0fea6  size=3  appears_in_main_topics=3
-      C0002792  'Anaphylaxis' <-- self
-      C0685898  'Food anaphylaxis'
-      C4316895  'Shock due to anaphylaxis'
-
-
-================================================================================
-  C0013182  'Allergy to drug'
-================================================================================
-  Main topic size  : 567
-  In total 3 sub-topics (across all main topics)
-
-  SUB-TOPICS within this main topic (3):
-
-    st_0e4a3b68d10635  size=3  appears_in_main_topics=3
-      C0013182  'Allergy to drug' <-- self
-      C0237865  'Propensity to adverse reactions to drug'
-      C0277585  'Drug intolerance'
-
-    st_1ef27b35fae029  size=3  appears_in_main_topics=3
-      C0011609  'Drug eruption'
-      C0013182  'Allergy to drug' <-- self
-      C0041755  'Adverse drug reaction'
-
-    st_231361dc77a525  size=3  appears_in_main_topics=3
-      C0013182  'Allergy to drug' <-- self
-      C0020517  'Hypersensitivity reaction (disorder)'
-      C1527304  'Allergic reaction'
-
-
-================================================================================
-  C2142181  'Pain of left knee joint (finding)'
-================================================================================
-  Main topic size  : 6
-  In total 1 sub-topics (across all main topics)
-
-  SUB-TOPICS within this main topic (1):
-
-    st_fdeef2e1130a13  size=3  appears_in_main_topics=3
-      C0231749  'Pain of knee region'
-      C2142181  'Pain of left knee joint (finding)' <-- self
-      C5442019  'Pain of left knee'
-
-
-================================================================================
-  C1621958  'Glioblastoma multiforme'
-================================================================================
-  Main topic size  : 13
-  In total 3 sub-topics (across all main topics)
-
-  SUB-TOPICS within this main topic (3):
-
-    st_889d5a7a4e174f  size=3  appears_in_main_topics=3
-      C0349543  'Glioblastoma multiforme of brain'
-      C1621958  'Glioblastoma multiforme' <-- self
-      C4076507  'Glioblastoma multiforme of central nervous sy'
-
-    st_0f0e6b6e1a1c4a  size=3  appears_in_main_topics=3
-      C0334579  'Astrocytoma, anaplastic'
-      C1621958  'Glioblastoma multiforme' <-- self
-      C4722099  'High-grade glioma'
-
-    st_3539b1d6ebfe48  size=3  appears_in_main_topics=3
-      C0017638  'Glioma'
-      C0206726  'Gliosarcoma (morphologic abnormality)'
-      C1621958  'Glioblastoma multiforme' <-- self
-
-
-================================================================================
-  C0016470  'Food allergy'
-================================================================================
-  Main topic size  : 38
-  In total 5 sub-topics (across all main topics)
-
-  SUB-TOPICS within this main topic (5):
-
-    st_d32615e50ca637  size=3  appears_in_main_topics=3
-      C0016470  'Food allergy' <-- self
-      C0020517  'Hypersensitivity reaction (disorder)'
-      C0020962  'Structure of immune system'
-
-    st_9173ce0623e6cd  size=3  appears_in_main_topics=3
-      C0016470  'Food allergy' <-- self
-      C0020517  'Hypersensitivity reaction (disorder)'
-      C0020523  'IgE-mediated allergic disorder'
-
-    st_f5ffa371fe9ad5  size=3  appears_in_main_topics=3
-      C0016470  'Food allergy' <-- self
-      C0020517  'Hypersensitivity reaction (disorder)'
-      C1527304  'Allergic reaction'
-
-    st_b76b5249e60e3c  size=3  appears_in_main_topics=3
-      C0016470  'Food allergy' <-- self
-      C0149696  'Food intolerance'
-      C1630648  'Food sensitivity'
-
-    st_94f1c8b99d457e  size=3  appears_in_main_topics=3
-      C0016470  'Food allergy' <-- self
-      C0577625  'Allergy to shellfish'
-      C0685900  'Seafood allergy'
-
-
-################################################################################
-# REVERSE LOOKUP DEMO
-################################################################################
-
-  st_2cdac8d9979857 (size 5, appears in 5 main topics):
-    C0003286  'Anticonvulsant'
-    C0004745  'Barbiturate'
-    C0031412  'Phenobarbital-containing product'
-    C0282303  'Phenobarbital sodium'
-    C0360117  'Barbiturate antiepileptic'
-
-  st_8d361ef5673621 (size 5, appears in 5 main topics):
-    C1268567  'Protein-tyrosine kinase inhibitor-containing '
-    C2713008  'Neratinib'
-    C4519542  'Neratinib maleate'
-    C4759996  'Substance with human epidermal growth factor '
-    C5574906  'Epidermal growth factor receptor antagonist'
-
-  st_43b8fef4705d14 (size 5, appears in 5 main topics):
-    C0003811  'Cardiac arrhythmia'
-    C0039231  'Tachycardia (finding)'
-    C0039236  'Paroxysmal tachycardia'
-    C0039240  'Supraventricular tachycardia'
-    C0080203  'Tachyarrhythmia'
-
-  st_db5681f75e3b89 (size 5, appears in 5 main topics):
-    C0036400  'Scimitar syndrome'
-    C0158632  'Anomalies of great veins'
-    C0158634  'Partial anomalous pulmonary venous connection'
-    C0265914  'Pulmonary vein abnormality'
-    C0265916  'Anomalous pulmonary venous drainage'
-
-  st_2115ef5ef821ad (size 5, appears in 5 main topics):
-    C1268567  'Protein-tyrosine kinase inhibitor-containing '
-    C1504917  'Lapatinib ditosylate'
-    C1506770  'Lapatinib (substance)'
-    C4759996  'Substance with human epidermal growth factor '
-    C5574906  'Epidermal growth factor receptor antagonist'
-
-
-DONE
+"""
+spot_check_cuis.py
+------------------
+Stratified spot-check across clinical domains and semantic types.
+
+This is the same lookup as test_final.py, but with a broader CUI list
+covering many different clinical areas. Useful for validating that
+sub-topic quality holds across the universe, not just on the few
+CUIs we've been using.
+
+Paste in a notebook. Loads topic_lookup_final.pkl.
+"""
+
+import pickle
+
+PICKLE_PATH = "topic_lookup_final.pkl"
+
+# Stratified across semantic types + clinical domains
+CUIS_TO_TEST = [
+    # ---- CARDIOLOGY ----
+    ("C0027051", "Myocardial infarction"),
+    ("C0020538", "Hypertensive disease"),
+    ("C0018802", "Congestive heart failure"),
+    ("C0004238", "Atrial fibrillation"),
+    ("C0010068", "Coronary heart disease"),
+    ("C0042373", "Vascular disease"),
+
+    # ---- INFECTIONS ----
+    ("C0021400", "Influenza"),
+    ("C0036690", "Septicemia"),
+    ("C0042029", "Urinary tract infection"),
+    ("C0009450", "Communicable disease"),
+    ("C0036572", "Seizure"),  # neurologic, included to mix it up
+
+    # ---- ONCOLOGY ----
+    ("C0006142", "Malignant neoplasm of breast"),
+    ("C0007131", "Non-small cell lung cancer"),
+    ("C0024623", "Malignant neoplasm of stomach"),
+    ("C0007621", "Neoplastic cell"),
+    ("C0007112", "Malignant tumor of prostate"),
+    ("C0023893", "Liver cirrhosis"),
+
+    # ---- NEUROLOGY ----
+    ("C0038454", "Cerebrovascular accident (stroke)"),
+    ("C0002395", "Alzheimer's disease"),
+    ("C0026769", "Multiple sclerosis"),
+    ("C0030567", "Parkinson disease"),
+    ("C0014544", "Epilepsy"),
+    ("C0149931", "Migraine"),
+
+    # ---- GASTROENTEROLOGY ----
+    ("C0010346", "Crohn disease"),
+    ("C0009324", "Ulcerative colitis"),
+    ("C0011991", "Diarrhea"),
+    ("C0011860", "Type 2 diabetes mellitus"),  # endocrine cross-check
+    ("C0020443", "Hypercholesterolemia"),
+
+    # ---- MUSCULOSKELETAL ----
+    ("C0003864", "Arthritis"),
+    ("C0029408", "Degenerative polyarthritis"),
+    ("C0003873", "Rheumatoid arthritis"),
+    ("C0024031", "Low back pain"),
+    ("C0029443", "Osteoporosis"),
+
+    # ---- PEDIATRIC / OBSTETRIC ----
+    ("C0007222", "Cardiovascular disease"),
+    ("C0009806", "Constipation"),
+    ("C0042961", "Vomiting"),
+    ("C0032797", "Postpartum disorder"),
+    ("C0085207", "Gestational diabetes"),
+
+    # ---- ANATOMY ----
+    ("C0018787", "Heart"),
+    ("C0023884", "Liver"),
+    ("C0022646", "Kidney"),
+    ("C0006104", "Brain"),
+    ("C0006141", "Breast structure"),
+
+    # ---- PROCEDURES ----
+    ("C0021107", "Operative surgical procedures"),
+    ("C0028778", "Obstruction (procedure)"),
+    ("C0034102", "Pulmonary lobectomy"),
+    ("C0010055", "Coronary artery bypass surgery"),
+    ("C0009378", "Colonoscopy"),
+
+    # ---- LAB / DIAGNOSTIC ----
+    ("C0202223", "Complete blood count"),
+    ("C0202117", "Standard chemistry panel"),
+    ("C0392201", "Glucose measurement, blood"),
+    ("C0474680", "Haemoglobin A1c measurement"),
+
+    # ---- DRUGS ----
+    ("C0004057", "Aspirin"),
+    ("C0021641", "Insulin"),
+    ("C0025859", "Metformin"),
+    ("C0006675", "Caffeine"),
+
+    # ---- SYMPTOMS / FINDINGS ----
+    ("C0030193", "Pain"),
+    ("C0015967", "Fever"),
+    ("C0008031", "Chest pain"),
+    ("C0013404", "Dyspnea"),
+    ("C0027497", "Nausea"),
+]
+
+
+print(f"Loading {PICKLE_PATH} ...")
+with open(PICKLE_PATH, "rb") as f:
+    p = pickle.load(f)
+
+topic_to_cuis              = p["topic_to_cuis"]
+main_topic_to_subtopic_ids = p["main_topic_to_subtopic_ids"]
+subtopic_id_to_cuis        = p["subtopic_id_to_cuis"]
+subtopic_id_to_main_topics = p["subtopic_id_to_main_topics"]
+cui_to_subtopic_ids        = p["cui_to_subtopic_ids"]
+subtopic_metadata          = p["subtopic_metadata"]
+labels                     = p.get("labels", {})
+
+
+def lbl(c):
+    return labels.get(c, "?")[:45] if labels else "?"
+
+
+# Aggregate summary first
+print(f"\n{'='*100}")
+print(f"  SUMMARY TABLE")
+print(f"{'='*100}")
+print(f"  {'CUI':<12s}  {'Expected label':<35s}  {'Real label':<35s}  {'Main':>5s}  {'Subs':>5s}")
+
+for cui, expected in CUIS_TO_TEST:
+    actual = lbl(cui)
+    main_sz = len(topic_to_cuis.get(cui, set()))
+    sub_count = len(dict.fromkeys(main_topic_to_subtopic_ids.get(cui, [])))
+    in_universe = "?" if cui not in topic_to_cuis else ""
+    print(f"  {cui:<12s}  {expected[:35]:<35s}  {actual[:35]:<35s}  "
+          f"{main_sz:>5d}  {sub_count:>5d}  {in_universe}")
+
+
+# Now detailed for each
+for cui, expected in CUIS_TO_TEST:
+    print(f"\n\n{'='*80}")
+    print(f"  {cui}  expected: '{expected}'  actual: '{lbl(cui)}'")
+    print(f"{'='*80}")
+
+    main_members = topic_to_cuis.get(cui, set())
+    print(f"  Main topic size: {len(main_members)}")
+
+    if not main_members:
+        print(f"  ⚠️ NOT IN SNOMED UNIVERSE")
+        continue
+
+    # Show first 8 main topic members
+    print(f"  Main topic members (first 8):")
+    for m in sorted(main_members)[:8]:
+        marker = " <-- self" if m == cui else ""
+        print(f"    {m}  '{lbl(m)}'{marker}")
+    if len(main_members) > 8:
+        print(f"    ... +{len(main_members)-8} more")
+
+    # Sub-topics
+    own = list(dict.fromkeys(main_topic_to_subtopic_ids.get(cui, [])))
+    print(f"\n  Sub-topics (size-3+ cliques) within this main topic: {len(own)}")
+    if not own:
+        print(f"    (none — graph is star-shaped or topic too small)")
+        continue
+
+    own_sorted = sorted(own, key=lambda s: -subtopic_metadata[s]["size"])
+    # Show up to 5 sub-topics, largest first
+    for sid in own_sorted[:5]:
+        meta = subtopic_metadata[sid]
+        members = subtopic_id_to_cuis[sid]
+        print(f"\n    {sid} (size {meta['size']}):")
+        for m in sorted(members):
+            marker = " <-- self" if m == cui else ""
+            print(f"      {m}  '{lbl(m)}'{marker}")
+    if len(own_sorted) > 5:
+        print(f"\n    ... +{len(own_sorted)-5} more sub-topics")
+
+
+print("\n\nDONE")
