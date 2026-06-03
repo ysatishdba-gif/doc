@@ -40,6 +40,7 @@ from collections import defaultdict, Counter
 
 OUTPUT_PATH       = "rollup_index.pkl"
 RELATIONS_TO_USE  = {"PAR", "CHD", "RB", "RN"}  # hierarchical only, NO RO
+MIN_CHILDREN      = 3                            # rollup must group >= N concepts
 
 
 # ============================================================================
@@ -191,36 +192,56 @@ def all_paths_to_root(cui, isa_parents, max_paths=200, max_depth=30):
     return paths
 
 
-def find_rollup_ancestor(path, ic):
+def find_rollup_ancestor(path, ic, isa_children, min_children):
     """Given a path [cui, parent, grandparent, ..., root], find the rollup
-    ancestor using the first-IC-acceleration rule.
+    ancestor using two combined rules:
+      1. First IC-acceleration along the path (clinically meaningful level)
+      2. Ancestor must have >= min_children direct children (real grouping)
+
+    If IC stop point doesn't meet the children constraint, walk up further
+    until it does.
 
     Returns the CUI in the path where we stop.
     """
     if len(path) == 1:
-        # CUI is a root or has no parents at all
         return path[0]
     if len(path) == 2:
-        # Just CUI and parent — rollup to parent
+        # Just CUI and one parent — return parent regardless of children count
         return path[1]
 
     ics = [ic.get(node, 0.0) for node in path]
     deltas = [ics[i] - ics[i+1] for i in range(len(ics) - 1)]
 
-    # Walk deltas; find first delta that exceeds the previous delta
-    # (rate of IC drop accelerates)
+    # Step 1: find first IC-acceleration
+    ic_stop_idx = None
     for i in range(1, len(deltas)):
         if deltas[i] > deltas[i-1]:
-            return path[i]  # ancestor just before the accelerated drop
+            ic_stop_idx = i
+            break
 
-    # No acceleration found — IC drops uniformly all the way to root
-    # Fall back to one step beyond immediate parent (= path[2])
-    return path[min(2, len(path) - 1)]
+    if ic_stop_idx is None:
+        # IC drops smoothly — fall back to one step beyond immediate parent
+        ic_stop_idx = min(2, len(path) - 1)
+
+    # Step 2: enforce min_children constraint by walking up from IC stop point
+    candidate_idx = ic_stop_idx
+    while candidate_idx < len(path) - 1:
+        candidate = path[candidate_idx]
+        n_kids = len(isa_children.get(candidate, set()))
+        if n_kids >= min_children:
+            return candidate
+        candidate_idx += 1
+
+    # Reached root without satisfying constraint — return the last node anyway
+    return path[-1]
 
 
-def build_rollups(snomed_cuis, isa_parents, ic):
-    """For each CUI, find rollup ancestors via path-wise stop rule."""
+def build_rollups(snomed_cuis, isa_parents, isa_children, ic, min_children):
+    """For each CUI, find rollup ancestors via path-wise stop rule with
+    sibling-count constraint.
+    """
     print("  Computing rollup ancestors for all CUIs...")
+    print(f"    IC-acceleration + min_children={min_children}")
     t0 = time.time()
 
     cui_to_rollup_ancestors = {}
@@ -230,10 +251,10 @@ def build_rollups(snomed_cuis, isa_parents, ic):
 
     for i, cui in enumerate(snomed_cuis):
         if i % 50000 == 0 and i > 0:
-            print(f"    Processed {i:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
+            print(f"    Processed {i:,}/{len(snomed_cuis):,} "
+                  f"({time.time()-t0:.0f}s)")
 
         if cui not in isa_parents:
-            # No IS-A parent — orphan; roll up to self
             cui_to_rollup_ancestors[cui] = frozenset({cui})
             paths_count[cui] = 0
             n_orphan += 1
@@ -244,7 +265,9 @@ def build_rollups(snomed_cuis, isa_parents, ic):
 
         rollup_ancestors = set()
         for path in paths:
-            rollup_ancestors.add(find_rollup_ancestor(path, ic))
+            rollup_ancestors.add(
+                find_rollup_ancestor(path, ic, isa_children, min_children)
+            )
 
         cui_to_rollup_ancestors[cui] = frozenset(rollup_ancestors)
         n_with_rollup += 1
@@ -330,7 +353,7 @@ def main():
 
     print(f"\n[4] Walk paths and find rollup ancestors")
     cui_to_rollup_ancestors, paths_count = build_rollups(
-        SNOMED_CUIS, isa_parents, ic
+        SNOMED_CUIS, isa_parents, isa_children, ic, MIN_CHILDREN
     )
 
     print(f"\n[5] Build reverse index")
@@ -348,7 +371,9 @@ def main():
         "config": {
             "relations_used":  sorted(RELATIONS_TO_USE),
             "ic_formula":      "Seco structural: 1 - log(descendants+1)/log(total)",
-            "stop_rule":       "first IC delta acceleration along path",
+            "stop_rule":       "first IC delta acceleration along path, "
+                               f"with min_children={MIN_CHILDREN} constraint",
+            "min_children":    MIN_CHILDREN,
             "snomed_universe_size": len(SNOMED_CUIS),
         },
         "built_at": datetime.datetime.now().isoformat(),
