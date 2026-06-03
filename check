@@ -1,144 +1,500 @@
-"""
-analyze_rela_distribution.py
-----------------------------
-Aggregate analysis of MRREL RO relations to decide if they're useful for rollup.
+Loading umls_cache.pkl ...
+Loading SNOMED universe from topic_lookup.pkl ...
+  MRREL rows         : 2,748,222
+  SNOMED CUIs        : 374,538
+  Labels             : 374,538
 
-Outputs:
-  1. Overall REL distribution (PAR, CHD, RB, RN, RO, SY, etc.)
-  2. For RO specifically: RELA distribution (has_causative_agent, finding_site, etc.)
-  3. For top RELAs: sample edges to judge clinical value
-  4. SNOMED-only filtered counts (both endpoints in our 374K universe)
-"""
+================================================================================
+  STEP 1: Overall REL distribution
+================================================================================
 
-import pickle
-from collections import Counter, defaultdict
+  REL              ALL rows         SNOMED-only
+  ----------       --------------   --------------
+  RO                    1,508,568        1,508,568
+  CHD                     615,978          615,978
+  PAR                     615,942          615,942
+  RN                        2,748            2,748
+  RB                        2,748            2,748
+  SY                        2,238            2,238
 
+================================================================================
+  STEP 2: RELA distribution WITHIN RO (cross-axis relations)
+================================================================================
 
-CACHE_PATH        = "umls_cache.pkl"
-TOPIC_LOOKUP_PATH = "topic_lookup.pkl"
+  RO has 212 distinct RELA values
+  Top 20 by SNOMED-only count:
 
-SAMPLES_PER_RELA  = 5     # show this many example edges per top RELA
-TOP_N_RELAS       = 20    # analyze top N most common RELA values in RO
+  RELA                                      ALL          SNOMED-only
+  --------------------------------------    ----------   --------------
+  finding_site_of                            106,424          106,424
+  has_finding_site                           106,423          106,423
+  has_associated_morphology                   79,784           79,784
+  associated_morphology_of                    78,747           78,747
+  has_method                                  68,889           68,889
+  method_of                                   68,889           68,889
+  mapped_from                                 46,130           46,130
+  mapped_to                                   46,130           46,130
+  interprets                                  39,547           39,547
+  is_interpreted_by                           39,547           39,547
+  direct_procedure_site_of                    38,934           38,934
+  has_direct_procedure_site                   38,934           38,934
+  has_pathological_process                    28,107           28,107
+  pathological_process_of                     28,107           28,107
+  has_laterality                              25,414           25,414
+  laterality_of                               25,414           25,414
+  has_occurrence                              22,576           22,576
+  occurs_in                                   22,576           22,576
+  has_interpretation                          19,078           19,078
+  interpretation_of                           19,078           19,078
 
+================================================================================
+  STEP 3: Sample edges per top RELA (for clinical judgment)
+================================================================================
 
-# ============================================================================
-# Load
-# ============================================================================
+  RELA: 'finding_site_of'  (106,424 SNOMED-only edges)
+    C1333139 'Complex endometrial hyperplasia without atypia'
+      --[finding_site_of]-->
+    C0014180 'Endometrium'
 
-print(f"Loading {CACHE_PATH} ...")
-with open(CACHE_PATH, "rb") as f:
-    cache = pickle.load(f)
-mrrel = cache["mrrel_rows"]
-labels = cache.get("labels", {})
+    C1333321 'Gastrinoma of duodenum'
+      --[finding_site_of]-->
+    C0013303 'Duodenal structure'
 
-# Load SNOMED universe from topic_lookup.pkl
-print(f"Loading SNOMED universe from {TOPIC_LOOKUP_PATH} ...")
-with open(TOPIC_LOOKUP_PATH, "rb") as f:
-    t = pickle.load(f)
-snomed_cuis = t.get("snomed_cuis", set())
-if not labels:
-    labels = t.get("labels", {})
+    C1333467 'Squamous cell papilloma of oesophagus'
+      --[finding_site_of]-->
+    C0014876 'Oesophagus'
 
-print(f"  MRREL rows         : {len(mrrel):,}")
-print(f"  SNOMED CUIs        : {len(snomed_cuis):,}")
-print(f"  Labels             : {len(labels):,}")
+    C1333636 'Foveolar hyperplasia'
+      --[finding_site_of]-->
+    C0227203 'Structure of gastric foveola'
 
-
-def lbl(c):
-    return labels.get(c, "?")[:50]
-
-
-# ============================================================================
-# 1. Overall REL distribution
-# ============================================================================
-
-print(f"\n{'='*80}")
-print(f"  STEP 1: Overall REL distribution")
-print(f"{'='*80}")
-
-rel_total       = Counter()         # all rows
-rel_snomed_only = Counter()         # rows where both endpoints are SNOMED
-
-for row in mrrel:
-    cui1, cui2, rel, rela = row[0], row[1], row[2], row[3]
-    rel_total[rel] += 1
-    if cui1 in snomed_cuis and cui2 in snomed_cuis:
-        rel_snomed_only[rel] += 1
-
-print(f"\n  REL              ALL rows         SNOMED-only")
-print(f"  ----------       --------------   --------------")
-for rel in sorted(rel_total, key=lambda r: -rel_total[r]):
-    t_all = rel_total[rel]
-    t_sno = rel_snomed_only[rel]
-    print(f"  {rel:<10s}       {t_all:>14,d}   {t_sno:>14,d}")
-
-
-# ============================================================================
-# 2. RELA distribution within RO
-# ============================================================================
-
-print(f"\n{'='*80}")
-print(f"  STEP 2: RELA distribution WITHIN RO (cross-axis relations)")
-print(f"{'='*80}")
-
-ro_rela_total       = Counter()
-ro_rela_snomed_only = Counter()
-ro_rela_samples     = defaultdict(list)   # RELA -> sample edges
-
-for row in mrrel:
-    cui1, cui2, rel, rela = row[0], row[1], row[2], row[3]
-    if rel != "RO":
-        continue
-    ro_rela_total[rela] += 1
-    if cui1 in snomed_cuis and cui2 in snomed_cuis:
-        ro_rela_snomed_only[rela] += 1
-        # Collect first few samples per RELA
-        if len(ro_rela_samples[rela]) < SAMPLES_PER_RELA:
-            ro_rela_samples[rela].append((cui1, cui2))
-
-print(f"\n  RO has {len(ro_rela_total)} distinct RELA values")
-print(f"  Top {TOP_N_RELAS} by SNOMED-only count:\n")
-print(f"  RELA                                      ALL          SNOMED-only")
-print(f"  --------------------------------------    ----------   --------------")
-
-top_relas = sorted(ro_rela_snomed_only,
-                   key=lambda r: -ro_rela_snomed_only[r])[:TOP_N_RELAS]
-
-for rela in top_relas:
-    t_all = ro_rela_total[rela]
-    t_sno = ro_rela_snomed_only[rela]
-    rela_str = (rela or "(none)")[:38]
-    print(f"  {rela_str:<38s}  {t_all:>10,d}   {t_sno:>14,d}")
+    C1333803 'Digestive system observation'
+      --[finding_site_of]-->
+    C0012240 'Digestive system'
 
 
-# ============================================================================
-# 3. Sample edges per top RELA — for clinical judgment
-# ============================================================================
+  RELA: 'has_finding_site'  (106,423 SNOMED-only edges)
+    C0205827 'Sacral plexus structure (body structure)'
+      --[has_finding_site]-->
+    C0434219 'Closed injury sacral plexus'
 
-print(f"\n{'='*80}")
-print(f"  STEP 3: Sample edges per top RELA (for clinical judgment)")
-print(f"{'='*80}")
+    C0206187 'Extrahepatic bile duct'
+      --[has_finding_site]-->
+    C0238019 'Carcinoma of extrahepatic bile duct (disorder)'
 
-for rela in top_relas:
-    samples = ro_rela_samples[rela]
-    rela_str = rela or "(none)"
-    n_sno = ro_rela_snomed_only[rela]
-    print(f"\n  RELA: '{rela_str}'  ({n_sno:,} SNOMED-only edges)")
-    for cui1, cui2 in samples:
-        print(f"    {cui1} '{lbl(cui1)}'")
-        print(f"      --[{rela_str}]-->")
-        print(f"    {cui2} '{lbl(cui2)}'")
-        print()
+    C0206187 'Extrahepatic bile duct'
+      --[has_finding_site]-->
+    C0686113 'Neoplasm of uncertain behavior of extrahepatic bil'
+
+    C0206187 'Extrahepatic bile duct'
+      --[has_finding_site]-->
+    C2959486 'Primary malignant neoplasm of perihilar bile duct'
+
+    C0206187 'Extrahepatic bile duct'
+      --[has_finding_site]-->
+    C2960367 'Primary malignant neoplasm of extrahepatic bile du'
 
 
-# ============================================================================
-# 4. Summary: which RELAs look hierarchical/useful?
-# ============================================================================
+  RELA: 'has_associated_morphology'  (79,784 SNOMED-only edges)
+    C1334014 'High grade glandular intraepithelial neoplasia'
+      --[has_associated_morphology]-->
+    C5395092 'High grade flat intraepithelial neoplasia of ampul'
 
-print(f"\n{'='*80}")
-print(f"  STEP 4: Quick classification hints (manual judgment needed)")
-print(f"{'='*80}")
-print(f"""
+    C1334014 'High grade glandular intraepithelial neoplasia'
+      --[has_associated_morphology]-->
+    C5686078 'High grade glandular intraepithelial neoplasia of '
+
+    C1334715 'Metastatic well-differentiated neuroendocrine tumo'
+      --[has_associated_morphology]-->
+    C5967915 'Metastatic well-differentiated neuroendocrine tumo'
+
+    C1334715 'Metastatic well-differentiated neuroendocrine tumo'
+      --[has_associated_morphology]-->
+    C5968443 'Metastatic well-differentiated neuroendocrine neop'
+
+    C1337012 'Well-differentiated papillary mesothelioma'
+      --[has_associated_morphology]-->
+    C5230651 'Well-differentiated papillary mesothelioma of pleu'
+
+
+  RELA: 'associated_morphology_of'  (78,747 SNOMED-only edges)
+    C1332917 'Carcinosarcoma of cervix uteri'
+      --[associated_morphology_of]-->
+    C0007140 'Carcinosarcoma'
+
+    C1332930 'Aggressive fibromatosis of chest wall'
+      --[associated_morphology_of]-->
+    C0079218 'Aggressive fibromatosis'
+
+    C1333149 'Pedunculated conjunctival papilloma'
+      --[associated_morphology_of]-->
+    C5548501 'Benign papilloma'
+
+    C1333176 'Lymphangioma of skin'
+      --[associated_morphology_of]-->
+    C0024221 'Congenital lymphangioma (disorder)'
+
+    C1333260 'Primary ameloblastic carcinoma'
+      --[associated_morphology_of]-->
+    C1314678 'Ameloblastic carcinoma (morphologic abnormality)'
+
+
+  RELA: 'has_method'  (68,889 SNOMED-only edges)
+    C0030247 'Palpation - action (qualifier value)'
+      --[has_method]-->
+    C0030249 'Palpation of liver'
+
+    C0030247 'Palpation - action (qualifier value)'
+      --[has_method]-->
+    C5688561 'Palpation of urinary bladder'
+
+    C1322279 'Dilation - action (qualifier value)'
+      --[has_method]-->
+    C0012358 'Dilation and curettage of uterus (procedure)'
+
+    C1322279 'Dilation - action (qualifier value)'
+      --[has_method]-->
+    C0189093 'Dilation of nasopharynx'
+
+    C1322279 'Dilation - action (qualifier value)'
+      --[has_method]-->
+    C0189463 'Dilation of bronchus'
+
+
+  RELA: 'method_of'  (68,889 SNOMED-only edges)
+    C0206054 'Transoesophageal echocardiography'
+      --[method_of]-->
+    C0041618 'Ultrasonography'
+
+    C0220931 'Functional training (procedure)'
+      --[method_of]-->
+    C1292797 'Training - action'
+
+    C0812489 'Open arteriovenous anastomosis by transposition of'
+      --[method_of]-->
+    C0677554 'Anastomosis - action (qualifier value)'
+
+    C0812509 'Laparoscopic pyeloplasty'
+      --[method_of]-->
+    C0199219 'Inspection'
+
+    C0844312 'Repair of oval window'
+      --[method_of]-->
+    C0374711 'Surgical repair'
+
+
+  RELA: 'mapped_from'  (46,130 SNOMED-only edges)
+    C1332911 'Cervical adenoid cystic carcinoma'
+      --[mapped_from]-->
+    C0007847 'Malignant tumour of cervix'
+
+    C1333071 'Chordoma of clivus'
+      --[mapped_from]-->
+    C0346653 'Malignant neoplasm of bones of skull and face'
+
+    C1333139 'Complex endometrial hyperplasia without atypia'
+      --[mapped_from]-->
+    C2712711 'Benign endometrial hyperplasia (disorder)'
+
+    C1333159 'Corneal intraepithelial neoplasia'
+      --[mapped_from]-->
+    C0154094 'Carcinoma in situ of eye'
+
+    C1333294 'ALK-positive large B-cell lymphoma'
+      --[mapped_from]-->
+    C0079744 'Diffuse large B cell lymphoma'
+
+
+  RELA: 'mapped_to'  (46,130 SNOMED-only edges)
+    C1333768 'Gastrointestinal stromal tumor of stomach (disorde'
+      --[mapped_to]-->
+    C5547338 'Gastrointestinal stromal neoplasm of cardia of sto'
+
+    C1335996 'Gastrointestinal stromal tumor of small intestine'
+      --[mapped_to]-->
+    C5547337 'Gastrointestinal stromal neoplasm of jejunum'
+
+    C1384514 'Conn's syndrome'
+      --[mapped_to]-->
+    C0342451 'Primary hyperaldosteronism due to hyperplasia'
+
+    C1384514 'Conn's syndrome'
+      --[mapped_to]-->
+    C4274967 'Primary unilateral adrenal hyperplasia'
+
+    C1384514 'Conn's syndrome'
+      --[mapped_to]-->
+    C5230308 'Primary hyperaldosteronism, seizures, neurological'
+
+
+  RELA: 'interprets'  (39,547 SNOMED-only edges)
+    C0205949 'Sexual orientation'
+      --[interprets]-->
+    C0237209 'Sexual orientation confusion'
+
+    C0205949 'Sexual orientation'
+      --[interprets]-->
+    C0242658 'Male homosexuality'
+
+    C0205949 'Sexual orientation'
+      --[interprets]-->
+    C0424397 'Concern about sexual orientation'
+
+    C0206161 'Reticulocyte count'
+      --[interprets]-->
+    C0421280 'Reticulocytosis after B12'
+
+    C0206161 'Reticulocyte count'
+      --[interprets]-->
+    C0858867 'Reticulocytopenia'
+
+
+  RELA: 'is_interpreted_by'  (39,547 SNOMED-only edges)
+    C0205564 'Clinical stage I'
+      --[is_interpreted_by]-->
+    C1286325 'Lesion observable'
+
+    C0205578 'Clinical stage III'
+      --[is_interpreted_by]-->
+    C1286325 'Lesion observable'
+
+    C0205599 'Clark melanoma level 2'
+      --[is_interpreted_by]-->
+    C1286325 'Lesion observable'
+
+    C0205604 'Breslow measurement - depth less than 0.76 mm'
+      --[is_interpreted_by]-->
+    C0430445 'Histopathology test'
+
+    C0205606 'Breslow measurement - depth greater than 1.75 mm'
+      --[is_interpreted_by]-->
+    C1286325 'Lesion observable'
+
+
+  RELA: 'direct_procedure_site_of'  (38,934 SNOMED-only edges)
+    C0812489 'Open arteriovenous anastomosis by transposition of'
+      --[direct_procedure_site_of]-->
+    C0226801 'Structure of basilic vein'
+
+    C0844312 'Repair of oval window'
+      --[direct_procedure_site_of]-->
+    C0029922 'Vestibular window structure (body structure)'
+
+    C0845202 'Open reduction of dislocation of carpometacarpal j'
+      --[direct_procedure_site_of]-->
+    C0224620 'Carpometacarpal joint structure'
+
+    C0845310 'Closed reduction of fracture of clavicle with inte'
+      --[direct_procedure_site_of]-->
+    C0008913 'Clavicle'
+
+    C0845315 'Open reduction of fracture of scapula with interna'
+      --[direct_procedure_site_of]-->
+    C0036277 'Bone structure of scapula'
+
+
+  RELA: 'has_direct_procedure_site'  (38,934 SNOMED-only edges)
+    C0205814 'Superior laryngeal nerve'
+      --[has_direct_procedure_site]-->
+    C0196612 'Division of superior laryngeal nerve'
+
+    C0206207 'Articular capsule'
+      --[has_direct_procedure_site]-->
+    C0185390 'Joint capsuloplasty'
+
+    C0206207 'Articular capsule'
+      --[has_direct_procedure_site]-->
+    C0185391 'Joint capsulodesis'
+
+    C0206207 'Articular capsule'
+      --[has_direct_procedure_site]-->
+    C0185467 'Transposition of joint capsule'
+
+    C0206248 'Pelvic diaphragm'
+      --[has_direct_procedure_site]-->
+    C4284271 'Repair of perineal hernia using surgical suture (p'
+
+
+  RELA: 'has_pathological_process'  (28,107 SNOMED-only edges)
+    C1534674 'Primary malignant neoplastic proliferation'
+      --[has_pathological_process]-->
+    C0345950 'Primary bronchial cancer'
+
+    C1534674 'Primary malignant neoplastic proliferation'
+      --[has_pathological_process]-->
+    C0346642 'Primary malignant neoplasm of common bile duct (di'
+
+    C1534674 'Primary malignant neoplastic proliferation'
+      --[has_pathological_process]-->
+    C0346659 'Primary malignant neoplasm of occipital bone'
+
+    C1534674 'Primary malignant neoplastic proliferation'
+      --[has_pathological_process]-->
+    C0346738 'Primary malignant neoplasm of skin of neck (disord'
+
+    C1534674 'Primary malignant neoplastic proliferation'
+      --[has_pathological_process]-->
+    C0346764 'Primary malignant neoplasm of skin of ankle'
+
+
+  RELA: 'pathological_process_of'  (28,107 SNOMED-only edges)
+    C1333260 'Primary ameloblastic carcinoma'
+      --[pathological_process_of]-->
+    C1534674 'Primary malignant neoplastic proliferation'
+
+    C1333482 'Exaggerated placental site (disorder)'
+      --[pathological_process_of]-->
+    C0586102 'Pathological developmental process'
+
+    C1364022 'Systemic lupus erythematosus-related syndrome'
+      --[pathological_process_of]-->
+    C0443146 'Autoimmune reaction (finding)'
+
+    C1384583 'Del Castillo syndrome'
+      --[pathological_process_of]-->
+    C0586102 'Pathological developmental process'
+
+    C0206138 'CREST syndrome'
+      --[pathological_process_of]-->
+    C0443146 'Autoimmune reaction (finding)'
+
+
+  RELA: 'has_laterality'  (25,414 SNOMED-only edges)
+    C0205090 'Right side'
+      --[has_laterality]-->
+    C0225460 'Right frontal sinus'
+
+    C0205090 'Right side'
+      --[has_laterality]-->
+    C0225469 'Right ethmoid sinus structure'
+
+    C0205090 'Right side'
+      --[has_laterality]-->
+    C0225608 'Right main bronchus structure'
+
+    C0205090 'Right side'
+      --[has_laterality]-->
+    C0225620 'Right middle lobe bronchial lumen'
+
+    C0205090 'Right side'
+      --[has_laterality]-->
+    C0225623 'Entire apical segmental bronchus of right lower lo'
+
+
+  RELA: 'laterality_of'  (25,414 SNOMED-only edges)
+    C0205814 'Superior laryngeal nerve'
+      --[laterality_of]-->
+    C0441987 'Side'
+
+    C0205826 'Lumbar plexus structure (body structure)'
+      --[laterality_of]-->
+    C0441987 'Side'
+
+    C0205956 'Ventral spinal nerve root'
+      --[laterality_of]-->
+    C0441987 'Side'
+
+    C0206257 'Superior cervical ganglion'
+      --[laterality_of]-->
+    C0441987 'Side'
+
+    C0815870 'Structure of left popliteal fossa'
+      --[laterality_of]-->
+    C0205091 'Levo-'
+
+
+  RELA: 'has_occurrence'  (22,576 SNOMED-only edges)
+    C1333482 'Exaggerated placental site (disorder)'
+      --[has_occurrence]-->
+    C5566148 'Maternal pregnancy period'
+
+    C0205710 'Gray matter degeneration'
+      --[has_occurrence]-->
+    C0231335 'Childhood - period'
+
+    C0220659 'Acrodysostosis (disorder)'
+      --[has_occurrence]-->
+    C1744681 'Congenital'
+
+    C0220663 'BPES - blepharophimosis epicanthus inversus ptosis'
+      --[has_occurrence]-->
+    C1744681 'Congenital'
+
+    C0220663 'BPES - blepharophimosis epicanthus inversus ptosis'
+      --[has_occurrence]-->
+    C1744681 'Congenital'
+
+
+  RELA: 'occurs_in'  (22,576 SNOMED-only edges)
+    C0700597 'Adulthood - period'
+      --[occurs_in]-->
+    C0221056 'Adult onset dermatomyositis'
+
+    C0700597 'Adulthood - period'
+      --[occurs_in]-->
+    C0236859 'Physical abuse of adult'
+
+    C0700597 'Adulthood - period'
+      --[occurs_in]-->
+    C0236860 'Sexual abuse of adult'
+
+    C0700597 'Adulthood - period'
+      --[occurs_in]-->
+    C0267990 'Adult-onset obesity'
+
+    C0700597 'Adulthood - period'
+      --[occurs_in]-->
+    C0268413 'Hypophosphatasia, adult type'
+
+
+  RELA: 'has_interpretation'  (19,078 SNOMED-only edges)
+    C0220938 'White colour'
+      --[has_interpretation]-->
+    C1411610 'Phlegmasia alba dolens in pregnancy'
+
+    C0221099 'Impaired (qualifier value)'
+      --[has_interpretation]-->
+    C0002624 'Retrograde amnesia (finding)'
+
+    C0221099 'Impaired (qualifier value)'
+      --[has_interpretation]-->
+    C0003504 'Aortic valve insufficiency'
+
+    C0221099 'Impaired (qualifier value)'
+      --[has_interpretation]-->
+    C0016667 'Fragile X syndrome'
+
+    C0221099 'Impaired (qualifier value)'
+      --[has_interpretation]-->
+    C0033074 'Presbycusis (disorder)'
+
+
+  RELA: 'interpretation_of'  (19,078 SNOMED-only edges)
+    C1334171 'Ineffective hematopoiesis'
+      --[interpretation_of]-->
+    C0205161 'Abnormal (qualifier value)'
+
+    C1367053 'Blue baby'
+      --[interpretation_of]-->
+    C1260957 'Blue colour'
+
+    C0205858 'Progressive general paresis'
+      --[interpretation_of]-->
+    C0221099 'Impaired (qualifier value)'
+
+    C0220662 'Distal arthrogryposis type 1'
+      --[interpretation_of]-->
+    C0205216 'Decreased by'
+
+    C0220686 'Aase Smith type 1 syndrome'
+      --[interpretation_of]-->
+    C0205216 'Decreased by'
+
+
+================================================================================
+  STEP 4: Quick classification hints (manual judgment needed)
+================================================================================
+
   Look at the RELA names above. Common categories you'll see:
 
   HIERARCHY-LIKE (similar to PAR/CHD, likely useful for rollup):
@@ -163,6 +519,5 @@ print(f"""
 
   After running this, identify which RELAs (if any) actually behave
   hierarchically in your data and could supplement IS-A.
-""")
 
-print("DONE")
+DONE
