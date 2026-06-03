@@ -1,34 +1,118 @@
-DEFAULTS — routing for a clinical document-search system:
+"""
+inspect_rollup.py
+-----------------
+Inspect the rollup pickle. Verify what each CUI's topic set looks like.
 
-This system retrieves from patient charts and clinical references. The gate's
-job is to recognize whether the query targets retrievable CLINICAL CONTENT.
+The rollup set for each CUI = {self} U deduped(IS-A ancestors).
+Every CUI is always findable as itself; ancestors are extra.
 
-- A query targets clinical content when it names or asks about a clinical
-  entity — a diagnosis, medication, allergy, lab, test, result, procedure,
-  device, symptom, finding, vital, or any concept a chart maintains a clinical
-  record for. Such a query is information_retrieval EVEN AS A BARE NOUN, because
-  clinicians legitimately query by entity name.
+Edit CUIS list, run.
+"""
 
-- information_retrieval may combine with ANY of the other non-exclusive actions
-  — conversational_response, knowledge_fact_search, or admin_response — singly
-  or together, whenever the query carries that intent ALONGSIDE a retrievable
-  clinical angle. Do not restrict combinations to one companion type. Examples
-  of the SHAPE (not an exhaustive list):
-    * a documentable question that also wants general guidance
-      -> information_retrieval + knowledge_fact_search
-    * a symptom or operational request that also has chart-documented context
-      -> information_retrieval + admin_response
-    * a clinical entity asked about in a way that also needs explanation or
-      clarification -> information_retrieval + conversational_response
-  When information_retrieval is present in any combination, list it FIRST.
+import os
+import pickle
 
-- out_of_scope is the ONE exception: it NEVER combines. If any part of the query
-  is unsafe or prohibited, return ["out_of_scope"] alone.
+ROLLUP_PATH       = "rollup_index.pkl"
+TOPIC_LOOKUP_PATH = "topic_lookup.pkl"   # for labels
 
-- A query that names ONLY a demographic or administrative identifier field,
-  with no clinical content and no surrounding request, does not target clinical
-  content on its own; treat it as conversational_response (needs context).
+CUIS = [
+    "C2142181",  # Pain of left knee joint
+    "C0571275",  # Allergy to ketoconazole
+    "C0571398",  # Cinoxacin allergy
+    "C0276253",  # Cytomegaloviral pneumonia
+    "C0032285",  # Pneumonia
+    "C0011849",  # Diabetes mellitus
+    "C0021368",  # Inflammation
+    "C0559470",  # Allergy to peanut
+    "C0002792",  # Anaphylaxis
+    "C0024109",  # Lung
+]
 
-- When genuinely uncertain whether a noun is clinical, INCLUDE
-  information_retrieval. In this system a missed clinical query is worse than an
-  extra retrieval that returns nothing. Resolve ties toward is_processable=true.
+
+# ============================================================================
+# Load
+# ============================================================================
+
+print(f"Loading {ROLLUP_PATH} ...")
+with open(ROLLUP_PATH, "rb") as f:
+    r = pickle.load(f)
+
+cui_to_rollup     = r["cui_to_rollup_ancestors"]
+rollup_to_cuis    = r["rollup_to_descendants"]
+ic_scores         = r["ic_scores"]
+descendant_counts = r["descendant_counts"]
+isa_parents       = r["isa_parents"]
+paths_count       = r["paths_count"]
+config            = r.get("config", {})
+
+labels = {}
+if os.path.exists(TOPIC_LOOKUP_PATH):
+    print(f"Loading labels from {TOPIC_LOOKUP_PATH} ...")
+    with open(TOPIC_LOOKUP_PATH, "rb") as f:
+        t = pickle.load(f)
+    labels = t.get("labels", {})
+    print(f"  Loaded {len(labels):,} labels")
+else:
+    print(f"  WARNING: {TOPIC_LOOKUP_PATH} not in cwd ({os.getcwd()})")
+
+
+def lbl(c):
+    return labels.get(c, "?")
+
+
+# ============================================================================
+# Summary
+# ============================================================================
+
+print(f"\n{'='*80}")
+print(f"  ROLLUP INDEX SUMMARY")
+print(f"{'='*80}")
+print(f"  CUIs with rollup data : {len(cui_to_rollup):,}")
+print(f"  Unique topic ancestors: {len(rollup_to_cuis):,}")
+print(f"  Compression ratio     : "
+      f"{len(cui_to_rollup)/max(len(rollup_to_cuis),1):.1f}x")
+print(f"  Config:")
+for k, v in config.items():
+    print(f"    {k}: {v}")
+
+
+# ============================================================================
+# Per-CUI display
+# ============================================================================
+
+for cui in CUIS:
+    print(f"\n{'='*80}")
+    print(f"  {cui}  '{lbl(cui)}'")
+    print(f"{'='*80}")
+
+    if cui not in cui_to_rollup:
+        print(f"  Not in rollup index (likely out of SNOMED scope)")
+        continue
+
+    ic_self = ic_scores.get(cui)
+    descs   = descendant_counts.get(cui, 0)
+    parents = isa_parents.get(cui, set())
+    n_paths = paths_count.get(cui, 0)
+
+    print(f"  IC                              : "
+          f"{ic_self:.3f}" if ic_self is not None else "  IC: N/A")
+    print(f"  Descendants                     : {descs}")
+    print(f"  Immediate IS-A parents          : {len(parents)}")
+    for p in sorted(parents)[:5]:
+        p_ic = ic_scores.get(p, 0.0)
+        p_descs = descendant_counts.get(p, 0)
+        print(f"      {p}  IC={p_ic:.3f}  descs={p_descs:>5d}  '{lbl(p)}'")
+    print(f"  Paths to root                   : {n_paths}")
+
+    rollup_set = cui_to_rollup[cui]
+    print(f"\n  TOPIC SET ({len(rollup_set)} entries, self + deduped ancestors):")
+    for r_cui in sorted(rollup_set, key=lambda c: -ic_scores.get(c, 0.0)):
+        r_ic = ic_scores.get(r_cui, 0.0)
+        r_descs = descendant_counts.get(r_cui, 0)
+        r_cluster = len(rollup_to_cuis.get(r_cui, []))
+        marker = " <-- SELF" if r_cui == cui else ""
+        print(f"    {r_cui}  IC={r_ic:.3f}  descs={r_descs:>5d}  "
+              f"cluster={r_cluster:>5d}  '{lbl(r_cui)}'{marker}")
+
+
+print("\n\nDONE")
