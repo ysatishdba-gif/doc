@@ -1,126 +1,230 @@
-# Groups CUIs by their precomputed sibling_reach topics.
+# cui_topics.py
+# Forms topics from surviving CUIs.
 #
-# Two output modes:
-#   group()      → full output with members, scores, labels (for display)
-#   topic_cuis() → {topic_cui: topic_label} dict (for matching)
+# Strategies:
+#   "hierarchy" — UMLS ancestor convergence (default, deterministic, interpretable)
+#   "embedding" — Louvain on cosine k-NN graph of CUI embeddings (semantic clustering)
 
-import pickle
+import time, logging
 from collections import defaultdict
+import numpy as np
+from google.cloud import bigquery
+from config import PROJECT_ID, DATASET_ID, EMBEDDING_TABLE, hierarchy, ic_precomputed, medlineplus
+
+from cui_core import (
+    MetadataFetcher, ICComputer, EmbeddingFetcher,
+    HierarchicalTopicBuilder, TopicBuilder, fetch_preferred_terms,
+)
+
+log = logging.getLogger(__name__)
 
 
-class SiblingReachGrouper:
-    """
-    Loads cui_topic_lookup.pkl and exposes:
-      - topic_cuis(cuis)      → {cui: label} for matching
-      - group(cuis, ...)      → grouped dict for display
-    """
+class CUITopics:
 
-    def __init__(self, pickle_path="cui_topic_lookup.pkl"):
-        with open(pickle_path, "rb") as f:
-            self._lookup = pickle.load(f)
-        print(f"SiblingReachGrouper: loaded {len(self._lookup):,} entries "
-              f"from {pickle_path}")
+    def __init__(self):
+        self._graph = hierarchy
+        self._ic_pre = ic_precomputed
+        self._bq = bigquery.Client(project=PROJECT_ID)
+        self._pid, self._did = PROJECT_ID, DATASET_ID
+        self._meta = MetadataFetcher(self._bq, PROJECT_ID, DATASET_ID)
+        self._ic = ICComputer(self._graph, self._ic_pre)
+        self._emb = EmbeddingFetcher(self._bq, PROJECT_ID, DATASET_ID, EMBEDDING_TABLE)
 
-    # ── For matching: {topic_cui: topic_label} ────────────────────────
-
-    def topic_cuis(self, cuis):
+    def build_topics(self, cuis, strategy="hierarchy"):
         """
-        Given an iterable of CUIs, return {topic_cui: topic_label} for
-        all topics those CUIs map to via the sibling_reach lookup.
-        Missing CUIs are silently skipped.
+        strategy = "hierarchy"  -> UMLS ancestor convergence (HierarchicalTopicBuilder)
+        strategy = "embedding"  -> Louvain on cosine k-NN of embeddings (TopicBuilder)
         """
-        topics = {}
-        for cui in cuis:
-            entry = self._lookup.get(cui)
-            if entry is None:
-                continue
-            for t in entry.get("topics", []):
-                topics[t["topic_cui"]] = t["topic_label"]
-        return topics
+        t0 = time.perf_counter()
 
-    # ── For display: grouped output with members ──────────────────────
+        if not cuis:
+            return self._empty(t0)
 
-    def group(self, cuis, ic_map=None, term_map=None, min_members=1):
-        """
-        Group CUIs by sibling_reach topic. Returns a structure suitable
-        for printing / inspection.
+        cuis = list(dict.fromkeys(cuis))
+        n_in = len(cuis)
 
-        cuis        : iterable of CUIs
-        ic_map      : {cui -> IC} for display (optional)
-        term_map    : {cui -> preferred_term} for display (optional)
-        min_members : drop topics with fewer members (default 1 = keep all)
-        """
-        cuis = list(cuis)
-        bag = defaultdict(lambda: {"label": None, "members": set(), "score": 0.0})
-        missing = []
+        meta = self._meta.fetch(cuis)
+        ic = self._ic.compute(cuis, meta)
+        embs = self._emb.fetch(cuis)
+        terms = fetch_preferred_terms(self._bq, self._pid, self._did, cuis)
 
-        for cui in cuis:
-            entry = self._lookup.get(cui)
-            if entry is None:
-                missing.append(cui)
-                continue
-            for topic in entry.get("topics", []):
-                tcui = topic["topic_cui"]
-                bag[tcui]["label"] = topic["topic_label"]
-                bag[tcui]["members"].add(cui)
-                s = topic.get("score", 0.0)
-                if s > bag[tcui]["score"]:
-                    bag[tcui]["score"] = s
+        if strategy == "embedding":
+            h = self._form_embedding(cuis, embs, ic, meta)
+        elif strategy == "hierarchy":
+            h = self._form_hierarchy(cuis, ic)
+        else:
+            raise ValueError(f"unknown strategy: {strategy}")
+
+        if not h:
+            ms = (time.perf_counter() - t0) * 1000
+            return {"topics": [], "metrics": {"input_cui_count": n_in, "topic_count": 0,
+                                               "singleton_count": 0, "strategy": strategy,
+                                               "processing_time_ms": round(ms, 1)}}
+
+        # ensure each topic has a topic_cui (highest IC member)
+        for t in h.values():
+            if not t.get("topic_cui"):
+                t["topic_cui"] = max(t.get("members", [""]), key=lambda c: ic.get(c, 0.0))
+
+        # collect all label CUIs (topic + subtopic)
+        label_cuis = set()
+        for t in h.values():
+            if t.get("topic_cui"):
+                label_cuis.add(t["topic_cui"])
+            for st in t.get("subtopics", {}).values():
+                if st.get("subtopic_cui"):
+                    label_cuis.add(st["subtopic_cui"])
+
+        missing = label_cuis - set(terms)
+        if missing:
+            terms.update(fetch_preferred_terms(self._bq, self._pid, self._did, missing))
+
+        centroids = {}
+        for tid, t in h.items():
+            vecs = [embs[c] for c in t.get("members", []) if c in embs]
+            if vecs:
+                mu = np.mean(vecs, axis=0, dtype=np.float32)
+                n = np.linalg.norm(mu)
+                centroids[tid] = (mu / n).tolist() if n > 0 else None
+            else:
+                centroids[tid] = None
 
         topics_out = []
-        dropped_singletons = 0
+        for tid in sorted(h):
+            t = h[tid]
+            tc = t.get("topic_cui", "")
+            members_list = t.get("members", [])
 
-        for tcui, data in sorted(
-            bag.items(),
-            key=lambda kv: (-len(kv[1]["members"]), -kv[1]["score"],
-                            kv[1]["label"] or "")
-        ):
-            member_cuis = sorted(data["members"])
+            members = []
+            for c in members_list:
+                m = meta.get(c)
+                members.append({"cui": c, "preferred_term": terms.get(c, c),
+                                "ic": round(ic.get(c, 0.0), 4),
+                                "semantic_types": list(m.semantic_types) if m and m.semantic_types else []})
 
-            if len(member_cuis) < min_members:
-                dropped_singletons += 1
+            topic_label, topic_label_source = self._pick_label(tc, terms)
+
+            subtopics = []
+            for sid in sorted(t.get("subtopics", {})):
+                st = t["subtopics"][sid]
+                sc = st.get("subtopic_cui", "")
+                st_members = st.get("members", [])
+                st_mem = [{"cui": c, "preferred_term": terms.get(c, c),
+                           "ic": round(ic.get(c, 0.0), 4)} for c in st_members]
+                st_label, st_source = self._pick_label(sc, terms)
+                subtopics.append({"subtopic_id": sid,
+                                  "subtopic_cui": sc,
+                                  "subtopic_label": st_label,
+                                  "label_source": st_source,
+                                  "members": st_mem})
+
+            topics_out.append({"topic_id": tid,
+                               "topic_cui": tc,
+                               "topic_label": topic_label,
+                               "label_source": topic_label_source,
+                               "members": members, "subtopics": subtopics,
+                               "centroid": centroids.get(tid)})
+
+        ms = (time.perf_counter() - t0) * 1000
+        n_topics = len(topics_out)
+        n_sing = sum(1 for t in topics_out if len(t["members"]) == 1)
+        n_mtp = sum(1 for t in topics_out if t["label_source"] == "medlineplus")
+        n_hier = n_topics - n_mtp
+
+        # sanity check: every input CUI ends up in exactly one topic
+        total_members = sum(len(t["members"]) for t in topics_out)
+        if total_members != n_in:
+            log.warning(f"CUI count mismatch: {n_in} in, {total_members} in topics")
+
+        log.info(f"[{strategy}] {n_in} CUIs -> {n_topics} topics ({n_sing} singletons) "
+                 f"labels: {n_mtp} medlineplus, {n_hier} hierarchy "
+                 f"{ms:.0f}ms")
+
+        return {"topics": topics_out,
+                "metrics": {"input_cui_count": n_in, "topic_count": n_topics,
+                            "singleton_count": n_sing, "strategy": strategy,
+                            "processing_time_ms": round(ms, 1)}}
+
+    # ── Strategies ───────────────────────────────────────────────────────────
+
+    def _form_hierarchy(self, cuis, ic):
+        """UMLS ancestor convergence via HierarchicalTopicBuilder."""
+        return HierarchicalTopicBuilder.build(cuis, self._graph, ic)
+
+    def _form_embedding(self, cuis, embs, ic, metadata):
+        """Phase 1: stratify by dominant semantic type, then cluster within each group.
+
+        Each CUI is assigned to its first (primary) semantic type. CUIs with no
+        type form their own group. Within each type group, TopicBuilder runs
+        independently, so Disease CUIs never cluster with Procedure CUIs etc.
+        """
+        cuis_with_emb = [c for c in cuis if c in embs]
+        if not cuis_with_emb:
+            return {}
+
+        # Group CUIs by primary semantic type
+        by_type = defaultdict(list)
+        for cui in cuis_with_emb:
+            m = metadata.get(cui)
+            types = m.semantic_types if (m and m.semantic_types) else []
+            primary = types[0] if types else "__untyped__"
+            by_type[primary].append(cui)
+
+        # Cluster within each type group independently
+        h = {}
+        next_tid = 0
+        for sem_type, group_cuis in sorted(by_type.items()):
+            if len(group_cuis) < 2:
+                # singleton CUI in its own topic
+                cui = group_cuis[0]
+                h[next_tid] = {
+                    "topic_cui": cui,
+                    "members": [cui],
+                    "subtopics": {},
+                    "ungrouped": [cui],
+                    "_grouping_cui": cui,
+                    "_semantic_type": sem_type,
+                }
+                next_tid += 1
                 continue
 
-            members = [
-                {
-                    "cui"           : mc,
-                    "preferred_term": (term_map or {}).get(mc, mc),
-                    "ic"            : round((ic_map or {}).get(mc, 0.0), 4),
+            groups = TopicBuilder.build(group_cuis, embs)
+            if not groups:
+                continue
+
+            for _, members in groups.items():
+                if not members:
+                    continue
+                members_sorted = sorted(members)
+                topic_cui = max(members_sorted, key=lambda c: ic.get(c, 0.0))
+                h[next_tid] = {
+                    "topic_cui": topic_cui,
+                    "members": members_sorted,
+                    "subtopics": {},
+                    "ungrouped": members_sorted,
+                    "_grouping_cui": topic_cui,
+                    "_semantic_type": sem_type,
                 }
-                for mc in member_cuis
-            ]
+                next_tid += 1
+        return h
 
-            topics_out.append({
-                "topic_id"   : len(topics_out),
-                "topic_cui"  : tcui,
-                "topic_label": data["label"] or tcui,
-                "score"      : round(data["score"], 4),
-                "members"    : members,
-            })
+    # ── Helpers ──────────────────────────────────────────────────────────────
 
-        return {
-            "topics": topics_out,
-            "metrics": {
-                "input_cui_count"   : len(cuis),
-                "topic_count"       : len(topics_out),
-                "missing_cui_count" : len(missing),
-                "dropped_singletons": dropped_singletons,
-                "strategy"          : "siblingreach",
-            },
-            "missing_cuis": missing,
-        }
+    @staticmethod
+    def _pick_label(cui, terms):
+        """MedlinePlus if available, else MRCONSO preferred term."""
+        if not cui:
+            return "", "hierarchy"
+        if cui in medlineplus:
+            return medlineplus[cui], "medlineplus"
+        return terms.get(cui, cui), "hierarchy"
 
+    @staticmethod
+    def _empty(t0):
+        ms = (time.perf_counter() - t0) * 1000
+        return {"topics": [], "metrics": {"input_cui_count": 0, "topic_count": 0,
+                                           "singleton_count": 0, "strategy": None,
+                                           "processing_time_ms": round(ms, 1)}}
 
-def print_siblingreach(result):
-    """Pretty-print a group() result."""
-    m = result["metrics"]
-    print(f"\n[siblingreach] {m['topic_count']} topics from {m['input_cui_count']} CUIs"
-          f"  (missing: {m['missing_cui_count']}, "
-          f"dropped singletons: {m['dropped_singletons']})")
-    if result["missing_cuis"]:
-        print(f"  missing CUIs: {result['missing_cuis']}")
-    for topic in result["topics"]:
-        print(f"  [{topic['topic_id']}] {topic['topic_label']}  "
-              f"(score={topic['score']})  [{len(topic['members'])} members]")
-        for mem in topic["members"]:
-            print(f"    {mem['cui']}  {mem['preferred_term']}  IC={mem['ic']}")
+    def close(self):
+        self._emb.close()
