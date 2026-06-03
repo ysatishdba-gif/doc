@@ -1,22 +1,17 @@
-import pickle
-with open("cui_topic_lookup.pkl", "rb") as f:
-    sr_lookup = pickle.load(f)
+BUILD START — 2026-06-03T15:32:53.731735
+Found notebook 'cache' dict with keys: ['schema_version', 'fetched_at', 'config', 'cuis', 'mrrel_rows', 'tags', 'labels']
+  Using cache['mrrel_rows']  (2,748,222 rows)
 
-print(f"Total CUIs in lookup       : {len(sr_lookup):,}")
-print(f"Sample entry:")
-sample_cui = next(iter(sr_lookup))
-print(f"  {sample_cui}: {sr_lookup[sample_cui]}")
+Inputs:
+  mrrel_rows        : 2,748,222
+  SNOMED_CUIS       : 374,538
 
-# Coverage check against our SNOMED universe
-covered = sum(1 for c in SNOMED_CUIS if c in sr_lookup)
-print(f"\nOur SNOMED CUIs           : {len(SNOMED_CUIS):,}")
-print(f"Covered by sibling_reach  : {covered:,}")
-print(f"Coverage %                : {100*covered/len(SNOMED_CUIS):.1f}%")
-
-# Topic count
-all_topics = set()
-for entry in sr_lookup.values():
-    for t in entry.get("topics", []):
-        all_topics.add(t["topic_cui"])
-print(f"\nUnique topic CUIs         : {len(all_topics):,}")
-print(f"Compression ratio         : {len(sr_lookup)/max(len(all_topics),1):.1f}x")
+[1] Extract IS-A edges
+  Extracting IS-A edges from MRREL...
+    Total MRREL rows                : 2,748,222
+    Filtering to REL in             : ['CHD', 'PAR', 'RB', 'RN']
+    Skipped (wrong relation)        : 0
+    Skipped (out of scope)          : 0
+    Kept (relation x scope match)   : 0
+    Unique IS-A edges               : 0
+  ERROR: no IS-A edges extracted. Check MRREL row format.
