@@ -1,16 +1,12 @@
-mrrel = cache["mrrel_rows"]
-print(f"Type: {type(mrrel).__name__}")
-print(f"Length: {len(mrrel)}")
-print(f"\nFirst row:")
-print(f"  type: {type(mrrel[0]).__name__}")
-print(f"  value: {mrrel[0]}")
-print(f"\nSecond row:")
-print(f"  value: {mrrel[1]}")
-print(f"\nThird row:")
-print(f"  value: {mrrel[2]}")
+Type: list
+Length: 2748222
 
-# If it's a DataFrame, show columns
-import pandas as pd
-if isinstance(mrrel, pd.DataFrame):
-    print(f"\nColumns: {list(mrrel.columns)}")
-    print(mrrel.head())
+First row:
+  type: tuple
+  value: ('C1333235', 'C5768774', 'RO', 'has_component')
+
+Second row:
+  value: ('C1333235', 'C5768778', 'RO', 'has_component')
+
+Third row:
+  value: ('C1334603', 'C0007140', 'SY', 'same_as')
