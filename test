@@ -1,360 +1,192 @@
-====================================================================================================
-  C2142181  '?'
-  Rollups (final): ['C0231749', 'C5442019']
-====================================================================================================
+"""
+analyze_duplicates.py
+---------------------
+For each CUI's rollup set, detect "duplicate" ancestors:
+  1. Literal duplicates (shouldn't exist but verify)
+  2. Hierarchical duplicates: rollup A is an IS-A ancestor of rollup B
+     -> B is more specific; A is redundant
+  3. Descendant-overlap duplicates: two rollups cover ~same descendants
 
-  Found 31 paths to root
-  Showing first 10 paths
+Edit CUIS list, run.
+"""
 
+import pickle
+from itertools import combinations
 
-  ─── PATH 1  ─────────────────
-  Stop reason: IC accel at idx=1: delta[0]=0.098 -> delta[1]=0.138
-  Picked: idx=1  C0231749  '?'
+ROLLUP_PATH       = "rollup_index.pkl"
+TOPIC_LOOKUP_PATH = "topic_lookup.pkl"
 
-  level  CUI         IC      delta   children  label
-      0  C2142181  0.860       -      3    '?'
-      1  C0231749  0.763  +0.098      9    '?'  ← PICKED
-      2  C0003862  0.625  +0.138     20    '?'
-      3  C0575027  0.602  +0.023      4    '?'
-      4  C3698353  0.418  +0.183     66    '?'
-      5  C1291731  0.400  +0.018     17    '?'
-      6  C0422837  0.354  +0.046     58    '?'
-      7  C0037088  0.082  +0.272    221    '?'
-      8  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 2  ─────────────────
-  Stop reason: IC accel at idx=1: delta[0]=0.098 -> delta[1]=0.138
-  Picked: idx=1  C0231749  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C2142181  0.860       -      3    '?'
-      1  C0231749  0.763  +0.098      9    '?'  ← PICKED
-      2  C0003862  0.625  +0.138     20    '?'
-      3  C0575027  0.602  +0.023      4    '?'
-      4  C0427210  0.312  +0.290     65    '?'
-      5  C0426779  0.235  +0.077    114    '?'
-      6  C0037088  0.082  +0.153    221    '?'
-      7  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 3  ─────────────────
-  Stop reason: IC accel at idx=1: delta[0]=0.098 -> delta[1]=0.138
-  Picked: idx=1  C0231749  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C2142181  0.860       -      3    '?'
-      1  C0231749  0.763  +0.098      9    '?'  ← PICKED
-      2  C0003862  0.625  +0.138     20    '?'
-      3  C0026858  0.573  +0.052     17    '?'
-      4  C0458087  0.449  +0.124     44    '?'
-      5  C3698353  0.418  +0.030     66    '?'
-      6  C1291731  0.400  +0.018     17    '?'
-      7  C0422837  0.354  +0.046     58    '?'
-      8  C0037088  0.082  +0.272    221    '?'
-      9  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 4  ─────────────────
-  Stop reason: IC accel at idx=1: delta[0]=0.098 -> delta[1]=0.138
-  Picked: idx=1  C0231749  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C2142181  0.860       -      3    '?'
-      1  C0231749  0.763  +0.098      9    '?'  ← PICKED
-      2  C0003862  0.625  +0.138     20    '?'
-      3  C0026858  0.573  +0.052     17    '?'
-      4  C0458087  0.449  +0.124     44    '?'
-      5  C0030193  0.427  +0.021     70    '?'
-      6  C0234185  0.418  +0.010      2    '?'
-      7  C1291731  0.400  +0.018     17    '?'
-      8  C0422837  0.354  +0.046     58    '?'
-      9  C0037088  0.082  +0.272    221    '?'
-     10  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 5  ─────────────────
-  Stop reason: IC accel at idx=1: delta[0]=0.098 -> delta[1]=0.138
-  Picked: idx=1  C0231749  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C2142181  0.860       -      3    '?'
-      1  C0231749  0.763  +0.098      9    '?'  ← PICKED
-      2  C0003862  0.625  +0.138     20    '?'
-      3  C0026858  0.573  +0.052     17    '?'
-      4  C0426779  0.235  +0.338    114    '?'
-      5  C0037088  0.082  +0.153    221    '?'
-      6  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 6  ─────────────────
-  Stop reason: IC accel at idx=1: delta[0]=0.098 -> delta[1]=0.171
-  Picked: idx=1  C0231749  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C2142181  0.860       -      3    '?'
-      1  C0231749  0.763  +0.098      9    '?'  ← PICKED
-      2  C0023222  0.592  +0.171     22    '?'
-      3  C4076247  0.574  +0.017     32    '?'
-      4  C3698353  0.418  +0.156     66    '?'
-      5  C1291731  0.400  +0.018     17    '?'
-      6  C0422837  0.354  +0.046     58    '?'
-      7  C0037088  0.082  +0.272    221    '?'
-      8  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 7  ─────────────────
-  Stop reason: IC accel at idx=1: delta[0]=0.098 -> delta[1]=0.171
-  Picked: idx=1  C0231749  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C2142181  0.860       -      3    '?'
-      1  C0231749  0.763  +0.098      9    '?'  ← PICKED
-      2  C0023222  0.592  +0.171     22    '?'
-      3  C4076247  0.574  +0.017     32    '?'
-      4  C0575986  0.283  +0.292    114    '?'
-      5  C0579141  0.228  +0.055     45    '?'
-      6  C0037088  0.082  +0.146    221    '?'
-      7  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 8  ─────────────────
-  Stop reason: IC accel at idx=1: delta[0]=0.098 -> delta[1]=0.171
-  Picked: idx=1  C0231749  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C2142181  0.860       -      3    '?'
-      1  C0231749  0.763  +0.098      9    '?'  ← PICKED
-      2  C0023222  0.592  +0.171     22    '?'
-      3  C0030196  0.550  +0.042      9    '?'
-      4  C0458087  0.449  +0.101     44    '?'
-      5  C3698353  0.418  +0.030     66    '?'
-      6  C1291731  0.400  +0.018     17    '?'
-      7  C0422837  0.354  +0.046     58    '?'
-      8  C0037088  0.082  +0.272    221    '?'
-      9  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 9  ─────────────────
-  Stop reason: IC accel at idx=1: delta[0]=0.098 -> delta[1]=0.171
-  Picked: idx=1  C0231749  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C2142181  0.860       -      3    '?'
-      1  C0231749  0.763  +0.098      9    '?'  ← PICKED
-      2  C0023222  0.592  +0.171     22    '?'
-      3  C0030196  0.550  +0.042      9    '?'
-      4  C0458087  0.449  +0.101     44    '?'
-      5  C0030193  0.427  +0.021     70    '?'
-      6  C0234185  0.418  +0.010      2    '?'
-      7  C1291731  0.400  +0.018     17    '?'
-      8  C0422837  0.354  +0.046     58    '?'
-      9  C0037088  0.082  +0.272    221    '?'
-     10  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 10  ─────────────────
-  Stop reason: IC accel at idx=1: delta[0]=0.098 -> delta[1]=0.171
-  Picked: idx=1  C0231749  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C2142181  0.860       -      3    '?'
-      1  C0231749  0.763  +0.098      9    '?'  ← PICKED
-      2  C0023222  0.592  +0.171     22    '?'
-      3  C0030196  0.550  +0.042      9    '?'
-      4  C0579141  0.228  +0.322     45    '?'
-      5  C0037088  0.082  +0.146    221    '?'
-      6  C2720507  0.001  +0.080     19    '?'
-
-  ... 21 more paths not shown
-
-====================================================================================================
-  C0571275  '?'
-  Rollups (final): ['C0020517', 'C0237865', 'C0439659', 'C0559546', 'C1527304', 'C1628518', 'C3532523', 'C3662243', 'C5395981']
-====================================================================================================
-
-  Found 23 paths to root
-  Showing first 10 paths
+CUIS = [
+    "C2142181",  # Pain of left knee joint
+    "C0571275",  # Allergy to ketoconazole
+    "C0571398",  # Cinoxacin allergy
+    "C0276253",  # Cytomegaloviral pneumonia
+    "C0021368",  # Inflammation
+    "C0024109",  # Lung
+]
 
 
-  ─── PATH 1  ─────────────────
-  Stop reason: IC accel at idx=2: delta[1]=0.001 -> delta[2]=0.038
-  Picked: idx=2  C0237865  '?'
+# ============================================================================
+# Load with explicit label diagnostics
+# ============================================================================
 
-  level  CUI         IC      delta   children  label
-      0  C0571275  1.000       -      0    '?'
-      1  C0013182  0.456  +0.544    564    '?'
-      2  C0237865  0.455  +0.001     13    '?'  ← PICKED
-      3  C1628518  0.417  +0.038      6    '?'
-      4  C0037088  0.082  +0.335    221    '?'
-      5  C2720507  0.001  +0.080     19    '?'
+print(f"Loading {ROLLUP_PATH} ...")
+with open(ROLLUP_PATH, "rb") as f:
+    r = pickle.load(f)
 
-  ─── PATH 2  ─────────────────
-  Stop reason: IC accel at idx=2: delta[1]=0.008 -> delta[2]=0.038
-  Picked: idx=2  C1527304  '?'
+cui_to_rollup     = r["cui_to_rollup_ancestors"]
+ic_scores         = r["ic_scores"]
+descendant_counts = r["descendant_counts"]
+isa_parents       = r["isa_parents"]
+isa_children      = r["isa_children"]
 
-  level  CUI         IC      delta   children  label
-      0  C0571275  1.000       -      0    '?'
-      1  C0013182  0.456  +0.544    564    '?'
-      2  C1527304  0.448  +0.008     25    '?'  ← PICKED
-      3  C0851444  0.410  +0.038     12    '?'
-      4  C3532523  0.396  +0.013     31    '?'
-      5  C0037088  0.082  +0.315    221    '?'
-      6  C2720507  0.001  +0.080     19    '?'
+# Reconstruct descendant SETS (not just counts) for overlap analysis
+print("Computing descendant sets for overlap analysis...")
+descendant_sets = {}
+def get_descendants(node, stack):
+    if node in descendant_sets:
+        return descendant_sets[node]
+    if node in stack:
+        return set()
+    stack = stack | {node}
+    result = set()
+    for child in isa_children.get(node, ()):
+        result.add(child)
+        result |= get_descendants(child, stack)
+    descendant_sets[node] = result
+    return result
 
-  ─── PATH 3  ─────────────────
-  Stop reason: IC accel at idx=3: delta[2]=0.003 -> delta[3]=0.072
-  Picked: idx=3  C0020517  '?'
+# Only compute for nodes we'll need (rollup ancestors + their context)
+rollup_universe = set()
+for cui in CUIS:
+    rollup_universe |= cui_to_rollup.get(cui, set())
+for r_cui in list(rollup_universe):
+    rollup_universe |= cui_to_rollup.get(r_cui, set())  # transitive a bit
 
-  level  CUI         IC      delta   children  label
-      0  C0571275  1.000       -      0    '?'
-      1  C0013182  0.456  +0.544    564    '?'
-      2  C1527304  0.448  +0.008     25    '?'
-      3  C0020517  0.445  +0.003     10    '?'  ← PICKED
-      4  C0559546  0.373  +0.072    140    '?'
-      5  C0012634  0.108  +0.264    168    '?'
-      6  C0037088  0.082  +0.026    221    '?'
-      7  C2720507  0.001  +0.080     19    '?'
+for node in rollup_universe:
+    get_descendants(node, set())
+print(f"  Computed {len(descendant_sets):,} descendant sets")
 
-  ─── PATH 4  ─────────────────
-  Stop reason: IC accel at idx=3: delta[2]=0.003 -> delta[3]=0.072
-  Picked: idx=3  C0020517  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C0571275  1.000       -      0    '?'
-      1  C0013182  0.456  +0.544    564    '?'
-      2  C1527304  0.448  +0.008     25    '?'
-      3  C0020517  0.445  +0.003     10    '?'  ← PICKED
-      4  C0559546  0.373  +0.072    140    '?'
-      5  C0012634  0.108  +0.264    168    '?'
-      6  C0277543  0.108  +0.000      3    '?'
-      7  C0574125  0.102  +0.006    317    '?'
-      8  C0037088  0.082  +0.020    221    '?'
-      9  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 5  ─────────────────
-  Stop reason: IC accel at idx=3: delta[2]=0.003 -> delta[3]=0.072
-  Picked: idx=3  C0020517  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C0571275  1.000       -      0    '?'
-      1  C0013182  0.456  +0.544    564    '?'
-      2  C1527304  0.448  +0.008     25    '?'
-      3  C0020517  0.445  +0.003     10    '?'  ← PICKED
-      4  C0559546  0.373  +0.072    140    '?'
-      5  C0012634  0.108  +0.264    168    '?'
-      6  C0277542  0.108  +0.000      1    '?'
-      7  C0037088  0.082  +0.026    221    '?'
-      8  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 6  ─────────────────
-  Stop reason: IC accel at idx=3: delta[2]=0.003 -> delta[3]=0.048
-  Picked: idx=3  C0020517  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C0571275  1.000       -      0    '?'
-      1  C0013182  0.456  +0.544    564    '?'
-      2  C1527304  0.448  +0.008     25    '?'
-      3  C0020517  0.445  +0.003     10    '?'  ← PICKED
-      4  C3532523  0.396  +0.048     31    '?'
-      5  C0037088  0.082  +0.315    221    '?'
-      6  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 7  ─────────────────
-  Stop reason: IC accel at idx=3: delta[2]=0.003 -> delta[3]=0.017
-  Picked: idx=3  C0020517  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C0571275  1.000       -      0    '?'
-      1  C0013182  0.456  +0.544    564    '?'
-      2  C1527304  0.448  +0.008     25    '?'
-      3  C0020517  0.445  +0.003     10    '?'  ← PICKED
-      4  C3539909  0.428  +0.017    119    '?'
-      5  C0851444  0.410  +0.018     12    '?'
-      6  C3532523  0.396  +0.013     31    '?'
-      7  C0037088  0.082  +0.315    221    '?'
-      8  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 8  ─────────────────
-  Stop reason: IC accel at idx=3: delta[2]=0.003 -> delta[3]=0.017
-  Picked: idx=3  C0020517  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C0571275  1.000       -      0    '?'
-      1  C0013182  0.456  +0.544    564    '?'
-      2  C1527304  0.448  +0.008     25    '?'
-      3  C0020517  0.445  +0.003     10    '?'  ← PICKED
-      4  C3539909  0.428  +0.017    119    '?'
-      5  C3662243  0.419  +0.009     14    '?'
-      6  C1628518  0.417  +0.002      6    '?'
-      7  C0037088  0.082  +0.335    221    '?'
-      8  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 9  ─────────────────
-  Stop reason: IC accel at idx=3: delta[2]=0.003 -> delta[3]=0.017
-  Picked: idx=3  C0020517  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C0571275  1.000       -      0    '?'
-      1  C0013182  0.456  +0.544    564    '?'
-      2  C1527304  0.448  +0.008     25    '?'
-      3  C0020517  0.445  +0.003     10    '?'  ← PICKED
-      4  C3539909  0.428  +0.017    119    '?'
-      5  C3662243  0.419  +0.009     14    '?'
-      6  C3532523  0.396  +0.022     31    '?'
-      7  C0037088  0.082  +0.315    221    '?'
-      8  C2720507  0.001  +0.080     19    '?'
-
-  ─── PATH 10  ─────────────────
-  Stop reason: IC accel at idx=2: delta[1]=0.008 -> delta[2]=0.085
-  Picked: idx=2  C1527304  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C0571275  1.000       -      0    '?'
-      1  C0013182  0.456  +0.544    564    '?'
-      2  C1527304  0.448  +0.008     25    '?'  ← PICKED
-      3  C1532237  0.362  +0.085     48    '?'
-      4  C0012634  0.108  +0.254    168    '?'
-      5  C0037088  0.082  +0.026    221    '?'
-      6  C2720507  0.001  +0.080     19    '?'
-
-  ... 13 more paths not shown
-
-====================================================================================================
-  C0021368  '?'
-  Rollups (final): ['C0030660', 'C1285164']
-====================================================================================================
-
-  Found 3 paths to root
-
-  ─── PATH 1  ─────────────────
-  Stop reason: IC accel at idx=2: delta[1]=0.129 -> delta[2]=0.456
-  Walked past (too few children): [(2, 'C4521054', 2)]
-  Picked: idx=3  C1285164  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C0021368  0.914       -      1    '?'
-      1  C0030660  0.705  +0.209     10    '?'
-      2  C4521054  0.576  +0.129      2    '?'
-      3  C1285164  0.120  +0.456     72    '?'  ← PICKED
-      4  C2720507  0.001  +0.119     19    '?'
-
-  ─── PATH 2  ─────────────────
-  Stop reason: IC accel at idx=1: delta[0]=0.209 -> delta[1]=0.219
-  Picked: idx=1  C0030660  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C0021368  0.914       -      1    '?'
-      1  C0030660  0.705  +0.209     10    '?'  ← PICKED
-      2  C0580197  0.486  +0.219     10    '?'
-      3  C0559482  0.484  +0.003      5    '?'
-      4  C1285164  0.120  +0.364     72    '?'
-      5  C2720507  0.001  +0.119     19    '?'
-
-  ─── PATH 3  ─────────────────
-  Stop reason: IC accel at idx=1: delta[0]=0.209 -> delta[1]=0.421
-  Picked: idx=1  C0030660  '?'
-
-  level  CUI         IC      delta   children  label
-      0  C0021368  0.914       -      1    '?'
-      1  C0030660  0.705  +0.209     10    '?'  ← PICKED
-      2  C4546005  0.284  +0.421    103    '?'
-      3  C1444750  0.284  +0.000      2    '?'
-      4  C0449234  0.112  +0.172      5    '?'
-      5  C0332280  0.112  +0.000      2    '?'
-      6  C3540689  0.111  +0.001      5    '?'
-      7  C2720507  0.001  +0.110     19    '?'
+# Load labels — with explicit reporting
+labels = {}
+import os
+if os.path.exists(TOPIC_LOOKUP_PATH):
+    print(f"Loading labels from {TOPIC_LOOKUP_PATH} ...")
+    with open(TOPIC_LOOKUP_PATH, "rb") as f:
+        t = pickle.load(f)
+    labels = t.get("labels", {})
+    print(f"  Loaded {len(labels):,} labels")
+else:
+    print(f"  WARNING: {TOPIC_LOOKUP_PATH} not found in cwd. "
+          f"Run: {os.getcwd()}")
 
 
-DONE
+def lbl(c):
+    return labels.get(c, "?")
+
+
+# ============================================================================
+# Duplicate detection helpers
+# ============================================================================
+
+def is_ancestor_of(a, b, parents_dict, max_depth=20):
+    """Is `a` a transitive IS-A ancestor of `b`?"""
+    visited = set()
+    stack = [(b, 0)]
+    while stack:
+        node, depth = stack.pop()
+        if depth > max_depth:
+            continue
+        if node in visited:
+            continue
+        visited.add(node)
+        for p in parents_dict.get(node, set()):
+            if p == a:
+                return True
+            stack.append((p, depth + 1))
+    return False
+
+
+def descendant_jaccard(a, b):
+    """Jaccard similarity of descendant sets."""
+    da = descendant_sets.get(a, set())
+    db = descendant_sets.get(b, set())
+    union = da | db
+    if not union:
+        return 0.0
+    return len(da & db) / len(union)
+
+
+# ============================================================================
+# Per-CUI analysis
+# ============================================================================
+
+for cui in CUIS:
+    print(f"\n{'='*100}")
+    print(f"  {cui}  '{lbl(cui)}'")
+    print(f"{'='*100}")
+    
+    rollups = sorted(cui_to_rollup.get(cui, []))
+    if not rollups:
+        print(f"  No rollups")
+        continue
+    
+    print(f"  {len(rollups)} rollup ancestors:\n")
+    for r_cui in sorted(rollups, key=lambda c: -ic_scores.get(c, 0.0)):
+        r_ic = ic_scores.get(r_cui, 0.0)
+        r_descs = descendant_counts.get(r_cui, 0)
+        print(f"    {r_cui}  IC={r_ic:.3f}  descs={r_descs:>5d}  "
+              f"'{lbl(r_cui)}'")
+    
+    # 1. Literal duplicate check
+    if len(rollups) != len(set(rollups)):
+        print(f"\n  ⚠ LITERAL DUPLICATES FOUND in set!")
+    else:
+        print(f"\n  ✓ No literal duplicates (set has {len(set(rollups))} unique)")
+    
+    # 2. Hierarchical duplicates: pairs where one is ancestor of the other
+    print(f"\n  Hierarchical-duplicate pairs (one is IS-A ancestor of the other):")
+    hier_dups = []
+    for a, b in combinations(rollups, 2):
+        if is_ancestor_of(a, b, isa_parents):
+            hier_dups.append((a, b, "a is ancestor of b"))
+        elif is_ancestor_of(b, a, isa_parents):
+            hier_dups.append((b, a, "b is ancestor of a"))
+    
+    if hier_dups:
+        for anc, desc, _ in hier_dups:
+            print(f"    {anc} (anc, IC={ic_scores.get(anc, 0):.3f}) "
+                  f"'{lbl(anc)[:35]}'")
+            print(f"      ↑ contains ↑")
+            print(f"    {desc} (desc, IC={ic_scores.get(desc, 0):.3f}) "
+                  f"'{lbl(desc)[:35]}'")
+            print(f"    -> '{lbl(anc)[:25]}' is REDUNDANT, drop it\n")
+    else:
+        print(f"    (none — all rollups are siblings in IS-A, not ancestors)")
+    
+    # 3. Descendant overlap: pairs with high Jaccard
+    print(f"  Descendant-overlap pairs (Jaccard > 0.5):")
+    overlap_dups = []
+    for a, b in combinations(rollups, 2):
+        j = descendant_jaccard(a, b)
+        if j > 0.5:
+            overlap_dups.append((a, b, j))
+    
+    overlap_dups.sort(key=lambda x: -x[2])
+    if overlap_dups:
+        for a, b, j in overlap_dups:
+            print(f"    J={j:.3f}  {a} ({lbl(a)[:30]}) <-> {b} ({lbl(b)[:30]})")
+    else:
+        print(f"    (none — rollups cover distinct concept regions)")
+    
+    # 4. Suggested dedup: keep only most-specific (highest IC), drop ancestors
+    redundant = {anc for anc, desc, _ in hier_dups}
+    kept = [r for r in rollups if r not in redundant]
+    print(f"\n  After dropping hierarchical redundancy: {len(kept)} kept "
+          f"(was {len(rollups)})")
+    for r_cui in sorted(kept, key=lambda c: -ic_scores.get(c, 0.0)):
+        r_ic = ic_scores.get(r_cui, 0.0)
+        print(f"    {r_cui}  IC={r_ic:.3f}  '{lbl(r_cui)}'")
+
+
+print("\n\nDONE")
