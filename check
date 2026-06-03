@@ -1,91 +1,48 @@
-"""
-check_isa_path.py
------------------
-For two CUIs, find all IS-A paths between them (if any exist).
+================================================================================
+  Looking for IS-A paths:
+  FROM: C0559470  'Allergy to peanut'
+  TO  : C0016470  'Food allergy'
+================================================================================
+  Target in IS-A DAG  : True
+  Target IC           : 0.6635754450552043
+  Target descendants  : 74
 
-Use to verify whether the algorithm is missing a path that exists,
-or whether the path simply isn't in MRREL.
-"""
+  Found 1 path(s):
 
-import os
-import pickle
-from collections import deque
+  Path 1 (3 hops):
+    [ 0]  C0559470  IC=1.000  'Allergy to peanut'
+    [ 1]  C1096735  IC=0.860  'Allergy to pulse vegetable'
+    [ 2]  C2227759  IC=0.800  'Allergy to vegetable'
+    [ 3]  C0016470  IC=0.664  'Food allergy'
 
-ROLLUP_PATH       = "rollup_index.pkl"
-TOPIC_LOOKUP_PATH = "topic_lookup.pkl"
+================================================================================
+  Looking for IS-A paths:
+  FROM: C0559470  'Allergy to peanut'
+  TO  : C2227759  'Allergy to vegetable'
+================================================================================
+  Target in IS-A DAG  : True
+  Target IC           : 0.800135652178286
+  Target descendants  : 12
 
-# Pairs to check: (descendant_cui, suspected_ancestor_cui)
-PAIRS = [
-    ("C0559470", "C0016470"),  # Allergy to peanut -> Food allergy
-    ("C0559470", "C2227759"),  # Allergy to peanut -> Allergy to vegetable (known path)
-    ("C0559470", "C0013182"),  # Allergy to peanut -> Allergy to drug (shouldn't connect)
-]
+  Found 1 path(s):
 
+  Path 1 (2 hops):
+    [ 0]  C0559470  IC=1.000  'Allergy to peanut'
+    [ 1]  C1096735  IC=0.860  'Allergy to pulse vegetable'
+    [ 2]  C2227759  IC=0.800  'Allergy to vegetable'
 
-with open(ROLLUP_PATH, "rb") as f:
-    r = pickle.load(f)
+================================================================================
+  Looking for IS-A paths:
+  FROM: C0559470  'Allergy to peanut'
+  TO  : C0013182  'Allergy to drug'
+================================================================================
+  Target in IS-A DAG  : True
+  Target IC           : 0.45588582258322097
+  Target descendants  : 1077
 
-isa_parents       = r["isa_parents"]
-isa_children      = r["isa_children"]
-ic_scores         = r["ic_scores"]
-descendant_counts = r["descendant_counts"]
-
-labels = {}
-if os.path.exists(TOPIC_LOOKUP_PATH):
-    with open(TOPIC_LOOKUP_PATH, "rb") as f:
-        t = pickle.load(f)
-    labels = t.get("labels", {})
-
-
-def lbl(c):
-    return labels.get(c, "?")
-
-
-def find_paths(start, target, max_paths=10, max_depth=15):
-    """BFS for all IS-A paths from start (descendant) to target (ancestor)."""
-    paths = []
-    queue = deque()
-    queue.append([start])
-    while queue and len(paths) < max_paths:
-        path = queue.popleft()
-        if len(path) > max_depth:
-            continue
-        current = path[-1]
-        if current == target:
-            paths.append(path)
-            continue
-        for parent in isa_parents.get(current, set()):
-            if parent in path:
-                continue
-            queue.append(path + [parent])
-    return paths
+  NO IS-A PATH FOUND between these two CUIs.
+  -> They are not connected via PAR/CHD/RB/RN in MRREL,
+     OR the connection requires more than 15 hops.
 
 
-for start, target in PAIRS:
-    print(f"\n{'='*80}")
-    print(f"  Looking for IS-A paths:")
-    print(f"  FROM: {start}  '{lbl(start)}'")
-    print(f"  TO  : {target}  '{lbl(target)}'")
-    print(f"{'='*80}")
-
-    target_in_index = target in isa_parents or target in isa_children
-    print(f"  Target in IS-A DAG  : {target_in_index}")
-    print(f"  Target IC           : {ic_scores.get(target, 'N/A')}")
-    print(f"  Target descendants  : {descendant_counts.get(target, 'N/A')}")
-
-    paths = find_paths(start, target)
-    if not paths:
-        print(f"\n  NO IS-A PATH FOUND between these two CUIs.")
-        print(f"  -> They are not connected via PAR/CHD/RB/RN in MRREL,")
-        print(f"     OR the connection requires more than 15 hops.")
-        continue
-
-    print(f"\n  Found {len(paths)} path(s):")
-    for i, path in enumerate(paths):
-        print(f"\n  Path {i+1} ({len(path)-1} hops):")
-        for j, node in enumerate(path):
-            ic_node = ic_scores.get(node, 0.0)
-            print(f"    [{j:>2d}]  {node}  IC={ic_node:.3f}  '{lbl(node)}'")
-
-
-print("\n\nDONE")
+DONE
