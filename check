@@ -1,48 +1,168 @@
-================================================================================
-  Looking for IS-A paths:
-  FROM: C0559470  'Allergy to peanut'
-  TO  : C0016470  'Food allergy'
-================================================================================
-  Target in IS-A DAG  : True
-  Target IC           : 0.6635754450552043
-  Target descendants  : 74
+"""
+analyze_rela_distribution.py
+----------------------------
+Aggregate analysis of MRREL RO relations to decide if they're useful for rollup.
 
-  Found 1 path(s):
+Outputs:
+  1. Overall REL distribution (PAR, CHD, RB, RN, RO, SY, etc.)
+  2. For RO specifically: RELA distribution (has_causative_agent, finding_site, etc.)
+  3. For top RELAs: sample edges to judge clinical value
+  4. SNOMED-only filtered counts (both endpoints in our 374K universe)
+"""
 
-  Path 1 (3 hops):
-    [ 0]  C0559470  IC=1.000  'Allergy to peanut'
-    [ 1]  C1096735  IC=0.860  'Allergy to pulse vegetable'
-    [ 2]  C2227759  IC=0.800  'Allergy to vegetable'
-    [ 3]  C0016470  IC=0.664  'Food allergy'
-
-================================================================================
-  Looking for IS-A paths:
-  FROM: C0559470  'Allergy to peanut'
-  TO  : C2227759  'Allergy to vegetable'
-================================================================================
-  Target in IS-A DAG  : True
-  Target IC           : 0.800135652178286
-  Target descendants  : 12
-
-  Found 1 path(s):
-
-  Path 1 (2 hops):
-    [ 0]  C0559470  IC=1.000  'Allergy to peanut'
-    [ 1]  C1096735  IC=0.860  'Allergy to pulse vegetable'
-    [ 2]  C2227759  IC=0.800  'Allergy to vegetable'
-
-================================================================================
-  Looking for IS-A paths:
-  FROM: C0559470  'Allergy to peanut'
-  TO  : C0013182  'Allergy to drug'
-================================================================================
-  Target in IS-A DAG  : True
-  Target IC           : 0.45588582258322097
-  Target descendants  : 1077
-
-  NO IS-A PATH FOUND between these two CUIs.
-  -> They are not connected via PAR/CHD/RB/RN in MRREL,
-     OR the connection requires more than 15 hops.
+import pickle
+from collections import Counter, defaultdict
 
 
-DONE
+CACHE_PATH        = "umls_cache.pkl"
+TOPIC_LOOKUP_PATH = "topic_lookup.pkl"
+
+SAMPLES_PER_RELA  = 5     # show this many example edges per top RELA
+TOP_N_RELAS       = 20    # analyze top N most common RELA values in RO
+
+
+# ============================================================================
+# Load
+# ============================================================================
+
+print(f"Loading {CACHE_PATH} ...")
+with open(CACHE_PATH, "rb") as f:
+    cache = pickle.load(f)
+mrrel = cache["mrrel_rows"]
+labels = cache.get("labels", {})
+
+# Load SNOMED universe from topic_lookup.pkl
+print(f"Loading SNOMED universe from {TOPIC_LOOKUP_PATH} ...")
+with open(TOPIC_LOOKUP_PATH, "rb") as f:
+    t = pickle.load(f)
+snomed_cuis = t.get("snomed_cuis", set())
+if not labels:
+    labels = t.get("labels", {})
+
+print(f"  MRREL rows         : {len(mrrel):,}")
+print(f"  SNOMED CUIs        : {len(snomed_cuis):,}")
+print(f"  Labels             : {len(labels):,}")
+
+
+def lbl(c):
+    return labels.get(c, "?")[:50]
+
+
+# ============================================================================
+# 1. Overall REL distribution
+# ============================================================================
+
+print(f"\n{'='*80}")
+print(f"  STEP 1: Overall REL distribution")
+print(f"{'='*80}")
+
+rel_total       = Counter()         # all rows
+rel_snomed_only = Counter()         # rows where both endpoints are SNOMED
+
+for row in mrrel:
+    cui1, cui2, rel, rela = row[0], row[1], row[2], row[3]
+    rel_total[rel] += 1
+    if cui1 in snomed_cuis and cui2 in snomed_cuis:
+        rel_snomed_only[rel] += 1
+
+print(f"\n  REL              ALL rows         SNOMED-only")
+print(f"  ----------       --------------   --------------")
+for rel in sorted(rel_total, key=lambda r: -rel_total[r]):
+    t_all = rel_total[rel]
+    t_sno = rel_snomed_only[rel]
+    print(f"  {rel:<10s}       {t_all:>14,d}   {t_sno:>14,d}")
+
+
+# ============================================================================
+# 2. RELA distribution within RO
+# ============================================================================
+
+print(f"\n{'='*80}")
+print(f"  STEP 2: RELA distribution WITHIN RO (cross-axis relations)")
+print(f"{'='*80}")
+
+ro_rela_total       = Counter()
+ro_rela_snomed_only = Counter()
+ro_rela_samples     = defaultdict(list)   # RELA -> sample edges
+
+for row in mrrel:
+    cui1, cui2, rel, rela = row[0], row[1], row[2], row[3]
+    if rel != "RO":
+        continue
+    ro_rela_total[rela] += 1
+    if cui1 in snomed_cuis and cui2 in snomed_cuis:
+        ro_rela_snomed_only[rela] += 1
+        # Collect first few samples per RELA
+        if len(ro_rela_samples[rela]) < SAMPLES_PER_RELA:
+            ro_rela_samples[rela].append((cui1, cui2))
+
+print(f"\n  RO has {len(ro_rela_total)} distinct RELA values")
+print(f"  Top {TOP_N_RELAS} by SNOMED-only count:\n")
+print(f"  RELA                                      ALL          SNOMED-only")
+print(f"  --------------------------------------    ----------   --------------")
+
+top_relas = sorted(ro_rela_snomed_only,
+                   key=lambda r: -ro_rela_snomed_only[r])[:TOP_N_RELAS]
+
+for rela in top_relas:
+    t_all = ro_rela_total[rela]
+    t_sno = ro_rela_snomed_only[rela]
+    rela_str = (rela or "(none)")[:38]
+    print(f"  {rela_str:<38s}  {t_all:>10,d}   {t_sno:>14,d}")
+
+
+# ============================================================================
+# 3. Sample edges per top RELA — for clinical judgment
+# ============================================================================
+
+print(f"\n{'='*80}")
+print(f"  STEP 3: Sample edges per top RELA (for clinical judgment)")
+print(f"{'='*80}")
+
+for rela in top_relas:
+    samples = ro_rela_samples[rela]
+    rela_str = rela or "(none)"
+    n_sno = ro_rela_snomed_only[rela]
+    print(f"\n  RELA: '{rela_str}'  ({n_sno:,} SNOMED-only edges)")
+    for cui1, cui2 in samples:
+        print(f"    {cui1} '{lbl(cui1)}'")
+        print(f"      --[{rela_str}]-->")
+        print(f"    {cui2} '{lbl(cui2)}'")
+        print()
+
+
+# ============================================================================
+# 4. Summary: which RELAs look hierarchical/useful?
+# ============================================================================
+
+print(f"\n{'='*80}")
+print(f"  STEP 4: Quick classification hints (manual judgment needed)")
+print(f"{'='*80}")
+print(f"""
+  Look at the RELA names above. Common categories you'll see:
+
+  HIERARCHY-LIKE (similar to PAR/CHD, likely useful for rollup):
+    - inverse_isa, kind_of, classified_as, classifies, has_inheritance_type
+    - subset_of, member_of (sometimes)
+
+  CAUSATIVE / ETIOLOGY (cross-axis but clinically meaningful):
+    - has_causative_agent, causative_agent_of
+    - has_associated_morphology, associated_morphology_of
+    - has_finding_site, finding_site_of
+
+  COMPOSITION / STRUCTURE (cross-axis, sometimes useful):
+    - has_component, part_of, has_active_ingredient
+
+  CROSS-VOCABULARY / SYNONYMY (NOT hierarchy):
+    - mapped_to, mapped_from
+    - same_as (typically only in SY, but check)
+
+  NOISE / FLAT:
+    - allowed_qualifier, has_dose_form, has_administration_method
+    - has_intent, refers_to
+
+  After running this, identify which RELAs (if any) actually behave
+  hierarchically in your data and could supplement IS-A.
+""")
+
+print("DONE")
