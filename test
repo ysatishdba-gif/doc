@@ -1,7 +1,11 @@
-# Find candidates
-candidates = [n for n in dir() if 'rel' in n.lower() or 'mr' in n.lower()]
-print("Possible names:", candidates)
-
-# Or if it's inside umls_cache:
-if 'umls_cache' in dir():
-    print("umls_cache keys:", list(umls_cache.keys()) if hasattr(umls_cache, 'keys') else type(umls_cache))
+# Run this to see what's actually available
+for n in dir():
+    if not n.startswith('_'):
+        try:
+            v = eval(n)
+            if hasattr(v, '__len__'):
+                print(f"  {n}: type={type(v).__name__}, len={len(v)}")
+            else:
+                print(f"  {n}: type={type(v).__name__}")
+        except Exception:
+            pass
