@@ -1,11 +1,62 @@
-# Run this to see what's actually available
-for n in dir():
-    if not n.startswith('_'):
-        try:
-            v = eval(n)
-            if hasattr(v, '__len__'):
-                print(f"  {n}: type={type(v).__name__}, len={len(v)}")
-            else:
-                print(f"  {n}: type={type(v).__name__}")
-        except Exception:
-            pass
+ CUIS: type=list, len=2
+  DATASET: type=str, len=21
+  In: type=list, len=15
+  LABELS: type=dict, len=374538
+  MAX_CLIQUES_PER_TOPIC: type=int
+  MIN_CHILDREN: type=int
+  MIN_CLIQUE_SIZE: type=int
+  OUTPUT_PATH: type=str, len=16
+  Out: type=dict, len=0
+  PICKLE_PATH: type=str, len=16
+  PROJECT: type=str, len=25
+  RELATIONS_TO_USE: type=set, len=4
+  SNOMED_CUIS: type=set, len=374538
+  TAGS: type=dict, len=370670
+  all_paths_to_root: type=function
+  bron_kerbosch: type=function
+  build_isa_dag: type=function
+  build_main_topics: type=function
+  build_reverse_and_stats: type=function
+  build_rollups: type=function
+  build_subtopics: type=function
+  cache: type=dict, len=7
+  candidates: type=list, len=1
+  compute_descendant_counts: type=function
+  compute_ic: type=function
+  cui: type=str, len=8
+  data: type=DiGraph, len=24055828
+  datetime: type=module
+  exit: type=ZMQExitAutocall
+  extract_isa_edges: type=function
+  f: type=BufferedReader
+  find_cliques: type=function
+  find_rollup_ancestor: type=function
+  flatten_graph: type=function
+  get_ipython: type=method
+  hashlib: type=module
+  induced_subgraph: type=function
+  labels: type=dict, len=374538
+  lbl: type=function
+  m: type=str, len=8
+  main: type=function
+  main_members: type=set, len=4
+  main_topic_to_subtopic_ids: type=dict, len=373605
+  marker: type=str, len=0
+  math: type=module
+  members: type=frozenset, len=3
+  meta: type=dict, len=1
+  open: type=function
+  os: type=module
+  own: type=list, len=2
+  own_sorted: type=list, len=2
+  p: type=dict, len=13
+  pickle: type=module
+  quit: type=ZMQExitAutocall
+  sid: type=str, len=17
+  sty: type=list, len=1
+  subtopic_id: type=function
+  subtopic_id_to_cuis: type=dict, len=631786
+  subtopic_metadata: type=dict, len=631786
+  tags: type=dict, len=370670
+  time: type=module
+  topic_to_cuis: type=dict, len=374538
