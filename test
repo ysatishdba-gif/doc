@@ -1,17 +1,16 @@
-BUILD START — 2026-06-03T15:32:53.731735
-Found notebook 'cache' dict with keys: ['schema_version', 'fetched_at', 'config', 'cuis', 'mrrel_rows', 'tags', 'labels']
-  Using cache['mrrel_rows']  (2,748,222 rows)
+mrrel = cache["mrrel_rows"]
+print(f"Type: {type(mrrel).__name__}")
+print(f"Length: {len(mrrel)}")
+print(f"\nFirst row:")
+print(f"  type: {type(mrrel[0]).__name__}")
+print(f"  value: {mrrel[0]}")
+print(f"\nSecond row:")
+print(f"  value: {mrrel[1]}")
+print(f"\nThird row:")
+print(f"  value: {mrrel[2]}")
 
-Inputs:
-  mrrel_rows        : 2,748,222
-  SNOMED_CUIS       : 374,538
-
-[1] Extract IS-A edges
-  Extracting IS-A edges from MRREL...
-    Total MRREL rows                : 2,748,222
-    Filtering to REL in             : ['CHD', 'PAR', 'RB', 'RN']
-    Skipped (wrong relation)        : 0
-    Skipped (out of scope)          : 0
-    Kept (relation x scope match)   : 0
-    Unique IS-A edges               : 0
-  ERROR: no IS-A edges extracted. Check MRREL row format.
+# If it's a DataFrame, show columns
+import pandas as pd
+if isinstance(mrrel, pd.DataFrame):
+    print(f"\nColumns: {list(mrrel.columns)}")
+    print(mrrel.head())
