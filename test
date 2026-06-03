@@ -1,15 +1,16 @@
 """
 analyze_duplicates.py
 ---------------------
-For each CUI's rollup set, detect "duplicate" ancestors:
-  1. Literal duplicates (shouldn't exist but verify)
-  2. Hierarchical duplicates: rollup A is an IS-A ancestor of rollup B
-     -> B is more specific; A is redundant
-  3. Descendant-overlap duplicates: two rollups cover ~same descendants
+For each CUI's rollup set, detect REDUNDANT ancestors using ONLY structural
+IS-A traversal — no similarity metrics, no thresholds.
 
-Edit CUIS list, run.
+Rule: if rollup A is a transitive IS-A ancestor of rollup B (both in the
+rollup set), A is redundant. Drop A. Keep only the most-specific rollups.
+
+This is graph traversal only. No math.
 """
 
+import os
 import pickle
 from itertools import combinations
 
@@ -27,7 +28,7 @@ CUIS = [
 
 
 # ============================================================================
-# Load with explicit label diagnostics
+# Load
 # ============================================================================
 
 print(f"Loading {ROLLUP_PATH} ...")
@@ -40,36 +41,7 @@ descendant_counts = r["descendant_counts"]
 isa_parents       = r["isa_parents"]
 isa_children      = r["isa_children"]
 
-# Reconstruct descendant SETS (not just counts) for overlap analysis
-print("Computing descendant sets for overlap analysis...")
-descendant_sets = {}
-def get_descendants(node, stack):
-    if node in descendant_sets:
-        return descendant_sets[node]
-    if node in stack:
-        return set()
-    stack = stack | {node}
-    result = set()
-    for child in isa_children.get(node, ()):
-        result.add(child)
-        result |= get_descendants(child, stack)
-    descendant_sets[node] = result
-    return result
-
-# Only compute for nodes we'll need (rollup ancestors + their context)
-rollup_universe = set()
-for cui in CUIS:
-    rollup_universe |= cui_to_rollup.get(cui, set())
-for r_cui in list(rollup_universe):
-    rollup_universe |= cui_to_rollup.get(r_cui, set())  # transitive a bit
-
-for node in rollup_universe:
-    get_descendants(node, set())
-print(f"  Computed {len(descendant_sets):,} descendant sets")
-
-# Load labels — with explicit reporting
 labels = {}
-import os
 if os.path.exists(TOPIC_LOOKUP_PATH):
     print(f"Loading labels from {TOPIC_LOOKUP_PATH} ...")
     with open(TOPIC_LOOKUP_PATH, "rb") as f:
@@ -77,8 +49,7 @@ if os.path.exists(TOPIC_LOOKUP_PATH):
     labels = t.get("labels", {})
     print(f"  Loaded {len(labels):,} labels")
 else:
-    print(f"  WARNING: {TOPIC_LOOKUP_PATH} not found in cwd. "
-          f"Run: {os.getcwd()}")
+    print(f"  WARNING: {TOPIC_LOOKUP_PATH} not in cwd ({os.getcwd()})")
 
 
 def lbl(c):
@@ -86,11 +57,15 @@ def lbl(c):
 
 
 # ============================================================================
-# Duplicate detection helpers
+# Structural ancestor check (graph traversal only — no math)
 # ============================================================================
 
-def is_ancestor_of(a, b, parents_dict, max_depth=20):
-    """Is `a` a transitive IS-A ancestor of `b`?"""
+def is_isa_ancestor_of(a, b, max_depth=20):
+    """True iff `a` is a transitive IS-A ancestor of `b`.
+    Pure graph traversal — walks parent edges from `b` upward looking for `a`.
+    """
+    if a == b:
+        return False
     visited = set()
     stack = [(b, 0)]
     while stack:
@@ -100,21 +75,11 @@ def is_ancestor_of(a, b, parents_dict, max_depth=20):
         if node in visited:
             continue
         visited.add(node)
-        for p in parents_dict.get(node, set()):
+        for p in isa_parents.get(node, set()):
             if p == a:
                 return True
             stack.append((p, depth + 1))
     return False
-
-
-def descendant_jaccard(a, b):
-    """Jaccard similarity of descendant sets."""
-    da = descendant_sets.get(a, set())
-    db = descendant_sets.get(b, set())
-    union = da | db
-    if not union:
-        return 0.0
-    return len(da & db) / len(union)
 
 
 # ============================================================================
@@ -125,65 +90,53 @@ for cui in CUIS:
     print(f"\n{'='*100}")
     print(f"  {cui}  '{lbl(cui)}'")
     print(f"{'='*100}")
-    
+
     rollups = sorted(cui_to_rollup.get(cui, []))
     if not rollups:
         print(f"  No rollups")
         continue
-    
+
     print(f"  {len(rollups)} rollup ancestors:\n")
     for r_cui in sorted(rollups, key=lambda c: -ic_scores.get(c, 0.0)):
         r_ic = ic_scores.get(r_cui, 0.0)
         r_descs = descendant_counts.get(r_cui, 0)
         print(f"    {r_cui}  IC={r_ic:.3f}  descs={r_descs:>5d}  "
               f"'{lbl(r_cui)}'")
-    
+
     # 1. Literal duplicate check
     if len(rollups) != len(set(rollups)):
-        print(f"\n  ⚠ LITERAL DUPLICATES FOUND in set!")
+        print(f"\n  ⚠ LITERAL DUPLICATES FOUND")
     else:
-        print(f"\n  ✓ No literal duplicates (set has {len(set(rollups))} unique)")
-    
-    # 2. Hierarchical duplicates: pairs where one is ancestor of the other
-    print(f"\n  Hierarchical-duplicate pairs (one is IS-A ancestor of the other):")
-    hier_dups = []
+        print(f"\n  ✓ No literal duplicates ({len(set(rollups))} unique)")
+
+    # 2. Hierarchical redundancy: pairs where one is IS-A ancestor of the other
+    print(f"\n  Hierarchical redundancy "
+          f"(one rollup is an IS-A ancestor of another):")
+    redundant = set()    # rollups to drop (less specific)
+    pairs = []           # (ancestor, descendant) pairs found
+
     for a, b in combinations(rollups, 2):
-        if is_ancestor_of(a, b, isa_parents):
-            hier_dups.append((a, b, "a is ancestor of b"))
-        elif is_ancestor_of(b, a, isa_parents):
-            hier_dups.append((b, a, "b is ancestor of a"))
-    
-    if hier_dups:
-        for anc, desc, _ in hier_dups:
-            print(f"    {anc} (anc, IC={ic_scores.get(anc, 0):.3f}) "
-                  f"'{lbl(anc)[:35]}'")
-            print(f"      ↑ contains ↑")
-            print(f"    {desc} (desc, IC={ic_scores.get(desc, 0):.3f}) "
-                  f"'{lbl(desc)[:35]}'")
-            print(f"    -> '{lbl(anc)[:25]}' is REDUNDANT, drop it\n")
+        if is_isa_ancestor_of(a, b):
+            pairs.append((a, b))     # a is ancestor; a is redundant
+            redundant.add(a)
+        elif is_isa_ancestor_of(b, a):
+            pairs.append((b, a))     # b is ancestor; b is redundant
+            redundant.add(b)
+
+    if pairs:
+        for anc, desc in pairs:
+            print(f"    {anc} '{lbl(anc)[:40]}'")
+            print(f"      ↑ is ancestor of ↑")
+            print(f"    {desc} '{lbl(desc)[:40]}'")
+            print(f"    -> drop '{lbl(anc)[:30]}' (less specific)\n")
     else:
-        print(f"    (none — all rollups are siblings in IS-A, not ancestors)")
-    
-    # 3. Descendant overlap: pairs with high Jaccard
-    print(f"  Descendant-overlap pairs (Jaccard > 0.5):")
-    overlap_dups = []
-    for a, b in combinations(rollups, 2):
-        j = descendant_jaccard(a, b)
-        if j > 0.5:
-            overlap_dups.append((a, b, j))
-    
-    overlap_dups.sort(key=lambda x: -x[2])
-    if overlap_dups:
-        for a, b, j in overlap_dups:
-            print(f"    J={j:.3f}  {a} ({lbl(a)[:30]}) <-> {b} ({lbl(b)[:30]})")
-    else:
-        print(f"    (none — rollups cover distinct concept regions)")
-    
-    # 4. Suggested dedup: keep only most-specific (highest IC), drop ancestors
-    redundant = {anc for anc, desc, _ in hier_dups}
+        print(f"    (none — all rollups are siblings in IS-A, "
+              f"no ancestor/descendant pairs)")
+
+    # Suggested clean set
     kept = [r for r in rollups if r not in redundant]
-    print(f"\n  After dropping hierarchical redundancy: {len(kept)} kept "
-          f"(was {len(rollups)})")
+    print(f"  After dropping IS-A ancestors of other rollups: "
+          f"{len(kept)} kept (was {len(rollups)})")
     for r_cui in sorted(kept, key=lambda c: -ic_scores.get(c, 0.0)):
         r_ic = ic_scores.get(r_cui, 0.0)
         print(f"    {r_cui}  IC={r_ic:.3f}  '{lbl(r_cui)}'")
