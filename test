@@ -1,189 +1,70 @@
 """
-build_isa_subgroups.py
-----------------------
-Take the network-graph main topics and partition each topic's members
-into IS-A subgroups using MRREL hierarchy.
+inspect_isa_subgroups.py
+------------------------
+Show IS-A subgroups for sample CUIs.
 
-For each main topic T with members M:
-  For each pair of members (m1, m2) in M, find their shared IS-A ancestors
-  (via the rollup_index ancestors).
-  Group members by shared ancestor — one subgroup per ancestor that links
-  >= 2 members in M.
-
-Members can belong to multiple subgroups (allowed).
-
-Inputs (from existing pickles):
-  topic_lookup.pkl    : has topic_to_cuis (main topics from network graph)
-  rollup_index.pkl    : has cui_to_rollup_ancestors (IS-A rollup per CUI)
-
-Output:
-  topic_with_isa_subgroups.pkl
-
-Structure:
-  topic_to_cuis              : carried through from topic_lookup.pkl
-  isa_subgroups              : main_topic_cui -> {ancestor_cui: frozenset(members)}
-  isa_subgroup_index         : (main_topic_cui, ancestor_cui) -> frozenset(members)
-                               (flat dict for fast lookup)
-  ungrouped_members          : main_topic_cui -> frozenset(members with no
-                               shared IS-A ancestor)
-  cui_to_subgroup_ancestors  : cui -> set of (main_topic_cui, ancestor_cui)
-                               telling which subgroups a CUI participates in
-  config                     : build settings
+For each CUI, displays its main topic members partitioned into IS-A
+subgroups (members sharing rollup ancestors).
 """
 
 import pickle
-import datetime
-import time
-import os
-from collections import defaultdict
+
+PKL_PATH = "topic_with_isa_subgroups.pkl"
+
+CUIS = [
+    "C0032285",  # Pneumonia
+    "C0011849",  # Diabetes mellitus
+    "C0021368",  # Inflammation
+    "C0024109",  # Lung
+    "C2142181",  # Pain of left knee joint
+    "C0559470",  # Allergy to peanut
+    "C0013182",  # Allergy to drug
+    "C0002792",  # Anaphylaxis
+]
 
 
-TOPIC_PATH  = "topic_lookup.pkl"
-ROLLUP_PATH = "rollup_index.pkl"
-OUTPUT_PATH = "topic_with_isa_subgroups.pkl"
+with open(PKL_PATH, "rb") as f:
+    p = pickle.load(f)
+
+topic_to_cuis     = p["topic_to_cuis"]
+isa_subgroups     = p["isa_subgroups"]
+ungrouped_members = p["ungrouped_members"]
+labels            = p.get("labels", {})
 
 
-# ============================================================================
-# Load both inputs
-# ============================================================================
-
-def main():
-    print(f"BUILD START — {datetime.datetime.now().isoformat()}")
-    t_total = time.time()
-
-    print(f"\n[1] Load inputs")
-    print(f"  Loading {TOPIC_PATH} ...")
-    with open(TOPIC_PATH, "rb") as f:
-        topic_pkl = pickle.load(f)
-    topic_to_cuis = topic_pkl["topic_to_cuis"]
-    labels        = topic_pkl.get("labels", {})
-    print(f"    main topics: {len(topic_to_cuis):,}")
-
-    print(f"  Loading {ROLLUP_PATH} ...")
-    with open(ROLLUP_PATH, "rb") as f:
-        rollup_pkl = pickle.load(f)
-    cui_to_rollup = rollup_pkl["cui_to_rollup_ancestors"]
-    print(f"    CUIs with rollups: {len(cui_to_rollup):,}")
-
-    # ========================================================================
-    # [2] For each main topic, group members by shared IS-A ancestors
-    # ========================================================================
-
-    print(f"\n[2] Build IS-A subgroups within each main topic")
-    t0 = time.time()
-
-    isa_subgroups            = {}            # main_topic_cui -> {ancestor: frozenset(members)}
-    ungrouped_members        = {}            # main_topic_cui -> frozenset(members)
-    cui_to_subgroup_ancestors = defaultdict(set)
-    n_topics_with_subgroups  = 0
-    total_subgroups          = 0
-    total_members_grouped    = 0
-    total_members_ungrouped  = 0
-
-    for i, (main_topic, members) in enumerate(topic_to_cuis.items()):
-        if i % 50000 == 0 and i > 0:
-            print(f"    {i:,}/{len(topic_to_cuis):,} ({time.time()-t0:.0f}s)")
-
-        if len(members) < 2:
-            # Trivial topic — its sole member is also its anchor
-            ungrouped_members[main_topic] = frozenset(members)
-            continue
-
-        # Count, per ancestor, which members roll up to it
-        ancestor_to_members = defaultdict(set)
-        for m in members:
-            for anc in cui_to_rollup.get(m, frozenset({m})):
-                ancestor_to_members[anc].add(m)
-
-        # Keep only ancestors that link >= 2 members in this topic
-        valid_subgroups = {
-            anc: frozenset(mems)
-            for anc, mems in ancestor_to_members.items()
-            if len(mems) >= 2
-        }
-
-        if valid_subgroups:
-            isa_subgroups[main_topic] = valid_subgroups
-            n_topics_with_subgroups += 1
-            total_subgroups += len(valid_subgroups)
-
-            # Record per-CUI participation
-            grouped_in_this_topic = set()
-            for anc, mems in valid_subgroups.items():
-                for m in mems:
-                    cui_to_subgroup_ancestors[m].add((main_topic, anc))
-                    grouped_in_this_topic.add(m)
-
-            # Members not in any sub-group within this topic
-            ungrouped = set(members) - grouped_in_this_topic
-            if ungrouped:
-                ungrouped_members[main_topic] = frozenset(ungrouped)
-            total_members_grouped   += len(grouped_in_this_topic)
-            total_members_ungrouped += len(ungrouped)
-        else:
-            # No ancestor links >= 2 members — entire topic is ungrouped
-            ungrouped_members[main_topic] = frozenset(members)
-            total_members_ungrouped += len(members)
-
-    print(f"    Done in {time.time()-t0:.0f}s")
-    print(f"\n  Stats:")
-    print(f"    Main topics                       : {len(topic_to_cuis):,}")
-    print(f"    Topics with >=1 IS-A subgroup     : {n_topics_with_subgroups:,}")
-    print(f"    Total IS-A subgroups across topics: {total_subgroups:,}")
-    print(f"    Members grouped (across topics)   : {total_members_grouped:,}")
-    print(f"    Members ungrouped (across topics) : {total_members_ungrouped:,}")
-
-    # Subgroup size distribution
-    if total_subgroups:
-        sizes = []
-        for subgroups in isa_subgroups.values():
-            for mems in subgroups.values():
-                sizes.append(len(mems))
-        sizes.sort()
-        print(f"\n    IS-A subgroup size distribution:")
-        print(f"      min/median/p90/p99/max : "
-              f"{sizes[0]} / {sizes[len(sizes)//2]} / "
-              f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
-              f"{sizes[-1]}")
-
-    # ========================================================================
-    # [3] Flat lookup index (optional, for fast access)
-    # ========================================================================
-
-    print(f"\n[3] Build flat lookup index")
-    isa_subgroup_index = {}  # (main_topic_cui, ancestor_cui) -> frozenset
-    for main_topic, subgroups in isa_subgroups.items():
-        for anc, mems in subgroups.items():
-            isa_subgroup_index[(main_topic, anc)] = mems
-    print(f"    Flat entries: {len(isa_subgroup_index):,}")
-
-    # ========================================================================
-    # [4] Save
-    # ========================================================================
-
-    print(f"\n[4] Save to {OUTPUT_PATH}")
-    payload = {
-        "topic_to_cuis":             topic_to_cuis,
-        "labels":                    labels,
-        "isa_subgroups":             isa_subgroups,
-        "isa_subgroup_index":        isa_subgroup_index,
-        "ungrouped_members":         ungrouped_members,
-        "cui_to_subgroup_ancestors": dict(cui_to_subgroup_ancestors),
-        "config": {
-            "min_members_per_subgroup": 2,
-            "members_can_appear_in_multiple_subgroups": True,
-            "source_topic_lookup":      TOPIC_PATH,
-            "source_rollup":            ROLLUP_PATH,
-        },
-        "built_at": datetime.datetime.now().isoformat(),
-    }
-    with open(OUTPUT_PATH, "wb") as f:
-        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
-    print(f"    Wrote {size_mb:.1f} MB")
-
-    print(f"\nTOTAL: {time.time()-t_total:.0f}s")
-    print(f"DONE — {datetime.datetime.now().isoformat()}")
+def lbl(c):
+    return labels.get(c, "?")
 
 
-main()
+for cui in CUIS:
+    print(f"\n{'='*90}")
+    print(f"  {cui}  '{lbl(cui)}'")
+    print(f"{'='*90}")
+
+    members = topic_to_cuis.get(cui, frozenset())
+    print(f"  Main topic size: {len(members)}")
+
+    subgroups = isa_subgroups.get(cui, {})
+    ungrouped = ungrouped_members.get(cui, frozenset())
+
+    print(f"  IS-A subgroups : {len(subgroups)}")
+    print(f"  Ungrouped      : {len(ungrouped)} members\n")
+
+    # Show subgroups sorted by size (larger first)
+    sorted_groups = sorted(subgroups.items(),
+                           key=lambda kv: -len(kv[1]))
+    for anc, mems in sorted_groups:
+        marker = " <-- SELF anchor" if anc == cui else ""
+        print(f"  SUBGROUP via ancestor: {anc}  '{lbl(anc)}'{marker}")
+        for m in sorted(mems):
+            self_mark = " (self)" if m == cui else ""
+            print(f"    {m}  '{lbl(m)}'{self_mark}")
+        print()
+
+    if ungrouped:
+        print(f"  UNGROUPED (no shared IS-A ancestor with other members):")
+        for m in sorted(ungrouped):
+            self_mark = " (self)" if m == cui else ""
+            print(f"    {m}  '{lbl(m)}'{self_mark}")
+
+print("\nDONE")
