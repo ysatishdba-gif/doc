@@ -1,302 +1,97 @@
 """
-build_isa_subgroups.py
-----------------------
-For each main topic from the network graph, form GRANULAR sub-topics
-within the topic's own members.
+inspect_isa_subgroups.py
+------------------------
+Per-CUI inspector. For each CUI, prints the topics it belongs to in the
+final flat format:
 
-For each member m in topic T:
-  1. Compute m's transitive IS-A ancestor closure.
-  2. Filter to ancestors that are members of T.
-  3. Pick the highest-IC (most specific) one as m's anchor.
-  4. If no IS-A ancestor of m is in T, m goes ungrouped.
-
-Why this works:
-  IC tells us how specific a concept is. Among topic-member ancestors of
-  m, the highest-IC one is the most-specific that's still in the topic
-  — exactly the granular anchor we want.
-
-  We do NOT use Step 2's rollup ancestor here. Step 2's rollup is
-  optimized for global generalization level (where to stop walking the
-  full tree). That can be much broader than the most-specific topic
-  member. Using it as the anchor would collapse fine-grained subgroups
-  into one big broad subgroup.
-
-Inputs:
-  topic_lookup.pkl   : has topic_to_cuis (main topics from network graph)
-  rollup_index.pkl   : has ic_scores and isa_parents
-
-Output:
-  topic_with_isa_subgroups.pkl
-
-Output structure:
-  topic_to_cuis              : carried through
-  isa_subgroups              : main_topic_cui -> {anchor_cui: frozenset(members)}
-  isa_subgroup_index         : (main_topic_cui, anchor_cui) -> frozenset
-  ungrouped_members          : main_topic_cui -> frozenset(members)
-  cui_to_primary_anchor      : (main_topic_cui, cui) -> anchor_cui
-  config                     : build settings
+  ================================================================================
+  CUI  |  Label
+  STY: ...
+  -> N TOPIC(S)
+    Topic ID: tp_<hash>
+    Canonical: <CUI>
+    Label    : <label>
+    Size     : <N> CUIs
+    Members  : [list]
 """
 
 import pickle
-import datetime
-import time
-import os
-from collections import defaultdict
+
+PKL_PATH = "topic_with_isa_subgroups.pkl"
+
+CUIS = [
+    "C0032285",  # Pneumonia
+    "C0011849",  # Diabetes mellitus
+    "C0021368",  # Inflammation
+    "C0024109",  # Lung
+    "C2142181",  # Pain of left knee joint
+    "C0559470",  # Allergy to peanut
+    "C0013182",  # Allergy to drug
+    "C0002792",  # Anaphylaxis
+]
+
+MAX_MEMBERS_TO_SHOW = 25  # cap per topic for readability
 
 
-TOPIC_PATH  = "topic_lookup.pkl"
-ROLLUP_PATH = "rollup_index.pkl"
-OUTPUT_PATH = "topic_with_isa_subgroups.pkl"
+with open(PKL_PATH, "rb") as f:
+    p = pickle.load(f)
+
+topic_id_to_topic = p["topic_id_to_topic"]
+cui_to_topic_ids  = p["cui_to_topic_ids"]
+labels            = p.get("labels", {})
+tags              = p.get("tags", {})  # may be empty
 
 
-# ============================================================================
-# Ancestor closure (memoized) — used only when Step 2 rollup not in topic
-# ============================================================================
-
-def compute_ancestor_closure(cui, isa_parents, cache):
-    """All transitive IS-A ancestors of `cui` (memoized).
-    Pure graph walk."""
-    if cui in cache:
-        return cache[cui]
-    ancestors = set()
-    stack = [cui]
-    visited = set()
-    while stack:
-        node = stack.pop()
-        if node in visited:
-            continue
-        visited.add(node)
-        for p in isa_parents.get(node, set()):
-            if p not in ancestors:
-                ancestors.add(p)
-                stack.append(p)
-    cache[cui] = frozenset(ancestors)
-    return cache[cui]
+def lbl(c):
+    return labels.get(c, "?")
 
 
-# ============================================================================
-# Main
-# ============================================================================
-
-def main():
-    print(f"BUILD START — {datetime.datetime.now().isoformat()}")
-    t_total = time.time()
-
-    print(f"\n[1] Load inputs")
-    with open(TOPIC_PATH, "rb") as f:
-        topic_pkl = pickle.load(f)
-    topic_to_cuis = topic_pkl["topic_to_cuis"]
-    labels        = topic_pkl.get("labels", {})
-    tags          = topic_pkl.get("tags", {})
-    print(f"  topic_lookup.pkl: {len(topic_to_cuis):,} main topics")
-    print(f"    labels         : {len(labels):,}")
-    print(f"    tags           : {len(tags):,}")
-
-    with open(ROLLUP_PATH, "rb") as f:
-        rollup_pkl = pickle.load(f)
-    ic_scores     = rollup_pkl["ic_scores"]
-    isa_parents   = rollup_pkl["isa_parents"]
-    print(f"  rollup_index.pkl loaded")
-    print(f"    ic_scores      : {len(ic_scores):,}")
-    print(f"    isa_parents    : {len(isa_parents):,}")
-
-    # ========================================================================
-    # [2] For each main topic, assign each member to its primary anchor
-    # ========================================================================
-
-    print(f"\n[2] Form granular subgroups per main topic")
-    print(f"    Rule per member m in topic T:")
-    print(f"      1. Compute m's IS-A ancestor closure (transitive)")
-    print(f"      2. Filter to ancestors that are IN topic T")
-    print(f"      3. Pick the highest-IC (most specific) ancestor as anchor")
-    print(f"      4. If no IS-A ancestor of m is in T -> m goes ungrouped")
-    t0 = time.time()
-
-    closure_cache = {}
-    isa_subgroups            = {}
-    ungrouped_members        = {}
-    cui_to_primary_anchor    = {}   # (main_topic_cui, cui) -> anchor_cui
-    n_topics_with_subgroups  = 0
-    total_subgroups          = 0
-    total_members_grouped    = 0
-    total_members_ungrouped  = 0
-
-    for i, (main_topic, members) in enumerate(topic_to_cuis.items()):
-        if i % 50000 == 0 and i > 0:
-            print(f"    {i:,}/{len(topic_to_cuis):,} ({time.time()-t0:.0f}s)")
-
-        if len(members) < 2:
-            ungrouped_members[main_topic] = frozenset(members)
-            continue
-
-        member_set = set(members)
-
-        # Find anchor per member: highest-IC IS-A ancestor in topic
-        member_to_anchor = {}
-        for m in members:
-            closure = compute_ancestor_closure(m, isa_parents, closure_cache)
-            in_topic = closure & member_set
-            if in_topic:
-                anchor = max(in_topic,
-                             key=lambda a: ic_scores.get(a, 0.0))
-                member_to_anchor[m] = anchor
-
-        # Form subgroups: anchor -> {anchor + members anchored here}
-        subgroups = defaultdict(set)
-        for m, anchor in member_to_anchor.items():
-            subgroups[anchor].add(m)
-            subgroups[anchor].add(anchor)  # include the anchor itself
-
-        # Frozenset the subgroups
-        subgroups = {a: frozenset(s) for a, s in subgroups.items()}
-
-        if subgroups:
-            isa_subgroups[main_topic] = subgroups
-            n_topics_with_subgroups += 1
-            total_subgroups += len(subgroups)
-
-            grouped = set()
-            for s in subgroups.values():
-                grouped |= s
-            for m, anchor in member_to_anchor.items():
-                cui_to_primary_anchor[(main_topic, m)] = anchor
-
-            ungrouped = member_set - grouped
-            if ungrouped:
-                ungrouped_members[main_topic] = frozenset(ungrouped)
-            total_members_grouped   += len(grouped)
-            total_members_ungrouped += len(ungrouped)
-        else:
-            ungrouped_members[main_topic] = frozenset(members)
-            total_members_ungrouped += len(members)
-
-    print(f"\n  Done in {time.time()-t0:.0f}s")
-    print(f"\n  Stats:")
-    print(f"    Main topics                            : {len(topic_to_cuis):,}")
-    print(f"    Topics with >=1 IS-A subgroup          : "
-          f"{n_topics_with_subgroups:,}")
-    print(f"    Total subgroups across topics          : {total_subgroups:,}")
-    print(f"    Members grouped (across topics)        : "
-          f"{total_members_grouped:,}")
-    print(f"    Members ungrouped (across topics)      : "
-          f"{total_members_ungrouped:,}")
-    print(f"    Closure cache size                     : {len(closure_cache):,}")
-
-    if total_subgroups:
-        sizes = []
-        for sg in isa_subgroups.values():
-            for mems in sg.values():
-                sizes.append(len(mems))
-        sizes.sort()
-        print(f"\n    Subgroup size distribution:")
-        print(f"      min/median/p90/p99/max : "
-              f"{sizes[0]} / {sizes[len(sizes)//2]} / "
-              f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
-              f"{sizes[-1]}")
-
-    # ========================================================================
-    # [3] Build flat lookup index and FINAL topic structure
-    # ========================================================================
-
-    print(f"\n[3] Build flat lookup index")
-    isa_subgroup_index = {}
-    for main_topic, sg in isa_subgroups.items():
-        for anchor, mems in sg.items():
-            isa_subgroup_index[(main_topic, anchor)] = mems
-    print(f"    Flat entries: {len(isa_subgroup_index):,}")
-
-    # ========================================================================
-    # [3b] Deduplicate by anchor → final flat topics
-    # ========================================================================
-
-    print(f"\n[3b] Build deduplicated final topics (one per anchor CUI)")
-    import hashlib
-
-    canonical_to_members = defaultdict(set)
-    for main_topic, sg in isa_subgroups.items():
-        for anchor, mems in sg.items():
-            canonical_to_members[anchor] |= mems
-
-    def topic_id_for(canonical):
-        h = hashlib.sha1(canonical.encode()).hexdigest()[:12]
-        return f"tp_{h}"
-
-    topic_id_to_topic     = {}
-    canonical_to_topic_id = {}
-    cui_to_topic_ids      = defaultdict(set)
-
-    for canonical, mems in canonical_to_members.items():
-        tp_id = topic_id_for(canonical)
-        members_fs = frozenset(mems)
-        topic_id_to_topic[tp_id] = {
-            "canonical": canonical,
-            "label":     labels.get(canonical, "?"),
-            "members":   members_fs,
-            "size":      len(members_fs),
-        }
-        canonical_to_topic_id[canonical] = tp_id
-        for m in members_fs:
-            cui_to_topic_ids[m].add(tp_id)
-
-    # Stats on the deduped structure
-    n_topics = len(topic_id_to_topic)
-    sizes = sorted(t["size"] for t in topic_id_to_topic.values())
-    topics_per_cui = sorted(len(s) for s in cui_to_topic_ids.values())
-    print(f"    Unique topics (one per canonical anchor)  : {n_topics:,}")
-    print(f"    CUIs participating in >=1 topic           : "
-          f"{len(cui_to_topic_ids):,}")
-    if sizes:
-        print(f"    Topic size  min/median/p90/p99/max        : "
-              f"{sizes[0]} / {sizes[len(sizes)//2]} / "
-              f"{sizes[int(0.9*len(sizes))]} / "
-              f"{sizes[int(0.99*len(sizes))]} / {sizes[-1]}")
-    if topics_per_cui:
-        print(f"    Topics-per-CUI min/median/p90/p99/max     : "
-              f"{topics_per_cui[0]} / {topics_per_cui[len(topics_per_cui)//2]} / "
-              f"{topics_per_cui[int(0.9*len(topics_per_cui))]} / "
-              f"{topics_per_cui[int(0.99*len(topics_per_cui))]} / "
-              f"{topics_per_cui[-1]}")
-
-    # ========================================================================
-    # [4] Save
-    # ========================================================================
-
-    print(f"\n[4] Save to {OUTPUT_PATH}")
-    payload = {
-        "topic_to_cuis":           topic_to_cuis,
-        "labels":                  labels,
-        "tags":                    tags,
-        "isa_subgroups":           isa_subgroups,
-        "isa_subgroup_index":      isa_subgroup_index,
-        "ungrouped_members":       ungrouped_members,
-        "cui_to_primary_anchor":   cui_to_primary_anchor,
-
-        # Final flat topic structure (one topic per canonical anchor)
-        "topic_id_to_topic":       topic_id_to_topic,
-        "canonical_to_topic_id":   canonical_to_topic_id,
-        "cui_to_topic_ids":        {c: sorted(ids) for c, ids
-                                    in cui_to_topic_ids.items()},
-
-        "config": {
-            "anchor_rule":  "highest-IC IS-A ancestor in topic "
-                            "(most-specific topic-member ancestor)",
-            "one_anchor_per_member_per_main_topic": True,
-            "topic_definition":       "each unique anchor CUI = one topic, "
-                                      "members merged across all main topics",
-            "uses_ic_scores":         True,
-            "uses_step2_rollup":      False,
-            "source_topic_lookup":    TOPIC_PATH,
-            "source_rollup":          ROLLUP_PATH,
-        },
-        "built_at": datetime.datetime.now().isoformat(),
-    }
-    with open(OUTPUT_PATH, "wb") as f:
-        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
-    print(f"    Wrote {size_mb:.1f} MB")
-
-    print(f"\nTOTAL: {time.time()-t_total:.0f}s")
-    print(f"DONE — {datetime.datetime.now().isoformat()}")
+def sty(c):
+    t = tags.get(c)
+    if not t:
+        return "(no STY)"
+    if isinstance(t, (set, frozenset, list)):
+        return ", ".join(sorted(t))
+    return str(t)
 
 
-main()
+for cui in CUIS:
+    print(f"\n{'='*80}")
+    print(f"{cui}  |  {lbl(cui)}")
+    print(f"STY: {sty(cui)}")
+
+    topic_ids = cui_to_topic_ids.get(cui, [])
+    print(f"-> {len(topic_ids)} TOPIC(S)")
+
+    if not topic_ids:
+        print("  (no topics — this CUI is not anchored by any IS-A ancestor "
+              "in any of its main topics)")
+        continue
+
+    # Order topics by size (largest first) for readability
+    sorted_topic_ids = sorted(
+        topic_ids,
+        key=lambda tid: -topic_id_to_topic[tid]["size"]
+    )
+
+    for tid in sorted_topic_ids:
+        topic = topic_id_to_topic[tid]
+        canonical = topic["canonical"]
+        members   = topic["members"]
+        size      = topic["size"]
+
+        print()
+        print(f"  Topic ID : {tid}")
+        print(f"  Canonical: {canonical}")
+        print(f"  Label    : {topic['label']}")
+        print(f"  Size     : {size} CUIs")
+        print(f"  Members  :")
+
+        sorted_members = sorted(members)
+        for m in sorted_members[:MAX_MEMBERS_TO_SHOW]:
+            print(f"    {m}  '{lbl(m)}'")
+        if size > MAX_MEMBERS_TO_SHOW:
+            print(f"    ... and {size - MAX_MEMBERS_TO_SHOW} more")
+
+print("\n" + "="*80)
+print("DONE")
