@@ -1,19 +1,28 @@
 """
-inspect_topics.py
------------------
-Per-CUI inspector for topics.pkl.
+trace_topic.py
+--------------
+Show the per-member anchor decision for one focal CUI's main topic.
+For each member, prints:
+  Member CUI '<label>'  (IC=...)
+  -> Anchor CUI '<label>'  (IC=...)
+  OR -> UNGROUPED (no IS-A ancestor in topic)
 
-For each test CUI:
-  - Its STY tags
-  - All topics it belongs to (one per IS-A ancestor anchor)
-  - Per topic: ID, canonical, label, size, member CUIs
+This is the detail behind Stage C of the build. Use this to validate
+"why did this CUI get this anchor."
+
+Inputs:
+  topics_debug.pkl  : sidecar from build_topics.py
+                      Contains: neighbors, isa_parents, ic_scores, labels
+
+Edit FOCAL_CUIS to trace different CUIs. Re-running is instant —
+no rebuild needed.
 """
 
 import pickle
 
-PKL_PATH = "topics.pkl"
+DEBUG_PATH = "topics_debug.pkl"
 
-CUIS = [
+FOCAL_CUIS = [
     "C0032285",  # Pneumonia
     "C0011849",  # Diabetes mellitus
     "C0021368",  # Inflammation
@@ -24,62 +33,97 @@ CUIS = [
     "C0002792",  # Anaphylaxis
 ]
 
-MAX_MEMBERS_TO_SHOW = 25
+
+with open(DEBUG_PATH, "rb") as f:
+    d = pickle.load(f)
+
+neighbors    = d["neighbors"]
+isa_parents  = d["isa_parents"]
+ic_scores    = d["ic_scores"]
+labels       = d["labels"]
 
 
-with open(PKL_PATH, "rb") as f:
-    p = pickle.load(f)
-
-topic_id_to_topic = p["topic_id_to_topic"]
-cui_to_topic_ids  = p["cui_to_topic_ids"]
-labels            = p.get("labels", {})
-tags              = p.get("tags", {})
+def lbl(c, width=None):
+    s = labels.get(c, "?")
+    if width:
+        return s[:width].ljust(width)
+    return s
 
 
-def lbl(c):
-    return labels.get(c, "?")
+# ============================================================================
+# Memoized closure
+# ============================================================================
+
+_closure_cache = {}
 
 
-def sty(c):
-    t = tags.get(c)
-    if not t:
-        return "(no STY)"
-    if isinstance(t, (set, frozenset, list)):
-        return ", ".join(sorted(t))
-    return str(t)
+def ancestor_closure(cui):
+    if cui in _closure_cache:
+        return _closure_cache[cui]
+    ancestors = set()
+    stack = [cui]
+    visited = set()
+    while stack:
+        node = stack.pop()
+        if node in visited:
+            continue
+        visited.add(node)
+        for p in isa_parents.get(node, set()):
+            if p not in ancestors:
+                ancestors.add(p)
+                stack.append(p)
+    _closure_cache[cui] = frozenset(ancestors)
+    return _closure_cache[cui]
 
 
-for cui in CUIS:
-    print(f"\n{'='*80}")
-    print(f"{cui}  |  {lbl(cui)}")
-    print(f"STY: {sty(cui)}")
+# ============================================================================
+# Trace one focal CUI
+# ============================================================================
 
-    topic_ids = cui_to_topic_ids.get(cui, [])
-    print(f"-> {len(topic_ids)} TOPIC(S)")
+def trace(focal):
+    members = {focal} | neighbors.get(focal, frozenset())
 
-    if not topic_ids:
-        print("  (no topics — this CUI has no IS-A ancestor in any of its main topics)")
-        continue
+    print(f"\n{'='*110}")
+    print(f"FOCAL CUI: {focal}  '{labels.get(focal, '?')}'")
+    print(f"Main topic size: {len(members)} members")
+    print(f"{'='*110}\n")
 
-    # Show topics, smallest first (most specific tighter matches)
-    sorted_topic_ids = sorted(
-        topic_ids,
-        key=lambda tid: topic_id_to_topic[tid]["size"]
-    )
+    if len(members) < 2:
+        print("  (main topic too small to form subgroups)\n")
+        return
 
-    for tid in sorted_topic_ids:
-        topic = topic_id_to_topic[tid]
-        print()
-        print(f"  Topic ID : {tid}")
-        print(f"  Canonical: {topic['canonical']}")
-        print(f"  Label    : {lbl(topic['canonical'])}")
-        print(f"  Size     : {topic['size']} CUIs")
-        print(f"  IC       : {topic['anchor_ic']:.3f}")
-        print(f"  Members  :")
-        for m in sorted(topic["members"])[:MAX_MEMBERS_TO_SHOW]:
-            print(f"    {m}  '{lbl(m)}'")
-        if topic["size"] > MAX_MEMBERS_TO_SHOW:
-            print(f"    ... and {topic['size'] - MAX_MEMBERS_TO_SHOW} more")
+    # Header
+    print(f"  {'MEMBER':<70} {'->':<3} {'ANCHOR':<60} {'IC':<7}")
+    print(f"  {'-'*70} --- {'-'*60} {'-'*7}")
 
-print("\n" + "="*80)
+    # Sort members by IC descending (most-specific first)
+    sorted_members = sorted(members, key=lambda c: -ic_scores.get(c, 0.0))
+
+    n_anchored = 0
+    n_ungrouped = 0
+
+    for m in sorted_members:
+        m_ic = ic_scores.get(m, 0.0)
+        m_text = f"{m} '{lbl(m, 50)}' (IC={m_ic:.3f})"
+
+        closure = ancestor_closure(m)
+        in_topic = (closure & members) - {m}
+
+        if in_topic:
+            anchor = max(in_topic, key=lambda a: ic_scores.get(a, 0.0))
+            anchor_ic = ic_scores.get(anchor, 0.0)
+            anchor_text = f"{anchor} '{lbl(anchor, 40)}'"
+            print(f"  {m_text:<70} ->  {anchor_text:<60} {anchor_ic:.3f}")
+            n_anchored += 1
+        else:
+            print(f"  {m_text:<70} ->  UNGROUPED (no IS-A ancestor in topic)")
+            n_ungrouped += 1
+
+    print(f"\n  Summary: {n_anchored} anchored, {n_ungrouped} ungrouped")
+
+
+for cui in FOCAL_CUIS:
+    trace(cui)
+
+print(f"\n{'='*110}")
 print("DONE")
