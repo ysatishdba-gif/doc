@@ -1,274 +1,60 @@
 """
-build_rollup.py
----------------
-Build IS-A hierarchical rollup using MRREL.
+build_isa_subgroups.py
+----------------------
+For each main topic from the network graph, form GRANULAR sub-topics
+within the topic's own members, using IC-based hierarchy from Step 2.
 
-Inputs (from notebook globals):
-  cache         : dict with key 'mrrel_rows' (list of 4-tuples)
-                  Row format: (CUI1, CUI2, REL, RELA)
-  SNOMED_CUIS   : set of SNOMED CUIs (scope filter)
-  LABELS        : dict cui -> preferred label (optional, for diagnostics)
+For each member m in topic T:
+  1. Use Step 2's rollup ancestor for m as the candidate anchor.
+     (Step 2 already picked the optimal rollup using IC-acceleration
+     + min_children rule on the full IS-A DAG.)
+  2. If that rollup ancestor is a member of T → use it as m's anchor.
+  3. Else fall back: find m's IS-A ancestor closure, pick the highest-IC
+     ancestor that IS in T.
+  4. If no IS-A ancestor of m is in T → m goes ungrouped.
+
+Each member ends up in ONE primary granular subgroup (the most-specific
+anchor available in the topic). A member can also BE the anchor of
+another subgroup containing more specific members.
+
+Inputs:
+  topic_lookup.pkl   : has topic_to_cuis (main topics from network graph)
+  rollup_index.pkl   : has cui_to_rollup_ancestors, ic_scores, isa_parents
 
 Output:
-  rollup_index.pkl
+  topic_with_isa_subgroups.pkl
 
-Build rules (all structural — no similarity metrics, no thresholds on math):
-
-  1. EXTRACT IS-A edges from MRREL, REL in {PAR, CHD, RB, RN}.
-     Both endpoints must be in SNOMED_CUIS. Normalize to child -> parent.
-
-  2. Walk all paths from CUI to root via IS-A edges.
-
-  3. Find first IC delta acceleration along the path
-     (the "elbow" where ancestor IC starts dropping faster — gives a
-      clinically meaningful generalization level).
-
-  4. Walk further up if the picked ancestor has < MIN_CHILDREN children
-     (ensures rollup represents a real grouping, not a singleton parent).
-
-  5. Union the stop points across all paths -> candidate ancestors.
-
-  6. DEDUP ancestors structurally: drop any ancestor A if A is itself
-     an IS-A ancestor of another ancestor B in the set
-     (less-specific ancestors are redundant when more-specific ones exist).
-
-  7. Final rollup set = {self} U deduped(ancestors).
-     Every CUI is always findable as itself; ancestors are extra.
+Output structure:
+  topic_to_cuis              : carried through
+  isa_subgroups              : main_topic_cui -> {anchor_cui: frozenset(members)}
+  isa_subgroup_index         : (main_topic_cui, anchor_cui) -> frozenset
+  ungrouped_members          : main_topic_cui -> frozenset(members)
+  cui_to_primary_anchor      : (main_topic_cui, cui) -> anchor_cui
+                               tells what anchor each member uses in each topic
+  config                     : build settings
 """
 
 import pickle
 import datetime
-import math
 import time
 import os
-from collections import defaultdict, Counter
+from collections import defaultdict
 
 
-OUTPUT_PATH      = "rollup_index.pkl"
-RELATIONS_TO_USE = {"PAR", "CHD", "RB", "RN"}  # hierarchical only
-MIN_CHILDREN     = 3                            # rollup must group >= N concepts
-
-
-# ============================================================================
-# Step 1: Extract IS-A edges from MRREL
-# ============================================================================
-
-def extract_isa_edges(mrrel_rows, snomed_cuis, relations):
-    """Return set of (child, parent) tuples from MRREL.
-    
-    Row format: (CUI1, CUI2, REL, RELA)
-    
-    Direction normalization to child -> parent:
-      PAR  : CUI1 is child,  CUI2 is parent  -> (CUI1, CUI2)
-      CHD  : CUI1 is parent, CUI2 is child   -> (CUI2, CUI1)
-      RB   : CUI1 is narrower, CUI2 broader  -> (CUI1, CUI2)
-      RN   : CUI1 is broader, CUI2 narrower  -> (CUI2, CUI1)
-    """
-    print("  Extracting IS-A edges from MRREL...")
-    print(f"    Total rows                      : {len(mrrel_rows):,}")
-    print(f"    Filtering to REL in             : {sorted(relations)}")
-    print(f"    Both endpoints must be in SNOMED ({len(snomed_cuis):,} CUIs)")
-    
-    edges = set()
-    n_rel_match = 0
-    n_skipped_rel = 0
-    n_skipped_scope = 0
-    rel_counts = Counter()
-    
-    for row in mrrel_rows:
-        # Expected: (CUI1, CUI2, REL, RELA)
-        if len(row) < 3:
-            continue
-        cui1, cui2, rel = row[0], row[1], row[2]
-        rel_counts[rel] += 1
-        
-        if rel not in relations:
-            n_skipped_rel += 1
-            continue
-        
-        if cui1 not in snomed_cuis or cui2 not in snomed_cuis:
-            n_skipped_scope += 1
-            continue
-        if cui1 == cui2:
-            continue
-        
-        n_rel_match += 1
-        
-        # Normalize to child -> parent
-        if rel == "PAR" or rel == "RB":
-            edges.add((cui1, cui2))
-        elif rel == "CHD" or rel == "RN":
-            edges.add((cui2, cui1))
-    
-    print(f"    REL distribution (top 10):")
-    for r, c in rel_counts.most_common(10):
-        marker = " <-- using" if r in relations else ""
-        print(f"      {r:<10s}: {c:>10,d}{marker}")
-    
-    print(f"    Wrong relation                  : {n_skipped_rel:,}")
-    print(f"    Out of scope                    : {n_skipped_scope:,}")
-    print(f"    Relation matches                : {n_rel_match:,}")
-    print(f"    Unique IS-A edges               : {len(edges):,}")
-    
-    return edges
+TOPIC_PATH  = "topic_lookup.pkl"
+ROLLUP_PATH = "rollup_index.pkl"
+OUTPUT_PATH = "topic_with_isa_subgroups.pkl"
 
 
 # ============================================================================
-# Step 2: Build IS-A DAG
+# Ancestor closure (memoized) — used only when Step 2 rollup not in topic
 # ============================================================================
 
-def build_isa_dag(edges):
-    """Build child -> parents and parent -> children indexes."""
-    print("  Building IS-A DAG indexes...")
-    isa_parents  = defaultdict(set)
-    isa_children = defaultdict(set)
-    
-    for child, parent in edges:
-        isa_parents[child].add(parent)
-        isa_children[parent].add(child)
-    
-    return dict(isa_parents), dict(isa_children)
-
-
-# ============================================================================
-# Step 3: Compute descendant counts and IC
-# ============================================================================
-
-def compute_descendant_counts(isa_children, all_nodes):
-    """Transitive descendant count per node (memoized DFS)."""
-    print("  Computing descendant counts...")
-    t0 = time.time()
-    
-    descendant_sets = {}
-    
-    def descendants(node, stack):
-        if node in descendant_sets:
-            return descendant_sets[node]
-        if node in stack:
-            return set()  # cycle guard
-        stack = stack | {node}
-        result = set()
-        for child in isa_children.get(node, ()):
-            result.add(child)
-            result |= descendants(child, stack)
-        descendant_sets[node] = result
-        return result
-    
-    for node in all_nodes:
-        descendants(node, set())
-    
-    counts = {n: len(d) for n, d in descendant_sets.items()}
-    print(f"    Computed for {len(counts):,} nodes in {time.time()-t0:.1f}s")
-    return counts
-
-
-def compute_ic(descendant_counts, total_nodes):
-    """Seco structural IC: 1 - log(descendants+1) / log(total)."""
-    print("  Computing Seco IC scores...")
-    log_total = math.log(total_nodes + 1)
-    ic = {}
-    for cui, n_desc in descendant_counts.items():
-        ic[cui] = 1.0 - math.log(n_desc + 1) / log_total
-    return ic
-
-
-# ============================================================================
-# Step 4: Walk paths and find rollup ancestors
-# ============================================================================
-
-def all_paths_to_root(cui, isa_parents, max_paths=200, max_depth=30):
-    """Return list of paths (each a list of CUIs from cui up to a root).
-    Caps applied as safety nets."""
-    paths = []
-    
-    def walk(current_path, visited):
-        if len(paths) >= max_paths:
-            return
-        if len(current_path) >= max_depth:
-            paths.append(list(current_path))
-            return
-        current = current_path[-1]
-        parents = isa_parents.get(current, set()) - visited
-        if not parents:
-            paths.append(list(current_path))
-            return
-        for p in parents:
-            current_path.append(p)
-            visited.add(p)
-            walk(current_path, visited)
-            current_path.pop()
-            visited.remove(p)
-    
-    walk([cui], {cui})
-    return paths
-
-
-def find_rollup_ancestor(path, ic, isa_children, min_children):
-    """Find rollup ancestor on this path using:
-       1. First IC delta acceleration (clinically meaningful level)
-       2. Walk further if ancestor has < min_children children
-    """
-    if len(path) == 1:
-        return path[0]
-    if len(path) == 2:
-        return path[1]
-    
-    ics = [ic.get(node, 0.0) for node in path]
-    deltas = [ics[i] - ics[i+1] for i in range(len(ics) - 1)]
-    
-    # Find first delta that exceeds the previous (rate of drop accelerates)
-    ic_stop_idx = None
-    for i in range(1, len(deltas)):
-        if deltas[i] > deltas[i-1]:
-            ic_stop_idx = i
-            break
-    
-    if ic_stop_idx is None:
-        # IC drops smoothly to root — fall back to grandparent level
-        ic_stop_idx = min(2, len(path) - 1)
-    
-    # Enforce min_children: walk up if needed
-    candidate_idx = ic_stop_idx
-    while candidate_idx < len(path) - 1:
-        candidate = path[candidate_idx]
-        n_kids = len(isa_children.get(candidate, set()))
-        if n_kids >= min_children:
-            return candidate
-        candidate_idx += 1
-    
-    return path[-1]
-
-
-def is_isa_ancestor_of(a, b, isa_parents, max_depth=20):
-    """True iff `a` is a transitive IS-A ancestor of `b`.
-    Pure graph traversal — walks parent edges from `b` upward looking for `a`.
-    """
-    if a == b:
-        return False
-    visited = set()
-    stack = [(b, 0)]
-    while stack:
-        node, depth = stack.pop()
-        if depth > max_depth:
-            continue
-        if node in visited:
-            continue
-        visited.add(node)
-        for p in isa_parents.get(node, set()):
-            if p == a:
-                return True
-            stack.append((p, depth + 1))
-    return False
-
-
-# Module-level memoization cache for ancestor closure
-_ancestor_closure_cache = {}
-
-
-def _compute_ancestor_closure(cui, isa_parents):
-    """Return set of all transitive IS-A ancestors of `cui` (memoized)."""
-    if cui in _ancestor_closure_cache:
-        return _ancestor_closure_cache[cui]
+def compute_ancestor_closure(cui, isa_parents, cache):
+    """All transitive IS-A ancestors of `cui` (memoized).
+    Pure graph walk."""
+    if cui in cache:
+        return cache[cui]
     ancestors = set()
     stack = [cui]
     visited = set()
@@ -281,111 +67,8 @@ def _compute_ancestor_closure(cui, isa_parents):
             if p not in ancestors:
                 ancestors.add(p)
                 stack.append(p)
-    _ancestor_closure_cache[cui] = frozenset(ancestors)
-    return _ancestor_closure_cache[cui]
-
-
-def dedup_ancestors(ancestors, isa_parents):
-    """Drop any ancestor that is an IS-A ancestor of another ancestor in
-    the set. Keep only the most-specific ones.
-
-    Uses memoized ancestor closure -> O(N) instead of O(N^2 * depth).
-    """
-    ancestors = list(ancestors)
-    if len(ancestors) <= 1:
-        return frozenset(ancestors)
-
-    # Compute closure once per candidate (cached across CUIs)
-    closures = {a: _compute_ancestor_closure(a, isa_parents) for a in ancestors}
-
-    redundant = set()
-    for a in ancestors:
-        # `a` is redundant if some other b in the set has `a` in its closure
-        for b in ancestors:
-            if a == b:
-                continue
-            if a in closures[b]:
-                redundant.add(a)
-                break
-
-    return frozenset(a for a in ancestors if a not in redundant)
-
-
-def build_rollups(snomed_cuis, isa_parents, isa_children, ic, min_children):
-    """For each CUI, compute rollup set = {self} ∪ deduped(ancestors).
-    
-    Self is always included so the CUI itself can be a topic.
-    Ancestors are deduped to drop IS-A redundant ones.
-    """
-    print(f"  Building rollups (IC-accel + min_children={min_children})...")
-    print(f"  Each CUI's rollup = {{self}} U deduped(ancestors)")
-    t0 = time.time()
-    
-    cui_to_rollup = {}
-    paths_count = {}
-    n_orphan = 0
-    n_with_rollup = 0
-    
-    for i, cui in enumerate(snomed_cuis):
-        if i % 50000 == 0 and i > 0:
-            print(f"    Processed {i:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
-        
-        if cui not in isa_parents:
-            # Orphan: rollup is just self
-            cui_to_rollup[cui] = frozenset({cui})
-            paths_count[cui] = 0
-            n_orphan += 1
-            continue
-        
-        paths = all_paths_to_root(cui, isa_parents)
-        paths_count[cui] = len(paths)
-        
-        ancestors = set()
-        for path in paths:
-            ancestors.add(find_rollup_ancestor(path, ic, isa_children, min_children))
-        
-        # Dedup ancestors structurally (drop less-specific ancestors)
-        deduped = dedup_ancestors(ancestors, isa_parents)
-        
-        # Always include self in rollup set
-        cui_to_rollup[cui] = frozenset({cui} | deduped)
-        n_with_rollup += 1
-    
-    print(f"  Done in {time.time()-t0:.0f}s")
-    print(f"    CUIs with IS-A parents          : {n_with_rollup:,}")
-    print(f"    Orphans (rollup = self only)    : {n_orphan:,}")
-    return cui_to_rollup, paths_count
-
-
-# ============================================================================
-# Step 5: Reverse index and stats
-# ============================================================================
-
-def build_reverse_and_stats(cui_to_rollup):
-    print("  Building reverse index...")
-    rollup_to_cuis = defaultdict(set)
-    for cui, ancestors in cui_to_rollup.items():
-        for anc in ancestors:
-            rollup_to_cuis[anc].add(cui)
-    
-    n_unique = len(rollup_to_cuis)
-    compression = len(cui_to_rollup) / max(n_unique, 1)
-    
-    print(f"    Unique rollup ancestors         : {n_unique:,}")
-    print(f"    Compression ratio               : {compression:.1f}x")
-    
-    # Size distribution
-    sizes = Counter(len(d) for d in rollup_to_cuis.values())
-    print(f"    Cluster size distribution (first 10):")
-    for size, count in sorted(sizes.items())[:10]:
-        print(f"      cluster size {size:>5d}: {count:>7,d} rollups")
-    
-    biggest = sorted(rollup_to_cuis.items(), key=lambda kv: -len(kv[1]))[:5]
-    print(f"    Biggest rollup clusters (top 5):")
-    for r, descs in biggest:
-        print(f"      {r}: {len(descs):,} descendants")
-    
-    return dict(rollup_to_cuis)
+    cache[cui] = frozenset(ancestors)
+    return cache[cui]
 
 
 # ============================================================================
@@ -395,64 +78,168 @@ def build_reverse_and_stats(cui_to_rollup):
 def main():
     print(f"BUILD START — {datetime.datetime.now().isoformat()}")
     t_total = time.time()
-    
-    # Get inputs from notebook
-    mrrel_rows = cache["mrrel_rows"]
-    
-    print(f"\nInputs:")
-    print(f"  mrrel_rows       : {len(mrrel_rows):,} rows")
-    print(f"  SNOMED_CUIS      : {len(SNOMED_CUIS):,}")
-    print(f"  relations to use : {sorted(RELATIONS_TO_USE)}")
-    print(f"  min_children     : {MIN_CHILDREN}")
-    
-    print(f"\n[1] Extract IS-A edges")
-    edges = extract_isa_edges(mrrel_rows, SNOMED_CUIS, RELATIONS_TO_USE)
-    if not edges:
-        print("  ERROR: no IS-A edges. Check REL values in your MRREL.")
-        return
-    
-    print(f"\n[2] Build IS-A DAG")
-    isa_parents, isa_children = build_isa_dag(edges)
-    print(f"    CUIs with parents               : {len(isa_parents):,}")
-    print(f"    CUIs with children              : {len(isa_children):,}")
-    
-    print(f"\n[3] Compute descendants and IC")
-    all_nodes = set(isa_parents.keys()) | set(isa_children.keys())
-    descendant_counts = compute_descendant_counts(isa_children, all_nodes)
-    ic = compute_ic(descendant_counts, len(SNOMED_CUIS))
-    
-    ic_vals = sorted(ic.values())
-    if ic_vals:
-        print(f"    IC range                        : "
-              f"{ic_vals[0]:.3f} to {ic_vals[-1]:.3f}")
-        print(f"    IC median                       : "
-              f"{ic_vals[len(ic_vals)//2]:.3f}")
-    
-    print(f"\n[4] Walk paths, find rollup ancestors")
-    cui_to_rollup, paths_count = build_rollups(
-        SNOMED_CUIS, isa_parents, isa_children, ic, MIN_CHILDREN
-    )
-    
-    print(f"\n[5] Reverse index and stats")
-    rollup_to_cuis = build_reverse_and_stats(cui_to_rollup)
-    
-    print(f"\n[6] Saving to {OUTPUT_PATH}")
+
+    print(f"\n[1] Load inputs")
+    with open(TOPIC_PATH, "rb") as f:
+        topic_pkl = pickle.load(f)
+    topic_to_cuis = topic_pkl["topic_to_cuis"]
+    labels        = topic_pkl.get("labels", {})
+    print(f"  topic_lookup.pkl: {len(topic_to_cuis):,} main topics")
+
+    with open(ROLLUP_PATH, "rb") as f:
+        rollup_pkl = pickle.load(f)
+    cui_to_rollup = rollup_pkl["cui_to_rollup_ancestors"]
+    ic_scores     = rollup_pkl["ic_scores"]
+    isa_parents   = rollup_pkl["isa_parents"]
+    print(f"  rollup_index.pkl: {len(cui_to_rollup):,} CUIs with rollup")
+    print(f"    ic_scores      : {len(ic_scores):,}")
+    print(f"    isa_parents    : {len(isa_parents):,}")
+
+    # ========================================================================
+    # [2] For each main topic, assign each member to its primary anchor
+    # ========================================================================
+
+    print(f"\n[2] Form granular subgroups per main topic")
+    print(f"    Rule per member m in topic T:")
+    print(f"      1. If Step 2's rollup ancestor of m is in T -> use it")
+    print(f"         (pick highest-IC if multiple rollups in T)")
+    print(f"      2. Else find m's IS-A ancestors in T,")
+    print(f"         pick highest-IC one")
+    print(f"      3. Else m goes ungrouped")
+    t0 = time.time()
+
+    closure_cache = {}
+    isa_subgroups            = {}
+    ungrouped_members        = {}
+    cui_to_primary_anchor    = {}   # (main_topic_cui, cui) -> anchor_cui
+    n_topics_with_subgroups  = 0
+    total_subgroups          = 0
+    total_members_grouped    = 0
+    total_members_ungrouped  = 0
+    n_via_rollup             = 0
+    n_via_fallback           = 0
+
+    for i, (main_topic, members) in enumerate(topic_to_cuis.items()):
+        if i % 50000 == 0 and i > 0:
+            print(f"    {i:,}/{len(topic_to_cuis):,} ({time.time()-t0:.0f}s)")
+
+        if len(members) < 2:
+            ungrouped_members[main_topic] = frozenset(members)
+            continue
+
+        member_set = set(members)
+
+        # Find anchor per member
+        member_to_anchor = {}
+        for m in members:
+            # Try Step 2's rollup ancestors first
+            rollup_ancestors = cui_to_rollup.get(m, frozenset({m}))
+            rollup_in_topic = (rollup_ancestors & member_set) - {m}
+
+            if rollup_in_topic:
+                # Pick highest-IC rollup ancestor that's in topic
+                anchor = max(rollup_in_topic,
+                             key=lambda a: ic_scores.get(a, 0.0))
+                member_to_anchor[m] = anchor
+                n_via_rollup += 1
+                continue
+
+            # Fallback: full IS-A ancestor closure
+            closure = compute_ancestor_closure(m, isa_parents, closure_cache)
+            closure_in_topic = closure & member_set
+            if closure_in_topic:
+                anchor = max(closure_in_topic,
+                             key=lambda a: ic_scores.get(a, 0.0))
+                member_to_anchor[m] = anchor
+                n_via_fallback += 1
+
+        # Form subgroups: anchor -> {anchor + members anchored here}
+        subgroups = defaultdict(set)
+        for m, anchor in member_to_anchor.items():
+            subgroups[anchor].add(m)
+            subgroups[anchor].add(anchor)  # include the anchor itself
+
+        # Frozenset the subgroups
+        subgroups = {a: frozenset(s) for a, s in subgroups.items()}
+
+        if subgroups:
+            isa_subgroups[main_topic] = subgroups
+            n_topics_with_subgroups += 1
+            total_subgroups += len(subgroups)
+
+            grouped = set()
+            for s in subgroups.values():
+                grouped |= s
+            for m, anchor in member_to_anchor.items():
+                cui_to_primary_anchor[(main_topic, m)] = anchor
+
+            ungrouped = member_set - grouped
+            if ungrouped:
+                ungrouped_members[main_topic] = frozenset(ungrouped)
+            total_members_grouped   += len(grouped)
+            total_members_ungrouped += len(ungrouped)
+        else:
+            ungrouped_members[main_topic] = frozenset(members)
+            total_members_ungrouped += len(members)
+
+    print(f"\n  Done in {time.time()-t0:.0f}s")
+    print(f"\n  Stats:")
+    print(f"    Main topics                            : {len(topic_to_cuis):,}")
+    print(f"    Topics with >=1 IS-A subgroup          : "
+          f"{n_topics_with_subgroups:,}")
+    print(f"    Total subgroups across topics          : {total_subgroups:,}")
+    print(f"    Members grouped (across topics)        : "
+          f"{total_members_grouped:,}")
+    print(f"    Members ungrouped (across topics)      : "
+          f"{total_members_ungrouped:,}")
+    print(f"    Anchors via Step-2 rollup directly     : {n_via_rollup:,}")
+    print(f"    Anchors via fallback (closure search)  : {n_via_fallback:,}")
+    print(f"    Closure cache size                     : {len(closure_cache):,}")
+
+    if total_subgroups:
+        sizes = []
+        for sg in isa_subgroups.values():
+            for mems in sg.values():
+                sizes.append(len(mems))
+        sizes.sort()
+        print(f"\n    Subgroup size distribution:")
+        print(f"      min/median/p90/p99/max : "
+              f"{sizes[0]} / {sizes[len(sizes)//2]} / "
+              f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
+              f"{sizes[-1]}")
+
+    # ========================================================================
+    # [3] Flat lookup index
+    # ========================================================================
+
+    print(f"\n[3] Build flat lookup index")
+    isa_subgroup_index = {}
+    for main_topic, sg in isa_subgroups.items():
+        for anchor, mems in sg.items():
+            isa_subgroup_index[(main_topic, anchor)] = mems
+    print(f"    Flat entries: {len(isa_subgroup_index):,}")
+
+    # ========================================================================
+    # [4] Save
+    # ========================================================================
+
+    print(f"\n[4] Save to {OUTPUT_PATH}")
     payload = {
-        "cui_to_rollup_ancestors": cui_to_rollup,
-        "rollup_to_descendants":   rollup_to_cuis,
-        "ic_scores":               ic,
-        "descendant_counts":       descendant_counts,
-        "paths_count":             paths_count,
-        "isa_parents":             isa_parents,
-        "isa_children":            isa_children,
+        "topic_to_cuis":           topic_to_cuis,
+        "labels":                  labels,
+        "isa_subgroups":           isa_subgroups,
+        "isa_subgroup_index":      isa_subgroup_index,
+        "ungrouped_members":       ungrouped_members,
+        "cui_to_primary_anchor":   cui_to_primary_anchor,
         "config": {
-            "relations_used": sorted(RELATIONS_TO_USE),
-            "ic_formula":     "Seco: 1 - log(desc+1) / log(total)",
-            "stop_rule":      "IC-acceleration + min_children walk-up, "
-                              "with structural ancestor dedup",
-            "rollup_includes_self": True,
-            "min_children":   MIN_CHILDREN,
-            "snomed_universe_size": len(SNOMED_CUIS),
+            "anchor_rule":  "Step-2 rollup ancestor if in topic; "
+                            "else highest-IC IS-A ancestor in topic",
+            "one_anchor_per_member": True,
+            "anchors_can_also_be_members_of_other_subgroups": True,
+            "uses_ic_scores":         True,
+            "uses_step2_rollup":      True,
+            "source_topic_lookup":    TOPIC_PATH,
+            "source_rollup":          ROLLUP_PATH,
         },
         "built_at": datetime.datetime.now().isoformat(),
     }
@@ -460,7 +247,7 @@ def main():
         pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
     size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
     print(f"    Wrote {size_mb:.1f} MB")
-    
+
     print(f"\nTOTAL: {time.time()-t_total:.0f}s")
     print(f"DONE — {datetime.datetime.now().isoformat()}")
 
