@@ -1,284 +1,8 @@
 ================================================================================
-C0032285  |  Pneumonia (disorder)
-STY: Disease or Syndrome
--> 5 TOPIC(S)
-
-  Topic ID : tp_5df0c267588e
-  Canonical: C0035204
-  Label    : Respiratory disorder
-  Size     : 76 CUIs
-  Members  :
-    C0001344  'Acute pharyngitis'
-    C0001883  'Embarrassed airway'
-    C0004096  'Asthmatic'
-    C0006261  'Bronchial disorder'
-    C0006277  'Bronchitis'
-    C0010674  'Cystic fibrosis'
-    C0014013  'Abscess of pleural cavity'
-    C0018196  'Laryngeal granuloma'
-    C0021400  'Grippe'
-    C0023051  'Disease of larynx'
-    C0023067  'Laryngitis'
-    C0024110  'Abscess of lung'
-    C0024115  'Disorder of lung'
-    C0024117  'Chronic obstructive airway disease'
-    C0031350  'Pharyngitis (disorder)'
-    C0032231  'Pleuritis'
-    C0032285  'Pneumonia (disorder)'
-    C0035204  'Respiratory disorder'
-    C0035229  'Respiratory insufficiency'
-    C0035243  'Respiratory tract infection'
-    C0035244  'Neoplasm of respiratory tract'
-    C0035455  'Rhinitis'
-    C0037199  'Sinusitis'
-    C0037368  'Smoker's respiratory syndrome'
-    C0040584  'Tracheitis (disorder)'
-    ... and 51 more
-
-  Topic ID : tp_f65e676f9759
-  Canonical: C3714636
-  Label    : Pneumonitis
-  Size     : 33 CUIs
-  Members  :
-    C0002390  'EAA - Extrinsic allergic alveolitis'
-    C0032285  'Pneumonia (disorder)'
-    C0032290  'Aspiration pneumonia'
-    C0032298  'Lipid pneumonitis'
-    C0034068  'Pulmonary eosinophilia'
-    C0152450  'Rheumatic pneumonitis'
-    C0206063  'Radiation pneumonitis'
-    C0238263  'Manganese pneumonitis'
-    C0264383  'Organized pneumonia'
-    C0264384  'Granulomatous pneumonitis'
-    C0264438  'Cadmium pneumonitis'
-    C0264506  'Simple pulmonary alveolitis'
-    C0264507  'Prolonged pulmonary alveolitis'
-    C0264508  'Asthmatic pulmonary alveolitis'
-    C0264509  'Tropical pulmonary alveolitis'
-    C0264511  'Lymphoid interstitial pneumonitis (disorder)'
-    C0264512  'Rheumatoid fibrosing alveolitis'
-    C0270155  'Meconium pneumonitis'
-    C0340143  'Traumatic pneumonitis'
-    C0878555  'Diffuse panbronchiolitis'
-    C1112402  'Lupus pneumonitis'
-    C1761609  'Aspiration pneumonitis (disorder)'
-    C1960026  'Drug induced pneumonitis'
-    C2350236  'Idiopathic interstitial pneumonia'
-    C3714636  'Pneumonitis'
-    ... and 8 more
-
-  Topic ID : tp_4385b55dfcd9
-  Canonical: C0032285
-  Label    : Pneumonia (disorder)
-  Size     : 32 CUIs
-  Members  :
-    C0004626  'Bacterial pneumonia'
-    C0006285  'Lobular pneumonia'
-    C0032285  'Pneumonia (disorder)'
-    C0032290  'Aspiration pneumonia'
-    C0032300  'Lobar pneumonia'
-    C0032310  'Viral pneumonia'
-    C0155870  'Pneumonia and influenza'
-    C0158935  'Congenital pneumonia'
-    C0206061  'Interstitial pneumonia'
-    C0264377  'Peribronchial pneumonia'
-    C0264381  'Unresolved pneumonia'
-    C0264386  'Foreign body pneumonia'
-    C0264515  'Necrotizing pneumonia'
-    C0264522  'Hypostatic pneumonia'
-    C0276527  'Pneumonia with AIDS (acquired immunodeficiency syndrome)'
-    C0339961  'Fungal pneumonia'
-    C0339965  'Haemorrhagic pneumonia'
-    C0339968  'Neonatal pneumonia'
-    C0339969  'Pneumonia due to parasitic infestation'
-    C0348806  'Abscess of lung with pneumonia'
-    C0694549  'Community acquired pneumonia'
-    C0694550  'Recurrent pneumonia (disorder)'
-    C0747674  'Cavitary pneumonia'
-    C0747690  'Postobstructive pneumonia'
-    C0949083  'Nosocomial pneumonia (disorder)'
-    ... and 7 more
-
-  Topic ID : tp_35bd3a69f6da
-  Canonical: C0876973
-  Label    : Pulmonary infection
-  Size     : 22 CUIs
-  Members  :
-    C0024118  'Parasitic infection of lung (disorder)'
-    C0032285  'Pneumonia (disorder)'
-    C0041327  'Pulmonary tuberculosis'
-    C0151874  'Fungal infection of lung'
-    C0153177  'Syphilis of lung'
-    C0243025  'Hantavirus pulmonary syndrome'
-    C0275566  'Pulmonary actinomycosis'
-    C0275583  'Pulmonary nocardiosis'
-    C0275641  'Pulmonary actinobacillosis'
-    C0275705  'Pulmonary disease caused by Mycobacteria'
-    C0276154  'Adenoviral bronchiolitis'
-    C0276340  'Respiratory syncytial virus bronchiolitis'
-    C0276688  'Pulmonary cryptococcosis'
-    C0339941  'Acute viral bronchiolitis'
-    C0343436  'Pulmonary glanders'
-    C0343440  'Pulmonary melioidosis'
-    C0524688  'Pneumonic plague'
-    C0876973  'Pulmonary infection'
-    C4038810  'Bronchiolitis caused by influenza virus'
-    C4303106  'Infection of lung caused by Pneumocystis'
-    C4520326  'Pneumonia caused by Enterococcus'
-    C4520337  'Pneumonia caused by Serratia'
-
-  Topic ID : tp_49e9108d1829
-  Canonical: C0149725
-  Label    : Lower respiratory tract infection
-  Size     : 12 CUIs
-  Members  :
-    C0032285  'Pneumonia (disorder)'
-    C0149725  'Lower respiratory tract infection'
-    C0238990  'Acute lower respiratory tract infection'
-    C0340223  'Infectious disorder of trachea'
-    C0340238  'Infection of bronchus'
-    C0553966  'Infection of lower respiratory tract and mediastinum'
-    C0729520  'Bacterial lower respiratory infection'
-    C0729532  'Viral lower respiratory infection'
-    C0876973  'Pulmonary infection'
-    C3163798  'Recurrent lower respiratory tract infection'
-    C3164632  'Postoperative lower respiratory tract infection'
-    C5230491  'Obstructing Aspergillus tracheobronchitis'
-
-================================================================================
-C0011849  |  Diabetes mellitus
-STY: Disease or Syndrome
--> 5 TOPIC(S)
-
-  Topic ID : tp_8eff71ed83ee
-  Canonical: C0012634
-  Label    : Diseases
-  Size     : 564 CUIs
-  Members  :
-    C0001206  'Marie disease'
-    C0001314  'Acute disease'
-    C0001396  'Stokes-Adams attack (disorder)'
-    C0001529  'Adiposis dolorosa'
-    C0002445  'Amoeboma'
-    C0002636  'Amniotic band syndrome'
-    C0002726  'Amyloidosis'
-    C0003782  'Argyrosis'
-    C0003811  'Cardiac arrhythmia'
-    C0003962  'Ascites'
-    C0004775  'Bartter syndrome'
-    C0004812  'Insufficiency - basilar artery'
-    C0004936  'Mental disorder'
-    C0004943  'Behcet's syndrome'
-    C0005129  'Bernard Soulier syndrome'
-    C0005779  'Blood coagulation disorder'
-    C0005940  'Bone disease'
-    C0006430  'Burning mouth syndrome'
-    C0006666  'Calciphylaxis (disorder)'
-    C0007286  'Carpal tunnel syndrome'
-    C0007642  'Cellulitis (disorder)'
-    C0007682  'Disorder of the central nervous system (disorder)'
-    C0007795  'Encephalitis periaxialis diffusa'
-    C0008073  'Developmental disorder (disorder)'
-    C0008340  'Choledochal cyst'
-    ... and 539 more
-
-  Topic ID : tp_6db1986379b2
-  Canonical: C0025517
-  Label    : Metabolic disease
-  Size     : 115 CUIs
-  Members  :
-    C0001122  'Acidosis (disorder)'
-    C0001916  'Albinismus'
-    C0002063  'Alkalosis'
-    C0002514  'Inborn error of amino acid metabolism'
-    C0005944  'Metabolic disorder of bone'
-    C0006112  'Metabolic brain syndrome'
-    C0011848  'Diabetes insipidus'
-    C0011849  'Diabetes mellitus'
-    C0012715  'Disorder of iron metabolism'
-    C0016751  'Fructosemia'
-    C0016952  'Galactosaemia'
-    C0018099  'Gout'
-    C0019151  'Hepatic encephalopathy'
-    C0020623  'Hypolipoproteinaemia'
-    C0020639  'Hypoproteinaemia'
-    C0021655  'Insulin resistance'
-    C0022610  'Kernicterus'
-    C0023195  'Complete LCAT (lecithin-cholesterol acyltransferase) deficiency'
-    C0023794  'Lipoidosis (disorder)'
-    C0025517  'Metabolic disease'
-    C0025521  'Inborn error of metabolism'
-    C0026697  'Mucolipidosis'
-    C0026703  'Mucopolysaccharidosis'
-    C0032617  'Polyuric state'
-    C0032708  'Disorder of porphyrin metabolism'
-    ... and 90 more
-
-  Topic ID : tp_ac21fa560b8e
-  Canonical: C0014130
-  Label    : Endocrine system disease
-  Size     : 54 CUIs
-  Members  :
-    C0001621  'Disorder of adrenal gland'
-    C0002176  'Endocrine alopecia'
-    C0010308  'Congenital hypothyroidism'
-    C0011849  'Diabetes mellitus'
-    C0014130  'Endocrine system disease'
-    C0014132  'Neoplasm of endocrine gland'
-    C0017301  'General adaptation syndrome'
-    C0020456  'Hyperglycaemia'
-    C0020615  'Hypoglycaemia'
-    C0029927  'Ovarian cyst'
-    C0029928  'Disorder of ovary'
-    C0030286  'Disorder of pancreas (disorder)'
-    C0030517  'Parathyroid disease'
-    C0032002  'Pituitary disease'
-    C0040128  'Thyroid disease'
-    C0085215  'Premature ovarian failure'
-    C0085404  'POEMS syndrome'
-    C0154199  'Disorder of thymus gland (disorder)'
-    C0154218  'Polyglandular dysfunction AND/OR related disorder'
-    C0154222  'Polyglandular dysfunction'
-    C0232567  'Increased gastrin secretion (disorder)'
-    C0266271  'Congenital anomaly of endocrine gland'
-    C0271587  'Isolated deficiency of hormone other than HGH (human growth hormone)'
-    C0271650  'Impaired glucose tolerance (disorder)'
-    C0271880  'Functional disease of the CNS with neuroendocrine disturbance'
-    ... and 29 more
-
-  Topic ID : tp_dc3787c01d5a
-  Canonical: C0011849
-  Label    : Diabetes mellitus
-  Size     : 18 CUIs
-  Members  :
-    C0011849  'Diabetes mellitus'
-    C0011854  'Diabetes mellitus type 1'
-    C0011859  'Lipodystrophic diabetes'
-    C0011860  'Type II diabetes mellitus'
-    C0271640  'Secondary diabetes mellitus'
-    C0341893  'Diabetes mellitus in mother complicating pregnancy, childbirth AND/OR puerperium'
-    C0342302  'Brittle diabetes mellitus (disorder)'
-    C1263962  'Houssay syndrome'
-    C1320655  'Newly diagnosed diabetes'
-    C1859965  'Alaninuria, microcephaly, dwarfism, enamel hypoplasia, diabetes mellitus syndrome'
-    C2874124  'Diabetes mellitus due to genetic defect in insulin action'
-    C2874125  'Diabetes mellitus due to genetic defect in beta cell function'
-    C2931296  'Pancreatic hypoplasia, diabetes mellitus, congenital heart disease syndrome'
-    C3837958  'Ketosis-prone diabetes mellitus'
-    C3839440  'Diabetes mellitus in remission'
-    C3875503  'Diabetes mellitus due to pancreatic injury'
-    C4274674  'Gingival disease co-occurrent with diabetes mellitus'
-    C4302120  'Atypical diabetes mellitus'
-
-  Topic ID : tp_aeea67caebcf
-  Canonical: C1257958
-  Label    : Disorder of glucose metabolism
-  Size     : 4 CUIs
-  Members  :
-    C0011849  'Diabetes mellitus'
-    C0020456  'Hyperglycaemia'
-    C0020615  'Hypoglycaemia'
-    C1257958  'Disorder of glucose metabolism'
+C4318450  |  DNA mismatch repair protein (substance)
+STY: Amino Acid, Peptide, or Protein, Biologically Active Substance
+-> 0 TOPIC(S)
+  (no topics — this CUI is not anchored by any IS-A ancestor in any of its main topics)
 
 ================================================================================
 C0021368  |  Inflammation
@@ -311,147 +35,88 @@ STY: Pathologic Function
     C1260958  'Serofibrinous inflammation'
 
 ================================================================================
-C0024109  |  Lung
-STY: Body Part, Organ, or Organ Component
--> 9 TOPIC(S)
+C0024485  |  Magnetic resonance imaging
+STY: Diagnostic Procedure
+-> 3 TOPIC(S)
 
-  Topic ID : tp_9eabfc734440
-  Canonical: C0817096
-  Label    : Thoracic structure
-  Size     : 29 CUIs
+  Topic ID : tp_314135c2e182
+  Canonical: C0011923
+  Label    : Imaging (procedure)
+  Size     : 68 CUIs
   Members  :
-    C0006141  'Breast'
-    C0006255  'Bronchus'
-    C0024109  'Lung'
-    C0025066  'Mediastinal structure (body structure)'
-    C0032225  'Pleura'
-    C0039976  'Artery of thorax'
-    C0205076  'Chest wall'
-    C0222762  'Rib cage'
-    C0226629  'Vein of thorax'
-    C0229745  'Thoracic lymph node'
-    C0230077  'Clavicular region'
-    C0230108  'Infraclavicular region structure'
-    C0230130  'Thoracic viscus'
-    C0230135  'Sternal region'
-    C0230146  'Structure of soft tissue of thorax'
-    C0230147  'Superior mediastinum'
-    C0231127  'Structure of foetal chest contents'
-    C0446468  'Structure of surface region of thorax'
-    C0448157  'Bone structure of thorax'
-    C0559667  'Structure of lymphatic system of thorax'
-    C0567362  'Structure of musculoskeletal system of thorax'
-    C0817096  'Thoracic structure'
-    C1269614  'Entire chest region'
-    C1276308  'Part of chest wall'
-    C1301386  'Thoracic mesothelium'
-    ... and 4 more
+    C0002971  'Angiocardiography'
+    C0002978  'Angiogram'
+    C0003885  'Arthrography (procedure)'
+    C0008797  'Cineradiography (procedure)'
+    C0009618  'Computer assisted image analysis'
+    C0011923  'Imaging (procedure)'
+    C0016356  'Fluoroscopy (procedure)'
+    C0024485  'Magnetic resonance imaging'
+    C0032743  'Positron emission tomography'
+    C0034606  'Radionuclide scanning'
+    C0039810  'Thermography imaging - action (qualifier value)'
+    C0039985  'Plain X-ray of chest'
+    C0040395  'Tomographic imaging procedure'
+    C0040399  'Single photon emission computed tomography'
+    C0041618  'Ultrasonography'
+    C0043350  'Xerography'
+    C0202633  'Radiologic supervision and interpretation of procedure'
+    C0203051  'Vaginography'
+    C0203057  'Upper gastrointestinal tract series'
+    C0203103  'Nephrotomography'
+    C0203108  'Intravenous urography'
+    C0203139  'Plain X-ray of spine'
+    C0203800  'Bone marrow imaging'
+    C0412163  'Cavernosometry'
+    C0412176  'Acromioclavicular joint arthrogram'
+    ... and 43 more
 
-  Topic ID : tp_60705b7e60c3
-  Canonical: C3698554
-  Label    : Structure of thoracic cavity and/or content
-  Size     : 12 CUIs
+  Topic ID : tp_a2eb423e4b4f
+  Canonical: C0024485
+  Label    : Magnetic resonance imaging
+  Size     : 44 CUIs
   Members  :
-    C0006255  'Bronchus'
-    C0024109  'Lung'
-    C0025066  'Mediastinal structure (body structure)'
-    C0040113  'Thymus gland structure (body structure)'
-    C0230130  'Thoracic viscus'
-    C0230138  'Thoracic outlet'
-    C0230139  'Thoracic cavity structure'
-    C0230142  'Structure of pulmonary sulcus of thorax (body structure)'
-    C0559362  'Intrathoracic cardiovascular structure'
-    C3698225  'Structure of pulmopleural compartment'
-    C3698554  'Structure of thoracic cavity and/or content'
-    C4516548  'Entire compartment of thorax'
+    C0024485  'Magnetic resonance imaging'
+    C0024487  'Magnetic resonance spectroscopy'
+    C0177803  'MRI of spine'
+    C0202670  'MRI without contrast'
+    C0202671  'MRI with contrast'
+    C0202672  'Magnetic resonance imaging without IV contrast followed by contrast and more sections'
+    C0202673  'MRI - musculoskeletal structures'
+    C0202762  'MRI of neck'
+    C0202826  'Magnetic resonance imaging of chest'
+    C0202828  'MRI of mediastinum'
+    C0203201  'Magnetic resonance imaging of pelvis'
+    C0412674  'MRI of head'
+    C0412693  'Magnetic resonance imaging of abdomen'
+    C0412697  'MRI of pancreas'
+    C0442974  'Magnetic resonance imaging guidance'
+    C0598801  'Diffusion weighted magnetic resonance imaging (procedure)'
+    C1142375  'MRI of whole body'
+    C1518156  'Magnetic resonance elastography'
+    C1628484  'MRI of lymphatic system'
+    C1634512  'MRI of urinary tract'
+    C2021832  'MRI of retroperitoneum'
+    C2121332  'MRI of esophagus'
+    C2315874  'MRI of acromioclavicular joint'
+    C2315957  'MRI of foetus'
+    C2316168  'MRI of spine with contrast'
+    ... and 19 more
 
-  Topic ID : tp_c7325d96fc7d
-  Canonical: C0024109
-  Label    : Lung
-  Size     : 10 CUIs
+  Topic ID : tp_f354a5f59b9a
+  Canonical: C1275506
+  Label    : Imaging - action
+  Size     : 9 CUIs
   Members  :
-    C0006270  'Lobular bronchiole'
-    C0024109  'Lung'
-    C0034051  'Pulmonary alveolar structure (body structure)'
-    C0225696  'Structure of acinus of lung (body structure)'
-    C0225698  'Pneumocyte (cell)'
-    C0225706  'Right lung structure (body structure)'
-    C0225730  'Left lung structure'
-    C0278427  'Structure of transplanted lung (body structure)'
-    C1268107  'Lung part'
-    C1278908  'Entire lung'
-
-  Topic ID : tp_8d65e8d148ea
-  Canonical: C1302847
-  Label    : Lower respiratory system structure
-  Size     : 7 CUIs
-  Members  :
-    C0024109  'Lung'
-    C0032225  'Pleura'
-    C0040578  'Windpipe'
-    C0458579  'Lower respiratory tract'
-    C0504090  'Pleural sac structure'
-    C1302847  'Lower respiratory system structure'
-    C4517053  'Entire lower respiratory system'
-
-  Topic ID : tp_94dff4917c03
-  Canonical: C0458579
-  Label    : Lower respiratory tract
-  Size     : 7 CUIs
-  Members  :
-    C0006255  'Bronchus'
-    C0024109  'Lung'
-    C0225384  'Lower respiratory spaces'
-    C0458579  'Lower respiratory tract'
-    C0458580  'Tracheobronchial tree'
-    C0545700  'Lower respiratory fluids and spaces'
-    C3665591  'Entire lower respiratory tract (body structure)'
-
-  Topic ID : tp_b494de843578
-  Canonical: C0230130
-  Label    : Thoracic viscus
-  Size     : 6 CUIs
-  Members  :
-    C0018787  'Cardiac structure'
-    C0024109  'Lung'
-    C0040113  'Thymus gland structure (body structure)'
-    C0230130  'Thoracic viscus'
-    C0524420  'Structure of lower third of trachea'
-    C1279251  'Entire thoracic viscera'
-
-  Topic ID : tp_bb1e1122be2b
-  Canonical: C4075195
-  Label    : Structure of organ in respiratory system
-  Size     : 6 CUIs
-  Members  :
-    C0023078  'Larynx'
-    C0024109  'Lung'
-    C0031354  'Pharynx'
-    C0458580  'Tracheobronchial tree'
-    C4075195  'Structure of organ in respiratory system'
-    C4075385  'Entire organ in respiratory system'
-
-  Topic ID : tp_e1a185cf32fc
-  Canonical: C3698225
-  Label    : Structure of pulmopleural compartment
-  Size     : 6 CUIs
-  Members  :
-    C0024109  'Lung'
-    C0229749  'Structure of intrapulmonary lymph node'
-    C0504090  'Pleural sac structure'
-    C1305372  'Hilar lymph nodes'
-    C3698225  'Structure of pulmopleural compartment'
-    C4516549  'Entire pulmopleural compartment'
-
-  Topic ID : tp_12911e72b2d6
-  Canonical: C1285482
-  Label    : Pulmonary structure including vessels and lymphoid tissue
-  Size     : 4 CUIs
-  Members  :
-    C0024109  'Lung'
-    C0229919  'Structure of lymphatic vessel of lung'
-    C0459963  'Structure of pulmonary blood vessel'
-    C1285482  'Pulmonary structure including vessels and lymphoid tissue'
+    C0024485  'Magnetic resonance imaging'
+    C0039810  'Thermography imaging - action (qualifier value)'
+    C0040395  'Tomographic imaging procedure'
+    C0041618  'Ultrasonography'
+    C0457276  'Radiographic imaging - action'
+    C1275506  'Imaging - action'
+    C1283198  'Cine imaging - action'
+    C1283205  'Video imaging - action'
+    C2368359  'Radionuclide imaging'
 
 ================================================================================
 C2142181  |  Pain of left knee joint (finding)
@@ -479,90 +144,9 @@ STY: Sign or Symptom
     C4509797  'Chronic pain following left total knee arthroplasty'
 
 ================================================================================
-C0559470  |  Allergy to peanut
+C0016470  |  Food allergy
 STY: Disease or Syndrome
--> 1 TOPIC(S)
-
-  Topic ID : tp_cba809ff32f0
-  Canonical: C1096735
-  Label    : Allergy to pulse vegetable
-  Size     : 6 CUIs
-  Members  :
-    C0559470  'Allergy to peanut'
-    C1096735  'Allergy to pulse vegetable'
-    C2227748  'Allergy to bean'
-    C4708093  'Allergy to pea'
-    C4758649  'Allergy to lupine seed'
-    C4758660  'Allergy to soy protein'
-
-================================================================================
-C0013182  |  Allergy to drug
-STY: Pathologic Function
 -> 5 TOPIC(S)
-
-  Topic ID : tp_040e78072525
-  Canonical: C0013182
-  Label    : Allergy to drug
-  Size     : 565 CUIs
-  Members  :
-    C0013182  'Allergy to drug'
-    C0014808  'Allergy to erythromycin'
-    C0030824  'Penicillin allergy'
-    C0039645  'Tetracycline allergy'
-    C0344168  'Drug-induced anaphylaxis'
-    C0570513  'Acetaminophen allergy'
-    C0570514  'Salicylate allergy'
-    C0570537  'Allergy to non-steroidal anti-inflammatory agent'
-    C0570569  'Allergy to tripotassium dicitratobismuthate'
-    C0570570  'Sucralfate allergy'
-    C0570573  'Allergy to histamine H2 receptor antagonist'
-    C0570578  'Allergy to H+/K+-exchanging ATPase inhibitor'
-    C0570581  'Carbenoxolone allergy'
-    C0570582  'Allergy to pirenzepine'
-    C0570583  'Pancreatin allergy'
-    C0570589  'Allergy to magnesium trisilicate'
-    C0570590  'Allergy to aluminum hydroxide'
-    C0570592  'Allergy to loperamide'
-    C0570595  'Cisapride allergy'
-    C0570597  'Nabilone allergy'
-    C0570598  'Allergy to domperidone'
-    C0570599  'Metoclopramide allergy'
-    C0570600  'Allergy to 5-hydroxytryptamine-3-receptor antagonist'
-    C0570602  'Bisacodyl allergy'
-    C0570603  'Allergy to danthron'
-    ... and 540 more
-
-  Topic ID : tp_37a5d8bdf1d3
-  Canonical: C0041755
-  Label    : Adverse drug reaction
-  Size     : 158 CUIs
-  Members  :
-    C0011609  'Drug eruption'
-    C0013182  'Allergy to drug'
-    C0041755  'Adverse drug reaction'
-    C0261889  'Adverse reaction caused by digestant (disorder)'
-    C0261891  'Adverse reaction to emetic'
-    C0261915  'Adverse reaction to antipruritic'
-    C0261926  'Adverse reaction to lipotropic drugs'
-    C0264712  'Drug-related myocardial necrosis syndrome'
-    C0339490  'Drug-induced retinopathy'
-    C0340067  'Drug-induced asthma'
-    C0344178  'Non-allergic anaphylaxis caused by drug'
-    C0393582  'Drug-induced chorea'
-    C0413625  'Chlorphenamine adverse reaction'
-    C0413626  'Diphenylpyraline adverse reaction'
-    C0413627  'Adverse reaction to metoclopramide'
-    C0413637  'Treosulphan adverse reaction'
-    C0413671  'Anticoagulant adverse reaction'
-    C0413678  'Adverse reaction to fibrinolytic drugs'
-    C0413681  'Adverse reaction to anticoagulant antagonists'
-    C0413691  'Adverse reaction to macromolecular blood substitutes'
-    C0413694  'Adverse reaction to antipyretic'
-    C0413715  'Adverse reaction to pyrazole derivative'
-    C0413758  'Adverse reaction to barbiturate'
-    C0413785  'Adverse reaction to central nervous system muscle-tone depressants'
-    C0413876  'Adverse reaction to parasympathomimetic'
-    ... and 133 more
 
   Topic ID : tp_ac524d20e417
   Canonical: C3539909
@@ -596,183 +180,271 @@ STY: Pathologic Function
     C0571089  'Allergy to anthralin'
     ... and 110 more
 
-  Topic ID : tp_efde21f90a91
-  Canonical: C1527304
-  Label    : Allergic reaction
-  Size     : 27 CUIs
+  Topic ID : tp_871baf25637b
+  Canonical: C3532523
+  Label    : Hypersensitivity condition
+  Size     : 41 CUIs
   Members  :
-    C0002792  'Anaphylaxis'
-    C0013182  'Allergy to drug'
-    C0259756  'Jarisch Herxheimer reaction'
-    C0271157  'Phacoanaphylaxis'
-    C0343029  'Tuberculids'
-    C0392707  'Atopic diathesis'
-    C0413234  'Acute allergic reaction'
-    C0429892  'Type 1 hypersensitivity response'
-    C1283787  'Allergic transfusion reaction'
-    C1304076  'Angry back syndrome'
-    C1527304  'Allergic reaction'
-    C1626923  'Allergic reaction to chemical'
-    C1630647  'Allergic reaction to animal'
-    C1631062  'Allergic reaction to detergent'
-    C1633733  'Allergic reaction to cosmetics'
-    C1633749  'Allergic reaction to adhesive'
-    C1635270  'Allergic reaction to pollen'
-    C1636155  'Allergic reaction to plant, except food'
-    C1690580  'Allergic reaction to food'
-    C1690975  'Allergic reaction to flour dust'
-    C2317062  'Allergic reaction to tattoo ink'
-    C3532600  'Allergic reaction to hair dye'
-    C3662037  'Allergic reaction to radiocontrast media'
-    C4749634  'Allergic reaction caused by vaccine product'
-    C5192382  'Allergic reaction due to allergy skin test'
-    ... and 2 more
-
-  Topic ID : tp_382c1947e0ae
-  Canonical: C0237865
-  Label    : Propensity to adverse reactions to drug
-  Size     : 13 CUIs
-  Members  :
-    C0013182  'Allergy to drug'
-    C0237865  'Propensity to adverse reactions to drug'
-    C0277585  'Drug intolerance'
-    C1622492  'Minocycline hypersensitivity'
-    C5192094  'Multiple drug intolerant hypertension'
-    C5567104  'Hypersensitivity to polyethylene glycol'
-    C5768819  'Hypersensitivity to abacavir'
-    C5817289  'Hypersensitivity to succinylcholine'
-    C5817290  'Hypersensitivity to gentamicin'
-    C5817291  'Erythromycin hypersensitivity'
-    C5817297  'Hydrocortisone hypersensitivity'
-    C5817298  'Hypersensitivity to atenolol'
-    C5817301  'Nalidixic acid hypersensitivity'
-
-================================================================================
-C0002792  |  Anaphylaxis
-STY: Pathologic Function
--> 5 TOPIC(S)
-
-  Topic ID : tp_da5a4bd9cd3e
-  Canonical: C0442893
-  Label    : Systemic illness
-  Size     : 31 CUIs
-  Members  :
-    C0002792  'Anaphylaxis'
-    C0021390  'Inflammatory bowel disease'
-    C0032453  'Relapsing polychondritis'
-    C0036421  'Systemic scleroderma'
-    C0221013  'Systemic mastocytosis'
-    C0242966  'Systemic inflammatory response syndrome'
-    C0263741  'Extra-articular rheumatoid process'
-    C0268380  'Systemic amyloidosis (disorder)'
-    C0339369  'Cataract in systemic disorders'
-    C0339907  'Lung disease with Sjogren's disease'
-    C0340865  'Anaphylactoid reaction'
-    C0342961  'Severe systemic illness tissue wasting'
-    C0343092  'Systemic lymphangiomatosis'
-    C0343205  'Lupus vasculitis'
-    C0403517  'Renal disorders in systemic disease'
-    C0406680  'Systemic disease affecting skin'
-    C0442893  'Systemic illness'
-    C0948245  'Cytokine release syndrome'
-    C1275457  'Lupus erythematosus-associated necrotizing vasculitis'
-    C1384600  'Systemic onset juvenile chronic arthritis (disorder)'
-    C4014795  'Signal transducer and activator of transcription 3-related early-onset multisystem autoimmune disease'
-    C4305593  'Disorder of connective tissue co-occurrent and due to systemic disease'
-    C4518482  'Extraintestinal Crohn's'
-    C4545341  'Interstitial lung disease with systemic vasculitis'
-    C4552543  'TAFRO syndrome'
-    ... and 6 more
-
-  Topic ID : tp_efde21f90a91
-  Canonical: C1527304
-  Label    : Allergic reaction
-  Size     : 27 CUIs
-  Members  :
-    C0002792  'Anaphylaxis'
-    C0013182  'Allergy to drug'
-    C0259756  'Jarisch Herxheimer reaction'
-    C0271157  'Phacoanaphylaxis'
-    C0343029  'Tuberculids'
-    C0392707  'Atopic diathesis'
-    C0413234  'Acute allergic reaction'
-    C0429892  'Type 1 hypersensitivity response'
-    C1283787  'Allergic transfusion reaction'
-    C1304076  'Angry back syndrome'
-    C1527304  'Allergic reaction'
-    C1626923  'Allergic reaction to chemical'
-    C1630647  'Allergic reaction to animal'
-    C1631062  'Allergic reaction to detergent'
-    C1633733  'Allergic reaction to cosmetics'
-    C1633749  'Allergic reaction to adhesive'
-    C1635270  'Allergic reaction to pollen'
-    C1636155  'Allergic reaction to plant, except food'
-    C1690580  'Allergic reaction to food'
-    C1690975  'Allergic reaction to flour dust'
-    C2317062  'Allergic reaction to tattoo ink'
-    C3532600  'Allergic reaction to hair dye'
-    C3662037  'Allergic reaction to radiocontrast media'
-    C4749634  'Allergic reaction caused by vaccine product'
-    C5192382  'Allergic reaction due to allergy skin test'
-    ... and 2 more
-
-  Topic ID : tp_7fe1ee2e1f55
-  Canonical: C0002792
-  Label    : Anaphylaxis
-  Size     : 21 CUIs
-  Members  :
-    C0002792  'Anaphylaxis'
-    C0161840  'Anaphylactic transfusion reaction'
-    C0274305  'Localized anaphylaxis'
-    C0344159  'Anaphylaxis caused by venom'
-    C0344168  'Drug-induced anaphylaxis'
-    C0344172  'Seminal fluid-induced anaphylaxis'
-    C0344183  'Exercise-induced anaphylaxis'
-    C0413235  'Idiopathic anaphylaxis'
-    C0685898  'Food anaphylaxis'
-    C4316895  'Shock due to anaphylaxis'
-    C4543745  'Anaphylaxis due to mast cell disorder'
-    C4546212  'Anaphylaxis caused by low temperature'
-    C5192386  'Anaphylaxis after allergen immunotherapy'
-    C5397548  'Anaphylaxis caused by insect bite and/or insect sting'
-    C5438739  'Anaphylaxis caused by Hevea brasiliensis latex protein'
-    C5549840  'Anaphylaxis caused by component of vaccine product'
-    C5687621  'Anaphylaxis caused by allergy skin test'
-    C5788565  'Postoperative anaphylaxis'
-    C5817050  'Anaphylaxis caused by radiographic contrast media'
-    C5817051  'Anaphylaxis caused by sulfonamide'
-    C5817053  'Anaphylaxis caused by food additive'
-
-  Topic ID : tp_4e2ba1c64fef
-  Canonical: C0020517
-  Label    : Hypersensitivity reaction (disorder)
-  Size     : 17 CUIs
-  Members  :
-    C0002792  'Anaphylaxis'
+    C0009766  'Allergic conjunctivitis'
+    C0011616  'Contact dermatitis'
+    C0016470  'Food allergy'
     C0020517  'Hypersensitivity reaction (disorder)'
     C0020522  'Hypersensitivity reaction type IV'
-    C0030824  'Penicillin allergy'
-    C0036830  'Serum sickness due to transfusion'
-    C0155854  'Upper respiratory tract hypersensitivity reaction'
-    C0392707  'Atopic diathesis'
-    C0399430  'Plasma cell gingivitis'
-    C0406201  'Skin reaction to suture material'
-    C0413234  'Acute allergic reaction'
-    C1302878  'Contact hypersensitivity reaction'
-    C1527304  'Allergic reaction'
-    C3541994  'Drug reaction with eosinophilia and systemic symptoms (disorder)'
-    C3662262  'Non-allergic hypersensitivity reaction'
-    C3662263  'Immune hypersensitivity reaction by mechanism'
-    C4521760  'Hypersensitivity reaction caused by food'
-    C4543756  'Cutaneous hypersensitivity reaction caused by Hymenoptera venom'
+    C0020523  'IgE-mediated allergic disorder'
+    C0038325  'Stevens-Johnson syndrome'
+    C0151726  'Injection site hypersensitivity'
+    C0155150  'Contact blepharoconjunctivitis'
+    C0162351  'Contact hypersensitivity'
+    C0263333  'Contact urticaria'
+    C0263347  'Urticaria medicamentosa'
+    C0272285  'Heparin induced thrombocytopenia'
+    C0276742  'Kerion celsi'
+    C0282504  'Environmental allergy (finding)'
+    C0301923  'Hypersensitivity to foreign antigen'
+    C0301924  'Hypersensitivity to endogenous antigen'
+    C0413243  'Chemical-aggravated angioedema-urticaria'
+    C0521714  'Marginal keratitis'
+    C0577628  'Allergy to latex'
+    C0851444  'Allergic condition'
+    C1260879  'Autoimmune progesterone dermatitis (disorder)'
+    C1268945  'ACE inhibitor-induced angioedema'
+    C1274191  'Toxic epidermal necrolysis caused by drug'
+    C1304159  'Toxic epidermal necrolysis due to graft-versus-host disease'
+    ... and 16 more
 
-  Topic ID : tp_00a20a95db49
-  Canonical: C0413234
-  Label    : Acute allergic reaction
+  Topic ID : tp_6cc42f11d92f
+  Canonical: C0016470
+  Label    : Food allergy
+  Size     : 30 CUIs
+  Members  :
+    C0016470  'Food allergy'
+    C0567447  'Allergy to egg protein'
+    C0570763  'Tryptophan allergy'
+    C0571213  'Glycine allergy'
+    C0571230  'Olive oil allergy'
+    C0571231  'Arachis oil allergy'
+    C0571649  'Guar gum allergy'
+    C0577620  'Allergy to nut'
+    C0577624  'Allergy to chocolate'
+    C0577626  'Allergy to cheese'
+    C0685900  'Seafood allergy'
+    C0685901  'Allergy to fruit'
+    C0859949  'Allergy to meat'
+    C0949570  'Allergy to wheat'
+    C1623734  'Allergy to oat'
+    C1630645  'Allergy to red meat'
+    C1636156  'Allergy to rye'
+    C1638314  'Allergy to coconut oil'
+    C1639524  'Allergy to cinnamon'
+    C1641255  'Allergy to almond oil'
+    C1642837  'Allergy to seed'
+    C2227759  'Allergy to vegetable'
+    C2316159  'Oral allergy syndrome'
+    C2321305  'Allergy to barley'
+    C3163684  'Allergy to dietary mushroom'
+    ... and 5 more
+
+  Topic ID : tp_4a0e68c9d877
+  Canonical: C0851444
+  Label    : Allergic condition
+  Size     : 15 CUIs
+  Members  :
+    C0016470  'Food allergy'
+    C0020517  'Hypersensitivity reaction (disorder)'
+    C0234240  'Allergic headache'
+    C0264480  'Bakers' asthma'
+    C0267437  'Allergic diarrhea'
+    C0272193  'Allergic eosinophilia'
+    C0851444  'Allergic condition'
+    C0859949  'Allergy to meat'
+    C1304186  'Allergic urticaria and/or angioedema'
+    C1304338  'Lichenoid allergic contact reaction'
+    C1720649  'Allergic disorder'
+    C3539909  'Allergic disposition'
+    C3662483  'Allergic sensitization'
+    C4082933  'Animal allergy'
+    C4543750  'Allergic bronchospasm caused by dietary substance'
+
+  Topic ID : tp_5ed348315995
+  Canonical: C1630648
+  Label    : Food sensitivity
+  Size     : 5 CUIs
+  Members  :
+    C0016470  'Food allergy'
+    C0149696  'Food intolerance'
+    C0266823  'Eosinophilic gastroenteropathy with food sensitivity'
+    C1630648  'Food sensitivity'
+    C3662111  'Non-allergic hypersensitivity to aspartame'
+
+================================================================================
+C0034060  |  Pulmonary medicine
+STY: Biomedical Occupation or Discipline
+-> 2 TOPIC(S)
+
+  Topic ID : tp_6cfaf1abfffa
+  Canonical: C0037778
+  Label    : Medical speciality
+  Size     : 78 CUIs
+  Members  :
+    C0001581  'Adolescent medicine'
+    C0001713  'Aerospace medicine'
+    C0002112  'Clinical immunology/allergy'
+    C0007189  'Cardiology (qualifier value)'
+    C0011627  'Dermatology (qualifier value)'
+    C0014137  'Endocrinology'
+    C0015607  'Family practice (qualifier value)'
+    C0017163  'Gastroenterology'
+    C0017469  'Geriatric medicine (qualifier value)'
+    C0018417  'Gynaecology'
+    C0021782  'Internal medicine (qualifier value)'
+    C0025098  'Medical oncology (qualifier value)'
+    C0026124  'Military medicine'
+    C0027712  'Renal medicine'
+    C0027855  'Neurology (qualifier value)'
+    C0028582  'Nuclear medicine - specialty'
+    C0028802  'Occupational medicine (qualifier value)'
+    C0030755  'Paediatrics'
+    C0031063  'Perinatology (qualifier value)'
+    C0031332  'Clinical pharmacology'
+    C0032331  'Podiatry'
+    C0033110  'Preventive medicine (qualifier value)'
+    C0034060  'Pulmonary medicine'
+    C0034599  'Radiology - specialty'
+    C0035452  'Rheumatology (qualifier value)'
+    ... and 53 more
+
+  Topic ID : tp_d6fa8406dc00
+  Canonical: C0034060
+  Label    : Pulmonary medicine
   Size     : 2 CUIs
   Members  :
-    C0002792  'Anaphylaxis'
-    C0413234  'Acute allergic reaction'
+    C0034060  'Pulmonary medicine'
+    C1635023  'Paediatric pulmonology'
+
+================================================================================
+C0041296  |  Infection caused by Mycobacterium tuberculosis
+STY: Disease or Syndrome
+-> 4 TOPIC(S)
+
+  Topic ID : tp_c33cdf9aedb3
+  Canonical: C0009450
+  Label    : Communicable disease
+  Size     : 138 CUIs
+  Members  :
+    C0004623  'Bacterial infection'
+    C0009186  'Coccidioidomycosis (disorder)'
+    C0009450  'Communicable disease'
+    C0010356  'Cross infection'
+    C0010418  'Cryptosporidiosis'
+    C0014055  'Arthropod-borne viral encephalitis, vector unknown (navigational concept)'
+    C0014061  'Tick-borne encephalitis'
+    C0016397  'Localized infection (disorder)'
+    C0019104  'Viral hemorrhagic fever'
+    C0023240  'Legionellosis'
+    C0024449  'Mycetomata'
+    C0025229  'Infection due to Burkholderia pseudomallei'
+    C0026946  'Mycosis'
+    C0028242  'Nocardiosis'
+    C0029118  'Opportunistic infectious disease'
+    C0030499  'Parasitic disease'
+    C0033740  'Protozoan infection'
+    C0034189  'Pyemia'
+    C0034223  'Pyoureter'
+    C0035243  'Respiratory tract infection'
+    C0035436  'Rheumatic fever'
+    C0035921  'Congenital rubella syndrome'
+    C0036916  'Sexually transmitted disease'
+    C0038826  'Suprainfection'
+    C0040921  'Infection by Trichomonas'
+    ... and 113 more
+
+  Topic ID : tp_bedf9e3c83eb
+  Canonical: C0041296
+  Label    : Infection caused by Mycobacterium tuberculosis
+  Size     : 80 CUIs
+  Members  :
+    C0007943  'Tuberculous chancre'
+    C0014014  'Tuberculous empyema'
+    C0037118  'Silicotuberculosis'
+    C0041295  'Tuberculoma'
+    C0041296  'Infection caused by Mycobacterium tuberculosis'
+    C0041307  'Infection caused by Mycobacterium bovis'
+    C0041309  'Cutaneous tuberculosis'
+    C0041312  'Tuberculosis of gastrointestinal tract'
+    C0041313  'Tuberculosis of liver (disorder)'
+    C0041315  'Laryngeal tuberculosis'
+    C0041316  'Tuberculosis of lymph node'
+    C0041322  'Ocular tuberculosis'
+    C0041323  'Oral tuberculosis'
+    C0041324  'Tuberculosis of bones and/or joints (disorder)'
+    C0041325  'Tuberculous peritonitis'
+    C0041326  'Tuberculosis of pleura'
+    C0041327  'Pulmonary tuberculosis'
+    C0041331  'Tuberculosis of spleen (disorder)'
+    C0041333  'Urogenital tuberculosis'
+    C0041336  'Tuberculous fibrosis of lung'
+    C0151332  'Active tuberculosis'
+    C0152545  'Primary tuberculosis'
+    C0152600  'Tuberculous pneumothorax'
+    C0152627  'Tuberculosis of intrathoracic lymph nodes'
+    C0152874  'Tuberculosis of ear'
+    ... and 55 more
+
+  Topic ID : tp_e7516417cb8f
+  Canonical: C0456953
+  Label    : Morphological descriptors
+  Size     : 66 CUIs
+  Members  :
+    C0005699  'Blastic phase chronic myeloid leukemia (disorder)'
+    C0016024  'Fibroadenosis'
+    C0024525  'Malakoplakia'
+    C0027707  'IN - Interstitial nephritis'
+    C0029974  'Ovum structure'
+    C0041296  'Infection caused by Mycobacterium tuberculosis'
+    C0205180  'Anicteric'
+    C0205192  'Cicatricial'
+    C0205226  'Exfoliative'
+    C0205268  'Intertriginous'
+    C0205273  'Isomorphous'
+    C0205274  'Laminar (qualifier value)'
+    C0205323  'Pitting (qualifier value)'
+    C0230704  'Lipid droplets'
+    C0332204  'Angiolupoid'
+    C0332207  'Acinar'
+    C0332235  'Lepromatous'
+    C0332244  'Rupial'
+    C0332250  'Tubercular'
+    C0333316  'Rice bodies'
+    C0392634  'Inguinal bubo'
+    C0429186  'Oil droplets'
+    C0440790  'Solid organ'
+    C0442806  'Increased - homogenous'
+    C0442807  'Increased - patchy'
+    ... and 41 more
+
+  Topic ID : tp_9109941743b9
+  Canonical: C0026918
+  Label    : Mycobacteriosis (disorder)
+  Size     : 18 CUIs
+  Members  :
+    C0023343  'Infection due to Mycobacterium leprae'
+    C0026918  'Mycobacteriosis (disorder)'
+    C0026919  'Infection due to non-TB (tuberculous) mycobacteria'
+    C0041296  'Infection caused by Mycobacterium tuberculosis'
+    C0275705  'Pulmonary disease caused by Mycobacteria'
+    C0275707  'Cutaneous infectious disease caused by Mycobacteria'
+    C0343431  'Disseminated mycobacteriosis'
+    C1320199  'Mycobacterial infection of the central nervous system'
+    C1720238  'Mycobacteriosis with AIDS (acquired immunodeficiency syndrome)'
+    C1960555  'Mycobacterial keratitis'
+    C2315962  'Infection caused by Mycobacterium resistant to multiple antimycobacterial agents'
+    C5396420  'Mycobacterial tenosynovitis'
+    C5566258  'Mycobacterial arthritis'
+    C5566259  'Mycobacterial bursitis'
+    C5566650  'Mycobacterial myositis'
+    C5567318  'Mycobacterial oesophagitis'
+    C5567319  'Mycobacterial gastritis'
+    C5569194  'Mycobacterial enteritis of intestine'
 
 ================================================================================
 DONE
