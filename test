@@ -1,450 +1,347 @@
-================================================================================
-C4318450  |  DNA mismatch repair protein (substance)
-STY: Amino Acid, Peptide, or Protein, Biologically Active Substance
--> 0 TOPIC(S)
-  (no topics — this CUI is not anchored by any IS-A ancestor in any of its main topics)
+"""
+build_topics.py
+---------------
+Unified end-to-end build. Produces ONE pickle for production use.
 
-================================================================================
-C0021368  |  Inflammation
-STY: Pathologic Function
--> 2 TOPIC(S)
+Pipeline (all stages internal, intermediate state not saved to disk):
 
-  Topic ID : tp_bdd5d79fcf0e
-  Canonical: C0030660
-  Label    : Pathological process (attribute)
-  Size     : 11 CUIs
-  Members  :
-    C0021368  'Inflammation'
-    C0030660  'Pathological process (attribute)'
-    C0332240  'Idiopathic cause'
-    C0332663  'Traumatic'
-    C0458006  'Psychogenic'
-    C0586102  'Pathological developmental process'
-    C0745283  'Infectious process'
-    C0920616  'Regression of neoplasm'
-    C3532482  'Hypersensitivity process'
-    C4708780  'Abnormal immune process'
-    C5548425  'Neoplastic proliferation'
+  STAGE A: Flatten the suffix-bridge network graph to direct CUI-CUI edges.
+           Used to find each CUI's "main topic" = {self} U direct neighbors.
 
-  Topic ID : tp_d6697884946a
-  Canonical: C0021368
-  Label    : Inflammation
-  Size     : 2 CUIs
-  Members  :
-    C0021368  'Inflammation'
-    C1260958  'Serofibrinous inflammation'
+  STAGE B: Extract IS-A hierarchy from MRREL (PAR/CHD/RB/RN), build DAG.
+           Compute Seco structural IC for every node.
 
-================================================================================
-C0024485  |  Magnetic resonance imaging
-STY: Diagnostic Procedure
--> 3 TOPIC(S)
+  STAGE C: For each main topic T with members M:
+             For each m in M, find m's IS-A ancestors that are in M.
+             Pick the highest-IC (most-specific) one as m's anchor.
+             Members with no IS-A ancestor in M are not anchored.
 
-  Topic ID : tp_314135c2e182
-  Canonical: C0011923
-  Label    : Imaging (procedure)
-  Size     : 68 CUIs
-  Members  :
-    C0002971  'Angiocardiography'
-    C0002978  'Angiogram'
-    C0003885  'Arthrography (procedure)'
-    C0008797  'Cineradiography (procedure)'
-    C0009618  'Computer assisted image analysis'
-    C0011923  'Imaging (procedure)'
-    C0016356  'Fluoroscopy (procedure)'
-    C0024485  'Magnetic resonance imaging'
-    C0032743  'Positron emission tomography'
-    C0034606  'Radionuclide scanning'
-    C0039810  'Thermography imaging - action (qualifier value)'
-    C0039985  'Plain X-ray of chest'
-    C0040395  'Tomographic imaging procedure'
-    C0040399  'Single photon emission computed tomography'
-    C0041618  'Ultrasonography'
-    C0043350  'Xerography'
-    C0202633  'Radiologic supervision and interpretation of procedure'
-    C0203051  'Vaginography'
-    C0203057  'Upper gastrointestinal tract series'
-    C0203103  'Nephrotomography'
-    C0203108  'Intravenous urography'
-    C0203139  'Plain X-ray of spine'
-    C0203800  'Bone marrow imaging'
-    C0412163  'Cavernosometry'
-    C0412176  'Acromioclavicular joint arthrogram'
-    ... and 43 more
+  STAGE D: Dedupe by anchor — each unique anchor CUI = one final topic.
+           Topic ID = tp_<sha1(canonical)>[:12]
+           Members = union of all subgroups anchored by this CUI across
+                     all main topics.
 
-  Topic ID : tp_a2eb423e4b4f
-  Canonical: C0024485
-  Label    : Magnetic resonance imaging
-  Size     : 44 CUIs
-  Members  :
-    C0024485  'Magnetic resonance imaging'
-    C0024487  'Magnetic resonance spectroscopy'
-    C0177803  'MRI of spine'
-    C0202670  'MRI without contrast'
-    C0202671  'MRI with contrast'
-    C0202672  'Magnetic resonance imaging without IV contrast followed by contrast and more sections'
-    C0202673  'MRI - musculoskeletal structures'
-    C0202762  'MRI of neck'
-    C0202826  'Magnetic resonance imaging of chest'
-    C0202828  'MRI of mediastinum'
-    C0203201  'Magnetic resonance imaging of pelvis'
-    C0412674  'MRI of head'
-    C0412693  'Magnetic resonance imaging of abdomen'
-    C0412697  'MRI of pancreas'
-    C0442974  'Magnetic resonance imaging guidance'
-    C0598801  'Diffusion weighted magnetic resonance imaging (procedure)'
-    C1142375  'MRI of whole body'
-    C1518156  'Magnetic resonance elastography'
-    C1628484  'MRI of lymphatic system'
-    C1634512  'MRI of urinary tract'
-    C2021832  'MRI of retroperitoneum'
-    C2121332  'MRI of esophagus'
-    C2315874  'MRI of acromioclavicular joint'
-    C2315957  'MRI of foetus'
-    C2316168  'MRI of spine with contrast'
-    ... and 19 more
+Inputs (notebook globals expected):
+  data         : the suffix-bridge DiGraph (~24M nodes)
+  cache        : dict with key 'mrrel_rows' (list of (CUI1, CUI2, REL, RELA))
+  SNOMED_CUIS  : set of SNOMED CUIs
+  LABELS       : dict cui -> label
+  TAGS         : dict cui -> STY codes (optional)
 
-  Topic ID : tp_f354a5f59b9a
-  Canonical: C1275506
-  Label    : Imaging - action
-  Size     : 9 CUIs
-  Members  :
-    C0024485  'Magnetic resonance imaging'
-    C0039810  'Thermography imaging - action (qualifier value)'
-    C0040395  'Tomographic imaging procedure'
-    C0041618  'Ultrasonography'
-    C0457276  'Radiographic imaging - action'
-    C1275506  'Imaging - action'
-    C1283198  'Cine imaging - action'
-    C1283205  'Video imaging - action'
-    C2368359  'Radionuclide imaging'
+Output:
+  topics.pkl with:
+    topic_id_to_topic       : tp_id -> {canonical, label, members,
+                                         size, anchor_ic}
+    cui_to_topic_ids        : cui -> sorted list of tp_ids
+    canonical_to_topic_id   : anchor_cui -> tp_id
+    labels, tags            : pass-through (for inspectors / displays)
+    config                  : build settings
+    built_at                : ISO timestamp
+"""
 
-================================================================================
-C2142181  |  Pain of left knee joint (finding)
-STY: Sign or Symptom
--> 2 TOPIC(S)
+import pickle
+import datetime
+import hashlib
+import math
+import os
+import time
+from collections import defaultdict, Counter
 
-  Topic ID : tp_4b868e75bf1a
-  Canonical: C5442019
-  Label    : Pain of left knee
-  Size     : 4 CUIs
-  Members  :
-    C2142181  'Pain of left knee joint (finding)'
-    C3863257  'Iliotibial band friction syndrome of left knee'
-    C5442019  'Pain of left knee'
-    C5549683  'Pain of bilateral knee regions'
 
-  Topic ID : tp_d2396e5d2f87
-  Canonical: C2142181
-  Label    : Pain of left knee joint (finding)
-  Size     : 4 CUIs
-  Members  :
-    C2051306  'Patellofemoral syndrome of left knee'
-    C2142181  'Pain of left knee joint (finding)'
-    C2220048  'Pain of bilateral knee joints'
-    C4509797  'Chronic pain following left total knee arthroplasty'
+OUTPUT_PATH = "topics.pkl"
 
-================================================================================
-C0016470  |  Food allergy
-STY: Disease or Syndrome
--> 5 TOPIC(S)
+# IS-A relation types from MRREL (hierarchical only)
+HIERARCHY_RELS = {"PAR", "CHD", "RB", "RN"}
 
-  Topic ID : tp_ac524d20e417
-  Canonical: C3539909
-  Label    : Allergic disposition
-  Size     : 135 CUIs
-  Members  :
-    C0013182  'Allergy to drug'
-    C0016470  'Food allergy'
-    C0018621  'Seasonal allergic rhinitis (disorder)'
-    C0020517  'Hypersensitivity reaction (disorder)'
-    C0038757  'Sulfonamide allergy'
-    C0282504  'Environmental allergy (finding)'
-    C0570529  'Opium alkaloid allergy'
-    C0570560  'Tuberculin purified protein derivative allergy'
-    C0570561  'Radiopharmaceutical allergy'
-    C0570562  'Allergy to contrast media'
-    C0571016  'Allergy to nikethamide'
-    C0571017  'Ethamivan allergy'
-    C0571026  'Allergy to histamine H1 receptor antagonist'
-    C0571037  'Mequitazine allergy'
-    C0571038  'Oxatomide allergy'
-    C0571039  'Cyclizine allergy'
-    C0571045  'Allergy to brompheniramine'
-    C0571047  'Cinnarizine allergy'
-    C0571049  'Allergy to dimethindene'
-    C0571050  'Diphenhydramine allergy'
-    C0571053  'Allergy to pyrilamine'
-    C0571054  'Phenindamine allergy'
-    C0571056  'Allergy to triprolidine'
-    C0571073  'Allergy to xanthine'
-    C0571089  'Allergy to anthralin'
-    ... and 110 more
 
-  Topic ID : tp_871baf25637b
-  Canonical: C3532523
-  Label    : Hypersensitivity condition
-  Size     : 41 CUIs
-  Members  :
-    C0009766  'Allergic conjunctivitis'
-    C0011616  'Contact dermatitis'
-    C0016470  'Food allergy'
-    C0020517  'Hypersensitivity reaction (disorder)'
-    C0020522  'Hypersensitivity reaction type IV'
-    C0020523  'IgE-mediated allergic disorder'
-    C0038325  'Stevens-Johnson syndrome'
-    C0151726  'Injection site hypersensitivity'
-    C0155150  'Contact blepharoconjunctivitis'
-    C0162351  'Contact hypersensitivity'
-    C0263333  'Contact urticaria'
-    C0263347  'Urticaria medicamentosa'
-    C0272285  'Heparin induced thrombocytopenia'
-    C0276742  'Kerion celsi'
-    C0282504  'Environmental allergy (finding)'
-    C0301923  'Hypersensitivity to foreign antigen'
-    C0301924  'Hypersensitivity to endogenous antigen'
-    C0413243  'Chemical-aggravated angioedema-urticaria'
-    C0521714  'Marginal keratitis'
-    C0577628  'Allergy to latex'
-    C0851444  'Allergic condition'
-    C1260879  'Autoimmune progesterone dermatitis (disorder)'
-    C1268945  'ACE inhibitor-induced angioedema'
-    C1274191  'Toxic epidermal necrolysis caused by drug'
-    C1304159  'Toxic epidermal necrolysis due to graft-versus-host disease'
-    ... and 16 more
+# ============================================================================
+# STAGE A: Flatten network graph → per-CUI neighbors
+# ============================================================================
 
-  Topic ID : tp_6cc42f11d92f
-  Canonical: C0016470
-  Label    : Food allergy
-  Size     : 30 CUIs
-  Members  :
-    C0016470  'Food allergy'
-    C0567447  'Allergy to egg protein'
-    C0570763  'Tryptophan allergy'
-    C0571213  'Glycine allergy'
-    C0571230  'Olive oil allergy'
-    C0571231  'Arachis oil allergy'
-    C0571649  'Guar gum allergy'
-    C0577620  'Allergy to nut'
-    C0577624  'Allergy to chocolate'
-    C0577626  'Allergy to cheese'
-    C0685900  'Seafood allergy'
-    C0685901  'Allergy to fruit'
-    C0859949  'Allergy to meat'
-    C0949570  'Allergy to wheat'
-    C1623734  'Allergy to oat'
-    C1630645  'Allergy to red meat'
-    C1636156  'Allergy to rye'
-    C1638314  'Allergy to coconut oil'
-    C1639524  'Allergy to cinnamon'
-    C1641255  'Allergy to almond oil'
-    C1642837  'Allergy to seed'
-    C2227759  'Allergy to vegetable'
-    C2316159  'Oral allergy syndrome'
-    C2321305  'Allergy to barley'
-    C3163684  'Allergy to dietary mushroom'
-    ... and 5 more
+def flatten_graph(graph, snomed_cuis):
+    """For each SNOMED CUI A: A's neighbors = {B in SNOMED : ∃ suffix bridge
+    A-i ↔ B-j in the graph}. Symmetric, conservative direction."""
+    print("  [A] Flattening suffix-bridge graph...")
+    t0 = time.time()
 
-  Topic ID : tp_4a0e68c9d877
-  Canonical: C0851444
-  Label    : Allergic condition
-  Size     : 15 CUIs
-  Members  :
-    C0016470  'Food allergy'
-    C0020517  'Hypersensitivity reaction (disorder)'
-    C0234240  'Allergic headache'
-    C0264480  'Bakers' asthma'
-    C0267437  'Allergic diarrhea'
-    C0272193  'Allergic eosinophilia'
-    C0851444  'Allergic condition'
-    C0859949  'Allergy to meat'
-    C1304186  'Allergic urticaria and/or angioedema'
-    C1304338  'Lichenoid allergic contact reaction'
-    C1720649  'Allergic disorder'
-    C3539909  'Allergic disposition'
-    C3662483  'Allergic sensitization'
-    C4082933  'Animal allergy'
-    C4543750  'Allergic bronchospasm caused by dietary substance'
+    neighbors = defaultdict(set)
+    n_processed = 0
+    for cui in snomed_cuis:
+        n_processed += 1
+        if n_processed % 50000 == 0:
+            print(f"      {n_processed:,}/{len(snomed_cuis):,} "
+                  f"({time.time()-t0:.0f}s)")
 
-  Topic ID : tp_5ed348315995
-  Canonical: C1630648
-  Label    : Food sensitivity
-  Size     : 5 CUIs
-  Members  :
-    C0016470  'Food allergy'
-    C0149696  'Food intolerance'
-    C0266823  'Eosinophilic gastroenteropathy with food sensitivity'
-    C1630648  'Food sensitivity'
-    C3662111  'Non-allergic hypersensitivity to aspartame'
+        if cui not in graph:
+            continue
 
-================================================================================
-C0034060  |  Pulmonary medicine
-STY: Biomedical Occupation or Discipline
--> 2 TOPIC(S)
+        for suffix_child in graph.successors(cui):
+            if "-" not in suffix_child:
+                continue
+            try:
+                base, _ = suffix_child.rsplit("-", 1)
+            except ValueError:
+                continue
+            if base != cui:
+                continue
 
-  Topic ID : tp_6cfaf1abfffa
-  Canonical: C0037778
-  Label    : Medical speciality
-  Size     : 78 CUIs
-  Members  :
-    C0001581  'Adolescent medicine'
-    C0001713  'Aerospace medicine'
-    C0002112  'Clinical immunology/allergy'
-    C0007189  'Cardiology (qualifier value)'
-    C0011627  'Dermatology (qualifier value)'
-    C0014137  'Endocrinology'
-    C0015607  'Family practice (qualifier value)'
-    C0017163  'Gastroenterology'
-    C0017469  'Geriatric medicine (qualifier value)'
-    C0018417  'Gynaecology'
-    C0021782  'Internal medicine (qualifier value)'
-    C0025098  'Medical oncology (qualifier value)'
-    C0026124  'Military medicine'
-    C0027712  'Renal medicine'
-    C0027855  'Neurology (qualifier value)'
-    C0028582  'Nuclear medicine - specialty'
-    C0028802  'Occupational medicine (qualifier value)'
-    C0030755  'Paediatrics'
-    C0031063  'Perinatology (qualifier value)'
-    C0031332  'Clinical pharmacology'
-    C0032331  'Podiatry'
-    C0033110  'Preventive medicine (qualifier value)'
-    C0034060  'Pulmonary medicine'
-    C0034599  'Radiology - specialty'
-    C0035452  'Rheumatology (qualifier value)'
-    ... and 53 more
+            for pred in graph.predecessors(suffix_child):
+                if pred == cui or "-" not in pred:
+                    continue
+                try:
+                    other, _ = pred.rsplit("-", 1)
+                except ValueError:
+                    continue
+                if other == cui or other not in snomed_cuis:
+                    continue
+                neighbors[cui].add(other)
+                neighbors[other].add(cui)
 
-  Topic ID : tp_d6fa8406dc00
-  Canonical: C0034060
-  Label    : Pulmonary medicine
-  Size     : 2 CUIs
-  Members  :
-    C0034060  'Pulmonary medicine'
-    C1635023  'Paediatric pulmonology'
+    n_with_edges = len(neighbors)
+    total_edges = sum(len(n) for n in neighbors.values()) // 2
+    print(f"      Done in {time.time()-t0:.0f}s")
+    print(f"      CUIs with at least 1 edge : {n_with_edges:,}")
+    print(f"      Total undirected edges    : {total_edges:,}")
+    return neighbors
 
-================================================================================
-C0041296  |  Infection caused by Mycobacterium tuberculosis
-STY: Disease or Syndrome
--> 4 TOPIC(S)
 
-  Topic ID : tp_c33cdf9aedb3
-  Canonical: C0009450
-  Label    : Communicable disease
-  Size     : 138 CUIs
-  Members  :
-    C0004623  'Bacterial infection'
-    C0009186  'Coccidioidomycosis (disorder)'
-    C0009450  'Communicable disease'
-    C0010356  'Cross infection'
-    C0010418  'Cryptosporidiosis'
-    C0014055  'Arthropod-borne viral encephalitis, vector unknown (navigational concept)'
-    C0014061  'Tick-borne encephalitis'
-    C0016397  'Localized infection (disorder)'
-    C0019104  'Viral hemorrhagic fever'
-    C0023240  'Legionellosis'
-    C0024449  'Mycetomata'
-    C0025229  'Infection due to Burkholderia pseudomallei'
-    C0026946  'Mycosis'
-    C0028242  'Nocardiosis'
-    C0029118  'Opportunistic infectious disease'
-    C0030499  'Parasitic disease'
-    C0033740  'Protozoan infection'
-    C0034189  'Pyemia'
-    C0034223  'Pyoureter'
-    C0035243  'Respiratory tract infection'
-    C0035436  'Rheumatic fever'
-    C0035921  'Congenital rubella syndrome'
-    C0036916  'Sexually transmitted disease'
-    C0038826  'Suprainfection'
-    C0040921  'Infection by Trichomonas'
-    ... and 113 more
+# ============================================================================
+# STAGE B: Extract IS-A from MRREL → DAG + IC
+# ============================================================================
 
-  Topic ID : tp_bedf9e3c83eb
-  Canonical: C0041296
-  Label    : Infection caused by Mycobacterium tuberculosis
-  Size     : 80 CUIs
-  Members  :
-    C0007943  'Tuberculous chancre'
-    C0014014  'Tuberculous empyema'
-    C0037118  'Silicotuberculosis'
-    C0041295  'Tuberculoma'
-    C0041296  'Infection caused by Mycobacterium tuberculosis'
-    C0041307  'Infection caused by Mycobacterium bovis'
-    C0041309  'Cutaneous tuberculosis'
-    C0041312  'Tuberculosis of gastrointestinal tract'
-    C0041313  'Tuberculosis of liver (disorder)'
-    C0041315  'Laryngeal tuberculosis'
-    C0041316  'Tuberculosis of lymph node'
-    C0041322  'Ocular tuberculosis'
-    C0041323  'Oral tuberculosis'
-    C0041324  'Tuberculosis of bones and/or joints (disorder)'
-    C0041325  'Tuberculous peritonitis'
-    C0041326  'Tuberculosis of pleura'
-    C0041327  'Pulmonary tuberculosis'
-    C0041331  'Tuberculosis of spleen (disorder)'
-    C0041333  'Urogenital tuberculosis'
-    C0041336  'Tuberculous fibrosis of lung'
-    C0151332  'Active tuberculosis'
-    C0152545  'Primary tuberculosis'
-    C0152600  'Tuberculous pneumothorax'
-    C0152627  'Tuberculosis of intrathoracic lymph nodes'
-    C0152874  'Tuberculosis of ear'
-    ... and 55 more
+def extract_isa_dag(mrrel_rows, snomed_cuis):
+    """Return (isa_parents, isa_children) dicts."""
+    print("  [B] Extracting IS-A edges from MRREL...")
+    t0 = time.time()
 
-  Topic ID : tp_e7516417cb8f
-  Canonical: C0456953
-  Label    : Morphological descriptors
-  Size     : 66 CUIs
-  Members  :
-    C0005699  'Blastic phase chronic myeloid leukemia (disorder)'
-    C0016024  'Fibroadenosis'
-    C0024525  'Malakoplakia'
-    C0027707  'IN - Interstitial nephritis'
-    C0029974  'Ovum structure'
-    C0041296  'Infection caused by Mycobacterium tuberculosis'
-    C0205180  'Anicteric'
-    C0205192  'Cicatricial'
-    C0205226  'Exfoliative'
-    C0205268  'Intertriginous'
-    C0205273  'Isomorphous'
-    C0205274  'Laminar (qualifier value)'
-    C0205323  'Pitting (qualifier value)'
-    C0230704  'Lipid droplets'
-    C0332204  'Angiolupoid'
-    C0332207  'Acinar'
-    C0332235  'Lepromatous'
-    C0332244  'Rupial'
-    C0332250  'Tubercular'
-    C0333316  'Rice bodies'
-    C0392634  'Inguinal bubo'
-    C0429186  'Oil droplets'
-    C0440790  'Solid organ'
-    C0442806  'Increased - homogenous'
-    C0442807  'Increased - patchy'
-    ... and 41 more
+    edges = set()
+    n_match = 0
+    rel_counts = Counter()
 
-  Topic ID : tp_9109941743b9
-  Canonical: C0026918
-  Label    : Mycobacteriosis (disorder)
-  Size     : 18 CUIs
-  Members  :
-    C0023343  'Infection due to Mycobacterium leprae'
-    C0026918  'Mycobacteriosis (disorder)'
-    C0026919  'Infection due to non-TB (tuberculous) mycobacteria'
-    C0041296  'Infection caused by Mycobacterium tuberculosis'
-    C0275705  'Pulmonary disease caused by Mycobacteria'
-    C0275707  'Cutaneous infectious disease caused by Mycobacteria'
-    C0343431  'Disseminated mycobacteriosis'
-    C1320199  'Mycobacterial infection of the central nervous system'
-    C1720238  'Mycobacteriosis with AIDS (acquired immunodeficiency syndrome)'
-    C1960555  'Mycobacterial keratitis'
-    C2315962  'Infection caused by Mycobacterium resistant to multiple antimycobacterial agents'
-    C5396420  'Mycobacterial tenosynovitis'
-    C5566258  'Mycobacterial arthritis'
-    C5566259  'Mycobacterial bursitis'
-    C5566650  'Mycobacterial myositis'
-    C5567318  'Mycobacterial oesophagitis'
-    C5567319  'Mycobacterial gastritis'
-    C5569194  'Mycobacterial enteritis of intestine'
+    for row in mrrel_rows:
+        if len(row) < 3:
+            continue
+        c1, c2, rel = row[0], row[1], row[2]
+        rel_counts[rel] += 1
+        if rel not in HIERARCHY_RELS:
+            continue
+        if c1 not in snomed_cuis or c2 not in snomed_cuis:
+            continue
+        if c1 == c2:
+            continue
+        # Normalize to child -> parent
+        if rel in ("PAR", "RB"):
+            edges.add((c1, c2))
+        else:  # CHD, RN
+            edges.add((c2, c1))
+        n_match += 1
 
-================================================================================
-DONE
+    isa_parents  = defaultdict(set)
+    isa_children = defaultdict(set)
+    for child, parent in edges:
+        isa_parents[child].add(parent)
+        isa_children[parent].add(child)
+
+    print(f"      MRREL rows scanned        : {len(mrrel_rows):,}")
+    print(f"      IS-A matches              : {n_match:,}")
+    print(f"      Unique IS-A edges         : {len(edges):,}")
+    print(f"      CUIs with parents         : {len(isa_parents):,}")
+    print(f"      Done in {time.time()-t0:.0f}s")
+    return dict(isa_parents), dict(isa_children)
+
+
+def compute_ic(isa_children, all_nodes, total_universe):
+    """Seco structural IC: 1 - log(descendants+1) / log(total)."""
+    print("  [B] Computing IC scores...")
+    t0 = time.time()
+
+    descendant_sets = {}
+
+    def descendants(node, stack):
+        if node in descendant_sets:
+            return descendant_sets[node]
+        if node in stack:
+            return set()
+        stack = stack | {node}
+        result = set()
+        for child in isa_children.get(node, ()):
+            result.add(child)
+            result |= descendants(child, stack)
+        descendant_sets[node] = result
+        return result
+
+    for node in all_nodes:
+        descendants(node, set())
+
+    log_total = math.log(total_universe + 1)
+    ic = {n: 1.0 - math.log(len(d) + 1) / log_total
+          for n, d in descendant_sets.items()}
+
+    print(f"      IC computed for {len(ic):,} nodes in {time.time()-t0:.0f}s")
+    return ic
+
+
+def ancestor_closure(cui, isa_parents, cache):
+    """All transitive IS-A ancestors of `cui` (memoized)."""
+    if cui in cache:
+        return cache[cui]
+    ancestors = set()
+    stack = [cui]
+    visited = set()
+    while stack:
+        node = stack.pop()
+        if node in visited:
+            continue
+        visited.add(node)
+        for p in isa_parents.get(node, set()):
+            if p not in ancestors:
+                ancestors.add(p)
+                stack.append(p)
+    cache[cui] = frozenset(ancestors)
+    return cache[cui]
+
+
+# ============================================================================
+# STAGE C: For each main topic, find anchor per member
+# STAGE D: Dedupe by anchor → final flat topics
+# ============================================================================
+
+def topic_id_for(canonical):
+    h = hashlib.sha1(canonical.encode()).hexdigest()[:12]
+    return f"tp_{h}"
+
+
+def build_final_topics(snomed_cuis, neighbors, isa_parents, ic_scores):
+    """Form granular subgroups per main topic, then dedupe by anchor."""
+    print("  [C] Forming granular subgroups per main topic...")
+    print("      Rule: each member's anchor = highest-IC IS-A ancestor"
+          " that's in the topic")
+    t0 = time.time()
+
+    closure_cache = {}
+    canonical_to_members = defaultdict(set)  # anchor -> all members ever
+
+    n_processed = 0
+    for focal in snomed_cuis:
+        n_processed += 1
+        if n_processed % 50000 == 0:
+            print(f"      {n_processed:,}/{len(snomed_cuis):,} "
+                  f"({time.time()-t0:.0f}s)")
+
+        members = {focal} | neighbors.get(focal, frozenset())
+        if len(members) < 2:
+            continue
+
+        member_set = members
+        for m in members:
+            closure = ancestor_closure(m, isa_parents, closure_cache)
+            in_topic = closure & member_set
+            if not in_topic:
+                continue
+            anchor = max(in_topic, key=lambda a: ic_scores.get(a, 0.0))
+            # Subgroup members anchored at `anchor` in this topic =
+            # {anchor} ∪ {m and other members where anchor is their pick}
+            # But: we only know one m at a time, so we add anchor + m here.
+            # Across all main topics, the union builds up the full member set.
+            canonical_to_members[anchor].add(anchor)
+            canonical_to_members[anchor].add(m)
+
+    print(f"      Done in {time.time()-t0:.0f}s")
+    print(f"      Closure cache size        : {len(closure_cache):,}")
+    print(f"      Unique anchors (= topics) : {len(canonical_to_members):,}")
+
+    print("  [D] Build flat topic structures...")
+    t1 = time.time()
+    topic_id_to_topic     = {}
+    canonical_to_topic_id = {}
+    cui_to_topic_ids      = defaultdict(set)
+
+    for canonical, mems in canonical_to_members.items():
+        tp_id = topic_id_for(canonical)
+        members_fs = frozenset(mems)
+        topic_id_to_topic[tp_id] = {
+            "canonical":  canonical,
+            "members":    members_fs,
+            "size":       len(members_fs),
+            "anchor_ic":  ic_scores.get(canonical, 0.0),
+        }
+        canonical_to_topic_id[canonical] = tp_id
+        for m in members_fs:
+            cui_to_topic_ids[m].add(tp_id)
+
+    sizes = sorted(t["size"] for t in topic_id_to_topic.values())
+    topics_per_cui = sorted(len(s) for s in cui_to_topic_ids.values())
+    print(f"      Done in {time.time()-t1:.0f}s")
+    print(f"      Final topics              : {len(topic_id_to_topic):,}")
+    print(f"      CUIs participating        : {len(cui_to_topic_ids):,}")
+    if sizes:
+        print(f"      Topic size min/med/p90/p99/max : "
+              f"{sizes[0]} / {sizes[len(sizes)//2]} / "
+              f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
+              f"{sizes[-1]}")
+    if topics_per_cui:
+        print(f"      Topics-per-CUI min/med/p90/p99/max : "
+              f"{topics_per_cui[0]} / {topics_per_cui[len(topics_per_cui)//2]} / "
+              f"{topics_per_cui[int(0.9*len(topics_per_cui))]} / "
+              f"{topics_per_cui[int(0.99*len(topics_per_cui))]} / "
+              f"{topics_per_cui[-1]}")
+
+    return topic_id_to_topic, canonical_to_topic_id, cui_to_topic_ids
+
+
+# ============================================================================
+# Main
+# ============================================================================
+
+def main():
+    print(f"BUILD START — {datetime.datetime.now().isoformat()}")
+    t_total = time.time()
+
+    print(f"\nInputs:")
+    print(f"  data (graph) : {type(data).__name__} with "
+          f"{data.number_of_nodes():,} nodes, "
+          f"{data.number_of_edges():,} edges")
+    print(f"  SNOMED_CUIS  : {len(SNOMED_CUIS):,}")
+    print(f"  LABELS       : {len(LABELS):,}")
+    print(f"  cache keys   : {list(cache.keys())}")
+    if "TAGS" in globals():
+        print(f"  TAGS         : {len(TAGS):,}")
+
+    print(f"\n[A+B] Build neighbors + IS-A DAG + IC")
+    neighbors = flatten_graph(data, SNOMED_CUIS)
+    isa_parents, isa_children = extract_isa_dag(cache["mrrel_rows"],
+                                                 SNOMED_CUIS)
+    all_nodes = set(isa_parents.keys()) | set(isa_children.keys())
+    ic_scores = compute_ic(isa_children, all_nodes, len(SNOMED_CUIS))
+
+    print(f"\n[C+D] Build final topics")
+    topic_id_to_topic, canonical_to_topic_id, cui_to_topic_ids = \
+        build_final_topics(SNOMED_CUIS, neighbors, isa_parents, ic_scores)
+
+    print(f"\n[Save] Writing to {OUTPUT_PATH}")
+    payload = {
+        "topic_id_to_topic":       topic_id_to_topic,
+        "canonical_to_topic_id":   canonical_to_topic_id,
+        "cui_to_topic_ids":        {c: sorted(s) for c, s
+                                    in cui_to_topic_ids.items()},
+        "labels":                  LABELS,
+        "tags":                    globals().get("TAGS", {}),
+        "config": {
+            "anchor_rule":     "highest-IC IS-A ancestor in topic",
+            "ic_formula":      "Seco: 1 - log(desc+1) / log(total)",
+            "hierarchy_rels":  sorted(HIERARCHY_RELS),
+            "topic_dedup":     "one topic per unique anchor CUI",
+            "filtering":       "none — production filters/scores at retrieval time",
+        },
+        "built_at": datetime.datetime.now().isoformat(),
+    }
+    with open(OUTPUT_PATH, "wb") as f:
+        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
+    print(f"        Wrote {size_mb:.1f} MB")
+
+    print(f"\nTOTAL: {time.time()-t_total:.0f}s")
+    print(f"DONE — {datetime.datetime.now().isoformat()}")
+
+
+main()
