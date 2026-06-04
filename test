@@ -1,14 +1,93 @@
-================================================================================
-C2142181  |  Pain of left knee joint (finding)
-STY: Sign or Symptom
--> 2 TOPIC(S)
+"""
+inspect_isa_subgroups.py
+------------------------
+Show IS-A subgroups for sample CUIs.
 
-  Topic ID: tp_02538dd82b5b
-  Canonical: C0231749
-  Label    : Pain of knee region
-  Size     : 9 CUIs
+For each CUI:
+  - Main topic members (from network graph)
+  - Granular subgroups within the topic (anchors = topic members,
+    chosen by Step 2 rollup or highest-IC fallback)
+  - Each member shows its primary anchor with IC for transparency
+"""
 
-  Topic ID: tp_4b868e75bf1a
-  Canonical: C5442019
-  Label    : Pain of left knee
-  Size     : 6 CUIs
+import pickle
+
+PKL_PATH    = "topic_with_isa_subgroups.pkl"
+ROLLUP_PATH = "rollup_index.pkl"   # for IC scores display
+
+CUIS = [
+    "C0032285",  # Pneumonia
+    "C0011849",  # Diabetes mellitus
+    "C0021368",  # Inflammation
+    "C0024109",  # Lung
+    "C2142181",  # Pain of left knee joint
+    "C0559470",  # Allergy to peanut
+    "C0013182",  # Allergy to drug
+    "C0002792",  # Anaphylaxis
+]
+
+
+with open(PKL_PATH, "rb") as f:
+    p = pickle.load(f)
+
+topic_to_cuis         = p["topic_to_cuis"]
+isa_subgroups         = p["isa_subgroups"]
+ungrouped_members     = p["ungrouped_members"]
+cui_to_primary_anchor = p.get("cui_to_primary_anchor", {})
+labels                = p.get("labels", {})
+
+# Load IC for display
+ic_scores = {}
+try:
+    with open(ROLLUP_PATH, "rb") as f:
+        r = pickle.load(f)
+    ic_scores = r.get("ic_scores", {})
+except FileNotFoundError:
+    pass
+
+
+def lbl(c):
+    return labels.get(c, "?")
+
+
+def ic(c):
+    return ic_scores.get(c, 0.0)
+
+
+for cui in CUIS:
+    print(f"\n{'='*90}")
+    print(f"  {cui}  '{lbl(cui)}'  (focal of topic)")
+    print(f"{'='*90}")
+
+    members = topic_to_cuis.get(cui, frozenset())
+    print(f"  Main topic size: {len(members)}")
+
+    subgroups = isa_subgroups.get(cui, {})
+    ungrouped = ungrouped_members.get(cui, frozenset())
+
+    print(f"  Subgroups      : {len(subgroups)}")
+    print(f"  Ungrouped      : {len(ungrouped)} members\n")
+
+    # Largest subgroups first
+    sorted_groups = sorted(subgroups.items(), key=lambda kv: -len(kv[1]))
+    for anchor, mems in sorted_groups:
+        anchor_mark = " <-- focal CUI itself" if anchor == cui else ""
+        print(f"  SUBGROUP anchored by: {anchor}  IC={ic(anchor):.3f}  "
+              f"'{lbl(anchor)}'{anchor_mark}")
+        for m in sorted(mems, key=lambda c: -ic(c)):
+            if m == anchor:
+                role = " (anchor)"
+            elif m == cui:
+                role = " (focal CUI of topic)"
+            else:
+                role = ""
+            print(f"    {m}  IC={ic(m):.3f}  '{lbl(m)}'{role}")
+        print()
+
+    if ungrouped:
+        print(f"  UNGROUPED (no IS-A ancestor in topic):")
+        for m in sorted(ungrouped, key=lambda c: -ic(c)):
+            role = " (focal CUI of topic)" if m == cui else ""
+            print(f"    {m}  IC={ic(m):.3f}  '{lbl(m)}'{role}")
+
+print("\nDONE")
