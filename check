@@ -1,523 +1,401 @@
-Loading umls_cache.pkl ...
-Loading SNOMED universe from topic_lookup.pkl ...
-  MRREL rows         : 2,748,222
-  SNOMED CUIs        : 374,538
-  Labels             : 374,538
-
-================================================================================
-  STEP 1: Overall REL distribution
-================================================================================
-
-  REL              ALL rows         SNOMED-only
-  ----------       --------------   --------------
-  RO                    1,508,568        1,508,568
-  CHD                     615,978          615,978
-  PAR                     615,942          615,942
-  RN                        2,748            2,748
-  RB                        2,748            2,748
-  SY                        2,238            2,238
-
-================================================================================
-  STEP 2: RELA distribution WITHIN RO (cross-axis relations)
-================================================================================
-
-  RO has 212 distinct RELA values
-  Top 20 by SNOMED-only count:
-
-  RELA                                      ALL          SNOMED-only
-  --------------------------------------    ----------   --------------
-  finding_site_of                            106,424          106,424
-  has_finding_site                           106,423          106,423
-  has_associated_morphology                   79,784           79,784
-  associated_morphology_of                    78,747           78,747
-  has_method                                  68,889           68,889
-  method_of                                   68,889           68,889
-  mapped_from                                 46,130           46,130
-  mapped_to                                   46,130           46,130
-  interprets                                  39,547           39,547
-  is_interpreted_by                           39,547           39,547
-  direct_procedure_site_of                    38,934           38,934
-  has_direct_procedure_site                   38,934           38,934
-  has_pathological_process                    28,107           28,107
-  pathological_process_of                     28,107           28,107
-  has_laterality                              25,414           25,414
-  laterality_of                               25,414           25,414
-  has_occurrence                              22,576           22,576
-  occurs_in                                   22,576           22,576
-  has_interpretation                          19,078           19,078
-  interpretation_of                           19,078           19,078
-
-================================================================================
-  STEP 3: Sample edges per top RELA (for clinical judgment)
-================================================================================
-
-  RELA: 'finding_site_of'  (106,424 SNOMED-only edges)
-    C1333139 'Complex endometrial hyperplasia without atypia'
-      --[finding_site_of]-->
-    C0014180 'Endometrium'
-
-    C1333321 'Gastrinoma of duodenum'
-      --[finding_site_of]-->
-    C0013303 'Duodenal structure'
-
-    C1333467 'Squamous cell papilloma of oesophagus'
-      --[finding_site_of]-->
-    C0014876 'Oesophagus'
-
-    C1333636 'Foveolar hyperplasia'
-      --[finding_site_of]-->
-    C0227203 'Structure of gastric foveola'
-
-    C1333803 'Digestive system observation'
-      --[finding_site_of]-->
-    C0012240 'Digestive system'
-
-
-  RELA: 'has_finding_site'  (106,423 SNOMED-only edges)
-    C0205827 'Sacral plexus structure (body structure)'
-      --[has_finding_site]-->
-    C0434219 'Closed injury sacral plexus'
-
-    C0206187 'Extrahepatic bile duct'
-      --[has_finding_site]-->
-    C0238019 'Carcinoma of extrahepatic bile duct (disorder)'
-
-    C0206187 'Extrahepatic bile duct'
-      --[has_finding_site]-->
-    C0686113 'Neoplasm of uncertain behavior of extrahepatic bil'
-
-    C0206187 'Extrahepatic bile duct'
-      --[has_finding_site]-->
-    C2959486 'Primary malignant neoplasm of perihilar bile duct'
-
-    C0206187 'Extrahepatic bile duct'
-      --[has_finding_site]-->
-    C2960367 'Primary malignant neoplasm of extrahepatic bile du'
-
-
-  RELA: 'has_associated_morphology'  (79,784 SNOMED-only edges)
-    C1334014 'High grade glandular intraepithelial neoplasia'
-      --[has_associated_morphology]-->
-    C5395092 'High grade flat intraepithelial neoplasia of ampul'
-
-    C1334014 'High grade glandular intraepithelial neoplasia'
-      --[has_associated_morphology]-->
-    C5686078 'High grade glandular intraepithelial neoplasia of '
-
-    C1334715 'Metastatic well-differentiated neuroendocrine tumo'
-      --[has_associated_morphology]-->
-    C5967915 'Metastatic well-differentiated neuroendocrine tumo'
-
-    C1334715 'Metastatic well-differentiated neuroendocrine tumo'
-      --[has_associated_morphology]-->
-    C5968443 'Metastatic well-differentiated neuroendocrine neop'
-
-    C1337012 'Well-differentiated papillary mesothelioma'
-      --[has_associated_morphology]-->
-    C5230651 'Well-differentiated papillary mesothelioma of pleu'
-
-
-  RELA: 'associated_morphology_of'  (78,747 SNOMED-only edges)
-    C1332917 'Carcinosarcoma of cervix uteri'
-      --[associated_morphology_of]-->
-    C0007140 'Carcinosarcoma'
-
-    C1332930 'Aggressive fibromatosis of chest wall'
-      --[associated_morphology_of]-->
-    C0079218 'Aggressive fibromatosis'
-
-    C1333149 'Pedunculated conjunctival papilloma'
-      --[associated_morphology_of]-->
-    C5548501 'Benign papilloma'
-
-    C1333176 'Lymphangioma of skin'
-      --[associated_morphology_of]-->
-    C0024221 'Congenital lymphangioma (disorder)'
-
-    C1333260 'Primary ameloblastic carcinoma'
-      --[associated_morphology_of]-->
-    C1314678 'Ameloblastic carcinoma (morphologic abnormality)'
-
-
-  RELA: 'has_method'  (68,889 SNOMED-only edges)
-    C0030247 'Palpation - action (qualifier value)'
-      --[has_method]-->
-    C0030249 'Palpation of liver'
-
-    C0030247 'Palpation - action (qualifier value)'
-      --[has_method]-->
-    C5688561 'Palpation of urinary bladder'
-
-    C1322279 'Dilation - action (qualifier value)'
-      --[has_method]-->
-    C0012358 'Dilation and curettage of uterus (procedure)'
-
-    C1322279 'Dilation - action (qualifier value)'
-      --[has_method]-->
-    C0189093 'Dilation of nasopharynx'
-
-    C1322279 'Dilation - action (qualifier value)'
-      --[has_method]-->
-    C0189463 'Dilation of bronchus'
-
-
-  RELA: 'method_of'  (68,889 SNOMED-only edges)
-    C0206054 'Transoesophageal echocardiography'
-      --[method_of]-->
-    C0041618 'Ultrasonography'
-
-    C0220931 'Functional training (procedure)'
-      --[method_of]-->
-    C1292797 'Training - action'
-
-    C0812489 'Open arteriovenous anastomosis by transposition of'
-      --[method_of]-->
-    C0677554 'Anastomosis - action (qualifier value)'
-
-    C0812509 'Laparoscopic pyeloplasty'
-      --[method_of]-->
-    C0199219 'Inspection'
-
-    C0844312 'Repair of oval window'
-      --[method_of]-->
-    C0374711 'Surgical repair'
-
-
-  RELA: 'mapped_from'  (46,130 SNOMED-only edges)
-    C1332911 'Cervical adenoid cystic carcinoma'
-      --[mapped_from]-->
-    C0007847 'Malignant tumour of cervix'
-
-    C1333071 'Chordoma of clivus'
-      --[mapped_from]-->
-    C0346653 'Malignant neoplasm of bones of skull and face'
-
-    C1333139 'Complex endometrial hyperplasia without atypia'
-      --[mapped_from]-->
-    C2712711 'Benign endometrial hyperplasia (disorder)'
-
-    C1333159 'Corneal intraepithelial neoplasia'
-      --[mapped_from]-->
-    C0154094 'Carcinoma in situ of eye'
-
-    C1333294 'ALK-positive large B-cell lymphoma'
-      --[mapped_from]-->
-    C0079744 'Diffuse large B cell lymphoma'
-
-
-  RELA: 'mapped_to'  (46,130 SNOMED-only edges)
-    C1333768 'Gastrointestinal stromal tumor of stomach (disorde'
-      --[mapped_to]-->
-    C5547338 'Gastrointestinal stromal neoplasm of cardia of sto'
-
-    C1335996 'Gastrointestinal stromal tumor of small intestine'
-      --[mapped_to]-->
-    C5547337 'Gastrointestinal stromal neoplasm of jejunum'
-
-    C1384514 'Conn's syndrome'
-      --[mapped_to]-->
-    C0342451 'Primary hyperaldosteronism due to hyperplasia'
-
-    C1384514 'Conn's syndrome'
-      --[mapped_to]-->
-    C4274967 'Primary unilateral adrenal hyperplasia'
-
-    C1384514 'Conn's syndrome'
-      --[mapped_to]-->
-    C5230308 'Primary hyperaldosteronism, seizures, neurological'
-
-
-  RELA: 'interprets'  (39,547 SNOMED-only edges)
-    C0205949 'Sexual orientation'
-      --[interprets]-->
-    C0237209 'Sexual orientation confusion'
-
-    C0205949 'Sexual orientation'
-      --[interprets]-->
-    C0242658 'Male homosexuality'
-
-    C0205949 'Sexual orientation'
-      --[interprets]-->
-    C0424397 'Concern about sexual orientation'
-
-    C0206161 'Reticulocyte count'
-      --[interprets]-->
-    C0421280 'Reticulocytosis after B12'
-
-    C0206161 'Reticulocyte count'
-      --[interprets]-->
-    C0858867 'Reticulocytopenia'
-
-
-  RELA: 'is_interpreted_by'  (39,547 SNOMED-only edges)
-    C0205564 'Clinical stage I'
-      --[is_interpreted_by]-->
-    C1286325 'Lesion observable'
-
-    C0205578 'Clinical stage III'
-      --[is_interpreted_by]-->
-    C1286325 'Lesion observable'
-
-    C0205599 'Clark melanoma level 2'
-      --[is_interpreted_by]-->
-    C1286325 'Lesion observable'
-
-    C0205604 'Breslow measurement - depth less than 0.76 mm'
-      --[is_interpreted_by]-->
-    C0430445 'Histopathology test'
-
-    C0205606 'Breslow measurement - depth greater than 1.75 mm'
-      --[is_interpreted_by]-->
-    C1286325 'Lesion observable'
-
-
-  RELA: 'direct_procedure_site_of'  (38,934 SNOMED-only edges)
-    C0812489 'Open arteriovenous anastomosis by transposition of'
-      --[direct_procedure_site_of]-->
-    C0226801 'Structure of basilic vein'
-
-    C0844312 'Repair of oval window'
-      --[direct_procedure_site_of]-->
-    C0029922 'Vestibular window structure (body structure)'
-
-    C0845202 'Open reduction of dislocation of carpometacarpal j'
-      --[direct_procedure_site_of]-->
-    C0224620 'Carpometacarpal joint structure'
-
-    C0845310 'Closed reduction of fracture of clavicle with inte'
-      --[direct_procedure_site_of]-->
-    C0008913 'Clavicle'
-
-    C0845315 'Open reduction of fracture of scapula with interna'
-      --[direct_procedure_site_of]-->
-    C0036277 'Bone structure of scapula'
-
-
-  RELA: 'has_direct_procedure_site'  (38,934 SNOMED-only edges)
-    C0205814 'Superior laryngeal nerve'
-      --[has_direct_procedure_site]-->
-    C0196612 'Division of superior laryngeal nerve'
-
-    C0206207 'Articular capsule'
-      --[has_direct_procedure_site]-->
-    C0185390 'Joint capsuloplasty'
-
-    C0206207 'Articular capsule'
-      --[has_direct_procedure_site]-->
-    C0185391 'Joint capsulodesis'
-
-    C0206207 'Articular capsule'
-      --[has_direct_procedure_site]-->
-    C0185467 'Transposition of joint capsule'
-
-    C0206248 'Pelvic diaphragm'
-      --[has_direct_procedure_site]-->
-    C4284271 'Repair of perineal hernia using surgical suture (p'
-
-
-  RELA: 'has_pathological_process'  (28,107 SNOMED-only edges)
-    C1534674 'Primary malignant neoplastic proliferation'
-      --[has_pathological_process]-->
-    C0345950 'Primary bronchial cancer'
-
-    C1534674 'Primary malignant neoplastic proliferation'
-      --[has_pathological_process]-->
-    C0346642 'Primary malignant neoplasm of common bile duct (di'
-
-    C1534674 'Primary malignant neoplastic proliferation'
-      --[has_pathological_process]-->
-    C0346659 'Primary malignant neoplasm of occipital bone'
-
-    C1534674 'Primary malignant neoplastic proliferation'
-      --[has_pathological_process]-->
-    C0346738 'Primary malignant neoplasm of skin of neck (disord'
-
-    C1534674 'Primary malignant neoplastic proliferation'
-      --[has_pathological_process]-->
-    C0346764 'Primary malignant neoplasm of skin of ankle'
-
-
-  RELA: 'pathological_process_of'  (28,107 SNOMED-only edges)
-    C1333260 'Primary ameloblastic carcinoma'
-      --[pathological_process_of]-->
-    C1534674 'Primary malignant neoplastic proliferation'
-
-    C1333482 'Exaggerated placental site (disorder)'
-      --[pathological_process_of]-->
-    C0586102 'Pathological developmental process'
-
-    C1364022 'Systemic lupus erythematosus-related syndrome'
-      --[pathological_process_of]-->
-    C0443146 'Autoimmune reaction (finding)'
-
-    C1384583 'Del Castillo syndrome'
-      --[pathological_process_of]-->
-    C0586102 'Pathological developmental process'
-
-    C0206138 'CREST syndrome'
-      --[pathological_process_of]-->
-    C0443146 'Autoimmune reaction (finding)'
-
-
-  RELA: 'has_laterality'  (25,414 SNOMED-only edges)
-    C0205090 'Right side'
-      --[has_laterality]-->
-    C0225460 'Right frontal sinus'
-
-    C0205090 'Right side'
-      --[has_laterality]-->
-    C0225469 'Right ethmoid sinus structure'
-
-    C0205090 'Right side'
-      --[has_laterality]-->
-    C0225608 'Right main bronchus structure'
-
-    C0205090 'Right side'
-      --[has_laterality]-->
-    C0225620 'Right middle lobe bronchial lumen'
-
-    C0205090 'Right side'
-      --[has_laterality]-->
-    C0225623 'Entire apical segmental bronchus of right lower lo'
-
-
-  RELA: 'laterality_of'  (25,414 SNOMED-only edges)
-    C0205814 'Superior laryngeal nerve'
-      --[laterality_of]-->
-    C0441987 'Side'
-
-    C0205826 'Lumbar plexus structure (body structure)'
-      --[laterality_of]-->
-    C0441987 'Side'
-
-    C0205956 'Ventral spinal nerve root'
-      --[laterality_of]-->
-    C0441987 'Side'
-
-    C0206257 'Superior cervical ganglion'
-      --[laterality_of]-->
-    C0441987 'Side'
-
-    C0815870 'Structure of left popliteal fossa'
-      --[laterality_of]-->
-    C0205091 'Levo-'
-
-
-  RELA: 'has_occurrence'  (22,576 SNOMED-only edges)
-    C1333482 'Exaggerated placental site (disorder)'
-      --[has_occurrence]-->
-    C5566148 'Maternal pregnancy period'
-
-    C0205710 'Gray matter degeneration'
-      --[has_occurrence]-->
-    C0231335 'Childhood - period'
-
-    C0220659 'Acrodysostosis (disorder)'
-      --[has_occurrence]-->
-    C1744681 'Congenital'
-
-    C0220663 'BPES - blepharophimosis epicanthus inversus ptosis'
-      --[has_occurrence]-->
-    C1744681 'Congenital'
-
-    C0220663 'BPES - blepharophimosis epicanthus inversus ptosis'
-      --[has_occurrence]-->
-    C1744681 'Congenital'
-
-
-  RELA: 'occurs_in'  (22,576 SNOMED-only edges)
-    C0700597 'Adulthood - period'
-      --[occurs_in]-->
-    C0221056 'Adult onset dermatomyositis'
-
-    C0700597 'Adulthood - period'
-      --[occurs_in]-->
-    C0236859 'Physical abuse of adult'
-
-    C0700597 'Adulthood - period'
-      --[occurs_in]-->
-    C0236860 'Sexual abuse of adult'
-
-    C0700597 'Adulthood - period'
-      --[occurs_in]-->
-    C0267990 'Adult-onset obesity'
-
-    C0700597 'Adulthood - period'
-      --[occurs_in]-->
-    C0268413 'Hypophosphatasia, adult type'
-
-
-  RELA: 'has_interpretation'  (19,078 SNOMED-only edges)
-    C0220938 'White colour'
-      --[has_interpretation]-->
-    C1411610 'Phlegmasia alba dolens in pregnancy'
-
-    C0221099 'Impaired (qualifier value)'
-      --[has_interpretation]-->
-    C0002624 'Retrograde amnesia (finding)'
-
-    C0221099 'Impaired (qualifier value)'
-      --[has_interpretation]-->
-    C0003504 'Aortic valve insufficiency'
-
-    C0221099 'Impaired (qualifier value)'
-      --[has_interpretation]-->
-    C0016667 'Fragile X syndrome'
-
-    C0221099 'Impaired (qualifier value)'
-      --[has_interpretation]-->
-    C0033074 'Presbycusis (disorder)'
-
-
-  RELA: 'interpretation_of'  (19,078 SNOMED-only edges)
-    C1334171 'Ineffective hematopoiesis'
-      --[interpretation_of]-->
-    C0205161 'Abnormal (qualifier value)'
-
-    C1367053 'Blue baby'
-      --[interpretation_of]-->
-    C1260957 'Blue colour'
-
-    C0205858 'Progressive general paresis'
-      --[interpretation_of]-->
-    C0221099 'Impaired (qualifier value)'
-
-    C0220662 'Distal arthrogryposis type 1'
-      --[interpretation_of]-->
-    C0205216 'Decreased by'
-
-    C0220686 'Aase Smith type 1 syndrome'
-      --[interpretation_of]-->
-    C0205216 'Decreased by'
-
-
-================================================================================
-  STEP 4: Quick classification hints (manual judgment needed)
-================================================================================
-
-  Look at the RELA names above. Common categories you'll see:
-
-  HIERARCHY-LIKE (similar to PAR/CHD, likely useful for rollup):
-    - inverse_isa, kind_of, classified_as, classifies, has_inheritance_type
-    - subset_of, member_of (sometimes)
-
-  CAUSATIVE / ETIOLOGY (cross-axis but clinically meaningful):
-    - has_causative_agent, causative_agent_of
-    - has_associated_morphology, associated_morphology_of
-    - has_finding_site, finding_site_of
-
-  COMPOSITION / STRUCTURE (cross-axis, sometimes useful):
-    - has_component, part_of, has_active_ingredient
-
-  CROSS-VOCABULARY / SYNONYMY (NOT hierarchy):
-    - mapped_to, mapped_from
-    - same_as (typically only in SY, but check)
-
-  NOISE / FLAT:
-    - allowed_qualifier, has_dose_form, has_administration_method
-    - has_intent, refers_to
-
-  After running this, identify which RELAs (if any) actually behave
-  hierarchically in your data and could supplement IS-A.
-
-DONE
+"""
+build_rollup_compare.py
+-----------------------
+Build TWO rollup indexes for side-by-side comparison:
+  - rollup_isa_only.pkl     : IS-A relations only (current build)
+  - rollup_isa_ro.pkl       : IS-A + direct RO neighbors of focal CUI
+
+The IS-A walk is unchanged between builds. The RO version ALSO adds the
+direct RO neighbors of each CUI as additional rollup ancestors.
+
+No transitive RO walking, no IS-A walks from RO neighbors. Each CUI
+contributes its own first-hop RO neighbors only — bounded and predictable.
+"""
+
+import pickle
+import datetime
+import math
+import time
+import os
+from collections import defaultdict, Counter
+
+
+ISA_OUTPUT_PATH = "rollup_isa_only.pkl"
+RO_OUTPUT_PATH  = "rollup_isa_ro.pkl"
+
+ISA_RELATIONS   = {"PAR", "CHD", "RB", "RN"}
+RO_RELATION     = "RO"
+MIN_CHILDREN    = 3
+
+
+# ============================================================================
+# Common: extract edges and build adjacency
+# ============================================================================
+
+def extract_isa_edges(mrrel_rows, snomed_cuis):
+    """Return set of (child, parent) tuples from MRREL IS-A relations.
+    Row format: (CUI1, CUI2, REL, RELA)
+    """
+    edges = set()
+    rel_counts = Counter()
+    for row in mrrel_rows:
+        if len(row) < 3:
+            continue
+        cui1, cui2, rel = row[0], row[1], row[2]
+        rel_counts[rel] += 1
+        if rel not in ISA_RELATIONS:
+            continue
+        if cui1 not in snomed_cuis or cui2 not in snomed_cuis:
+            continue
+        if cui1 == cui2:
+            continue
+        if rel == "PAR" or rel == "RB":
+            edges.add((cui1, cui2))
+        elif rel == "CHD" or rel == "RN":
+            edges.add((cui2, cui1))
+    return edges, rel_counts
+
+
+def extract_ro_neighbors(mrrel_rows, snomed_cuis):
+    """For each CUI, return its set of direct RO neighbors (any direction).
+    
+    Returns: dict[cui] -> set[(neighbor_cui, RELA)]
+    """
+    neighbors = defaultdict(set)
+    for row in mrrel_rows:
+        if len(row) < 4:
+            continue
+        cui1, cui2, rel, rela = row[0], row[1], row[2], row[3]
+        if rel != RO_RELATION:
+            continue
+        if cui1 not in snomed_cuis or cui2 not in snomed_cuis:
+            continue
+        if cui1 == cui2:
+            continue
+        neighbors[cui1].add((cui2, rela))
+        neighbors[cui2].add((cui1, rela))
+    return dict(neighbors)
+
+
+def build_isa_dag(edges):
+    isa_parents  = defaultdict(set)
+    isa_children = defaultdict(set)
+    for child, parent in edges:
+        isa_parents[child].add(parent)
+        isa_children[parent].add(child)
+    return dict(isa_parents), dict(isa_children)
+
+
+def compute_descendant_counts(isa_children, all_nodes):
+    descendant_sets = {}
+    def descendants(node, stack):
+        if node in descendant_sets:
+            return descendant_sets[node]
+        if node in stack:
+            return set()
+        stack = stack | {node}
+        result = set()
+        for child in isa_children.get(node, ()):
+            result.add(child)
+            result |= descendants(child, stack)
+        descendant_sets[node] = result
+        return result
+    for node in all_nodes:
+        descendants(node, set())
+    return {n: len(d) for n, d in descendant_sets.items()}
+
+
+def compute_ic(descendant_counts, total_nodes):
+    log_total = math.log(total_nodes + 1)
+    return {cui: 1.0 - math.log(n + 1) / log_total
+            for cui, n in descendant_counts.items()}
+
+
+# ============================================================================
+# Path walking and rollup finding (unchanged from before)
+# ============================================================================
+
+def all_paths_to_root(cui, isa_parents, max_paths=200, max_depth=30):
+    paths = []
+    def walk(current_path, visited):
+        if len(paths) >= max_paths:
+            return
+        if len(current_path) >= max_depth:
+            paths.append(list(current_path))
+            return
+        current = current_path[-1]
+        parents = isa_parents.get(current, set()) - visited
+        if not parents:
+            paths.append(list(current_path))
+            return
+        for p in parents:
+            current_path.append(p)
+            visited.add(p)
+            walk(current_path, visited)
+            current_path.pop()
+            visited.remove(p)
+    walk([cui], {cui})
+    return paths
+
+
+def find_rollup_ancestor(path, ic, isa_children, min_children):
+    if len(path) == 1:
+        return path[0]
+    if len(path) == 2:
+        return path[1]
+    ics = [ic.get(node, 0.0) for node in path]
+    deltas = [ics[i] - ics[i+1] for i in range(len(ics) - 1)]
+    ic_stop_idx = None
+    for i in range(1, len(deltas)):
+        if deltas[i] > deltas[i-1]:
+            ic_stop_idx = i
+            break
+    if ic_stop_idx is None:
+        ic_stop_idx = min(2, len(path) - 1)
+    candidate_idx = ic_stop_idx
+    while candidate_idx < len(path) - 1:
+        candidate = path[candidate_idx]
+        if len(isa_children.get(candidate, set())) >= min_children:
+            return candidate
+        candidate_idx += 1
+    return path[-1]
+
+
+# ============================================================================
+# Ancestor closure cache + dedup
+# ============================================================================
+
+_ancestor_closure_cache = {}
+
+def compute_ancestor_closure(cui, isa_parents):
+    if cui in _ancestor_closure_cache:
+        return _ancestor_closure_cache[cui]
+    ancestors = set()
+    stack = [cui]
+    visited = set()
+    while stack:
+        node = stack.pop()
+        if node in visited:
+            continue
+        visited.add(node)
+        for p in isa_parents.get(node, set()):
+            if p not in ancestors:
+                ancestors.add(p)
+                stack.append(p)
+    _ancestor_closure_cache[cui] = frozenset(ancestors)
+    return _ancestor_closure_cache[cui]
+
+
+def dedup_ancestors(ancestors, isa_parents):
+    ancestors = list(ancestors)
+    if len(ancestors) <= 1:
+        return frozenset(ancestors)
+    closures = {a: compute_ancestor_closure(a, isa_parents) for a in ancestors}
+    redundant = set()
+    for a in ancestors:
+        for b in ancestors:
+            if a == b:
+                continue
+            if a in closures[b]:
+                redundant.add(a)
+                break
+    return frozenset(a for a in ancestors if a not in redundant)
+
+
+# ============================================================================
+# Build rollups (both flavors)
+# ============================================================================
+
+def build_isa_only_rollups(snomed_cuis, isa_parents, isa_children, ic,
+                            min_children):
+    """Rollup set = {self} U deduped(IS-A ancestors via path walk)."""
+    cui_to_rollup = {}
+    paths_count = {}
+    n_orphan = 0
+    t0 = time.time()
+    for i, cui in enumerate(snomed_cuis):
+        if i % 50000 == 0 and i > 0:
+            print(f"    {i:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
+        if cui not in isa_parents:
+            cui_to_rollup[cui] = frozenset({cui})
+            paths_count[cui] = 0
+            n_orphan += 1
+            continue
+        paths = all_paths_to_root(cui, isa_parents)
+        paths_count[cui] = len(paths)
+        ancestors = set()
+        for path in paths:
+            ancestors.add(find_rollup_ancestor(path, ic, isa_children, min_children))
+        deduped = dedup_ancestors(ancestors, isa_parents)
+        cui_to_rollup[cui] = frozenset({cui} | deduped)
+    print(f"    Done in {time.time()-t0:.0f}s, {n_orphan:,} orphans")
+    return cui_to_rollup, paths_count
+
+
+def build_isa_ro_rollups(snomed_cuis, isa_parents, isa_children, ic,
+                          ro_neighbors, min_children):
+    """Rollup set = {self} U deduped(IS-A ancestors) U RO neighbors."""
+    cui_to_rollup = {}
+    paths_count = {}
+    cui_to_ro_neighbors_used = {}  # for diagnostic — which RO neighbors added
+    n_orphan = 0
+    n_ro_only = 0
+    t0 = time.time()
+    for i, cui in enumerate(snomed_cuis):
+        if i % 50000 == 0 and i > 0:
+            print(f"    {i:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
+        
+        # IS-A part
+        if cui not in isa_parents:
+            isa_part = frozenset()
+            paths_count[cui] = 0
+            n_orphan += 1
+        else:
+            paths = all_paths_to_root(cui, isa_parents)
+            paths_count[cui] = len(paths)
+            ancestors = set()
+            for path in paths:
+                ancestors.add(find_rollup_ancestor(path, ic, isa_children, min_children))
+            isa_part = dedup_ancestors(ancestors, isa_parents)
+        
+        # RO part: direct neighbors of focal CUI only
+        ro_part = set()
+        for neighbor, rela in ro_neighbors.get(cui, set()):
+            ro_part.add(neighbor)
+        
+        cui_to_rollup[cui] = frozenset({cui} | isa_part | ro_part)
+        if ro_part:
+            cui_to_ro_neighbors_used[cui] = frozenset(ro_part)
+            if not isa_part:
+                n_ro_only += 1
+    
+    print(f"    Done in {time.time()-t0:.0f}s, {n_orphan:,} IS-A orphans, "
+          f"{n_ro_only:,} CUIs got RO ancestors only")
+    return cui_to_rollup, paths_count, cui_to_ro_neighbors_used
+
+
+def build_reverse_index(cui_to_rollup):
+    rollup_to_cuis = defaultdict(set)
+    for cui, ancestors in cui_to_rollup.items():
+        for anc in ancestors:
+            rollup_to_cuis[anc].add(cui)
+    return dict(rollup_to_cuis)
+
+
+# ============================================================================
+# Main
+# ============================================================================
+
+def main():
+    print(f"BUILD START — {datetime.datetime.now().isoformat()}")
+    t_total = time.time()
+
+    mrrel_rows = cache["mrrel_rows"]
+    print(f"\nInputs:")
+    print(f"  mrrel_rows  : {len(mrrel_rows):,}")
+    print(f"  SNOMED_CUIS : {len(SNOMED_CUIS):,}")
+
+    print(f"\n[1] Extract IS-A edges")
+    isa_edges, rel_counts = extract_isa_edges(mrrel_rows, SNOMED_CUIS)
+    print(f"    IS-A edges: {len(isa_edges):,}")
+    print(f"    REL counts: {dict(rel_counts.most_common(8))}")
+
+    print(f"\n[2] Build IS-A DAG and IC")
+    isa_parents, isa_children = build_isa_dag(isa_edges)
+    all_isa_nodes = set(isa_parents) | set(isa_children)
+    descendant_counts = compute_descendant_counts(isa_children, all_isa_nodes)
+    ic = compute_ic(descendant_counts, len(SNOMED_CUIS))
+    print(f"    Nodes with parents: {len(isa_parents):,}")
+    print(f"    Nodes with children: {len(isa_children):,}")
+
+    print(f"\n[3] Extract RO neighbors")
+    ro_neighbors = extract_ro_neighbors(mrrel_rows, SNOMED_CUIS)
+    print(f"    CUIs with RO neighbors: {len(ro_neighbors):,}")
+    avg_ro = (sum(len(v) for v in ro_neighbors.values())
+              / max(len(ro_neighbors), 1))
+    print(f"    Avg RO neighbors per CUI: {avg_ro:.1f}")
+
+    # ─── Build 1: IS-A only ───
+    print(f"\n[4] Build IS-A-only rollups")
+    rollup_isa, paths_isa = build_isa_only_rollups(
+        SNOMED_CUIS, isa_parents, isa_children, ic, MIN_CHILDREN
+    )
+    reverse_isa = build_reverse_index(rollup_isa)
+    print(f"    Unique rollup ancestors (IS-A only): "
+          f"{len(reverse_isa):,}")
+    print(f"    Compression: "
+          f"{len(rollup_isa)/max(len(reverse_isa),1):.1f}x")
+
+    # ─── Build 2: IS-A + RO ───
+    print(f"\n[5] Build IS-A+RO rollups")
+    rollup_ro, paths_ro, ro_used = build_isa_ro_rollups(
+        SNOMED_CUIS, isa_parents, isa_children, ic, ro_neighbors, MIN_CHILDREN
+    )
+    reverse_ro = build_reverse_index(rollup_ro)
+    print(f"    Unique rollup ancestors (IS-A+RO):   "
+          f"{len(reverse_ro):,}")
+    print(f"    Compression: "
+          f"{len(rollup_ro)/max(len(reverse_ro),1):.1f}x")
+
+    # Quick diff stats
+    extra_per_cui = []
+    for cui in SNOMED_CUIS:
+        s_isa = rollup_isa.get(cui, frozenset())
+        s_ro = rollup_ro.get(cui, frozenset())
+        extra_per_cui.append(len(s_ro) - len(s_isa))
+    print(f"\n    Extra rollups per CUI from RO:")
+    print(f"      median: {sorted(extra_per_cui)[len(extra_per_cui)//2]}")
+    print(f"      mean:   {sum(extra_per_cui)/len(extra_per_cui):.1f}")
+    print(f"      max:    {max(extra_per_cui)}")
+
+    # ─── Save both ───
+    common_meta = {
+        "ic_scores":         ic,
+        "descendant_counts": descendant_counts,
+        "isa_parents":       isa_parents,
+        "isa_children":      isa_children,
+        "snomed_cuis":       SNOMED_CUIS,
+        "labels":            LABELS,
+        "built_at":          datetime.datetime.now().isoformat(),
+    }
+
+    print(f"\n[6] Save IS-A-only build")
+    with open(ISA_OUTPUT_PATH, "wb") as f:
+        pickle.dump({
+            **common_meta,
+            "cui_to_rollup_ancestors": rollup_isa,
+            "rollup_to_descendants":   reverse_isa,
+            "paths_count":             paths_isa,
+            "config": {
+                "relations_used":   sorted(ISA_RELATIONS),
+                "min_children":     MIN_CHILDREN,
+                "ro_added":         False,
+            },
+        }, f, protocol=pickle.HIGHEST_PROTOCOL)
+    sz1 = os.path.getsize(ISA_OUTPUT_PATH) / 1024 / 1024
+    print(f"    Wrote {ISA_OUTPUT_PATH} ({sz1:.1f} MB)")
+
+    print(f"\n[7] Save IS-A+RO build")
+    with open(RO_OUTPUT_PATH, "wb") as f:
+        pickle.dump({
+            **common_meta,
+            "cui_to_rollup_ancestors":   rollup_ro,
+            "rollup_to_descendants":     reverse_ro,
+            "paths_count":               paths_ro,
+            "cui_to_ro_neighbors_used":  ro_used,
+            "ro_neighbors_all":          ro_neighbors,
+            "config": {
+                "relations_used":   sorted(ISA_RELATIONS) + ["RO"],
+                "min_children":     MIN_CHILDREN,
+                "ro_added":         True,
+                "ro_mode":          "direct neighbors of focal CUI",
+            },
+        }, f, protocol=pickle.HIGHEST_PROTOCOL)
+    sz2 = os.path.getsize(RO_OUTPUT_PATH) / 1024 / 1024
+    print(f"    Wrote {RO_OUTPUT_PATH} ({sz2:.1f} MB)")
+
+    print(f"\nTOTAL: {time.time()-t_total:.0f}s")
+    print(f"DONE — {datetime.datetime.now().isoformat()}")
+
+
+main()
