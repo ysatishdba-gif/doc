@@ -1,76 +1,301 @@
 """
-inspect_isa_subgroups.py
-------------------------
-Show IS-A subgroups for sample CUIs.
+build_topics_unified.py
+-----------------------
+Build the topic lookup structure end-to-end from the network graph.
 
-For each CUI:
-  - Its main topic members (from network graph)
-  - The IS-A subgroups within the topic (anchored by topic members)
-  - Members ungrouped (no IS-A relation to other members)
+Pipeline:
+  1. FLATTEN the network graph (suffix-bridge → direct CUI-CUI edges)
+     For each SNOMED CUI A, A's neighbors = {B in SNOMED : ∃ suffix bridge
+     A-i  ↔  B-j in the graph}.
+  2. MAIN TOPICS: each CUI's main topic = {self} ∪ direct neighbors
+     (= 2-hop reachable CUIs via suffix bridges)
+  3. SUB-TOPICS: for each main topic, find all maximal cliques of size ≥ 2
+     in the induced subgraph. Each clique becomes a sub-topic with a
+     stable hashed ID (st_<14 hex chars>).
+  4. INDEXES: forward, reverse, and CUI-level lookups for both layers.
+
+Inputs (notebook globals expected):
+  data         : networkx DiGraph (24M nodes, suffix-bridge structure)
+  SNOMED_CUIS  : set of 374K SNOMED CUIs
+  LABELS       : dict cui -> label
+  TAGS         : dict cui -> set of STY codes (optional, carried through)
+
+Output:
+  topic_lookup.pkl with:
+    topic_to_cuis              : cui -> frozenset(main topic members)
+    flattened_neighbors        : cui -> frozenset(direct CUI neighbors)
+    main_topic_to_subtopic_ids : main_topic_cui -> list of subtopic_ids
+    subtopic_id_to_cuis        : sid -> frozenset of member CUIs
+    subtopic_id_to_main_topics : sid -> set of main topics that contain it
+    cui_to_subtopic_ids        : cui -> set of all sids containing it
+    subtopic_metadata          : sid -> {size}
+    snomed_cuis, labels, tags  : pass-through
+    config                     : build settings
 """
 
 import pickle
-
-PKL_PATH = "topic_with_isa_subgroups.pkl"
-
-CUIS = [
-    "C0032285",  # Pneumonia
-    "C0011849",  # Diabetes mellitus
-    "C0021368",  # Inflammation
-    "C0024109",  # Lung
-    "C2142181",  # Pain of left knee joint
-    "C0559470",  # Allergy to peanut
-    "C0013182",  # Allergy to drug
-    "C0002792",  # Anaphylaxis
-]
+import datetime
+import hashlib
+import time
+import os
+from collections import defaultdict
 
 
-with open(PKL_PATH, "rb") as f:
-    p = pickle.load(f)
-
-topic_to_cuis     = p["topic_to_cuis"]
-isa_subgroups     = p["isa_subgroups"]
-ungrouped_members = p["ungrouped_members"]
-labels            = p.get("labels", {})
+OUTPUT_PATH     = "topic_lookup.pkl"
+MIN_CLIQUE_SIZE = 2          # keep size-2 cliques too; production filters by size
+MAX_CLIQUES_PER_TOPIC = 200  # safety cap per main topic
 
 
-def lbl(c):
-    return labels.get(c, "?")
+# ============================================================================
+# Step 1: Flatten the suffix-bridge graph
+# ============================================================================
+
+def flatten_graph(graph, snomed_cuis):
+    """For each SNOMED CUI A, find its directly-connected SNOMED neighbors
+    via the suffix-bridge pattern.
+    
+    Pattern: A has suffix children (A-1, A-2, ...). Each A-k is connected
+    in the graph to some B-j (B's suffix child). Extract B from B-j; that's
+    a neighbor of A.
+    
+    Conservative version: only walk predecessors of each suffix node.
+    (Empirically equivalent to inclusive on this graph — see transcript.)
+    """
+    print("  Flattening suffix-bridge graph to direct CUI-CUI edges...")
+    t0 = time.time()
+    
+    neighbors = defaultdict(set)
+    n_processed = 0
+    
+    for cui in snomed_cuis:
+        n_processed += 1
+        if n_processed % 50000 == 0:
+            print(f"    {n_processed:,}/{len(snomed_cuis):,} "
+                  f"({time.time()-t0:.0f}s)")
+        
+        if cui not in graph:
+            continue
+        
+        # Walk A → A-k (successors) → predecessors of A-k → extract other CUI
+        for suffix_child in graph.successors(cui):
+            if "-" not in suffix_child:
+                continue
+            # Verify it's A's own suffix (starts with A-)
+            try:
+                base, _ = suffix_child.rsplit("-", 1)
+            except ValueError:
+                continue
+            if base != cui:
+                continue
+            
+            # Predecessors of A-k include A itself and possibly other suffix nodes B-j
+            for pred in graph.predecessors(suffix_child):
+                if pred == cui:
+                    continue
+                if "-" not in pred:
+                    continue
+                try:
+                    other_cui, _ = pred.rsplit("-", 1)
+                except ValueError:
+                    continue
+                if other_cui == cui:
+                    continue
+                if other_cui not in snomed_cuis:
+                    continue
+                neighbors[cui].add(other_cui)
+                neighbors[other_cui].add(cui)  # symmetric
+    
+    print(f"  Done in {time.time()-t0:.0f}s")
+    
+    # Convert to frozensets for the pickle
+    neighbors_frozen = {c: frozenset(n) for c, n in neighbors.items()}
+    
+    n_with_edges = len(neighbors_frozen)
+    total_edges = sum(len(n) for n in neighbors_frozen.values()) // 2
+    print(f"    CUIs with at least one edge : {n_with_edges:,}")
+    print(f"    Total undirected edges      : {total_edges:,}")
+    
+    return neighbors_frozen
 
 
-for cui in CUIS:
-    print(f"\n{'='*90}")
-    print(f"  {cui}  '{lbl(cui)}'")
-    print(f"{'='*90}")
+# ============================================================================
+# Step 2: Build main topics
+# ============================================================================
 
-    members = topic_to_cuis.get(cui, frozenset())
-    print(f"  Main topic size: {len(members)}")
+def build_main_topics(snomed_cuis, neighbors):
+    """Each CUI's main topic = {self} ∪ direct neighbors."""
+    print("  Building main topics ({self} U direct neighbors)...")
+    t0 = time.time()
+    
+    topic_to_cuis = {}
+    for cui in snomed_cuis:
+        members = {cui} | neighbors.get(cui, frozenset())
+        topic_to_cuis[cui] = frozenset(members)
+    
+    print(f"  Done in {time.time()-t0:.0f}s")
+    sizes = sorted(len(m) for m in topic_to_cuis.values())
+    print(f"    Topics built              : {len(topic_to_cuis):,}")
+    print(f"    Size min/median/p90/p99/max : "
+          f"{sizes[0]} / {sizes[len(sizes)//2]} / "
+          f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
+          f"{sizes[-1]}")
+    
+    return topic_to_cuis
 
-    subgroups = isa_subgroups.get(cui, {})
-    ungrouped = ungrouped_members.get(cui, frozenset())
 
-    print(f"  IS-A subgroups : {len(subgroups)}")
-    print(f"  Ungrouped      : {len(ungrouped)} members\n")
+# ============================================================================
+# Step 3: Build size-2+ clique sub-topics
+# ============================================================================
 
-    # Larger subgroups first
-    sorted_groups = sorted(subgroups.items(), key=lambda kv: -len(kv[1]))
-    for anchor, mems in sorted_groups:
-        anchor_mark = " <-- topic anchor (self)" if anchor == cui else ""
-        print(f"  SUBGROUP anchored by: {anchor}  '{lbl(anchor)}'{anchor_mark}")
-        for m in sorted(mems):
-            if m == anchor:
-                role = " (anchor)"
-            elif m == cui:
-                role = " (focal CUI of topic)"
-            else:
-                role = ""
-            print(f"    {m}  '{lbl(m)}'{role}")
-        print()
+def subtopic_id(members_frozenset):
+    """Stable hashed ID for a sub-topic."""
+    sorted_members = "|".join(sorted(members_frozenset))
+    h = hashlib.sha1(sorted_members.encode()).hexdigest()[:14]
+    return f"st_{h}"
 
-    if ungrouped:
-        print(f"  UNGROUPED (no IS-A relation to other topic members):")
-        for m in sorted(ungrouped):
-            role = " (focal CUI of topic)" if m == cui else ""
-            print(f"    {m}  '{lbl(m)}'{role}")
 
-print("\nDONE")
+def induced_subgraph(members, neighbors):
+    members_set = set(members)
+    return {cui: neighbors.get(cui, frozenset()) & members_set
+            for cui in members}
+
+
+def bron_kerbosch(R, P, X, sub_adj, results, min_size, max_results):
+    """Standard Bron-Kerbosch without pivoting. Capped to avoid runaway."""
+    if len(results) >= max_results:
+        return
+    if not P and not X:
+        if len(R) >= min_size:
+            results.append(frozenset(R))
+        return
+    for v in list(P):
+        if len(results) >= max_results:
+            return
+        Nv = sub_adj.get(v, set())
+        bron_kerbosch(R | {v}, P & Nv, X & Nv, sub_adj, results,
+                      min_size, max_results)
+        P = P - {v}
+        X = X | {v}
+
+
+def find_cliques(sub_adj, min_size, max_results):
+    results = []
+    bron_kerbosch(set(), set(sub_adj.keys()), set(), sub_adj, results,
+                  min_size, max_results)
+    return results
+
+
+def build_subtopics(topic_to_cuis, neighbors, min_size, max_per_topic):
+    """For each main topic, find all maximal cliques of size >= min_size."""
+    print(f"  Building sub-topics (cliques >= size {min_size})...")
+    t0 = time.time()
+    
+    main_topic_to_subtopic_ids = defaultdict(list)
+    subtopic_id_to_cuis        = {}
+    subtopic_id_to_main_topics = defaultdict(set)
+    cui_to_subtopic_ids        = defaultdict(set)
+    subtopic_metadata          = {}
+    
+    n_processed = 0
+    for main_topic, members in topic_to_cuis.items():
+        n_processed += 1
+        if n_processed % 50000 == 0:
+            print(f"    {n_processed:,}/{len(topic_to_cuis):,} "
+                  f"(sub-topics so far: {len(subtopic_id_to_cuis):,}, "
+                  f"{time.time()-t0:.0f}s)")
+        
+        if len(members) < min_size:
+            continue
+        
+        sub_adj = induced_subgraph(members, neighbors)
+        cliques = find_cliques(sub_adj, min_size, max_per_topic)
+        
+        for clq in cliques:
+            sid = subtopic_id(clq)
+            if sid not in subtopic_id_to_cuis:
+                subtopic_id_to_cuis[sid] = clq
+                subtopic_metadata[sid] = {"size": len(clq)}
+            main_topic_to_subtopic_ids[main_topic].append(sid)
+            subtopic_id_to_main_topics[sid].add(main_topic)
+            for c in clq:
+                cui_to_subtopic_ids[c].add(sid)
+    
+    print(f"  Done in {time.time()-t0:.0f}s")
+    print(f"    Unique sub-topics             : "
+          f"{len(subtopic_id_to_cuis):,}")
+    print(f"    Main topics with sub-topics   : "
+          f"{len(main_topic_to_subtopic_ids):,}")
+    print(f"    CUIs in at least one sub      : "
+          f"{len(cui_to_subtopic_ids):,}")
+    
+    sizes = sorted(meta["size"] for meta in subtopic_metadata.values())
+    if sizes:
+        print(f"    Sub-topic size min/med/p90/p99/max : "
+              f"{sizes[0]} / {sizes[len(sizes)//2]} / "
+              f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
+              f"{sizes[-1]}")
+    
+    return {
+        "main_topic_to_subtopic_ids": dict(main_topic_to_subtopic_ids),
+        "subtopic_id_to_cuis":        subtopic_id_to_cuis,
+        "subtopic_id_to_main_topics": dict(subtopic_id_to_main_topics),
+        "cui_to_subtopic_ids":        dict(cui_to_subtopic_ids),
+        "subtopic_metadata":          subtopic_metadata,
+    }
+
+
+# ============================================================================
+# Main
+# ============================================================================
+
+def main():
+    print(f"BUILD START — {datetime.datetime.now().isoformat()}")
+    t_total = time.time()
+    
+    print(f"\nInputs:")
+    print(f"  data (graph)      : {type(data).__name__} "
+          f"with {data.number_of_nodes():,} nodes, "
+          f"{data.number_of_edges():,} edges")
+    print(f"  SNOMED_CUIS       : {len(SNOMED_CUIS):,}")
+    print(f"  LABELS            : {len(LABELS):,}")
+    if 'TAGS' in globals():
+        print(f"  TAGS              : {len(TAGS):,}")
+    
+    print(f"\n[1] Flatten suffix-bridge graph")
+    neighbors = flatten_graph(data, SNOMED_CUIS)
+    
+    print(f"\n[2] Build main topics")
+    topic_to_cuis = build_main_topics(SNOMED_CUIS, neighbors)
+    
+    print(f"\n[3] Build sub-topics")
+    subtopic_data = build_subtopics(topic_to_cuis, neighbors,
+                                     MIN_CLIQUE_SIZE,
+                                     MAX_CLIQUES_PER_TOPIC)
+    
+    print(f"\n[4] Assemble pickle")
+    payload = {
+        "topic_to_cuis":       topic_to_cuis,
+        "flattened_neighbors": neighbors,
+        "snomed_cuis":         SNOMED_CUIS,
+        "labels":              LABELS,
+        "tags":                globals().get("TAGS", {}),
+        **subtopic_data,
+        "config": {
+            "min_clique_size":       MIN_CLIQUE_SIZE,
+            "max_cliques_per_topic": MAX_CLIQUES_PER_TOPIC,
+            "flatten_rule":          "conservative (predecessors only)",
+        },
+        "built_at": datetime.datetime.now().isoformat(),
+    }
+    
+    print(f"\n[5] Save to {OUTPUT_PATH}")
+    with open(OUTPUT_PATH, "wb") as f:
+        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
+    print(f"    Wrote {size_mb:.1f} MB")
+    
+    print(f"\nTOTAL: {time.time()-t_total:.0f}s")
+    print(f"DONE — {datetime.datetime.now().isoformat()}")
+
+
+main()
