@@ -1,93 +1,64 @@
-"""
-inspect_isa_subgroups.py
-------------------------
-Show IS-A subgroups for sample CUIs.
+==========================================================================================
+  C0032285  'Pneumonia (disorder)'  (focal of topic)
+==========================================================================================
+  Main topic size: 42
+  Subgroups      : 5
+  Ungrouped      : 1 members
 
-For each CUI:
-  - Main topic members (from network graph)
-  - Granular subgroups within the topic (anchors = topic members,
-    chosen by Step 2 rollup or highest-IC fallback)
-  - Each member shows its primary anchor with IC for transparency
-"""
+  SUBGROUP anchored by: C0876973  IC=0.559  'Pulmonary infection'
+    C0694549  IC=1.000  'Community acquired pneumonia'
+    C0032241  IC=1.000  'Pleurobronchopneumonia (disorder)'
+    C0264377  IC=1.000  'Peribronchial pneumonia'
+    C0264386  IC=1.000  'Foreign body pneumonia'
+    C0747674  IC=1.000  'Cavitary pneumonia'
+    C1290339  IC=1.000  'Focal pneumonia'
+    C0747690  IC=1.000  'Postobstructive pneumonia'
+    C1112452  IC=1.000  'Post measles pneumonia'
+    C1701940  IC=1.000  'Ventilator-associated pneumonia'
+    C0276253  IC=1.000  'Cytomegaloviral pneumonia'
+    C0348806  IC=0.946  'Abscess of lung with pneumonia'
+    C0264381  IC=0.946  'Unresolved pneumonia'
+    C0949083  IC=0.946  'Nosocomial pneumonia (disorder)'
+    C0206061  IC=0.946  'Interstitial pneumonia'
+    C1290340  IC=0.946  'Confluent pneumonia'
+    C0264522  IC=0.946  'Hypostatic pneumonia'
+    C0264515  IC=0.946  'Necrotizing pneumonia'
+    C1279386  IC=0.946  'Postoperative pneumonia'
+    C0152413  IC=0.946  'Pneumonia caused by respiratory syncytial virus'
+    C4039254  IC=0.914  'Chronic pneumonia'
+    C0339965  IC=0.914  'Haemorrhagic pneumonia'
+    C1142578  IC=0.914  'Bilateral pneumonia'
+    C0339968  IC=0.914  'Neonatal pneumonia'
+    C0694550  IC=0.892  'Recurrent pneumonia (disorder)'
+    C0155870  IC=0.875  'Pneumonia and influenza'
+    C0276527  IC=0.875  'Pneumonia with AIDS (acquired immunodeficiency syndrome)'
+    C0032290  IC=0.838  'Aspiration pneumonia'
+    C0158935  IC=0.821  'Congenital pneumonia'
+    C0032300  IC=0.813  'Lobar pneumonia'
+    C0032310  IC=0.738  'Viral pneumonia'
+    C0006285  IC=0.730  'Lobular pneumonia'
+    C0004626  IC=0.657  'Bacterial pneumonia'
+    C0032285  IC=0.594  'Pneumonia (disorder)' (focal CUI of topic)
+    C0876973  IC=0.559  'Pulmonary infection' (anchor)
 
-import pickle
+  SUBGROUP anchored by: C0024115  IC=0.440  'Disorder of lung'
+    C0276688  IC=1.000  'Pulmonary cryptococcosis'
+    C0876973  IC=0.559  'Pulmonary infection'
+    C3714636  IC=0.557  'Pneumonitis'
+    C0024115  IC=0.440  'Disorder of lung' (anchor)
 
-PKL_PATH    = "topic_with_isa_subgroups.pkl"
-ROLLUP_PATH = "rollup_index.pkl"   # for IC scores display
+  SUBGROUP anchored by: C3714636  IC=0.557  'Pneumonitis'
+    C0339969  IC=0.848  'Pneumonia due to parasitic infestation'
+    C0339961  IC=0.800  'Fungal pneumonia'
+    C3714636  IC=0.557  'Pneumonitis' (anchor)
 
-CUIS = [
-    "C0032285",  # Pneumonia
-    "C0011849",  # Diabetes mellitus
-    "C0021368",  # Inflammation
-    "C0024109",  # Lung
-    "C2142181",  # Pain of left knee joint
-    "C0559470",  # Allergy to peanut
-    "C0013182",  # Allergy to drug
-    "C0002792",  # Anaphylaxis
-]
+  SUBGROUP anchored by: C0339969  IC=0.848  'Pneumonia due to parasitic infestation'
+    C3495445  IC=1.000  'Toxoplasma pneumonia'
+    C0339969  IC=0.848  'Pneumonia due to parasitic infestation' (anchor)
 
+  SUBGROUP anchored by: C0339961  IC=0.800  'Fungal pneumonia'
+    C1535939  IC=1.000  'Pulmonary pneumocystosis'
+    C0339961  IC=0.800  'Fungal pneumonia' (anchor)
 
-with open(PKL_PATH, "rb") as f:
-    p = pickle.load(f)
-
-topic_to_cuis         = p["topic_to_cuis"]
-isa_subgroups         = p["isa_subgroups"]
-ungrouped_members     = p["ungrouped_members"]
-cui_to_primary_anchor = p.get("cui_to_primary_anchor", {})
-labels                = p.get("labels", {})
-
-# Load IC for display
-ic_scores = {}
-try:
-    with open(ROLLUP_PATH, "rb") as f:
-        r = pickle.load(f)
-    ic_scores = r.get("ic_scores", {})
-except FileNotFoundError:
-    pass
-
-
-def lbl(c):
-    return labels.get(c, "?")
-
-
-def ic(c):
-    return ic_scores.get(c, 0.0)
-
-
-for cui in CUIS:
-    print(f"\n{'='*90}")
-    print(f"  {cui}  '{lbl(cui)}'  (focal of topic)")
-    print(f"{'='*90}")
-
-    members = topic_to_cuis.get(cui, frozenset())
-    print(f"  Main topic size: {len(members)}")
-
-    subgroups = isa_subgroups.get(cui, {})
-    ungrouped = ungrouped_members.get(cui, frozenset())
-
-    print(f"  Subgroups      : {len(subgroups)}")
-    print(f"  Ungrouped      : {len(ungrouped)} members\n")
-
-    # Largest subgroups first
-    sorted_groups = sorted(subgroups.items(), key=lambda kv: -len(kv[1]))
-    for anchor, mems in sorted_groups:
-        anchor_mark = " <-- focal CUI itself" if anchor == cui else ""
-        print(f"  SUBGROUP anchored by: {anchor}  IC={ic(anchor):.3f}  "
-              f"'{lbl(anchor)}'{anchor_mark}")
-        for m in sorted(mems, key=lambda c: -ic(c)):
-            if m == anchor:
-                role = " (anchor)"
-            elif m == cui:
-                role = " (focal CUI of topic)"
-            else:
-                role = ""
-            print(f"    {m}  IC={ic(m):.3f}  '{lbl(m)}'{role}")
-        print()
-
-    if ungrouped:
-        print(f"  UNGROUPED (no IS-A ancestor in topic):")
-        for m in sorted(ungrouped, key=lambda c: -ic(c)):
-            role = " (focal CUI of topic)" if m == cui else ""
-            print(f"    {m}  IC={ic(m):.3f}  '{lbl(m)}'{role}")
-
-print("\nDONE")
+  UNGROUPED (no IS-A ancestor in topic):
+    C0035243  IC=0.511  'Respiratory tract infection'
