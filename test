@@ -1,247 +1,391 @@
 """
-build_topics_unified.py
------------------------
-Build the topic lookup structure end-to-end from the network graph.
+build_rollup.py
+---------------
+Build IS-A hierarchical rollup using MRREL.
 
-Pipeline:
-  1. FLATTEN the network graph (suffix-bridge → direct CUI-CUI edges)
-     For each SNOMED CUI A, A's neighbors = {B in SNOMED : ∃ suffix bridge
-     A-i  ↔  B-j in the graph}.
-  2. MAIN TOPICS: each CUI's main topic = {self} ∪ direct neighbors
-     (= 2-hop reachable CUIs via suffix bridges)
-  3. SUB-TOPICS: for each main topic, find all maximal cliques of size ≥ 2
-     in the induced subgraph. Each clique becomes a sub-topic with a
-     stable hashed ID (st_<14 hex chars>).
-  4. INDEXES: forward, reverse, and CUI-level lookups for both layers.
-
-Inputs (notebook globals expected):
-  data         : networkx DiGraph (24M nodes, suffix-bridge structure)
-  SNOMED_CUIS  : set of 374K SNOMED CUIs
-  LABELS       : dict cui -> label
-  TAGS         : dict cui -> set of STY codes (optional, carried through)
+Inputs (from notebook globals):
+  cache         : dict with key 'mrrel_rows' (list of 4-tuples)
+                  Row format: (CUI1, CUI2, REL, RELA)
+  SNOMED_CUIS   : set of SNOMED CUIs (scope filter)
+  LABELS        : dict cui -> preferred label (optional, for diagnostics)
 
 Output:
-  topic_lookup.pkl with:
-    topic_to_cuis              : cui -> frozenset(main topic members)
-    flattened_neighbors        : cui -> frozenset(direct CUI neighbors)
-    main_topic_to_subtopic_ids : main_topic_cui -> list of subtopic_ids
-    subtopic_id_to_cuis        : sid -> frozenset of member CUIs
-    subtopic_id_to_main_topics : sid -> set of main topics that contain it
-    cui_to_subtopic_ids        : cui -> set of all sids containing it
-    subtopic_metadata          : sid -> {size}
-    snomed_cuis, labels, tags  : pass-through
-    config                     : build settings
+  rollup_index.pkl
+
+Build rules (all structural — no similarity metrics, no thresholds on math):
+
+  1. EXTRACT IS-A edges from MRREL, REL in {PAR, CHD, RB, RN}.
+     Both endpoints must be in SNOMED_CUIS. Normalize to child -> parent.
+
+  2. Walk all paths from CUI to root via IS-A edges.
+
+  3. Find first IC delta acceleration along the path
+     (the "elbow" where ancestor IC starts dropping faster — gives a
+      clinically meaningful generalization level).
+
+  4. Walk further up if the picked ancestor has < MIN_CHILDREN children
+     (ensures rollup represents a real grouping, not a singleton parent).
+
+  5. Union the stop points across all paths -> candidate ancestors.
+
+  6. DEDUP ancestors structurally: drop any ancestor A if A is itself
+     an IS-A ancestor of another ancestor B in the set
+     (less-specific ancestors are redundant when more-specific ones exist).
+
+  7. Final rollup set = {self} U deduped(ancestors).
+     Every CUI is always findable as itself; ancestors are extra.
 """
 
 import pickle
 import datetime
-import hashlib
+import math
 import time
 import os
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 
-OUTPUT_PATH     = "topic_lookup.pkl"
-MIN_CLIQUE_SIZE = 2          # keep size-2 cliques too; production filters by size
-MAX_CLIQUES_PER_TOPIC = 200  # safety cap per main topic
+OUTPUT_PATH      = "rollup_index.pkl"
+RELATIONS_TO_USE = {"PAR", "CHD", "RB", "RN"}  # hierarchical only
+MIN_CHILDREN     = 3                            # rollup must group >= N concepts
 
 
 # ============================================================================
-# Step 1: Flatten the suffix-bridge graph
+# Step 1: Extract IS-A edges from MRREL
 # ============================================================================
 
-def flatten_graph(graph, snomed_cuis):
-    """For each SNOMED CUI A, find its directly-connected SNOMED neighbors
-    via the suffix-bridge pattern.
+def extract_isa_edges(mrrel_rows, snomed_cuis, relations):
+    """Return set of (child, parent) tuples from MRREL.
     
-    Pattern: A has suffix children (A-1, A-2, ...). Each A-k is connected
-    in the graph to some B-j (B's suffix child). Extract B from B-j; that's
-    a neighbor of A.
+    Row format: (CUI1, CUI2, REL, RELA)
     
-    Conservative version: only walk predecessors of each suffix node.
-    (Empirically equivalent to inclusive on this graph — see transcript.)
+    Direction normalization to child -> parent:
+      PAR  : CUI1 is child,  CUI2 is parent  -> (CUI1, CUI2)
+      CHD  : CUI1 is parent, CUI2 is child   -> (CUI2, CUI1)
+      RB   : CUI1 is narrower, CUI2 broader  -> (CUI1, CUI2)
+      RN   : CUI1 is broader, CUI2 narrower  -> (CUI2, CUI1)
     """
-    print("  Flattening suffix-bridge graph to direct CUI-CUI edges...")
-    t0 = time.time()
+    print("  Extracting IS-A edges from MRREL...")
+    print(f"    Total rows                      : {len(mrrel_rows):,}")
+    print(f"    Filtering to REL in             : {sorted(relations)}")
+    print(f"    Both endpoints must be in SNOMED ({len(snomed_cuis):,} CUIs)")
     
-    neighbors = defaultdict(set)
-    n_processed = 0
+    edges = set()
+    n_rel_match = 0
+    n_skipped_rel = 0
+    n_skipped_scope = 0
+    rel_counts = Counter()
     
-    for cui in snomed_cuis:
-        n_processed += 1
-        if n_processed % 50000 == 0:
-            print(f"    {n_processed:,}/{len(snomed_cuis):,} "
-                  f"({time.time()-t0:.0f}s)")
+    for row in mrrel_rows:
+        # Expected: (CUI1, CUI2, REL, RELA)
+        if len(row) < 3:
+            continue
+        cui1, cui2, rel = row[0], row[1], row[2]
+        rel_counts[rel] += 1
         
-        if cui not in graph:
+        if rel not in relations:
+            n_skipped_rel += 1
             continue
         
-        # Walk A → A-k (successors) → predecessors of A-k → extract other CUI
-        for suffix_child in graph.successors(cui):
-            if "-" not in suffix_child:
-                continue
-            # Verify it's A's own suffix (starts with A-)
-            try:
-                base, _ = suffix_child.rsplit("-", 1)
-            except ValueError:
-                continue
-            if base != cui:
-                continue
-            
-            # Predecessors of A-k include A itself and possibly other suffix nodes B-j
-            for pred in graph.predecessors(suffix_child):
-                if pred == cui:
-                    continue
-                if "-" not in pred:
-                    continue
-                try:
-                    other_cui, _ = pred.rsplit("-", 1)
-                except ValueError:
-                    continue
-                if other_cui == cui:
-                    continue
-                if other_cui not in snomed_cuis:
-                    continue
-                neighbors[cui].add(other_cui)
-                neighbors[other_cui].add(cui)  # symmetric
+        if cui1 not in snomed_cuis or cui2 not in snomed_cuis:
+            n_skipped_scope += 1
+            continue
+        if cui1 == cui2:
+            continue
+        
+        n_rel_match += 1
+        
+        # Normalize to child -> parent
+        if rel == "PAR" or rel == "RB":
+            edges.add((cui1, cui2))
+        elif rel == "CHD" or rel == "RN":
+            edges.add((cui2, cui1))
     
-    print(f"  Done in {time.time()-t0:.0f}s")
+    print(f"    REL distribution (top 10):")
+    for r, c in rel_counts.most_common(10):
+        marker = " <-- using" if r in relations else ""
+        print(f"      {r:<10s}: {c:>10,d}{marker}")
     
-    # Convert to frozensets for the pickle
-    neighbors_frozen = {c: frozenset(n) for c, n in neighbors.items()}
+    print(f"    Wrong relation                  : {n_skipped_rel:,}")
+    print(f"    Out of scope                    : {n_skipped_scope:,}")
+    print(f"    Relation matches                : {n_rel_match:,}")
+    print(f"    Unique IS-A edges               : {len(edges):,}")
     
-    n_with_edges = len(neighbors_frozen)
-    total_edges = sum(len(n) for n in neighbors_frozen.values()) // 2
-    print(f"    CUIs with at least one edge : {n_with_edges:,}")
-    print(f"    Total undirected edges      : {total_edges:,}")
-    
-    return neighbors_frozen
+    return edges
 
 
 # ============================================================================
-# Step 2: Build main topics
+# Step 2: Build IS-A DAG
 # ============================================================================
 
-def build_main_topics(snomed_cuis, neighbors):
-    """Each CUI's main topic = {self} ∪ direct neighbors."""
-    print("  Building main topics ({self} U direct neighbors)...")
+def build_isa_dag(edges):
+    """Build child -> parents and parent -> children indexes."""
+    print("  Building IS-A DAG indexes...")
+    isa_parents  = defaultdict(set)
+    isa_children = defaultdict(set)
+    
+    for child, parent in edges:
+        isa_parents[child].add(parent)
+        isa_children[parent].add(child)
+    
+    return dict(isa_parents), dict(isa_children)
+
+
+# ============================================================================
+# Step 3: Compute descendant counts and IC
+# ============================================================================
+
+def compute_descendant_counts(isa_children, all_nodes):
+    """Transitive descendant count per node (memoized DFS)."""
+    print("  Computing descendant counts...")
     t0 = time.time()
     
-    topic_to_cuis = {}
-    for cui in snomed_cuis:
-        members = {cui} | neighbors.get(cui, frozenset())
-        topic_to_cuis[cui] = frozenset(members)
+    descendant_sets = {}
     
-    print(f"  Done in {time.time()-t0:.0f}s")
-    sizes = sorted(len(m) for m in topic_to_cuis.values())
-    print(f"    Topics built              : {len(topic_to_cuis):,}")
-    print(f"    Size min/median/p90/p99/max : "
-          f"{sizes[0]} / {sizes[len(sizes)//2]} / "
-          f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
-          f"{sizes[-1]}")
+    def descendants(node, stack):
+        if node in descendant_sets:
+            return descendant_sets[node]
+        if node in stack:
+            return set()  # cycle guard
+        stack = stack | {node}
+        result = set()
+        for child in isa_children.get(node, ()):
+            result.add(child)
+            result |= descendants(child, stack)
+        descendant_sets[node] = result
+        return result
     
-    return topic_to_cuis
+    for node in all_nodes:
+        descendants(node, set())
+    
+    counts = {n: len(d) for n, d in descendant_sets.items()}
+    print(f"    Computed for {len(counts):,} nodes in {time.time()-t0:.1f}s")
+    return counts
+
+
+def compute_ic(descendant_counts, total_nodes):
+    """Seco structural IC: 1 - log(descendants+1) / log(total)."""
+    print("  Computing Seco IC scores...")
+    log_total = math.log(total_nodes + 1)
+    ic = {}
+    for cui, n_desc in descendant_counts.items():
+        ic[cui] = 1.0 - math.log(n_desc + 1) / log_total
+    return ic
 
 
 # ============================================================================
-# Step 3: Build size-2+ clique sub-topics
+# Step 4: Walk paths and find rollup ancestors
 # ============================================================================
 
-def subtopic_id(members_frozenset):
-    """Stable hashed ID for a sub-topic."""
-    sorted_members = "|".join(sorted(members_frozenset))
-    h = hashlib.sha1(sorted_members.encode()).hexdigest()[:14]
-    return f"st_{h}"
-
-
-def induced_subgraph(members, neighbors):
-    members_set = set(members)
-    return {cui: neighbors.get(cui, frozenset()) & members_set
-            for cui in members}
-
-
-def bron_kerbosch(R, P, X, sub_adj, results, min_size, max_results):
-    """Standard Bron-Kerbosch without pivoting. Capped to avoid runaway."""
-    if len(results) >= max_results:
-        return
-    if not P and not X:
-        if len(R) >= min_size:
-            results.append(frozenset(R))
-        return
-    for v in list(P):
-        if len(results) >= max_results:
+def all_paths_to_root(cui, isa_parents, max_paths=200, max_depth=30):
+    """Return list of paths (each a list of CUIs from cui up to a root).
+    Caps applied as safety nets."""
+    paths = []
+    
+    def walk(current_path, visited):
+        if len(paths) >= max_paths:
             return
-        Nv = sub_adj.get(v, set())
-        bron_kerbosch(R | {v}, P & Nv, X & Nv, sub_adj, results,
-                      min_size, max_results)
-        P = P - {v}
-        X = X | {v}
+        if len(current_path) >= max_depth:
+            paths.append(list(current_path))
+            return
+        current = current_path[-1]
+        parents = isa_parents.get(current, set()) - visited
+        if not parents:
+            paths.append(list(current_path))
+            return
+        for p in parents:
+            current_path.append(p)
+            visited.add(p)
+            walk(current_path, visited)
+            current_path.pop()
+            visited.remove(p)
+    
+    walk([cui], {cui})
+    return paths
 
 
-def find_cliques(sub_adj, min_size, max_results):
-    results = []
-    bron_kerbosch(set(), set(sub_adj.keys()), set(), sub_adj, results,
-                  min_size, max_results)
-    return results
+def find_rollup_ancestor(path, ic, isa_children, min_children):
+    """Find rollup ancestor on this path using:
+       1. First IC delta acceleration (clinically meaningful level)
+       2. Walk further if ancestor has < min_children children
+    """
+    if len(path) == 1:
+        return path[0]
+    if len(path) == 2:
+        return path[1]
+    
+    ics = [ic.get(node, 0.0) for node in path]
+    deltas = [ics[i] - ics[i+1] for i in range(len(ics) - 1)]
+    
+    # Find first delta that exceeds the previous (rate of drop accelerates)
+    ic_stop_idx = None
+    for i in range(1, len(deltas)):
+        if deltas[i] > deltas[i-1]:
+            ic_stop_idx = i
+            break
+    
+    if ic_stop_idx is None:
+        # IC drops smoothly to root — fall back to grandparent level
+        ic_stop_idx = min(2, len(path) - 1)
+    
+    # Enforce min_children: walk up if needed
+    candidate_idx = ic_stop_idx
+    while candidate_idx < len(path) - 1:
+        candidate = path[candidate_idx]
+        n_kids = len(isa_children.get(candidate, set()))
+        if n_kids >= min_children:
+            return candidate
+        candidate_idx += 1
+    
+    return path[-1]
 
 
-def build_subtopics(topic_to_cuis, neighbors, min_size, max_per_topic):
-    """For each main topic, find all maximal cliques of size >= min_size."""
-    print(f"  Building sub-topics (cliques >= size {min_size})...")
+def is_isa_ancestor_of(a, b, isa_parents, max_depth=20):
+    """True iff `a` is a transitive IS-A ancestor of `b`.
+    Pure graph traversal — walks parent edges from `b` upward looking for `a`.
+    """
+    if a == b:
+        return False
+    visited = set()
+    stack = [(b, 0)]
+    while stack:
+        node, depth = stack.pop()
+        if depth > max_depth:
+            continue
+        if node in visited:
+            continue
+        visited.add(node)
+        for p in isa_parents.get(node, set()):
+            if p == a:
+                return True
+            stack.append((p, depth + 1))
+    return False
+
+
+# Module-level memoization cache for ancestor closure
+_ancestor_closure_cache = {}
+
+
+def _compute_ancestor_closure(cui, isa_parents):
+    """Return set of all transitive IS-A ancestors of `cui` (memoized)."""
+    if cui in _ancestor_closure_cache:
+        return _ancestor_closure_cache[cui]
+    ancestors = set()
+    stack = [cui]
+    visited = set()
+    while stack:
+        node = stack.pop()
+        if node in visited:
+            continue
+        visited.add(node)
+        for p in isa_parents.get(node, set()):
+            if p not in ancestors:
+                ancestors.add(p)
+                stack.append(p)
+    _ancestor_closure_cache[cui] = frozenset(ancestors)
+    return _ancestor_closure_cache[cui]
+
+
+def dedup_ancestors(ancestors, isa_parents):
+    """Drop any ancestor that is an IS-A ancestor of another ancestor in
+    the set. Keep only the most-specific ones.
+
+    Uses memoized ancestor closure -> O(N) instead of O(N^2 * depth).
+    """
+    ancestors = list(ancestors)
+    if len(ancestors) <= 1:
+        return frozenset(ancestors)
+
+    # Compute closure once per candidate (cached across CUIs)
+    closures = {a: _compute_ancestor_closure(a, isa_parents) for a in ancestors}
+
+    redundant = set()
+    for a in ancestors:
+        # `a` is redundant if some other b in the set has `a` in its closure
+        for b in ancestors:
+            if a == b:
+                continue
+            if a in closures[b]:
+                redundant.add(a)
+                break
+
+    return frozenset(a for a in ancestors if a not in redundant)
+
+
+def build_rollups(snomed_cuis, isa_parents, isa_children, ic, min_children):
+    """For each CUI, compute rollup set = {self} ∪ deduped(ancestors).
+    
+    Self is always included so the CUI itself can be a topic.
+    Ancestors are deduped to drop IS-A redundant ones.
+    """
+    print(f"  Building rollups (IC-accel + min_children={min_children})...")
+    print(f"  Each CUI's rollup = {{self}} U deduped(ancestors)")
     t0 = time.time()
     
-    main_topic_to_subtopic_ids = defaultdict(list)
-    subtopic_id_to_cuis        = {}
-    subtopic_id_to_main_topics = defaultdict(set)
-    cui_to_subtopic_ids        = defaultdict(set)
-    subtopic_metadata          = {}
+    cui_to_rollup = {}
+    paths_count = {}
+    n_orphan = 0
+    n_with_rollup = 0
     
-    n_processed = 0
-    for main_topic, members in topic_to_cuis.items():
-        n_processed += 1
-        if n_processed % 50000 == 0:
-            print(f"    {n_processed:,}/{len(topic_to_cuis):,} "
-                  f"(sub-topics so far: {len(subtopic_id_to_cuis):,}, "
-                  f"{time.time()-t0:.0f}s)")
+    for i, cui in enumerate(snomed_cuis):
+        if i % 50000 == 0 and i > 0:
+            print(f"    Processed {i:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
         
-        if len(members) < min_size:
+        if cui not in isa_parents:
+            # Orphan: rollup is just self
+            cui_to_rollup[cui] = frozenset({cui})
+            paths_count[cui] = 0
+            n_orphan += 1
             continue
         
-        sub_adj = induced_subgraph(members, neighbors)
-        cliques = find_cliques(sub_adj, min_size, max_per_topic)
+        paths = all_paths_to_root(cui, isa_parents)
+        paths_count[cui] = len(paths)
         
-        for clq in cliques:
-            sid = subtopic_id(clq)
-            if sid not in subtopic_id_to_cuis:
-                subtopic_id_to_cuis[sid] = clq
-                subtopic_metadata[sid] = {"size": len(clq)}
-            main_topic_to_subtopic_ids[main_topic].append(sid)
-            subtopic_id_to_main_topics[sid].add(main_topic)
-            for c in clq:
-                cui_to_subtopic_ids[c].add(sid)
+        ancestors = set()
+        for path in paths:
+            ancestors.add(find_rollup_ancestor(path, ic, isa_children, min_children))
+        
+        # Dedup ancestors structurally (drop less-specific ancestors)
+        deduped = dedup_ancestors(ancestors, isa_parents)
+        
+        # Always include self in rollup set
+        cui_to_rollup[cui] = frozenset({cui} | deduped)
+        n_with_rollup += 1
     
     print(f"  Done in {time.time()-t0:.0f}s")
-    print(f"    Unique sub-topics             : "
-          f"{len(subtopic_id_to_cuis):,}")
-    print(f"    Main topics with sub-topics   : "
-          f"{len(main_topic_to_subtopic_ids):,}")
-    print(f"    CUIs in at least one sub      : "
-          f"{len(cui_to_subtopic_ids):,}")
+    print(f"    CUIs with IS-A parents          : {n_with_rollup:,}")
+    print(f"    Orphans (rollup = self only)    : {n_orphan:,}")
+    return cui_to_rollup, paths_count
+
+
+# ============================================================================
+# Step 5: Reverse index and stats
+# ============================================================================
+
+def build_reverse_and_stats(cui_to_rollup):
+    print("  Building reverse index...")
+    rollup_to_cuis = defaultdict(set)
+    for cui, ancestors in cui_to_rollup.items():
+        for anc in ancestors:
+            rollup_to_cuis[anc].add(cui)
     
-    sizes = sorted(meta["size"] for meta in subtopic_metadata.values())
-    if sizes:
-        print(f"    Sub-topic size min/med/p90/p99/max : "
-              f"{sizes[0]} / {sizes[len(sizes)//2]} / "
-              f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
-              f"{sizes[-1]}")
+    n_unique = len(rollup_to_cuis)
+    compression = len(cui_to_rollup) / max(n_unique, 1)
     
-    return {
-        "main_topic_to_subtopic_ids": dict(main_topic_to_subtopic_ids),
-        "subtopic_id_to_cuis":        subtopic_id_to_cuis,
-        "subtopic_id_to_main_topics": dict(subtopic_id_to_main_topics),
-        "cui_to_subtopic_ids":        dict(cui_to_subtopic_ids),
-        "subtopic_metadata":          subtopic_metadata,
-    }
+    print(f"    Unique rollup ancestors         : {n_unique:,}")
+    print(f"    Compression ratio               : {compression:.1f}x")
+    
+    # Size distribution
+    sizes = Counter(len(d) for d in rollup_to_cuis.values())
+    print(f"    Cluster size distribution (first 10):")
+    for size, count in sorted(sizes.items())[:10]:
+        print(f"      cluster size {size:>5d}: {count:>7,d} rollups")
+    
+    biggest = sorted(rollup_to_cuis.items(), key=lambda kv: -len(kv[1]))[:5]
+    print(f"    Biggest rollup clusters (top 5):")
+    for r, descs in biggest:
+        print(f"      {r}: {len(descs):,} descendants")
+    
+    return dict(rollup_to_cuis)
 
 
 # ============================================================================
@@ -252,43 +396,66 @@ def main():
     print(f"BUILD START — {datetime.datetime.now().isoformat()}")
     t_total = time.time()
     
+    # Get inputs from notebook
+    mrrel_rows = cache["mrrel_rows"]
+    
     print(f"\nInputs:")
-    print(f"  data (graph)      : {type(data).__name__} "
-          f"with {data.number_of_nodes():,} nodes, "
-          f"{data.number_of_edges():,} edges")
-    print(f"  SNOMED_CUIS       : {len(SNOMED_CUIS):,}")
-    print(f"  LABELS            : {len(LABELS):,}")
-    if 'TAGS' in globals():
-        print(f"  TAGS              : {len(TAGS):,}")
+    print(f"  mrrel_rows       : {len(mrrel_rows):,} rows")
+    print(f"  SNOMED_CUIS      : {len(SNOMED_CUIS):,}")
+    print(f"  relations to use : {sorted(RELATIONS_TO_USE)}")
+    print(f"  min_children     : {MIN_CHILDREN}")
     
-    print(f"\n[1] Flatten suffix-bridge graph")
-    neighbors = flatten_graph(data, SNOMED_CUIS)
+    print(f"\n[1] Extract IS-A edges")
+    edges = extract_isa_edges(mrrel_rows, SNOMED_CUIS, RELATIONS_TO_USE)
+    if not edges:
+        print("  ERROR: no IS-A edges. Check REL values in your MRREL.")
+        return
     
-    print(f"\n[2] Build main topics")
-    topic_to_cuis = build_main_topics(SNOMED_CUIS, neighbors)
+    print(f"\n[2] Build IS-A DAG")
+    isa_parents, isa_children = build_isa_dag(edges)
+    print(f"    CUIs with parents               : {len(isa_parents):,}")
+    print(f"    CUIs with children              : {len(isa_children):,}")
     
-    print(f"\n[3] Build sub-topics")
-    subtopic_data = build_subtopics(topic_to_cuis, neighbors,
-                                     MIN_CLIQUE_SIZE,
-                                     MAX_CLIQUES_PER_TOPIC)
+    print(f"\n[3] Compute descendants and IC")
+    all_nodes = set(isa_parents.keys()) | set(isa_children.keys())
+    descendant_counts = compute_descendant_counts(isa_children, all_nodes)
+    ic = compute_ic(descendant_counts, len(SNOMED_CUIS))
     
-    print(f"\n[4] Assemble pickle")
+    ic_vals = sorted(ic.values())
+    if ic_vals:
+        print(f"    IC range                        : "
+              f"{ic_vals[0]:.3f} to {ic_vals[-1]:.3f}")
+        print(f"    IC median                       : "
+              f"{ic_vals[len(ic_vals)//2]:.3f}")
+    
+    print(f"\n[4] Walk paths, find rollup ancestors")
+    cui_to_rollup, paths_count = build_rollups(
+        SNOMED_CUIS, isa_parents, isa_children, ic, MIN_CHILDREN
+    )
+    
+    print(f"\n[5] Reverse index and stats")
+    rollup_to_cuis = build_reverse_and_stats(cui_to_rollup)
+    
+    print(f"\n[6] Saving to {OUTPUT_PATH}")
     payload = {
-        "topic_to_cuis":       topic_to_cuis,
-        "flattened_neighbors": neighbors,
-        "snomed_cuis":         SNOMED_CUIS,
-        "labels":              LABELS,
-        "tags":                globals().get("TAGS", {}),
-        **subtopic_data,
+        "cui_to_rollup_ancestors": cui_to_rollup,
+        "rollup_to_descendants":   rollup_to_cuis,
+        "ic_scores":               ic,
+        "descendant_counts":       descendant_counts,
+        "paths_count":             paths_count,
+        "isa_parents":             isa_parents,
+        "isa_children":            isa_children,
         "config": {
-            "min_clique_size":       MIN_CLIQUE_SIZE,
-            "max_cliques_per_topic": MAX_CLIQUES_PER_TOPIC,
-            "flatten_rule":          "conservative (predecessors only)",
+            "relations_used": sorted(RELATIONS_TO_USE),
+            "ic_formula":     "Seco: 1 - log(desc+1) / log(total)",
+            "stop_rule":      "IC-acceleration + min_children walk-up, "
+                              "with structural ancestor dedup",
+            "rollup_includes_self": True,
+            "min_children":   MIN_CHILDREN,
+            "snomed_universe_size": len(SNOMED_CUIS),
         },
         "built_at": datetime.datetime.now().isoformat(),
     }
-    
-    print(f"\n[5] Save to {OUTPUT_PATH}")
     with open(OUTPUT_PATH, "wb") as f:
         pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
     size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
