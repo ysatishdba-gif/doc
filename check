@@ -1,401 +1,168 @@
 """
-build_rollup_compare.py
------------------------
-Build TWO rollup indexes for side-by-side comparison:
-  - rollup_isa_only.pkl     : IS-A relations only (current build)
-  - rollup_isa_ro.pkl       : IS-A + direct RO neighbors of focal CUI
+compare_rollups.py
+------------------
+Side-by-side comparison of IS-A-only vs IS-A+RO rollups for sample CUIs.
 
-The IS-A walk is unchanged between builds. The RO version ALSO adds the
-direct RO neighbors of each CUI as additional rollup ancestors.
+For each CUI, show:
+  - IS-A-only rollup set
+  - IS-A+RO rollup set
+  - What RO ADDED (diff)
+  - What was COMMON to both
 
-No transitive RO walking, no IS-A walks from RO neighbors. Each CUI
-contributes its own first-hop RO neighbors only — bounded and predictable.
+You judge: is the RO addition clinically useful or noise?
 """
 
 import pickle
-import datetime
-import math
-import time
-import os
-from collections import defaultdict, Counter
 
+ISA_PATH = "rollup_isa_only.pkl"
+RO_PATH  = "rollup_isa_ro.pkl"
 
-ISA_OUTPUT_PATH = "rollup_isa_only.pkl"
-RO_OUTPUT_PATH  = "rollup_isa_ro.pkl"
-
-ISA_RELATIONS   = {"PAR", "CHD", "RB", "RN"}
-RO_RELATION     = "RO"
-MIN_CHILDREN    = 3
-
-
-# ============================================================================
-# Common: extract edges and build adjacency
-# ============================================================================
-
-def extract_isa_edges(mrrel_rows, snomed_cuis):
-    """Return set of (child, parent) tuples from MRREL IS-A relations.
-    Row format: (CUI1, CUI2, REL, RELA)
-    """
-    edges = set()
-    rel_counts = Counter()
-    for row in mrrel_rows:
-        if len(row) < 3:
-            continue
-        cui1, cui2, rel = row[0], row[1], row[2]
-        rel_counts[rel] += 1
-        if rel not in ISA_RELATIONS:
-            continue
-        if cui1 not in snomed_cuis or cui2 not in snomed_cuis:
-            continue
-        if cui1 == cui2:
-            continue
-        if rel == "PAR" or rel == "RB":
-            edges.add((cui1, cui2))
-        elif rel == "CHD" or rel == "RN":
-            edges.add((cui2, cui1))
-    return edges, rel_counts
-
-
-def extract_ro_neighbors(mrrel_rows, snomed_cuis):
-    """For each CUI, return its set of direct RO neighbors (any direction).
-    
-    Returns: dict[cui] -> set[(neighbor_cui, RELA)]
-    """
-    neighbors = defaultdict(set)
-    for row in mrrel_rows:
-        if len(row) < 4:
-            continue
-        cui1, cui2, rel, rela = row[0], row[1], row[2], row[3]
-        if rel != RO_RELATION:
-            continue
-        if cui1 not in snomed_cuis or cui2 not in snomed_cuis:
-            continue
-        if cui1 == cui2:
-            continue
-        neighbors[cui1].add((cui2, rela))
-        neighbors[cui2].add((cui1, rela))
-    return dict(neighbors)
-
-
-def build_isa_dag(edges):
-    isa_parents  = defaultdict(set)
-    isa_children = defaultdict(set)
-    for child, parent in edges:
-        isa_parents[child].add(parent)
-        isa_children[parent].add(child)
-    return dict(isa_parents), dict(isa_children)
-
-
-def compute_descendant_counts(isa_children, all_nodes):
-    descendant_sets = {}
-    def descendants(node, stack):
-        if node in descendant_sets:
-            return descendant_sets[node]
-        if node in stack:
-            return set()
-        stack = stack | {node}
-        result = set()
-        for child in isa_children.get(node, ()):
-            result.add(child)
-            result |= descendants(child, stack)
-        descendant_sets[node] = result
-        return result
-    for node in all_nodes:
-        descendants(node, set())
-    return {n: len(d) for n, d in descendant_sets.items()}
-
-
-def compute_ic(descendant_counts, total_nodes):
-    log_total = math.log(total_nodes + 1)
-    return {cui: 1.0 - math.log(n + 1) / log_total
-            for cui, n in descendant_counts.items()}
+# Diverse 50-CUI sample across clinical domains
+CUIS = [
+    # Diseases — common
+    "C0032285",  # Pneumonia
+    "C0011849",  # Diabetes mellitus
+    "C0020538",  # Hypertensive disease
+    "C0027051",  # Myocardial infarction
+    "C0010054",  # Coronary heart disease
+    "C0038454",  # Cerebrovascular accident
+    "C0004096",  # Asthma
+    "C0024117",  # COPD
+    # Diseases — specific
+    "C0276253",  # Cytomegaloviral pneumonia
+    "C0152413",  # RSV pneumonia
+    "C0271650",  # Impaired glucose tolerance
+    "C0006142",  # Breast cancer
+    "C1621958",  # Glioblastoma multiforme
+    # Allergies
+    "C0013182",  # Allergy to drug
+    "C0571275",  # Allergy to ketoconazole
+    "C0571398",  # Cinoxacin allergy
+    "C0559470",  # Allergy to peanut
+    "C0016470",  # Food allergy
+    "C0002792",  # Anaphylaxis
+    "C1527304",  # Allergic reaction
+    # Pain/symptoms
+    "C2142181",  # Pain of left knee joint
+    "C0008031",  # Chest pain
+    "C0030193",  # Pain (generic)
+    "C0010200",  # Cough
+    "C0015967",  # Fever
+    # Anatomy
+    "C0024109",  # Lung
+    "C0018787",  # Heart
+    "C0023884",  # Liver
+    "C0022646",  # Kidney
+    "C0006104",  # Brain
+    "C0006141",  # Breast
+    # Procedures
+    "C0010055",  # CABG
+    "C0009378",  # Colonoscopy
+    # Labs
+    "C0474680",  # Hemoglobin A1c measurement
+    "C0392201",  # Glucose measurement blood
+    # Drugs
+    "C0004057",  # Aspirin
+    "C0021641",  # Insulin
+    "C0025859",  # Metoprolol
+    # Findings
+    "C0021368",  # Inflammation
+    "C0521530",  # Lung consolidation
+    "C0850149",  # Neutropenia
+    # Pediatrics / genetic
+    "C0265344",  # Donohue's syndrome
+    "C0019322",  # Hiatal hernia
+    # Mental health / general
+    "C0011570",  # Depressive disorder
+    "C0003467",  # Anxiety
+    # Pregnancy
+    "C0085207",  # Gestational diabetes
+    # Body systems
+    "C0035204",  # Respiratory disorder
+    "C0014130",  # Endocrine system disease
+    # Concepts
+    "C0035243",  # Respiratory tract infection
+    "C0876973",  # Pulmonary infection
+]
 
 
 # ============================================================================
-# Path walking and rollup finding (unchanged from before)
+# Load both pickles
 # ============================================================================
 
-def all_paths_to_root(cui, isa_parents, max_paths=200, max_depth=30):
-    paths = []
-    def walk(current_path, visited):
-        if len(paths) >= max_paths:
-            return
-        if len(current_path) >= max_depth:
-            paths.append(list(current_path))
-            return
-        current = current_path[-1]
-        parents = isa_parents.get(current, set()) - visited
-        if not parents:
-            paths.append(list(current_path))
-            return
-        for p in parents:
-            current_path.append(p)
-            visited.add(p)
-            walk(current_path, visited)
-            current_path.pop()
-            visited.remove(p)
-    walk([cui], {cui})
-    return paths
+print(f"Loading {ISA_PATH} ...")
+with open(ISA_PATH, "rb") as f:
+    isa = pickle.load(f)
+
+print(f"Loading {RO_PATH} ...")
+with open(RO_PATH, "rb") as f:
+    ro = pickle.load(f)
+
+isa_rollup = isa["cui_to_rollup_ancestors"]
+ro_rollup  = ro["cui_to_rollup_ancestors"]
+labels     = isa.get("labels", {})
+ic_scores  = isa.get("ic_scores", {})
+ro_neighbors_all = ro.get("ro_neighbors_all", {})
 
 
-def find_rollup_ancestor(path, ic, isa_children, min_children):
-    if len(path) == 1:
-        return path[0]
-    if len(path) == 2:
-        return path[1]
-    ics = [ic.get(node, 0.0) for node in path]
-    deltas = [ics[i] - ics[i+1] for i in range(len(ics) - 1)]
-    ic_stop_idx = None
-    for i in range(1, len(deltas)):
-        if deltas[i] > deltas[i-1]:
-            ic_stop_idx = i
-            break
-    if ic_stop_idx is None:
-        ic_stop_idx = min(2, len(path) - 1)
-    candidate_idx = ic_stop_idx
-    while candidate_idx < len(path) - 1:
-        candidate = path[candidate_idx]
-        if len(isa_children.get(candidate, set())) >= min_children:
-            return candidate
-        candidate_idx += 1
-    return path[-1]
+def lbl(c):
+    return labels.get(c, "?")
 
 
 # ============================================================================
-# Ancestor closure cache + dedup
+# Comparison
 # ============================================================================
 
-_ancestor_closure_cache = {}
+total_isa_size = 0
+total_ro_size  = 0
+total_diff     = 0
 
-def compute_ancestor_closure(cui, isa_parents):
-    if cui in _ancestor_closure_cache:
-        return _ancestor_closure_cache[cui]
-    ancestors = set()
-    stack = [cui]
-    visited = set()
-    while stack:
-        node = stack.pop()
-        if node in visited:
-            continue
-        visited.add(node)
-        for p in isa_parents.get(node, set()):
-            if p not in ancestors:
-                ancestors.add(p)
-                stack.append(p)
-    _ancestor_closure_cache[cui] = frozenset(ancestors)
-    return _ancestor_closure_cache[cui]
+for cui in CUIS:
+    if cui not in isa_rollup or cui not in ro_rollup:
+        continue
 
+    s_isa = isa_rollup[cui]
+    s_ro  = ro_rollup[cui]
+    common = s_isa & s_ro
+    added  = s_ro - s_isa
+    removed = s_isa - s_ro   # should be empty
 
-def dedup_ancestors(ancestors, isa_parents):
-    ancestors = list(ancestors)
-    if len(ancestors) <= 1:
-        return frozenset(ancestors)
-    closures = {a: compute_ancestor_closure(a, isa_parents) for a in ancestors}
-    redundant = set()
-    for a in ancestors:
-        for b in ancestors:
-            if a == b:
-                continue
-            if a in closures[b]:
-                redundant.add(a)
-                break
-    return frozenset(a for a in ancestors if a not in redundant)
+    total_isa_size += len(s_isa)
+    total_ro_size  += len(s_ro)
+    total_diff     += len(added)
 
+    print(f"\n{'='*90}")
+    print(f"  {cui}  '{lbl(cui)}'")
+    print(f"{'='*90}")
+    print(f"  IS-A only: {len(s_isa)} rollups   "
+          f"IS-A+RO: {len(s_ro)} rollups   "
+          f"RO added: +{len(added)}")
 
-# ============================================================================
-# Build rollups (both flavors)
-# ============================================================================
+    # COMMON
+    print(f"\n  COMMON (in both — IS-A backbone):")
+    for r_cui in sorted(common, key=lambda c: -ic_scores.get(c, 0.0)):
+        ic_r = ic_scores.get(r_cui, 0.0)
+        marker = " <- SELF" if r_cui == cui else ""
+        print(f"    {r_cui}  IC={ic_r:.3f}  '{lbl(r_cui)}'{marker}")
 
-def build_isa_only_rollups(snomed_cuis, isa_parents, isa_children, ic,
-                            min_children):
-    """Rollup set = {self} U deduped(IS-A ancestors via path walk)."""
-    cui_to_rollup = {}
-    paths_count = {}
-    n_orphan = 0
-    t0 = time.time()
-    for i, cui in enumerate(snomed_cuis):
-        if i % 50000 == 0 and i > 0:
-            print(f"    {i:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
-        if cui not in isa_parents:
-            cui_to_rollup[cui] = frozenset({cui})
-            paths_count[cui] = 0
-            n_orphan += 1
-            continue
-        paths = all_paths_to_root(cui, isa_parents)
-        paths_count[cui] = len(paths)
-        ancestors = set()
-        for path in paths:
-            ancestors.add(find_rollup_ancestor(path, ic, isa_children, min_children))
-        deduped = dedup_ancestors(ancestors, isa_parents)
-        cui_to_rollup[cui] = frozenset({cui} | deduped)
-    print(f"    Done in {time.time()-t0:.0f}s, {n_orphan:,} orphans")
-    return cui_to_rollup, paths_count
+    # ADDED BY RO
+    if added:
+        print(f"\n  ADDED BY RO ({len(added)} new):")
+        # Look up RELA for each added neighbor
+        ro_ctx = {n: rela for n, rela in ro_neighbors_all.get(cui, set())}
+        for r_cui in sorted(added, key=lambda c: -ic_scores.get(c, 0.0)):
+            ic_r = ic_scores.get(r_cui, 0.0)
+            rela = ro_ctx.get(r_cui, "?")
+            print(f"    {r_cui}  IC={ic_r:.3f}  via [{rela}]  "
+                  f"'{lbl(r_cui)}'")
 
+print(f"\n\n{'='*90}")
+print(f"  SUMMARY")
+print(f"{'='*90}")
+print(f"  CUIs compared       : {len(CUIS)}")
+print(f"  Total IS-A rollups  : {total_isa_size}")
+print(f"  Total IS-A+RO rollups: {total_ro_size}")
+print(f"  Total RO additions  : {total_diff}")
+print(f"  Avg additions/CUI   : {total_diff/max(len(CUIS),1):.1f}")
 
-def build_isa_ro_rollups(snomed_cuis, isa_parents, isa_children, ic,
-                          ro_neighbors, min_children):
-    """Rollup set = {self} U deduped(IS-A ancestors) U RO neighbors."""
-    cui_to_rollup = {}
-    paths_count = {}
-    cui_to_ro_neighbors_used = {}  # for diagnostic — which RO neighbors added
-    n_orphan = 0
-    n_ro_only = 0
-    t0 = time.time()
-    for i, cui in enumerate(snomed_cuis):
-        if i % 50000 == 0 and i > 0:
-            print(f"    {i:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
-        
-        # IS-A part
-        if cui not in isa_parents:
-            isa_part = frozenset()
-            paths_count[cui] = 0
-            n_orphan += 1
-        else:
-            paths = all_paths_to_root(cui, isa_parents)
-            paths_count[cui] = len(paths)
-            ancestors = set()
-            for path in paths:
-                ancestors.add(find_rollup_ancestor(path, ic, isa_children, min_children))
-            isa_part = dedup_ancestors(ancestors, isa_parents)
-        
-        # RO part: direct neighbors of focal CUI only
-        ro_part = set()
-        for neighbor, rela in ro_neighbors.get(cui, set()):
-            ro_part.add(neighbor)
-        
-        cui_to_rollup[cui] = frozenset({cui} | isa_part | ro_part)
-        if ro_part:
-            cui_to_ro_neighbors_used[cui] = frozenset(ro_part)
-            if not isa_part:
-                n_ro_only += 1
-    
-    print(f"    Done in {time.time()-t0:.0f}s, {n_orphan:,} IS-A orphans, "
-          f"{n_ro_only:,} CUIs got RO ancestors only")
-    return cui_to_rollup, paths_count, cui_to_ro_neighbors_used
-
-
-def build_reverse_index(cui_to_rollup):
-    rollup_to_cuis = defaultdict(set)
-    for cui, ancestors in cui_to_rollup.items():
-        for anc in ancestors:
-            rollup_to_cuis[anc].add(cui)
-    return dict(rollup_to_cuis)
-
-
-# ============================================================================
-# Main
-# ============================================================================
-
-def main():
-    print(f"BUILD START — {datetime.datetime.now().isoformat()}")
-    t_total = time.time()
-
-    mrrel_rows = cache["mrrel_rows"]
-    print(f"\nInputs:")
-    print(f"  mrrel_rows  : {len(mrrel_rows):,}")
-    print(f"  SNOMED_CUIS : {len(SNOMED_CUIS):,}")
-
-    print(f"\n[1] Extract IS-A edges")
-    isa_edges, rel_counts = extract_isa_edges(mrrel_rows, SNOMED_CUIS)
-    print(f"    IS-A edges: {len(isa_edges):,}")
-    print(f"    REL counts: {dict(rel_counts.most_common(8))}")
-
-    print(f"\n[2] Build IS-A DAG and IC")
-    isa_parents, isa_children = build_isa_dag(isa_edges)
-    all_isa_nodes = set(isa_parents) | set(isa_children)
-    descendant_counts = compute_descendant_counts(isa_children, all_isa_nodes)
-    ic = compute_ic(descendant_counts, len(SNOMED_CUIS))
-    print(f"    Nodes with parents: {len(isa_parents):,}")
-    print(f"    Nodes with children: {len(isa_children):,}")
-
-    print(f"\n[3] Extract RO neighbors")
-    ro_neighbors = extract_ro_neighbors(mrrel_rows, SNOMED_CUIS)
-    print(f"    CUIs with RO neighbors: {len(ro_neighbors):,}")
-    avg_ro = (sum(len(v) for v in ro_neighbors.values())
-              / max(len(ro_neighbors), 1))
-    print(f"    Avg RO neighbors per CUI: {avg_ro:.1f}")
-
-    # ─── Build 1: IS-A only ───
-    print(f"\n[4] Build IS-A-only rollups")
-    rollup_isa, paths_isa = build_isa_only_rollups(
-        SNOMED_CUIS, isa_parents, isa_children, ic, MIN_CHILDREN
-    )
-    reverse_isa = build_reverse_index(rollup_isa)
-    print(f"    Unique rollup ancestors (IS-A only): "
-          f"{len(reverse_isa):,}")
-    print(f"    Compression: "
-          f"{len(rollup_isa)/max(len(reverse_isa),1):.1f}x")
-
-    # ─── Build 2: IS-A + RO ───
-    print(f"\n[5] Build IS-A+RO rollups")
-    rollup_ro, paths_ro, ro_used = build_isa_ro_rollups(
-        SNOMED_CUIS, isa_parents, isa_children, ic, ro_neighbors, MIN_CHILDREN
-    )
-    reverse_ro = build_reverse_index(rollup_ro)
-    print(f"    Unique rollup ancestors (IS-A+RO):   "
-          f"{len(reverse_ro):,}")
-    print(f"    Compression: "
-          f"{len(rollup_ro)/max(len(reverse_ro),1):.1f}x")
-
-    # Quick diff stats
-    extra_per_cui = []
-    for cui in SNOMED_CUIS:
-        s_isa = rollup_isa.get(cui, frozenset())
-        s_ro = rollup_ro.get(cui, frozenset())
-        extra_per_cui.append(len(s_ro) - len(s_isa))
-    print(f"\n    Extra rollups per CUI from RO:")
-    print(f"      median: {sorted(extra_per_cui)[len(extra_per_cui)//2]}")
-    print(f"      mean:   {sum(extra_per_cui)/len(extra_per_cui):.1f}")
-    print(f"      max:    {max(extra_per_cui)}")
-
-    # ─── Save both ───
-    common_meta = {
-        "ic_scores":         ic,
-        "descendant_counts": descendant_counts,
-        "isa_parents":       isa_parents,
-        "isa_children":      isa_children,
-        "snomed_cuis":       SNOMED_CUIS,
-        "labels":            LABELS,
-        "built_at":          datetime.datetime.now().isoformat(),
-    }
-
-    print(f"\n[6] Save IS-A-only build")
-    with open(ISA_OUTPUT_PATH, "wb") as f:
-        pickle.dump({
-            **common_meta,
-            "cui_to_rollup_ancestors": rollup_isa,
-            "rollup_to_descendants":   reverse_isa,
-            "paths_count":             paths_isa,
-            "config": {
-                "relations_used":   sorted(ISA_RELATIONS),
-                "min_children":     MIN_CHILDREN,
-                "ro_added":         False,
-            },
-        }, f, protocol=pickle.HIGHEST_PROTOCOL)
-    sz1 = os.path.getsize(ISA_OUTPUT_PATH) / 1024 / 1024
-    print(f"    Wrote {ISA_OUTPUT_PATH} ({sz1:.1f} MB)")
-
-    print(f"\n[7] Save IS-A+RO build")
-    with open(RO_OUTPUT_PATH, "wb") as f:
-        pickle.dump({
-            **common_meta,
-            "cui_to_rollup_ancestors":   rollup_ro,
-            "rollup_to_descendants":     reverse_ro,
-            "paths_count":               paths_ro,
-            "cui_to_ro_neighbors_used":  ro_used,
-            "ro_neighbors_all":          ro_neighbors,
-            "config": {
-                "relations_used":   sorted(ISA_RELATIONS) + ["RO"],
-                "min_children":     MIN_CHILDREN,
-                "ro_added":         True,
-                "ro_mode":          "direct neighbors of focal CUI",
-            },
-        }, f, protocol=pickle.HIGHEST_PROTOCOL)
-    sz2 = os.path.getsize(RO_OUTPUT_PATH) / 1024 / 1024
-    print(f"    Wrote {RO_OUTPUT_PATH} ({sz2:.1f} MB)")
-
-    print(f"\nTOTAL: {time.time()-t_total:.0f}s")
-    print(f"DONE — {datetime.datetime.now().isoformat()}")
-
-
-main()
+print("\nDONE")
