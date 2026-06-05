@@ -1,62 +1,8 @@
 ================================================================================
-C0205082  |  High grade
-STY: Finding
--> 3 TOPIC(S)
+C0007113  |  Rectal cancer
+STY: Neoplastic Process
+-> 0 TOPIC(S)
+  (no topics — this CUI has no IS-A ancestor in any of its main topics)
 
-  Topic ID : tp_a5323e94f3a0
-  Canonical: C0205082
-  Label    : High grade
-  Size     : 2 CUIs
-  IC       : 0.946
-  Members  :
-    C0205082  'High grade'
-    C3641272  'Very severely'
-
-  Topic ID : tp_9b72779edaaf
-  Canonical: C0439793
-  Label    : Severity
-  Size     : 9 CUIs
-  IC       : 0.821
-  Members  :
-    C0205081  'Moderate severity'
-    C0205082  'High grade'
-    C0439793  'Severity'
-    C1299392  'Mild to moderate'
-    C1299393  'Moderate to severe'
-    C1302234  'Fatal (qualifier value)'
-    C2711184  'Life threatening severity'
-    C2945599  'Mild (qualifier value)'
-    C4316743  'Not severe'
-
-  Topic ID : tp_bf40b6103c51
-  Canonical: C1443286
-  Label    : Unapproved attribute
-  Size     : 209 CUIs
-  IC       : 0.120
-  Members  :
-    C0004083  'Association (attribute)'
-    C0009647  'Conditioning, function (observable entity)'
-    C0011121  'Decontamination'
-    C0011155  'Deficiency of'
-    C0011682  'Desiccation - action'
-    C0022423  'Judgement (observable entity)'
-    C0023185  'Learning, function'
-    C0025361  'Thought process (observable entity)'
-    C0028884  'With odor'
-    C0029235  'Organism'
-    C0034754  'Reading'
-    C0036525  'Metastatic to'
-    C0037775  'Distribution (attribute)'
-    C0039476  'Temperature (observable entity)'
-    C0079809  'Measure'
-    C0162425  'Intention'
-    C0184933  'Scraping (procedure)'
-    C0205081  'Moderate severity'
-    C0205082  'High grade'
-    C0205145  'Site (attribute)'
-    C0231448  'Extension'
-    C0234856  'Speaking (observable entity)'
-    C0237477  'Arrested (qualifier value)'
-    C0242656  'Course of illness'
-    C0332261  'Spreading'
-    ... and 184 more
+================================================================================
+DONE
