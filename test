@@ -1,89 +1,90 @@
-Total SNOMED CUIs in scope: 374,538
+"""
+inspect_mrrel_rows.py
+---------------------
+For a list of CUIs, dump EVERY MRREL row they participate in.
+Shows REL, RELA, other CUI, and whether the other CUI is in SNOMED.
 
-IS-A hierarchy participation:
-  CUIs with IS-A parents          : 367,217 (98.0%)
-  CUIs with no IS-A parents       : 7,321 (2.0%)
-    - has children, no parents    : 50
-    - no parents AND no children  : 7,271
+This tells us exactly what relations are available for "orphan" CUIs
+and whether we're filtering out useful hierarchy.
 
-Final topic coverage:
-  CUIs in >=1 topic   : 367,770 (98.2%)
-  CUIs in 0 topics    : 6,768 (1.8%)
+Requires notebook globals:
+  cache (with mrrel_rows)
+  SNOMED_CUIS
+  LABELS
+"""
 
-Why CUIs end up in 0 topics:
-  Orphans (no IS-A parents at all)         : 6,352
-  Has IS-A parents but no parents in any   : 416
-    main topic (cross-axis or isolated)
+from collections import Counter, defaultdict
 
-If we added network fallback for orphans:
-  Orphans with network neighbors  : 5,637 (could potentially borrow anchor from neighbors)
-  Orphans with no network either  : 715 (no way to anchor)
 
---- Sample orphans (no IS-A parents, in 0 topics) ---
-  C0000407  '3-hydroxyanthranilic acid'  (network neighbors: 0)
-  C0000817  'Septic abortion'  (network neighbors: 2)
-  C0000890  'Ticks and mites'  (network neighbors: 4)
-  C0001247  'Actinobacillosis'  (network neighbors: 1)
-  C0001291  'Actomyosin'  (network neighbors: 0)
-  C0002321  'Alpha>2<-H foetoprotein'  (network neighbors: 0)
-  C0002578  'Beta-aminopropionitrile'  (network neighbors: 1)
-  C0002884  'Hypochromic anaemia'  (network neighbors: 4)
-  C0003086  'Hock'  (network neighbors: 2)
-  C0003129  'Anoxaemia'  (network neighbors: 0)
-  C0003322  'CD - Cluster of differentiation antigen marker'  (network neighbors: 6)
-  C0003490  'Aortic arch syndrome'  (network neighbors: 5)
-  C0003510  'Aortitis syndrome'  (network neighbors: 0)
-  C0003601  'Apoprotein'  (network neighbors: 2)
-  C0003806  'Dopa decarboxylase'  (network neighbors: 1)
-  C0003838  'Arterial occlusive disease'  (network neighbors: 12)
-  C0003910  'Articulation disorder'  (network neighbors: 1)
-  C0004303  'Central auditory dysfunction'  (network neighbors: 3)
-  C0004422  'Avian leukosis virus'  (network neighbors: 2)
-  C0004616  'Bacterial aneurysm'  (network neighbors: 0)
-  ... and 6,332 more
+CUIS_TO_INSPECT = [
+    "C0007113",  # Rectal cancer
+    "C0007121",  # Bronchogenic carcinoma
+    "C0003838",  # Arterial occlusive disease
+    "C0002884",  # Hypochromic anaemia
+    "C0006370",  # Bulimia
+]
 
---- Sample orphans WITH network neighbors (could be saved) ---
-  C0000817  'Septic abortion'
-    ↳ sample neighbors: 'Systemic inflammatory response syndrome', 'Pregnancy with abortive outcome (disorder)'
-  C0000890  'Ticks and mites'
-    ↳ sample neighbors: 'Mite', 'Acariformes', 'Parasitiformes'
-  C0001247  'Actinobacillosis'
-    ↳ sample neighbors: 'Actinobacillus infection'
-  C0002578  'Beta-aminopropionitrile'
-    ↳ sample neighbors: 'Nitrile (substance)'
-  C0002884  'Hypochromic anaemia'
-    ↳ sample neighbors: 'Asiderotic anaemia', 'Anaemia', 'Microcytic hypochromic anemia'
-  C0003086  'Hock'
-    ↳ sample neighbors: 'Lower extremity', 'Body part structure (body structure)'
-  C0003322  'CD - Cluster of differentiation antigen marker'
-    ↳ sample neighbors: 'Leucocyte 16', 'Lymphocyte antigen CD83 (substance)', 'Lymphocyte antigen CD1'
-  C0003490  'Aortic arch syndrome'
-    ↳ sample neighbors: 'Takayasu's arteritis', 'Syndrome', 'Vascular ring - disorder'
-  C0003601  'Apoprotein'
-    ↳ sample neighbors: 'Protein (substance)', 'Apolipoprotein'
-  C0003806  'Dopa decarboxylase'
-    ↳ sample neighbors: 'Aromatic-L-amino-acid decarboxylase'
-  C0003838  'Arterial occlusive disease'
-    ↳ sample neighbors: 'Moyamoya disease', 'Leriche's syndrome', 'Carotid artery narrowing'
-  C0003910  'Articulation disorder'
-    ↳ sample neighbors: 'Dysarthria'
-  C0004303  'Central auditory dysfunction'
-    ↳ sample neighbors: 'Auditory processing disorder (disorder)', 'Disorder of brain (disorder)', 'Central hearing loss'
-  C0004422  'Avian leukosis virus'
-    ↳ sample neighbors: 'Genus Alpharetrovirus', 'Avian leukosis virus Ag'
-  C0005778  'Blood clotting'
-    ↳ sample neighbors: 'Haemostatic function', 'Host defence', 'Coagulation process'
-  C0005939  'Bone development'
-    ↳ sample neighbors: 'Ossification'
-  C0006370  'Bulimia'
-    ↳ sample neighbors: 'Overeating'
-  C0006948  'Carbamates'
-    ↳ sample neighbors: 'Diethylcarbamazine', '2-methyl-2-(methylthio) propionaldehyde O-methylcarbamoyloxime', 'Fenbendazole (substance)'
-  C0007113  'Rectal cancer'
-    ↳ sample neighbors: 'Adenocarcinoma of rectum (disorder)', 'Squamous cell carcinoma of rectum', 'Malignant tumour of rectum'
-  C0007121  'Bronchogenic carcinoma'
-    ↳ sample neighbors: 'Small cell carcinoma of lung', 'Bronchial tumour', 'Non-small cell lung cancer'
-  ... and 5,617 more
 
-================================================================================
-DONE
+# Index mrrel by CUI for fast lookup
+print("Indexing MRREL by CUI...")
+cui_to_rows = defaultdict(list)
+for row in cache["mrrel_rows"]:
+    if len(row) < 3:
+        continue
+    c1, c2, rel = row[0], row[1], row[2]
+    rela = row[3] if len(row) > 3 else ""
+    cui_to_rows[c1].append((c2, rel, rela))
+    cui_to_rows[c2].append((c1, rel, rela))
+
+print(f"Indexed {sum(len(v) for v in cui_to_rows.values()):,} CUI-row pairs\n")
+
+
+for cui in CUIS_TO_INSPECT:
+    label = LABELS.get(cui, "?")
+    print(f"\n{'='*100}")
+    print(f"CUI: {cui}  '{label}'")
+    print(f"{'='*100}")
+
+    rows = cui_to_rows.get(cui, [])
+    print(f"  Total MRREL rows: {len(rows)}")
+
+    if not rows:
+        print("  (no rows at all)")
+        continue
+
+    # Break down by REL type
+    rel_counts = Counter(r[1] for r in rows)
+    print(f"\n  Breakdown by REL:")
+    for rel, n in rel_counts.most_common():
+        print(f"    {rel:>6}  : {n}")
+
+    # Break down by RELA (the specific relation name)
+    rela_counts = Counter(r[2] for r in rows if r[2])
+    if rela_counts:
+        print(f"\n  Breakdown by RELA (top 10):")
+        for rela, n in rela_counts.most_common(10):
+            print(f"    {rela:<40} : {n}")
+
+    # Show all rows, grouped by REL
+    print(f"\n  All rows (other_cui | REL | RELA | other label | in SNOMED?):")
+    by_rel = defaultdict(list)
+    for other_cui, rel, rela in rows:
+        by_rel[rel].append((other_cui, rela))
+
+    for rel in sorted(by_rel):
+        print(f"\n    --- REL={rel} ({len(by_rel[rel])} rows) ---")
+        # Show first 15 per REL type to avoid swamping
+        shown = 0
+        for other_cui, rela in by_rel[rel]:
+            in_snomed = "SNOMED" if other_cui in SNOMED_CUIS else "OTHER"
+            other_label = LABELS.get(other_cui, "?")
+            print(f"      {other_cui}  [{rela:<25}]  [{in_snomed}]  '{other_label[:60]}'")
+            shown += 1
+            if shown >= 15:
+                remaining = len(by_rel[rel]) - 15
+                if remaining > 0:
+                    print(f"      ... and {remaining} more rows")
+                break
+
+print(f"\n{'='*100}")
+print("DONE")
