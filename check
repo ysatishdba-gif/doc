@@ -1,118 +1,106 @@
-"""
-inspect_cache.py
-----------------
-Print what's actually in `cache` and `TAGS` so we know what data we have
-for building the SemGroup mapping without hardcoding.
+================================================================================
+CACHE TOP-LEVEL KEYS
+================================================================================
 
-Reports:
-  - All cache keys with type and size
-  - Sample of mrrel_rows
-  - Detailed TAGS inspection (format, value types, sample CUIs)
-  - Looks for any STY/TUI/semantic-network-related data
+  Key: 'schema_version'
+      value: int = 2
 
-Requires notebook globals:
-  cache, TAGS, SNOMED_CUIS
-"""
+  Key: 'fetched_at'
+      value: str (26 chars) = '2026-05-21T21:51:40.591440'
 
-from collections import Counter
-import pprint
+  Key: 'config'
+      value: dict with 4 keys
 
+  Key: 'cuis'
+      value: set with 374,538 items
 
-def describe(obj, name=""):
-    """Print a structural description of an object."""
-    t = type(obj).__name__
-    if isinstance(obj, (dict,)):
-        n = len(obj)
-        print(f"  {name}: {t} with {n:,} keys")
-    elif isinstance(obj, (list, tuple, set, frozenset)):
-        n = len(obj)
-        print(f"  {name}: {t} with {n:,} items")
-    elif isinstance(obj, str):
-        print(f"  {name}: str ({len(obj)} chars) = {obj[:80]!r}")
-    else:
-        print(f"  {name}: {t} = {obj!r}")
+  Key: 'mrrel_rows'
+      value: list with 2,748,222 items
 
+  Key: 'tags'
+      value: dict with 370,670 keys
 
-print(f"\n{'='*80}")
-print("CACHE TOP-LEVEL KEYS")
-print('='*80)
-for k in cache.keys():
-    print(f"\n  Key: {k!r}")
-    describe(cache[k], "    value")
+  Key: 'labels'
+      value: dict with 374,538 keys
 
+================================================================================
+MRREL_ROWS DETAILED
+================================================================================
+  Total rows: 2,748,222
+  First row type: tuple
+  First row length: 4
+  First 5 rows:
+    ('C1333235', 'C5768774', 'RO', 'has_component')
+    ('C1333235', 'C5768778', 'RO', 'has_component')
+    ('C1334603', 'C0007140', 'SY', 'same_as')
+    ('C1334642', 'C3854175', 'RN', 'refers_to')
+    ('C1335336', 'C3854174', 'RN', 'refers_to')
 
-print(f"\n{'='*80}")
-print("MRREL_ROWS DETAILED")
-print('='*80)
-rows = cache.get("mrrel_rows", [])
-print(f"  Total rows: {len(rows):,}")
-if rows:
-    print(f"  First row type: {type(rows[0]).__name__}")
-    print(f"  First row length: {len(rows[0])}")
-    print(f"  First 5 rows:")
-    for r in rows[:5]:
-        print(f"    {r}")
-    # REL distribution
-    rel_counter = Counter()
-    for r in rows[:200000]:  # sample for speed
-        if len(r) >= 3:
-            rel_counter[r[2]] += 1
-    print(f"\n  REL distribution (first 200k rows):")
-    for rel, n in rel_counter.most_common():
-        print(f"    {rel}: {n:,}")
+  REL distribution (first 200k rows):
+    RO: 198,695
+    RB: 490
+    RN: 464
+    SY: 351
 
+================================================================================
+TAGS DETAILED
+================================================================================
+  Total entries: 370,670
 
-print(f"\n{'='*80}")
-print("TAGS DETAILED")
-print('='*80)
-print(f"  Total entries: {len(TAGS):,}")
-if TAGS:
-    # Look at a few entries
-    sample_cuis = list(TAGS.keys())[:10]
-    print(f"\n  Sample entries:")
-    for cui in sample_cuis:
-        val = TAGS[cui]
-        print(f"    {cui}: {type(val).__name__} = {val!r}")
+  Sample entries:
+    C0000163: frozenset = frozenset({'Organic Chemical', 'Hormone'})
+    C0000167: frozenset = frozenset({'Organic Chemical', 'Hormone'})
+    C0000248: frozenset = frozenset({'Indicator, Reagent, or Diagnostic Aid', 'Hazardous or Poisonous Substance', 'Organic Chemical'})
+    C0000334: frozenset = frozenset({'Organic Chemical', 'Vitamin'})
+    C0000872: frozenset = frozenset({'Health Care Related Organization', 'Manufactured Object'})
+    C0001079: frozenset = frozenset({'Congenital Abnormality'})
+    C0001128: frozenset = frozenset({'Chemical'})
+    C0001143: frozenset = frozenset({'Organic Chemical', 'Antibiotic'})
+    C0001280: frozenset = frozenset({'Cell'})
+    C0001407: frozenset = frozenset({'Biologically Active Substance', 'Nucleic Acid, Nucleoside, or Nucleotide'})
 
-    # Inspect value types and distinct values
-    value_types = Counter()
-    all_values = Counter()
-    sample_n = 5000
-    counted = 0
-    for cui, val in TAGS.items():
-        if counted >= sample_n:
-            break
-        value_types[type(val).__name__] += 1
-        if isinstance(val, (set, frozenset, list, tuple)):
-            for v in val:
-                all_values[v] += 1
-        else:
-            all_values[val] += 1
-        counted += 1
+  Value container types (sample 5000):
+    frozenset: 5000
 
-    print(f"\n  Value container types (sample {sample_n}):")
-    for t, n in value_types.most_common():
-        print(f"    {t}: {n}")
+  Top 30 distinct STY values (sample 5000 CUIs):
+    'Congenital Abnormality'  (414 CUIs)
+    'Professional or Occupational Group'  (296 CUIs)
+    'Body Space or Junction'  (247 CUIs)
+    'Mental or Behavioral Dysfunction'  (241 CUIs)
+    'Sign or Symptom'  (239 CUIs)
+    'Virus'  (235 CUIs)
+    'Manufactured Object'  (209 CUIs)
+    'Organic Chemical'  (191 CUIs)
+    'Tissue'  (170 CUIs)
+    'Acquired Abnormality'  (153 CUIs)
+    'Anatomical Abnormality'  (145 CUIs)
+    'Mammal'  (141 CUIs)
+    'Qualitative Concept'  (139 CUIs)
+    'Hazardous or Poisonous Substance'  (137 CUIs)
+    'Organ or Tissue Function'  (122 CUIs)
+    'Inorganic Chemical'  (118 CUIs)
+    'Element, Ion, or Isotope'  (117 CUIs)
+    'Language'  (114 CUIs)
+    'Pharmacologic Substance'  (107 CUIs)
+    'Biomedical or Dental Material'  (100 CUIs)
+    'Indicator, Reagent, or Diagnostic Aid'  (97 CUIs)
+    'Body Substance'  (94 CUIs)
+    'Laboratory or Test Result'  (94 CUIs)
+    'Classification'  (83 CUIs)
+    'Embryonic Structure'  (82 CUIs)
+    'Health Care Related Organization'  (81 CUIs)
+    'Food'  (79 CUIs)
+    'Reptile'  (76 CUIs)
+    'Cell'  (75 CUIs)
+    'Functional Concept'  (73 CUIs)
 
-    print(f"\n  Top 30 distinct STY values (sample {sample_n} CUIs):")
-    for v, n in all_values.most_common(30):
-        print(f"    '{v}'  ({n} CUIs)")
+  Total distinct STY values seen: 84
 
-    print(f"\n  Total distinct STY values seen: {len(all_values):,}")
+================================================================================
+SEARCHING CACHE FOR SEMANTIC-TYPE DATA
+================================================================================
+  Looking for keys related to semantic types / TUIs / SemGroups...
 
-
-print(f"\n{'='*80}")
-print("SEARCHING CACHE FOR SEMANTIC-TYPE DATA")
-print('='*80)
-print("  Looking for keys related to semantic types / TUIs / SemGroups...")
-for k in cache.keys():
-    lk = str(k).lower()
-    interesting = any(s in lk for s in ['sty', 'tui', 'sem', 'sg', 'srdef',
-                                          'srgr', 'srstre', 'semgroup'])
-    if interesting:
-        print(f"  FOUND: {k}")
-        describe(cache[k], "    ")
-
-print(f"\n{'='*80}")
-print("DONE — paste this output to decide on SemGroup mapping approach")
-print('='*80)
+================================================================================
+DONE — paste this output to decide on SemGroup mapping approach
+================================================================================
