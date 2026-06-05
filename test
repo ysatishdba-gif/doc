@@ -1,607 +1,431 @@
-==============================================================================
-C0032285  'Pneumonia (disorder)'  -> 12 topic(s)
-==============================================================================
+"""
+build_topics.py
+---------------
+End-to-end build: SNOMED CUIs -> clinical topics.
 
-  tp_1ae839747126  size=2  IC=1.000
-    Anchor: C0747674 'Cavitary pneumonia'
-      C0747674  'Cavitary pneumonia'
-      C0032285  'Pneumonia (disorder)'  <-- self
+PIPELINE:
+  STAGE 0  : SY clustering — synonyms (REL=SY) merged into canonical CUI
+  STAGE A  : Flatten network graph through SY canonical_map
+  STAGE B  : Extract IS-A DAG (PAR/CHD/RB/RN only) + Seco IC
+  STAGE C  : Anchor per member = highest-IC IS-A ancestor in topic,
+             with IC >= MIN_ANCHOR_IC (filters grouper junk)
+  STAGE D  : Dedup by anchor — one final topic per anchor canonical
+  STAGE E  : Expand back to original CUIs (SY synonyms inherit topics)
 
-  tp_addea0dd84fd  size=2  IC=1.000
-    Anchor: C1290339 'Focal pneumonia'
-      C1290339  'Focal pneumonia'
-      C0032285  'Pneumonia (disorder)'  <-- self
+Inputs (notebook globals):
+  data, cache (with mrrel_rows), SNOMED_CUIS, LABELS
 
-  tp_ebcd7467b58a  size=2  IC=1.000
-    Anchor: C0694549 'Community acquired pneumonia'
-      C0694549  'Community acquired pneumonia'
-      C0032285  'Pneumonia (disorder)'  <-- self
+Output:
+  topics.pkl + topics_debug.pkl
 
-  tp_f76b3d6b54eb  size=3  IC=0.946
-    Anchor: C0264381 'Unresolved pneumonia'
-      C0032285  'Pneumonia (disorder)'  <-- self
-      C0264382  'Unresolved lobar pneumonia'
-      C0264381  'Unresolved pneumonia'
+Known cost: ~1.8% of CUIs end up in 0 topics because they have no IS-A
+parents in MRREL. Production handles these via NER expansion + direct
+CUI overlap.
+"""
 
-  tp_3f2168c5806e  size=4  IC=0.914
-    Anchor: C1142578 'Bilateral pneumonia'
-      C1960025  'Bilateral basal pneumonia'
-      C1300643  'Bilateral bronchopneumonia'
-      C1142578  'Bilateral pneumonia'
-      C0032285  'Pneumonia (disorder)'  <-- self
+import pickle
+import datetime
+import hashlib
+import math
+import os
+import time
+from collections import defaultdict
 
-  tp_757239d34a68  size=4  IC=0.892
-    Anchor: C0694550 'Recurrent pneumonia (disorder)'
-      C0032285  'Pneumonia (disorder)'  <-- self
-      C0747651  'Recurrent aspiration pneumonia'
-      C0747667  'Recurrent bacterial pneumonia'
-      C0694550  'Recurrent pneumonia (disorder)'
 
-  tp_eef2bb7e70fc  size=4  IC=0.914
-    Anchor: C0339965 'Haemorrhagic pneumonia'
-      C0339965  'Haemorrhagic pneumonia'
-      C0153018  'Haemorrhagic pneumonia caused by varicella'
-      C0264378  'Hemorrhagic bronchopneumonia'
-      C0032285  'Pneumonia (disorder)'  <-- self
+OUTPUT_PATH = "topics.pkl"
 
-  tp_49e9108d1829  size=9  IC=0.543
-    Anchor: C0149725 'Lower respiratory tract infection'
-      C0340238  'Infection of bronchus'
-      C0553966  'Infection of lower respiratory tract and mediastinum'
-      C0340223  'Infectious disorder of trachea'
-      C0149725  'Lower respiratory tract infection'
-      C5230491  'Obstructing Aspergillus tracheobronchitis'
-      C0032285  'Pneumonia (disorder)'  <-- self
-      C3164632  'Postoperative lower respiratory tract infection'
-      C0876973  'Pulmonary infection'
-      C3163798  'Recurrent lower respiratory tract infection'
+# IS-A relation types from MRREL (hierarchical only)
+HIERARCHY_RELS = {"PAR", "CHD", "RB", "RN"}
 
-  tp_35bd3a69f6da  size=22  IC=0.559
-    Anchor: C0876973 'Pulmonary infection'
-      C0339941  'Acute viral bronchiolitis'
-      C0276154  'Adenoviral bronchiolitis'
-      C4038810  'Bronchiolitis caused by influenza virus'
-      C0151874  'Fungal infection of lung'
-      C0243025  'Hantavirus pulmonary syndrome'
-      C4303106  'Infection of lung caused by Pneumocystis'
-      C0024118  'Parasitic infection of lung (disorder)'
-      C0032285  'Pneumonia (disorder)'  <-- self
-      C4520326  'Pneumonia caused by Enterococcus'
-      C4520337  'Pneumonia caused by Serratia'
-      C0524688  'Pneumonic plague'
-      C0275641  'Pulmonary actinobacillosis'
-      C0275566  'Pulmonary actinomycosis'
-      C0276688  'Pulmonary cryptococcosis'
-      C0275705  'Pulmonary disease caused by Mycobacteria'
-      C0343436  'Pulmonary glanders'
-      C0876973  'Pulmonary infection'
-      C0343440  'Pulmonary melioidosis'
-      C0275583  'Pulmonary nocardiosis'
-      C0041327  'Pulmonary tuberculosis'
-      C0276340  'Respiratory syncytial virus bronchiolitis'
-      C0153177  'Syphilis of lung'
+# Synonym relation (handled via clustering)
+SY_REL = "SY"
 
-  tp_4385b55dfcd9  size=29  IC=0.594
-    Anchor: C0032285 'Pneumonia (disorder)'
-      C0348806  'Abscess of lung with pneumonia'
-      C0032290  'Aspiration pneumonia'
-      C0004626  'Bacterial pneumonia'
-      C1142578  'Bilateral pneumonia'
-      C0747674  'Cavitary pneumonia'
-      C4039254  'Chronic pneumonia'
-      C0694549  'Community acquired pneumonia'
-      C1290339  'Focal pneumonia'
-      C0264386  'Foreign body pneumonia'
-      C0339961  'Fungal pneumonia'
-      C0339965  'Haemorrhagic pneumonia'
-      C0264522  'Hypostatic pneumonia'
-      C0206061  'Interstitial pneumonia'
-      C0032300  'Lobar pneumonia'
-      C0264515  'Necrotizing pneumonia'
-      C0949083  'Nosocomial pneumonia (disorder)'
-      C0032285  'Pneumonia (disorder)'  <-- self
-      C0155870  'Pneumonia and influenza'
-      C0339969  'Pneumonia due to parasitic infestation'
-      C0276527  'Pneumonia with AIDS (acquired immunodeficiency syndrome)'
-      C3714636  'Pneumonitis'
-      C1112452  'Post measles pneumonia'
-      C0747690  'Postobstructive pneumonia'
-      C1279386  'Postoperative pneumonia'
-      C0876973  'Pulmonary infection'
-      C0694550  'Recurrent pneumonia (disorder)'
-      C0264381  'Unresolved pneumonia'
-      C1701940  'Ventilator-associated pneumonia'
-      C0032310  'Viral pneumonia'
+# Minimum IC for an ancestor to qualify as an anchor.
+# Drops SNOMED grouper concepts ("Unapproved attribute" ~0.12, etc.) that
+# would otherwise produce junk-drawer hub topics with hundreds of unrelated
+# members.
+MIN_ANCHOR_IC = 0.15
 
-  tp_f65e676f9759  size=32  IC=0.557
-    Anchor: C3714636 'Pneumonitis'
-      C0032290  'Aspiration pneumonia'
-      C1761609  'Aspiration pneumonitis (disorder)'
-      C0264508  'Asthmatic pulmonary alveolitis'
-      C0264438  'Cadmium pneumonitis'
-      C4039975  'Chemical pneumonitis caused by anaesthesia'
-      C3872848  'Chronic pneumonitis of infancy (disorder)'
-      C5574655  'Diffuse interstitial rheumatoid disease of lung'
-      C0878555  'Diffuse panbronchiolitis'
-      C1960026  'Drug induced pneumonitis'
-      C0002390  'EAA - Extrinsic allergic alveolitis'
-      C0340076  'Eosinophilic asthma'
-      C4721507  'Fibrosing alveolitis'
-      C0264384  'Granulomatous pneumonitis'
-      C3872845  'Idiopathic eosinophilic pneumonitis'
-      C2350236  'Idiopathic interstitial pneumonia'
-      C5887144  'Interstitial pneumonitis'
-      C0032298  'Lipid pneumonitis'
-      C1112402  'Lupus pneumonitis'
-      C0264511  'Lymphoid interstitial pneumonitis (disorder)'
-      C0270155  'Meconium pneumonitis'
-      C0264383  'Organized pneumonia'
-      C0032285  'Pneumonia (disorder)'  <-- self
-      C3714636  'Pneumonitis'
-      C5395595  'Pneumonitis caused by fumes'
-      C5395599  'Pneumonitis caused by vapour'
-      C5922950  'Pneumonitis due to foreign body'
-      C0264507  'Prolonged pulmonary alveolitis'
-      C0034068  'Pulmonary eosinophilia'
-      C0152450  'Rheumatic pneumonitis'
-      C0264512  'Rheumatoid fibrosing alveolitis'
-      C0264506  'Simple pulmonary alveolitis'
-      C0264509  'Tropical pulmonary alveolitis'
 
-  tp_5df0c267588e  size=140  IC=0.354
-    Anchor: C0035204 'Respiratory disorder'
-      C2607914  'AR - Allergic rhinitis'
-      C0024110  'Abscess of lung'
-      C0014013  'Abscess of pleural cavity'
-      C4081804  'Acute chest syndrome due to sickle cell hemoglobin C disease with crisis'
-      C5547538  'Acute chest syndrome due to sickle cell thalassemia with crisis'
-      C4039290  'Acute hypercapnic respiratory failure due to obstructive sleep apnoea'
-      C5397149  'Acute hypoxemic respiratory failure due to COVID-19'
-      C5397144  'Acute respiratory distress syndrome due to COVID-19'
-      C0339901  'Acute respiratory infection'
-      C4041492  'Acute severe exacerbation of asthma co-occurrent with allergic rhinitis'
-      C4081613  'Acute-on-chronic respiratory failure following trauma'
-      C1504369  'Allergic disorder of respiratory system'
-      C0339815  'Anterior epistaxis'
-      C4302138  'Apnea of newborn due to neurological injury'
-      C0004096  'Asthmatic'
-      C2673266  'Atypical Krabbe disease due to saposin A deficiency'
-      C0264480  'Bakers' asthma'
-      C0006261  'Bronchial disorder'
-      C0006277  'Bronchitis'
-      C4510692  'Central sleep apnea co-occurrent with Cheyne Stokes respiration'
-      C0274250  'Choking due to food in larynx'
-      C0264220  'Chronic disease of respiratory system'
-      C0746102  'Chronic lung disease (disorder)'
-      C0024117  'Chronic obstructive airway disease'
-      C0456012  'Chronic pulmonary insufficiency of prematurity'
-      C5395596  'Chronic respiratory condition caused by fumes'
-      C5767679  'Chronic respiratory failure due to neuromuscular disease'
-      C5437698  'Chronic respiratory failure due to obstructive sleep apnoea'
-      C1998122  'Chronic respiratory insufficiency'
-      C4302220  'Congenital pulmonary hypoplasia due to prolonged premature rupture of membranes'
-      C0010674  'Cystic fibrosis'
-      C0014434  'Detergent asthma'
-      C0340195  'Dialysis-associated hypoxia'
-      C0152097  'Diaphragmatic disorder'
-      C4551167  'Diaphragmatic hernia with gastroesophageal reflux disease'
-      C0023051  'Disease of larynx'
-      C0451801  'Disease of the respiratory system complicating pregnancy, childbirth and/or the puerperium'
-      C1290325  'Disorder of lower respiratory system'
-      C0024115  'Disorder of lung'
-      C4076110  'Disorder of respiratory system co-occurrent with human immunodeficiency virus infection'
-      C4040695  'Disorder of respiratory system due to dermatomyositis'
-      C5545970  'Disorder of respiratory system due to microscopic polyangiitis'
-      C0276572  'Dyspnea with AIDS (acquired immunodeficiency syndrome)'
-      C5397033  'Dyspnoea caused by SARS-CoV-2'
-      C0001883  'Embarrassed airway'
-      C4040027  'Enophthalmos co-occurrent and due to silent sinus syndrome'
-      C4758626  'Exacerbation of allergic asthma due to infection'
-      C3873160  'Exocrine pancreatic manifestation co-occurrent and due to cystic fibrosis'
-      C0270146  'Fetal and/or neonatal respiratory disorder'
-      C5567217  'Fibrosis of upper respiratory tract due to paracoccidioidomycosis'
-      C0349489  'Foetal hypoxia'
-      C1300118  'Gastroesophageal reflux disease with apnea'
-      C0021400  'Grippe'
-      C0243025  'Hantavirus pulmonary syndrome'
-      C3697679  'Hypertension in the puerperium with pulmonary oedema'
-      C1998370  'Hypoventilation during sleep due to neuromuscular disorder'
-      C2711232  'Idiopathic sleep related non-obstructive alveolar hypoventilation'
-      C0745261  'Infantile apnoea'
-      C3494995  'Infarction of lung due to embolus'
-      C5395594  'Inflammation of upper respiratory tract caused by fumes'
-      C1298756  'Inflammatory disorder of the respiratory system'
-      C4544970  'Interstitial lung disease due to granulomatous disease'
-      C5396397  'Interstitial lung disease due to juvenile polymyositis'
-      C4544971  'Interstitial lung disease due to metabolic disease'
-      C4544969  'Interstitial lung disease due to systemic disease'
-      C0270169  'Interstitial pulmonary fibrosis of prematurity'
-      C4273535  'Juvenile dermatomyositis co-occurrent with respiratory involvement'
-      C0018196  'Laryngeal granuloma'
-      C4039909  'Laryngeal obstruction due to supraglottitis'
-      C0023067  'Laryngitis'
-      C1997203  'Laryngitis due to gastroesophageal reflux'
-      C0340164  'Loefgrens syndrome'
-      C2931402  'Lubani Al-Saleh Teebi syndrome'
-      C0521530  'Lung consolidation (disorder)'
-      C4040862  'Lung disease due to connective tissue disorder'
-      C2315631  'Lung disorder due to autoimmune disorder'
-      C0340256  'Lung injury with sepsis'
-      C0340031  'Mucociliary clearance defect (disorder)'
-      C5568800  'Mucopolysaccharidosis-like plus disease'
-      C0339842  'Nasal septal haematoma'
-      C2937217  'Nasal sinus cyst'
-      C0684906  'Perforation of pharyngeal diverticulum'
-      C0031350  'Pharyngitis (disorder)'
-      C4081615  'Pleural effusion due to another disorder'
-      C0032249  'Plummer-Vinson syndrome'
-      C0032285  'Pneumonia (disorder)'  <-- self
-      C0339976  'Pneumonia due to measles'
-      C5395595  'Pneumonitis caused by fumes'
-      C5922950  'Pneumonitis due to foreign body'
-      C0339816  'Posterior epistaxis'
-      C0747690  'Postobstructive pneumonia'
-      C0348828  'Postprocedural respiratory disorders'
-      C0553822  'Psychogenic air hunger'
-      C3873349  'Pulmonary fibrosis due to Hermansky-Pudlak syndrome'
-      C5567909  'Pulmonary fibrosis due to paracoccidioidomycosis'
-      C1368021  'Pulmonary insufficiency following shock'
-      C1368020  'Pulmonary insufficiency following trauma'
-      C0564754  'Radiation respiratory disease'
-      C3714497  'Reactive airway disease (disorder)'
-      C1299633  'Reactive airways dysfunction syndrome'
-      C0339900  'Respiratory complications of care'
-      C5395604  'Respiratory condition caused by chemical fumes'
-      C5395605  'Respiratory condition caused by vapour'
-      C0035204  'Respiratory disorder'
-      C5967989  'Respiratory disorder caused by drug'
-      C1145670  'Respiratory failure'
-      C4302007  'Respiratory instability of prematurity'
-      C0456011  'Respiratory insufficiency syndrome of newborn (disorder)'
-      C0948349  'Respiratory tract congestion'
-      C1642397  'Respiratory tract congestion and cough'
-      C0035243  'Respiratory tract infection'
-      C4041512  'Restrictive lung disease due to Parkinson's disease'
-      C3662062  'Restrictive lung disease due to amyotrophic lateral sclerosis'
-      C1997603  'Restrictive lung disease due to kyphoscoliosis'
-      C1997904  'Restrictive lung disease due to muscular dystrophy'
-      C4041145  'Restrictive lung mechanics due to neuromuscular disease'
-      C0152450  'Rheumatic pneumonitis'
-      C0035455  'Rhinitis'
-      C4039649  'Rhinitis of pregnancy'
-      C0339952  'Secondary bacterial pneumonia'
-      C0037199  'Sinusitis'
-      C0037315  'Sleep apnoea syndrome'
-      C1997918  'Sleep-related groaning'
-      C4510843  'Sleep-related hypoventilation caused by substance'
-      C0751510  'Sleep-related neurogenic tachypnea'
-      C0037368  'Smoker's respiratory syndrome'
-      C0264454  'Spelters' fever'
-      C3161098  'Spontaneous pneumothorax due to respiratory disease'
-      C0040583  'Tracheal stenosis'
-      C0040584  'Tracheitis (disorder)'
-      C0340207  'Tracheobronchial disorder'
-      C1299608  'Transient respiratory distress with sepsis'
-      C0158940  'Transitory tachypnoea of newborn'
-      C0340016  'Traumatic chylothorax'
-      C0339817  'Traumatic epistaxis'
-      C4040514  'Ulcer of tonsil due to amygdalolith'
-      C1319384  'Upper airway resistance syndrome'
-      C0340107  'Uremic lung'
-      C5568866  'Viral pneumonia due to Epstein-Barr virus infectious mononucleosis'
-      C0270171  'Wilson-Mikity syndrome'
+# ============================================================================
+# Union-find for SY clustering
+# ============================================================================
 
-==============================================================================
-C0011849  'Diabetes mellitus'  -> 12 topic(s)
-==============================================================================
+class UnionFind:
+    def __init__(self):
+        self.parent = {}
+    def find(self, x):
+        if x not in self.parent:
+            self.parent[x] = x
+            return x
+        root = x
+        while self.parent[root] != root:
+            root = self.parent[root]
+        while self.parent[x] != root:
+            self.parent[x], x = root, self.parent[x]
+        return root
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.parent[ra] = rb
 
-  tp_aadaea44daf8  size=2  IC=1.000
-    Anchor: C5688175 'Diabetic neurotrophic keratitis'
-      C0011849  'Diabetes mellitus'  <-- self
-      C5688175  'Diabetic neurotrophic keratitis'
 
-  tp_ab21a5d21e71  size=2  IC=1.000
-    Anchor: C0393831 'Asymptomatic neuropathy due to diabetes mellitus'
-      C0393831  'Asymptomatic neuropathy due to diabetes mellitus'
-      C0011849  'Diabetes mellitus'  <-- self
+# ============================================================================
+# STAGE 0: SY clusters
+# ============================================================================
 
-  tp_b857071bd7d9  size=2  IC=1.000
-    Anchor: C0271931 'Anemia due to diabetes mellitus'
-      C0271931  'Anemia due to diabetes mellitus'
-      C0011849  'Diabetes mellitus'  <-- self
+def build_sy_canonical_map(mrrel_rows, snomed_cuis):
+    print("  [0] Building SY clusters...")
+    t0 = time.time()
+    uf = UnionFind()
+    sy_pairs = 0
+    for row in mrrel_rows:
+        if len(row) < 3:
+            continue
+        c1, c2, rel = row[0], row[1], row[2]
+        if rel != SY_REL:
+            continue
+        if c1 not in snomed_cuis or c2 not in snomed_cuis:
+            continue
+        if c1 == c2:
+            continue
+        uf.union(c1, c2)
+        sy_pairs += 1
 
-  tp_f9a9a53315b5  size=2  IC=1.000
-    Anchor: C1263959 'Diabetic ketoacidosis without coma'
-      C0011849  'Diabetes mellitus'  <-- self
-      C1263959  'Diabetic ketoacidosis without coma'
+    cluster_members = defaultdict(set)
+    for c in uf.parent:
+        cluster_members[uf.find(c)].add(c)
 
-  tp_3cd8dd624b79  size=3  IC=1.000
-    Anchor: C5230812 'Armanni-Ebstein kidney due to diabetes mellitus'
-      C0546391  'Armanni-Ebstein kidney'
-      C5230812  'Armanni-Ebstein kidney due to diabetes mellitus'
-      C0011849  'Diabetes mellitus'  <-- self
+    canonical_map = {}
+    cluster_sizes = []
+    for members in cluster_members.values():
+        canonical = min(members)
+        for m in members:
+            canonical_map[m] = canonical
+        cluster_sizes.append(len(members))
+    for c in snomed_cuis:
+        if c not in canonical_map:
+            canonical_map[c] = c
 
-  tp_01a20f6a90a2  size=4  IC=0.914
-    Anchor: C0206172 'Diabetic foot'
-      C0011849  'Diabetes mellitus'  <-- self
-      C0206172  'Diabetic foot'
-      C4040935  'Skin ulcer of toe due to diabetes mellitus type 1'
-      C4039071  'Skin ulcer of toe due to diabetes mellitus type 2'
+    n_clustered = sum(1 for c in snomed_cuis if c != canonical_map[c])
+    n_multi = sum(1 for s in cluster_sizes if s > 1)
+    print(f"      SY pairs: {sy_pairs:,}  | multi-member clusters: {n_multi:,}")
+    print(f"      CUIs merged into a synonym: {n_clustered:,}")
+    print(f"      Done in {time.time()-t0:.0f}s")
 
-  tp_aeea67caebcf  size=4  IC=0.585
-    Anchor: C1257958 'Disorder of glucose metabolism'
-      C0011849  'Diabetes mellitus'  <-- self
-      C1257958  'Disorder of glucose metabolism'
-      C0020456  'Hyperglycaemia'
-      C0020615  'Hypoglycaemia'
+    canonical_to_cluster = defaultdict(set)
+    for c, can in canonical_map.items():
+        canonical_to_cluster[can].add(c)
+    return canonical_map, dict(canonical_to_cluster)
 
-  tp_9e69ea8b525c  size=5  IC=0.914
-    Anchor: C0011871 'Peripheral angiopathy due to diabetes mellitus'
-      C0011849  'Diabetes mellitus'  <-- self
-      C0011871  'Peripheral angiopathy due to diabetes mellitus'
-      C4304957  'Peripheral angiopathy due to type 1 diabetes mellitus'
-      C1719760  'Peripheral vascular disorder due to diabetes mellitus'
-      C1279313  'Type 2 diabetes mellitus with peripheral angiopathy'
 
-  tp_42e31507c18a  size=6  IC=0.829
-    Anchor: C5231105 'Hyperglycaemia due to diabetes mellitus'
-      C0011849  'Diabetes mellitus'  <-- self
-      C5231105  'Hyperglycaemia due to diabetes mellitus'
-      C4076703  'Hyperglycaemia due to type 1 diabetes mellitus'
-      C4076711  'Hyperglycaemia due to type 2 diabetes mellitus'
-      C0342298  'Severe hyperglycemia due to diabetes mellitus'
-      C0948275  'Somogyi phenomenon'
+# ============================================================================
+# STAGE A: Flatten network graph
+# ============================================================================
 
-  tp_dc3787c01d5a  size=45  IC=0.622
-    Anchor: C0011849 'Diabetes mellitus'
-      C4543623  'Absence of lower limb due to diabetes mellitus'
-      C1859965  'Alaninuria, microcephaly, dwarfism, enamel hypoplasia, diabetes mellitus syndrome'
-      C0271931  'Anemia due to diabetes mellitus'
-      C4302120  'Atypical diabetes mellitus'
-      C0342302  'Brittle diabetes mellitus (disorder)'
-      C0011876  'Cataract due to diabetes mellitus'
-      C0406132  'Cellulitis of foot due to diabetes mellitus'
-      C0011849  'Diabetes mellitus'  <-- self
-      C2874125  'Diabetes mellitus due to genetic defect in beta cell function'
-      C2874124  'Diabetes mellitus due to genetic defect in insulin action'
-      C3875503  'Diabetes mellitus due to pancreatic injury'
-      C0341893  'Diabetes mellitus in mother complicating pregnancy, childbirth AND/OR puerperium'
-      C3839440  'Diabetes mellitus in remission'
-      C0011854  'Diabetes mellitus type 1'
-      C0853897  'Diabetic cardiomyopathy'
-      C0206172  'Diabetic foot'
-      C1456868  'Diabetic foot ulcer'
-      C0406685  'Diabetic hand syndrome'
-      C0011880  'Diabetic ketoacidosis'
-      C0011881  'Diabetic nephropathy'
-      C0011882  'Diabetic neuropathy'
-      C5688175  'Diabetic neurotrophic keratitis'
-      C0011884  'Diabetic retinopathy'
-      C0342257  'Disorder associated with diabetes mellitus'
-      C0342245  'Disorder of eye due to diabetes mellitus'
-      C1720078  'Disorder of nervous system due to diabetes mellitus'
-      C0406681  'Disorder of soft tissue due to diabetes mellitus'
-      C4709217  'Erectile dysfunction due to diabetes mellitus'
-      C0554436  'Gangrene due to diabetes mellitus'
-      C4274674  'Gingival disease co-occurrent with diabetes mellitus'
-      C5395900  'Glaucoma due to diabetes mellitus'
-      C1263962  'Houssay syndrome'
-      C0339310  'Iritis due to diabetes mellitus'
-      C3837958  'Ketosis-prone diabetes mellitus'
-      C0011859  'Lipodystrophic diabetes'
-      C2931521  'Lymphocytic mastitis'
-      C4543814  'Metabolic acidosis due to diabetes mellitus'
-      C4076158  'Neovascular glaucoma due to diabetes mellitus'
-      C5396911  'Newly diagnosed type 1 diabetes mellitus'
-      C2931296  'Pancreatic hypoplasia, diabetes mellitus, congenital heart disease syndrome'
-      C0011871  'Peripheral angiopathy due to diabetes mellitus'
-      C1719760  'Peripheral vascular disorder due to diabetes mellitus'
-      C0271640  'Secondary diabetes mellitus'
-      C0011860  'Type II diabetes mellitus'
-      C0730283  'Vitreous haemorrhage due to diabetes mellitus'
+def flatten_graph(graph, snomed_cuis, canonical_map):
+    print("  [A] Flattening graph (with SY canonicalization)...")
+    t0 = time.time()
+    neighbors = defaultdict(set)
+    n = 0
+    for cui in snomed_cuis:
+        n += 1
+        if n % 50000 == 0:
+            print(f"      {n:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
+        if cui not in graph:
+            continue
+        can_cui = canonical_map.get(cui, cui)
+        for suffix_child in graph.successors(cui):
+            if "-" not in suffix_child:
+                continue
+            try:
+                base, _ = suffix_child.rsplit("-", 1)
+            except ValueError:
+                continue
+            if base != cui:
+                continue
+            for pred in graph.predecessors(suffix_child):
+                if pred == cui or "-" not in pred:
+                    continue
+                try:
+                    other, _ = pred.rsplit("-", 1)
+                except ValueError:
+                    continue
+                if other == cui or other not in snomed_cuis:
+                    continue
+                can_other = canonical_map.get(other, other)
+                if can_cui == can_other:
+                    continue
+                neighbors[can_cui].add(can_other)
+                neighbors[can_other].add(can_cui)
 
-  tp_ac21fa560b8e  size=61  IC=0.394
-    Anchor: C0014130 'Endocrine system disease'
-      C0342320  'Alimentary hypoglycemia'
-      C5687733  'Atrophy of multiple endocrine glands'
-      C0342552  'Autoimmune endocrine disease'
-      C0010308  'Congenital hypothyroidism'
-      C3165526  'Congenital iodine deficiency syndrome (disorder)'
-      C0011849  'Diabetes mellitus'  <-- self
-      C1960705  'Diabetes mellitus due to cystic fibrosis'
-      C2874119  'Diabetes mellitus type 2 with periodontal disease'
-      C0001621  'Disorder of adrenal gland'
-      C1290845  'Disorder of endocrine gonad'
-      C1263946  'Disorder of endocrine receptor'
-      C0029928  'Disorder of ovary'
-      C0030286  'Disorder of pancreas (disorder)'
-      C0154199  'Disorder of thymus gland (disorder)'
-      C1960636  'Dysglycemia'
-      C1395984  'Dystrophy of multiple endocrine glands'
-      C2584703  'Endemic congenital iodine deficiency syndrome of myxoedematous type'
-      C0342200  'Endemic cretinism'
-      C0694452  'Endocrine / nutritional / metabolic disorder'
-      C0002176  'Endocrine alopecia'
-      C2711531  'Endocrine axis dysfunction'
-      C0729775  'Endocrine infection'
-      C0014130  'Endocrine system disease'
-      C0024586  'Excessive serotonin secretion'
-      C0271703  'Factitious hypoglycemia'
-      C1285294  'Foetal endocrine disorder'
-      C0271880  'Functional disease of the CNS with neuroendocrine disturbance'
-      C1276224  'Hereditary disorder of endocrine system'
-      C0020456  'Hyperglycaemia'
-      C4303082  'Hyperinsulinism due to uncoupling protein 2 deficiency'
-      C0271849  'Hyperparathyroidism due to lithium therapy'
-      C0405580  'Hypoadrenocorticism'
-      C0020615  'Hypoglycaemia'
-      C0342398  'Hypophysectomy-induced hypopituitarism'
-      C5681196  'Hypothalamic adipsic hypernatremia syndrome'
-      C5545389  'Hypothyroidism due to and following radiotherapy'
-      C0154163  'Iatrogenic thyroiditis'
-      C0271650  'Impaired glucose tolerance (disorder)'
-      C5700110  'Impaired glucose tolerance test'
-      C0027773  'Islet cell hyperplasia (disorder)'
-      C0271587  'Isolated deficiency of hormone other than HGH (human growth hormone)'
-      C1955743  'Mineralocorticoid deficiency (disorder)'
-      C5679884  'Multiple paraganglioma associated with polycythaemia'
-      C0271558  'Necrosis of pituitary'
-      C4544488  'Neonatal disorder of endocrine system'
-      C0029927  'Ovarian cyst'
-      C0085404  'POEMS syndrome'
-      C0030517  'Parathyroid disease'
-      C0456028  'Perinatal disorder of glucose regulation of fetus and/or neonate'
-      C0729870  'Pineal gland disorder'
-      C0032002  'Pituitary disease'
-      C0154222  'Polyglandular dysfunction'
-      C0154218  'Polyglandular dysfunction AND/OR related disorder'
-      C5568680  'Post iodine 131 treatment radiation thyroiditis'
-      C0085215  'Premature ovarian failure'
-      C0342346  'Pseudohypoparathyroidism and pseudopseudohypoparathyroidism'
-      C0338932  'Psychogenic endocrine malfunction'
-      C0271625  'Testicular hypofunction due to and following radiotherapy'
-      C0040128  'Thyroid disease'
-      C0342182  'Thyroid-binding globulin deficiency'
-      C5568676  'Vasopressin deficiency due to trauma'
+    total_edges = sum(len(v) for v in neighbors.values()) // 2
+    print(f"      CUIs with edges: {len(neighbors):,}, edges: {total_edges:,}")
+    print(f"      Done in {time.time()-t0:.0f}s")
+    return neighbors
 
-  tp_6db1986379b2  size=118  IC=0.377
-    Anchor: C0025517 'Metabolic disease'
-      C2746066  '2-hydroxyglutaric aciduria (disorder)'
-      C1290840  'Acute metabolic disorder'
-      C0001916  'Albinismus'
-      C0002063  'Alkalosis'
-      C0268457  'Aminoacidaemia'
-      C0342898  'Apolipoprotein A-I deficiency (disorder)'
-      C4225320  'CAD-CDG - carbamoyl-phosphate synthetase 2, aspartate transcarbamylase, and dihydroorotase congenital disorder of glycosylation'
-      C0751753  'Carbamoyl-phosphate synthetase I deficiency'
-      C1263722  'Chronic metabolic disorder'
-      C1444205  'Clinical manifestation of carnosinase deficiency'
-      C1444206  'Clinical manifestation of enzyme deficiency'
-      C1843920  'Coenzyme Q10 deficiency'
-      C0023195  'Complete LCAT (lecithin-cholesterol acyltransferase) deficiency'
-      C0282577  'Congenital disorder of glycosylation'
-      C1283620  'Congenital sucrose intolerance'
-      C0012714  'Copper metabolism disorder'
-      C0268237  'Cytochrome c oxidase deficiency'
-      C1291512  'Deficiency of beta-ureidopropionase'
-      C1291620  'Deficiency of bisphosphoglycerate mutase'
-      C1291579  'Deficiency of enolase'
-      C0398563  'Deficiency of hexokinase type IV'
-      C0011175  'Dehydration'
-      C0011849  'Diabetes mellitus'  <-- self
-      C1959620  'Dihydropyrimidine dehydrogenase deficiency'
-      C0268029  'Disorder of acid-base balance'
-      C5886841  'Disorder of amino acid metabolism (disorder)'
-      C0268629  'Disorder of beta alanine, carnosine AND/OR homocarnosine metabolism'
-      C0342965  'Disorder of blood gas'
-      C0006705  'Disorder of calcium metabolism'
-      C0149670  'Disorder of carbohydrate metabolism'
-      C0751748  'Disorder of glycine cleavage enzyme complex'
-      C1263965  'Disorder of iodine metabolism'
-      C0012715  'Disorder of iron metabolism'
-      C2874244  'Disorder of ketone metabolism'
-      C0154251  'Disorder of lipid metabolism'
-      C0268195  'Disorder of lipoprotein AND/OR lipid metabolism'
-      C0342830  'Disorder of lipoprotein storage and metabolism'
-      C0012716  'Disorder of magnesium metabolism (disorder)'
-      C0342774  'Disorder of mitochondrial respiratory chain complexes'
-      C0271884  'Disorder of neurometabolic regulation'
-      C1263739  'Disorder of organic acid metabolism'
-      C0032708  'Disorder of porphyrin metabolism'
-      C0268527  'Disorder of proline AND/OR hydroxyproline metabolism'
-      C0597300  'Disorder of protein metabolism'
-      C0034139  'Disorder of purine and pyrimidine metabolism'
-      C0268283  'Disorder of steroid metabolism'
-      C1263728  'Disorder of strontium metabolism'
-      C1263724  'Disorder of sulfur metabolism'
-      C0268613  'Disorder of sulfur-bearing amino acid metabolism'
-      C0268085  'Disorder of zinc metabolism'
-      C1290193  'Disorder with defective osteoid mineralisation'
-      C0520572  'Enzymopathy'
-      C1285357  'Fetal metabolic disorder'
-      C0016751  'Fructosemia'
-      C0268596  'Glutaric aciduria, type 2 (disorder)'
-      C0018099  'Gout'
-      C0019151  'Hepatic encephalopathy'
-      C5767707  'Hereditary metabolic disease'
-      C0220987  'Hereditary orotic aciduria'
-      C0268630  'Hyper-beta-alaninaemia'
-      C4329210  'Hyperandrogenism due to cortisone reductase deficiency'
-      C0598608  'Hyperhomocysteinemia'
-      C4303082  'Hyperinsulinism due to uncoupling protein 2 deficiency'
-      C0268009  'Hyperosmolality'
-      C0342580  'Hyperosmolality and or hypernatraemia'
-      C1876187  'Hyperphosphataemic familial tumoural calcinosis'
-      C0473527  'Hypoalphalipoproteinaemia'
-      C0268815  'Hyponatraemia with extracellular fluid depletion'
-      C0020639  'Hypoproteinaemia'
-      C0268005  'Hyposmolality'
-      C0221333  'Hypouricemia'
-      C0002514  'Inborn error of amino acid metabolism'
-      C0025521  'Inborn error of metabolism'
-      C0268605  'Inherited disorder of folate metabolism'
-      C1263848  'Inherited metabolic disorder of nervous system'
-      C0564730  'Iron, copper, magnesium metabolism disorder'
-      C0022610  'Kernicterus'
-      C0268095  'Keshan disease'
-      C5779633  'LCAT (lecithin-cholesterol acyltransferase) deficiency'
-      C0917796  'Leber's optic atrophy (disorder)'
-      C0023794  'Lipoidosis (disorder)'
-      C0267969  'Localised metabolic disorder'
-      C1621348  'Magnesium disorder'
-      C0268028  'McKittrick-Wheelock syndrome'
-      C0400963  'Metabolic and genetic disorder affecting the liver'
-      C0006112  'Metabolic brain syndrome'
-      C0025517  'Metabolic disease'
-      C5688295  'Metabolic disease due to and following complete induced termination of pregnancy'
-      C0268331  'Metabolic disease of collagen'
-      C2112192  'Metabolic disorder following ectopic pregnancy'
-      C2112557  'Metabolic disorder following molar pregnancy'
-      C0005944  'Metabolic disorder of bone'
-      C1263737  'Metabolic disorder of transport'
-      C0403515  'Metabolic renal disease'
-      C0524620  'Metabolic syndrome X'
-      C0342731  'Mevalonate kinase deficiency'
-      C2931928  'Mitochondrial cytopathy (disorder)'
-      C0162666  'Mitochondrial encephalomyopathy'
-      C0162670  'Mitochondrial myopathy'
-      C0872218  'Mitochondrial neurogastrointestinal encephalomyopathy syndrome (disorder)'
-      C0154264  'Mixed acid-base balance disorder'
-      C0026697  'Mucolipidosis'
-      C0026703  'Mucopolysaccharidosis'
-      C1404866  'Neonatal metabolic disorder'
-      C0268004  'Osmolality disturbance'
-      C0034341  'PC - Pyruvate carboxylase deficiency'
-      C5190786  'Panhypophysitis'
-      C0456032  'Perinatal disorder of electrolytes'
-      C0268194  'Phosphoenolpyruvate carboxykinase deficiency'
-      C0034345  'Pyruvate dehydrogenase complex deficiency (disorder)'
-      C0340968  'Pyruvate kinase deficiency'
-      C0035579  'Rickets'
-      C0268426  'Rowley-Rosenberg syndrome (disorder)'
-      C0149676  'Specific enzyme deficiency'
-      C0039292  'Tangier disease'
-      C0040156  'Thyrotoxicosis (disorder)'
-      C0270228  'Transitory neonatal electrolyte disturbance'
-      C0041364  'Tumor lysis syndrome'
 
-==============================================================================
-C0205082  'High grade'  -> 0 topic(s)
-==============================================================================
+# ============================================================================
+# STAGE B: Extract IS-A DAG + IC
+# ============================================================================
 
-==============================================================================
-C2142181  'Pain of left knee joint (finding)'  -> 2 topic(s)
-==============================================================================
+def extract_isa_dag(mrrel_rows, snomed_cuis, canonical_map):
+    print("  [B] Extracting IS-A DAG (PAR/CHD/RB/RN only)...")
+    t0 = time.time()
+    edges = set()
+    n_match = n_within = 0
+    for row in mrrel_rows:
+        if len(row) < 3:
+            continue
+        c1, c2, rel = row[0], row[1], row[2]
+        if rel not in HIERARCHY_RELS:
+            continue
+        if c1 not in snomed_cuis or c2 not in snomed_cuis:
+            continue
+        if c1 == c2:
+            continue
+        can_c1 = canonical_map.get(c1, c1)
+        can_c2 = canonical_map.get(c2, c2)
+        if can_c1 == can_c2:
+            n_within += 1
+            continue
+        if rel in ("PAR", "RB"):
+            edges.add((can_c1, can_c2))   # c1 child, c2 parent
+        else:  # CHD, RN
+            edges.add((can_c2, can_c1))
+        n_match += 1
 
-  tp_4b868e75bf1a  size=3  IC=0.821
-    Anchor: C5442019 'Pain of left knee'
-      C5549683  'Pain of bilateral knee regions'
-      C5442019  'Pain of left knee'
-      C2142181  'Pain of left knee joint (finding)'  <-- self
+    isa_parents  = defaultdict(set)
+    isa_children = defaultdict(set)
+    for child, parent in edges:
+        isa_parents[child].add(parent)
+        isa_children[parent].add(child)
 
-  tp_d2396e5d2f87  size=4  IC=0.860
-    Anchor: C2142181 'Pain of left knee joint (finding)'
-      C4509795  'Chronic pain following bilateral total knee arthroplasty'
-      C2220048  'Pain of bilateral knee joints'
-      C5442019  'Pain of left knee'
-      C2142181  'Pain of left knee joint (finding)'  <-- self
+    print(f"      IS-A rows: {n_match:,}  | unique edges: {len(edges):,}")
+    print(f"      Dropped (intra-SY-cluster): {n_within:,}")
+    print(f"      CUIs with IS-A parents: {len(isa_parents):,}")
+    print(f"      Done in {time.time()-t0:.0f}s")
+    return dict(isa_parents), dict(isa_children)
+
+
+def compute_ic(isa_children, all_nodes, total_universe):
+    print("  [B] Computing Seco IC...")
+    t0 = time.time()
+    descendant_sets = {}
+
+    def descendants(node, stack):
+        if node in descendant_sets:
+            return descendant_sets[node]
+        if node in stack:
+            return set()
+        stack = stack | {node}
+        result = set()
+        for child in isa_children.get(node, ()):
+            result.add(child)
+            result |= descendants(child, stack)
+        descendant_sets[node] = result
+        return result
+
+    for node in all_nodes:
+        descendants(node, set())
+
+    log_total = math.log(total_universe + 1)
+    ic = {n: 1.0 - math.log(len(d) + 1) / log_total
+          for n, d in descendant_sets.items()}
+    print(f"      IC computed for {len(ic):,} nodes in {time.time()-t0:.0f}s")
+    return ic
+
+
+def ancestor_closure(cui, isa_parents, cache):
+    if cui in cache:
+        return cache[cui]
+    ancestors = set()
+    stack = [cui]
+    visited = set()
+    while stack:
+        node = stack.pop()
+        if node in visited:
+            continue
+        visited.add(node)
+        for p in isa_parents.get(node, set()):
+            if p not in ancestors:
+                ancestors.add(p)
+                stack.append(p)
+    cache[cui] = frozenset(ancestors)
+    return cache[cui]
+
+
+# ============================================================================
+# STAGE C + D: Build topics
+# ============================================================================
+
+def topic_id_for(canonical):
+    h = hashlib.sha1(canonical.encode()).hexdigest()[:12]
+    return f"tp_{h}"
+
+
+def build_canonical_topics(canonical_cuis, neighbors, isa_parents, ic_scores):
+    print("  [C] Forming subgroups per main topic (IS-A only)...")
+    print(f"      Anchor rule: highest-IC IS-A ancestor in topic, "
+          f"IC >= {MIN_ANCHOR_IC}")
+    t0 = time.time()
+
+    closure_cache = {}
+    canonical_to_members = defaultdict(set)
+    n_filtered_ic = 0
+    n = 0
+
+    for focal in canonical_cuis:
+        n += 1
+        if n % 50000 == 0:
+            print(f"      {n:,}/{len(canonical_cuis):,} ({time.time()-t0:.0f}s)")
+
+        members = {focal} | neighbors.get(focal, frozenset())
+        if len(members) < 2:
+            continue
+
+        for m in members:
+            closure = ancestor_closure(m, isa_parents, closure_cache)
+            in_topic = (closure & members) - {m}
+            if not in_topic:
+                continue
+            qualified = {a for a in in_topic
+                         if ic_scores.get(a, 0.0) >= MIN_ANCHOR_IC}
+            if not qualified:
+                n_filtered_ic += 1
+                continue
+            anchor = max(qualified, key=lambda a: ic_scores.get(a, 0.0))
+            canonical_to_members[anchor].add(anchor)
+            canonical_to_members[anchor].add(m)
+
+    print(f"      Done in {time.time()-t0:.0f}s")
+    print(f"      Closure cache size       : {len(closure_cache):,}")
+    print(f"      Filtered by IC floor     : {n_filtered_ic:,}")
+    print(f"      Unique canonical anchors : {len(canonical_to_members):,}")
+    return dict(canonical_to_members)
+
+
+# ============================================================================
+# STAGE E: Expand back to original CUIs
+# ============================================================================
+
+def expand_to_original_cuis(canonical_to_members, canonical_to_cluster,
+                             ic_scores):
+    print("  [E] Expanding back to original CUIs...")
+    t0 = time.time()
+    topic_id_to_topic     = {}
+    canonical_to_topic_id = {}
+    cui_to_topic_ids      = defaultdict(set)
+
+    for canonical, mems in canonical_to_members.items():
+        tp_id = topic_id_for(canonical)
+        expanded = set()
+        for m in mems:
+            expanded |= canonical_to_cluster.get(m, {m})
+        expanded_fs = frozenset(expanded)
+        topic_id_to_topic[tp_id] = {
+            "canonical":  canonical,
+            "members":    expanded_fs,
+            "size":       len(expanded_fs),
+            "anchor_ic":  ic_scores.get(canonical, 0.0),
+        }
+        canonical_to_topic_id[canonical] = tp_id
+        for m in expanded_fs:
+            cui_to_topic_ids[m].add(tp_id)
+
+    print(f"      Done in {time.time()-t0:.0f}s")
+    print(f"      Final topics       : {len(topic_id_to_topic):,}")
+    print(f"      CUIs participating : {len(cui_to_topic_ids):,}")
+
+    sizes = sorted(t["size"] for t in topic_id_to_topic.values())
+    if sizes:
+        print(f"      Topic size min/med/p90/p99/max: "
+              f"{sizes[0]} / {sizes[len(sizes)//2]} / "
+              f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
+              f"{sizes[-1]}")
+    return topic_id_to_topic, canonical_to_topic_id, cui_to_topic_ids
+
+
+# ============================================================================
+# Main
+# ============================================================================
+
+def main():
+    print(f"BUILD START — {datetime.datetime.now().isoformat()}")
+    t_total = time.time()
+
+    print(f"\nInputs:")
+    print(f"  data         : {type(data).__name__} "
+          f"({data.number_of_nodes():,} nodes)")
+    print(f"  SNOMED_CUIS  : {len(SNOMED_CUIS):,}")
+    print(f"  LABELS       : {len(LABELS):,}")
+    print(f"  cache keys   : {list(cache.keys())}")
+
+    print(f"\n[0] SY clusters")
+    canonical_map, canonical_to_cluster = build_sy_canonical_map(
+        cache["mrrel_rows"], SNOMED_CUIS)
+
+    print(f"\n[A] Flatten network graph")
+    neighbors = flatten_graph(data, SNOMED_CUIS, canonical_map)
+
+    print(f"\n[B] Extract IS-A DAG + IC")
+    isa_parents, isa_children = extract_isa_dag(
+        cache["mrrel_rows"], SNOMED_CUIS, canonical_map)
+    canonical_cuis = {canonical_map[c] for c in SNOMED_CUIS}
+    all_nodes = set(isa_parents.keys()) | set(isa_children.keys())
+    ic_scores = compute_ic(isa_children, all_nodes, len(canonical_cuis))
+
+    print(f"\n[C+D] Build topics")
+    canonical_to_members = build_canonical_topics(
+        canonical_cuis, neighbors, isa_parents, ic_scores)
+
+    print(f"\n[E] Expand to original CUIs")
+    topic_id_to_topic, canonical_to_topic_id, cui_to_topic_ids = \
+        expand_to_original_cuis(canonical_to_members, canonical_to_cluster,
+                                 ic_scores)
+
+    print(f"\n[Save] Writing {OUTPUT_PATH}")
+    payload = {
+        "topic_id_to_topic":     topic_id_to_topic,
+        "canonical_to_topic_id": canonical_to_topic_id,
+        "cui_to_topic_ids":      {c: sorted(s) for c, s
+                                  in cui_to_topic_ids.items()},
+        "labels":                LABELS,
+        "tags":                  globals().get("TAGS", {}),
+        "canonical_map":         canonical_map,
+        "config": {
+            "anchor_rule":     "highest-IC IS-A ancestor in topic, "
+                               f"with IC >= {MIN_ANCHOR_IC}",
+            "min_anchor_ic":   MIN_ANCHOR_IC,
+            "ic_formula":      "Seco: 1 - log(desc+1) / log(total)",
+            "isa_rels":        sorted(HIERARCHY_RELS),
+            "uses_sy_merging": True,
+            "uses_ro":         False,
+            "uses_sty_filter": False,
+        },
+        "built_at": datetime.datetime.now().isoformat(),
+    }
+    with open(OUTPUT_PATH, "wb") as f:
+        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    print(f"        Wrote {os.path.getsize(OUTPUT_PATH)/1024/1024:.1f} MB")
+
+    debug_path = OUTPUT_PATH.replace(".pkl", "_debug.pkl")
+    print(f"\n[Save] Writing debug sidecar to {debug_path}")
+    debug_payload = {
+        "neighbors":            {c: frozenset(n) for c, n in neighbors.items()},
+        "isa_parents":          isa_parents,
+        "ic_scores":            ic_scores,
+        "labels":               LABELS,
+        "canonical_map":        canonical_map,
+        "canonical_to_cluster": canonical_to_cluster,
+        "built_at":             datetime.datetime.now().isoformat(),
+    }
+    with open(debug_path, "wb") as f:
+        pickle.dump(debug_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    print(f"        Wrote {os.path.getsize(debug_path)/1024/1024:.1f} MB")
+
+    print(f"\nTOTAL: {time.time()-t_total:.0f}s")
+    print(f"DONE — {datetime.datetime.now().isoformat()}")
+
+
+main()
