@@ -1,132 +1,89 @@
-"""
-diagnose_orphans.py
--------------------
-Count CUIs that have no IS-A relations in MRREL (orphans in the IS-A
-hierarchy). These end up in 0 final topics if their only main-topic
-neighbors don't help either.
+Total SNOMED CUIs in scope: 374,538
 
-Reads topics_debug.pkl (built by build_topics.py) — no rebuild needed.
+IS-A hierarchy participation:
+  CUIs with IS-A parents          : 367,217 (98.0%)
+  CUIs with no IS-A parents       : 7,321 (2.0%)
+    - has children, no parents    : 50
+    - no parents AND no children  : 7,271
 
-Reports:
-  1. Total orphans (CUIs with no IS-A parents)
-  2. Orphans broken down by whether they have ANY IS-A relations at all
-     (parent OR child)
-  3. Orphans that are in 0 final topics (the actual coverage gap)
-  4. Sample of orphan CUIs with labels (for inspection)
-"""
+Final topic coverage:
+  CUIs in >=1 topic   : 367,770 (98.2%)
+  CUIs in 0 topics    : 6,768 (1.8%)
 
-import pickle
+Why CUIs end up in 0 topics:
+  Orphans (no IS-A parents at all)         : 6,352
+  Has IS-A parents but no parents in any   : 416
+    main topic (cross-axis or isolated)
 
-DEBUG_PATH  = "topics_debug.pkl"
-TOPICS_PATH = "topics.pkl"
+If we added network fallback for orphans:
+  Orphans with network neighbors  : 5,637 (could potentially borrow anchor from neighbors)
+  Orphans with no network either  : 715 (no way to anchor)
 
+--- Sample orphans (no IS-A parents, in 0 topics) ---
+  C0000407  '3-hydroxyanthranilic acid'  (network neighbors: 0)
+  C0000817  'Septic abortion'  (network neighbors: 2)
+  C0000890  'Ticks and mites'  (network neighbors: 4)
+  C0001247  'Actinobacillosis'  (network neighbors: 1)
+  C0001291  'Actomyosin'  (network neighbors: 0)
+  C0002321  'Alpha>2<-H foetoprotein'  (network neighbors: 0)
+  C0002578  'Beta-aminopropionitrile'  (network neighbors: 1)
+  C0002884  'Hypochromic anaemia'  (network neighbors: 4)
+  C0003086  'Hock'  (network neighbors: 2)
+  C0003129  'Anoxaemia'  (network neighbors: 0)
+  C0003322  'CD - Cluster of differentiation antigen marker'  (network neighbors: 6)
+  C0003490  'Aortic arch syndrome'  (network neighbors: 5)
+  C0003510  'Aortitis syndrome'  (network neighbors: 0)
+  C0003601  'Apoprotein'  (network neighbors: 2)
+  C0003806  'Dopa decarboxylase'  (network neighbors: 1)
+  C0003838  'Arterial occlusive disease'  (network neighbors: 12)
+  C0003910  'Articulation disorder'  (network neighbors: 1)
+  C0004303  'Central auditory dysfunction'  (network neighbors: 3)
+  C0004422  'Avian leukosis virus'  (network neighbors: 2)
+  C0004616  'Bacterial aneurysm'  (network neighbors: 0)
+  ... and 6,332 more
 
-def main():
-    print(f"Loading {DEBUG_PATH} ...")
-    with open(DEBUG_PATH, "rb") as f:
-        d = pickle.load(f)
-    isa_parents = d["isa_parents"]
-    ic_scores   = d["ic_scores"]
-    labels      = d["labels"]
-    neighbors   = d["neighbors"]
+--- Sample orphans WITH network neighbors (could be saved) ---
+  C0000817  'Septic abortion'
+    ↳ sample neighbors: 'Systemic inflammatory response syndrome', 'Pregnancy with abortive outcome (disorder)'
+  C0000890  'Ticks and mites'
+    ↳ sample neighbors: 'Mite', 'Acariformes', 'Parasitiformes'
+  C0001247  'Actinobacillosis'
+    ↳ sample neighbors: 'Actinobacillus infection'
+  C0002578  'Beta-aminopropionitrile'
+    ↳ sample neighbors: 'Nitrile (substance)'
+  C0002884  'Hypochromic anaemia'
+    ↳ sample neighbors: 'Asiderotic anaemia', 'Anaemia', 'Microcytic hypochromic anemia'
+  C0003086  'Hock'
+    ↳ sample neighbors: 'Lower extremity', 'Body part structure (body structure)'
+  C0003322  'CD - Cluster of differentiation antigen marker'
+    ↳ sample neighbors: 'Leucocyte 16', 'Lymphocyte antigen CD83 (substance)', 'Lymphocyte antigen CD1'
+  C0003490  'Aortic arch syndrome'
+    ↳ sample neighbors: 'Takayasu's arteritis', 'Syndrome', 'Vascular ring - disorder'
+  C0003601  'Apoprotein'
+    ↳ sample neighbors: 'Protein (substance)', 'Apolipoprotein'
+  C0003806  'Dopa decarboxylase'
+    ↳ sample neighbors: 'Aromatic-L-amino-acid decarboxylase'
+  C0003838  'Arterial occlusive disease'
+    ↳ sample neighbors: 'Moyamoya disease', 'Leriche's syndrome', 'Carotid artery narrowing'
+  C0003910  'Articulation disorder'
+    ↳ sample neighbors: 'Dysarthria'
+  C0004303  'Central auditory dysfunction'
+    ↳ sample neighbors: 'Auditory processing disorder (disorder)', 'Disorder of brain (disorder)', 'Central hearing loss'
+  C0004422  'Avian leukosis virus'
+    ↳ sample neighbors: 'Genus Alpharetrovirus', 'Avian leukosis virus Ag'
+  C0005778  'Blood clotting'
+    ↳ sample neighbors: 'Haemostatic function', 'Host defence', 'Coagulation process'
+  C0005939  'Bone development'
+    ↳ sample neighbors: 'Ossification'
+  C0006370  'Bulimia'
+    ↳ sample neighbors: 'Overeating'
+  C0006948  'Carbamates'
+    ↳ sample neighbors: 'Diethylcarbamazine', '2-methyl-2-(methylthio) propionaldehyde O-methylcarbamoyloxime', 'Fenbendazole (substance)'
+  C0007113  'Rectal cancer'
+    ↳ sample neighbors: 'Adenocarcinoma of rectum (disorder)', 'Squamous cell carcinoma of rectum', 'Malignant tumour of rectum'
+  C0007121  'Bronchogenic carcinoma'
+    ↳ sample neighbors: 'Small cell carcinoma of lung', 'Bronchial tumour', 'Non-small cell lung cancer'
+  ... and 5,617 more
 
-    print(f"Loading {TOPICS_PATH} ...")
-    with open(TOPICS_PATH, "rb") as f:
-        t = pickle.load(f)
-    cui_to_topic_ids = t["cui_to_topic_ids"]
-
-    # Use the universe of CUIs that have a label (= SNOMED universe)
-    all_cuis = set(labels.keys())
-    print(f"\nTotal SNOMED CUIs in scope: {len(all_cuis):,}")
-
-    # ------------------------------------------------------------------
-    # Orphan classification
-    # ------------------------------------------------------------------
-    # An orphan = no entry in isa_parents (no IS-A parents).
-    # Sub-types:
-    #   - "leaf-orphan"  : no parents AND no children (truly isolated)
-    #   - "root-like"   : no parents BUT has children (rare; near-top
-    #                     of hierarchy or grouper)
-    in_ic        = set(ic_scores.keys())   # CUIs with parent OR child
-    has_parents  = set(isa_parents.keys())
-    has_children = in_ic - has_parents     # in IC but no parents
-
-    no_parents      = all_cuis - has_parents
-    truly_isolated  = all_cuis - in_ic     # neither parent nor child
-    parent_orphans  = no_parents - truly_isolated  # has children only
-
-    print(f"\nIS-A hierarchy participation:")
-    print(f"  CUIs with IS-A parents          : {len(has_parents):,} "
-          f"({100*len(has_parents)/len(all_cuis):.1f}%)")
-    print(f"  CUIs with no IS-A parents       : {len(no_parents):,} "
-          f"({100*len(no_parents)/len(all_cuis):.1f}%)")
-    print(f"    - has children, no parents    : {len(parent_orphans):,}")
-    print(f"    - no parents AND no children  : {len(truly_isolated):,}")
-
-    # ------------------------------------------------------------------
-    # Coverage gap: orphans that ALSO end up in 0 topics
-    # ------------------------------------------------------------------
-    in_zero_topics    = {c for c in all_cuis if not cui_to_topic_ids.get(c)}
-    in_some_topics    = all_cuis - in_zero_topics
-
-    print(f"\nFinal topic coverage:")
-    print(f"  CUIs in >=1 topic   : {len(in_some_topics):,} "
-          f"({100*len(in_some_topics)/len(all_cuis):.1f}%)")
-    print(f"  CUIs in 0 topics    : {len(in_zero_topics):,} "
-          f"({100*len(in_zero_topics)/len(all_cuis):.1f}%)")
-
-    # Breakdown of "0 topics" CUIs by why
-    zero_and_orphan        = in_zero_topics & no_parents
-    zero_but_has_parents   = in_zero_topics & has_parents
-    print(f"\nWhy CUIs end up in 0 topics:")
-    print(f"  Orphans (no IS-A parents at all)         : "
-          f"{len(zero_and_orphan):,}")
-    print(f"  Has IS-A parents but no parents in any   : "
-          f"{len(zero_but_has_parents):,}")
-    print(f"    main topic (cross-axis or isolated)")
-
-    # ------------------------------------------------------------------
-    # Network-graph reachability of orphans
-    # (Could network-based fallback save them?)
-    # ------------------------------------------------------------------
-    orphans_with_network_neighbors = {
-        c for c in zero_and_orphan
-        if neighbors.get(c)
-    }
-    orphans_truly_isolated = zero_and_orphan - orphans_with_network_neighbors
-
-    print(f"\nIf we added network fallback for orphans:")
-    print(f"  Orphans with network neighbors  : "
-          f"{len(orphans_with_network_neighbors):,} "
-          f"(could potentially borrow anchor from neighbors)")
-    print(f"  Orphans with no network either  : "
-          f"{len(orphans_truly_isolated):,} "
-          f"(no way to anchor)")
-
-    # ------------------------------------------------------------------
-    # Samples for inspection
-    # ------------------------------------------------------------------
-    print(f"\n--- Sample orphans (no IS-A parents, in 0 topics) ---")
-    sample = sorted(zero_and_orphan)[:20]
-    for c in sample:
-        n_neighbors = len(neighbors.get(c, set()))
-        print(f"  {c}  '{labels.get(c, '?')}'  "
-              f"(network neighbors: {n_neighbors})")
-    if len(zero_and_orphan) > 20:
-        print(f"  ... and {len(zero_and_orphan)-20:,} more")
-
-    print(f"\n--- Sample orphans WITH network neighbors (could be saved) ---")
-    sample = sorted(orphans_with_network_neighbors)[:20]
-    for c in sample:
-        nbrs = list(neighbors.get(c, set()))[:3]
-        nbr_labels = ", ".join(f"'{labels.get(n, n)}'" for n in nbrs)
-        print(f"  {c}  '{labels.get(c, '?')}'")
-        print(f"    ↳ sample neighbors: {nbr_labels}")
-    if len(orphans_with_network_neighbors) > 20:
-        print(f"  ... and {len(orphans_with_network_neighbors)-20:,} more")
-
-    print(f"\n{'='*80}")
-    print("DONE")
-
-
-main()
+================================================================================
+DONE
