@@ -1,59 +1,6 @@
-"""
-lookup.py
----------
-Look up topics for CUIs.
+Loaded topics.pkl: 346,407 CUIs with topics
 
-Usage (in notebook, after build):
-    exec(open("lookup.py").read())
-
-    # One or more CUIs -> topic IDs
-    topics_for("C0032285")
-    topics_for("C0032285", "C0011849", "C0013182")
-
-    # As a flat list
-    topics_for_cuis(["C0032285", "C0011849"])
-
-Returns / prints: each CUI mapped to its list of topic IDs.
-"""
-
-import pickle
-
-
-_PKL_PATH = "topics.pkl"
-_state = {}
-
-
-def _load():
-    if _state:
-        return
-    with open(_PKL_PATH, "rb") as f:
-        p = pickle.load(f)
-    _state["cui_to_topic_ids"] = p["cui_to_topic_ids"]
-    _state["labels"]           = p["labels"]
-    print(f"Loaded topics.pkl: {len(p['cui_to_topic_ids']):,} CUIs with topics")
-
-
-def topics_for(*cuis):
-    """Look up topic IDs for one or more CUIs. Prints and returns the result."""
-    _load()
-    out = {}
-    for cui in cuis:
-        tids = _state["cui_to_topic_ids"].get(cui, [])
-        out[cui] = tids
-        label = _state["labels"].get(cui, "?")
-        print(f"{cui}  '{label}'  -> {len(tids)} topic(s)")
-        for tid in tids:
-            print(f"    {tid}")
-    return out
-
-
-def topics_for_cuis(cui_list):
-    """Same as topics_for but accepts a list/set/iterable."""
-    return topics_for(*cui_list)
-
-
-_load()
-print("\nUsage:")
-print("  topics_for('C0032285')")
-print("  topics_for('C0032285', 'C0011849')")
-print("  topics_for_cuis(['C0032285', 'C0011849'])")
+Usage:
+  topics_for('C0032285')
+  topics_for('C0032285', 'C0011849')
+  topics_for_cuis(['C0032285', 'C0011849'])
