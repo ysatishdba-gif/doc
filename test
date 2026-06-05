@@ -1,15 +1,132 @@
-FOCAL CUI: C0007113  'Rectal cancer'
-Main topic size: 4 canonical members
-==============================================================================================================
+"""
+diagnose_orphans.py
+-------------------
+Count CUIs that have no IS-A relations in MRREL (orphans in the IS-A
+hierarchy). These end up in 0 final topics if their only main-topic
+neighbors don't help either.
 
-  MEMBER                                                                 ->  ANCHOR                                                       IC     
-  ---------------------------------------------------------------------- --- ------------------------------------------------------------ -------
-  C0149978 'Adenocarcinoma of rectum (disorder)               ' (IC=0.914) ->  C0949022 'Malignant tumour of rectum              '          0.716
-  C1335690 'Squamous cell carcinoma of rectum                 ' (IC=0.914) ->  C0949022 'Malignant tumour of rectum              '          0.716
-  C0949022 'Malignant tumour of rectum                        ' (IC=0.716) ->  UNGROUPED (no IS-A ancestor in topic)
-  C0007113 'Rectal cancer                                     ' (IC=0.000) ->  UNGROUPED (no IS-A ancestor in topic)
+Reads topics_debug.pkl (built by build_topics.py) — no rebuild needed.
 
-  Summary: 2 anchored, 2 ungrouped
+Reports:
+  1. Total orphans (CUIs with no IS-A parents)
+  2. Orphans broken down by whether they have ANY IS-A relations at all
+     (parent OR child)
+  3. Orphans that are in 0 final topics (the actual coverage gap)
+  4. Sample of orphan CUIs with labels (for inspection)
+"""
 
-==============================================================================================================
-DONE
+import pickle
+
+DEBUG_PATH  = "topics_debug.pkl"
+TOPICS_PATH = "topics.pkl"
+
+
+def main():
+    print(f"Loading {DEBUG_PATH} ...")
+    with open(DEBUG_PATH, "rb") as f:
+        d = pickle.load(f)
+    isa_parents = d["isa_parents"]
+    ic_scores   = d["ic_scores"]
+    labels      = d["labels"]
+    neighbors   = d["neighbors"]
+
+    print(f"Loading {TOPICS_PATH} ...")
+    with open(TOPICS_PATH, "rb") as f:
+        t = pickle.load(f)
+    cui_to_topic_ids = t["cui_to_topic_ids"]
+
+    # Use the universe of CUIs that have a label (= SNOMED universe)
+    all_cuis = set(labels.keys())
+    print(f"\nTotal SNOMED CUIs in scope: {len(all_cuis):,}")
+
+    # ------------------------------------------------------------------
+    # Orphan classification
+    # ------------------------------------------------------------------
+    # An orphan = no entry in isa_parents (no IS-A parents).
+    # Sub-types:
+    #   - "leaf-orphan"  : no parents AND no children (truly isolated)
+    #   - "root-like"   : no parents BUT has children (rare; near-top
+    #                     of hierarchy or grouper)
+    in_ic        = set(ic_scores.keys())   # CUIs with parent OR child
+    has_parents  = set(isa_parents.keys())
+    has_children = in_ic - has_parents     # in IC but no parents
+
+    no_parents      = all_cuis - has_parents
+    truly_isolated  = all_cuis - in_ic     # neither parent nor child
+    parent_orphans  = no_parents - truly_isolated  # has children only
+
+    print(f"\nIS-A hierarchy participation:")
+    print(f"  CUIs with IS-A parents          : {len(has_parents):,} "
+          f"({100*len(has_parents)/len(all_cuis):.1f}%)")
+    print(f"  CUIs with no IS-A parents       : {len(no_parents):,} "
+          f"({100*len(no_parents)/len(all_cuis):.1f}%)")
+    print(f"    - has children, no parents    : {len(parent_orphans):,}")
+    print(f"    - no parents AND no children  : {len(truly_isolated):,}")
+
+    # ------------------------------------------------------------------
+    # Coverage gap: orphans that ALSO end up in 0 topics
+    # ------------------------------------------------------------------
+    in_zero_topics    = {c for c in all_cuis if not cui_to_topic_ids.get(c)}
+    in_some_topics    = all_cuis - in_zero_topics
+
+    print(f"\nFinal topic coverage:")
+    print(f"  CUIs in >=1 topic   : {len(in_some_topics):,} "
+          f"({100*len(in_some_topics)/len(all_cuis):.1f}%)")
+    print(f"  CUIs in 0 topics    : {len(in_zero_topics):,} "
+          f"({100*len(in_zero_topics)/len(all_cuis):.1f}%)")
+
+    # Breakdown of "0 topics" CUIs by why
+    zero_and_orphan        = in_zero_topics & no_parents
+    zero_but_has_parents   = in_zero_topics & has_parents
+    print(f"\nWhy CUIs end up in 0 topics:")
+    print(f"  Orphans (no IS-A parents at all)         : "
+          f"{len(zero_and_orphan):,}")
+    print(f"  Has IS-A parents but no parents in any   : "
+          f"{len(zero_but_has_parents):,}")
+    print(f"    main topic (cross-axis or isolated)")
+
+    # ------------------------------------------------------------------
+    # Network-graph reachability of orphans
+    # (Could network-based fallback save them?)
+    # ------------------------------------------------------------------
+    orphans_with_network_neighbors = {
+        c for c in zero_and_orphan
+        if neighbors.get(c)
+    }
+    orphans_truly_isolated = zero_and_orphan - orphans_with_network_neighbors
+
+    print(f"\nIf we added network fallback for orphans:")
+    print(f"  Orphans with network neighbors  : "
+          f"{len(orphans_with_network_neighbors):,} "
+          f"(could potentially borrow anchor from neighbors)")
+    print(f"  Orphans with no network either  : "
+          f"{len(orphans_truly_isolated):,} "
+          f"(no way to anchor)")
+
+    # ------------------------------------------------------------------
+    # Samples for inspection
+    # ------------------------------------------------------------------
+    print(f"\n--- Sample orphans (no IS-A parents, in 0 topics) ---")
+    sample = sorted(zero_and_orphan)[:20]
+    for c in sample:
+        n_neighbors = len(neighbors.get(c, set()))
+        print(f"  {c}  '{labels.get(c, '?')}'  "
+              f"(network neighbors: {n_neighbors})")
+    if len(zero_and_orphan) > 20:
+        print(f"  ... and {len(zero_and_orphan)-20:,} more")
+
+    print(f"\n--- Sample orphans WITH network neighbors (could be saved) ---")
+    sample = sorted(orphans_with_network_neighbors)[:20]
+    for c in sample:
+        nbrs = list(neighbors.get(c, set()))[:3]
+        nbr_labels = ", ".join(f"'{labels.get(n, n)}'" for n in nbrs)
+        print(f"  {c}  '{labels.get(c, '?')}'")
+        print(f"    ↳ sample neighbors: {nbr_labels}")
+    if len(orphans_with_network_neighbors) > 20:
+        print(f"  ... and {len(orphans_with_network_neighbors)-20:,} more")
+
+    print(f"\n{'='*80}")
+    print("DONE")
+
+
+main()
