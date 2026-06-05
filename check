@@ -1,155 +1,52 @@
-"""
-trace_topic.py
---------------
-Show the per-member anchor decision for one focal CUI's main topic.
-For each member, prints:
-  Member CUI '<label>'  (IC=...)
-  -> Anchor CUI '<label>'  (IC=...)
-  OR -> UNGROUPED (no IS-A ancestor in topic)
-
-This is the detail behind Stage C of the build. Use this to validate
-"why did this CUI get this anchor."
-
-Inputs:
-  topics_debug.pkl  : sidecar from build_topics.py
-                      Contains: neighbors, isa_parents, ic_scores, labels
-
-Edit FOCAL_CUIS to trace different CUIs. Re-running is instant —
-no rebuild needed.
-"""
-
-import pickle
-
-DEBUG_PATH = "topics_debug.pkl"
-
-# Match build_topics.py's MIN_ANCHOR_IC.
-MIN_ANCHOR_IC = 0.15
-
-FOCAL_CUIS = [
-    "C0032285",  # Pneumonia
-    "C0011849",  # Diabetes mellitus
-    "C0021368",  # Inflammation
-    "C0024109",  # Lung
-    "C2142181",  # Pain of left knee joint
-    "C0559470",  # Allergy to peanut
-    "C0013182",  # Allergy to drug
-    "C0002792",  # Anaphylaxis
-]
+Indexing MRREL by CUI...
+Indexed 5,496,444 CUI-row pairs
 
 
-with open(DEBUG_PATH, "rb") as f:
-    d = pickle.load(f)
+====================================================================================================
+CUI: C0007113  'Rectal cancer'
+====================================================================================================
+  Total MRREL rows: 6
 
-neighbors      = d["neighbors"]
-isa_parents    = d["isa_parents"]
-ic_scores      = d["ic_scores"]
-labels         = d["labels"]
-canonical_map  = d.get("canonical_map", {})
+  Breakdown by REL:
+        RO  : 6
 
+  Breakdown by RELA (top 10):
+    possibly_equivalent_to                   : 6
 
-def canonical(cui):
-    """Map a CUI to its canonical (SY-cluster representative)."""
-    return canonical_map.get(cui, cui)
+  All rows (other_cui | REL | RELA | other label | in SNOMED?):
 
+    --- REL=RO (6 rows) ---
+      C0149978  [possibly_equivalent_to   ]  [SNOMED]  'Adenocarcinoma of rectum (disorder)'
+      C1306294  [possibly_equivalent_to   ]  [SNOMED]  'Primary malignant neoplasm of rectum'
+      C0149978  [possibly_equivalent_to   ]  [SNOMED]  'Adenocarcinoma of rectum (disorder)'
+      C0149978  [possibly_equivalent_to   ]  [SNOMED]  'Adenocarcinoma of rectum (disorder)'
+      C1306294  [possibly_equivalent_to   ]  [SNOMED]  'Primary malignant neoplasm of rectum'
+      C0149978  [possibly_equivalent_to   ]  [SNOMED]  'Adenocarcinoma of rectum (disorder)'
 
-def lbl(c, width=None):
-    s = labels.get(c, "?")
-    if width:
-        return s[:width].ljust(width)
-    return s
+====================================================================================================
+CUI: C0007121  'Bronchogenic carcinoma'
+====================================================================================================
+  Total MRREL rows: 0
+  (no rows at all)
 
+====================================================================================================
+CUI: C0003838  'Arterial occlusive disease'
+====================================================================================================
+  Total MRREL rows: 0
+  (no rows at all)
 
-# ============================================================================
-# Memoized closure
-# ============================================================================
+====================================================================================================
+CUI: C0002884  'Hypochromic anaemia'
+====================================================================================================
+  Total MRREL rows: 0
+  (no rows at all)
 
-_closure_cache = {}
+====================================================================================================
+CUI: C0006370  'Bulimia'
+====================================================================================================
+  Total MRREL rows: 0
+  (no rows at all)
 
-
-def ancestor_closure(cui):
-    if cui in _closure_cache:
-        return _closure_cache[cui]
-    ancestors = set()
-    stack = [cui]
-    visited = set()
-    while stack:
-        node = stack.pop()
-        if node in visited:
-            continue
-        visited.add(node)
-        for p in isa_parents.get(node, set()):
-            if p not in ancestors:
-                ancestors.add(p)
-                stack.append(p)
-    _closure_cache[cui] = frozenset(ancestors)
-    return _closure_cache[cui]
-
-
-# ============================================================================
-# Trace one focal CUI
-# ============================================================================
-
-def trace(focal):
-    can_focal = canonical(focal)
-    if can_focal != focal:
-        print(f"\n  [SY: {focal} is canonicalized to {can_focal} "
-              f"'{labels.get(can_focal, '?')}']")
-
-    members = {can_focal} | neighbors.get(can_focal, frozenset())
-
-    print(f"\n{'='*110}")
-    print(f"FOCAL CUI: {focal}  '{labels.get(focal, '?')}'")
-    if can_focal != focal:
-        print(f"  (resolved to canonical {can_focal} "
-              f"'{labels.get(can_focal, '?')}')")
-    print(f"Main topic size: {len(members)} canonical members")
-    print(f"{'='*110}\n")
-
-    if len(members) < 2:
-        print("  (main topic too small to form subgroups)\n")
-        return
-
-    # Header
-    print(f"  {'MEMBER':<70} {'->':<3} {'ANCHOR':<60} {'IC':<7}")
-    print(f"  {'-'*70} --- {'-'*60} {'-'*7}")
-
-    # Sort members by IC descending (most-specific first)
-    sorted_members = sorted(members, key=lambda c: -ic_scores.get(c, 0.0))
-
-    n_anchored = 0
-    n_ungrouped = 0
-
-    for m in sorted_members:
-        m_ic = ic_scores.get(m, 0.0)
-        m_text = f"{m} '{lbl(m, 50)}' (IC={m_ic:.3f})"
-
-        closure = ancestor_closure(m)
-        in_topic = (closure & members) - {m}
-
-        if in_topic:
-            qualified = {a for a in in_topic
-                         if ic_scores.get(a, 0.0) >= MIN_ANCHOR_IC}
-            if qualified:
-                anchor = max(qualified, key=lambda a: ic_scores.get(a, 0.0))
-                anchor_ic = ic_scores.get(anchor, 0.0)
-                anchor_text = f"{anchor} '{lbl(anchor, 40)}'"
-                print(f"  {m_text:<70} ->  {anchor_text:<60} {anchor_ic:.3f}")
-                n_anchored += 1
-            else:
-                # Had in-topic ancestors but all below IC floor
-                best_ic = max(ic_scores.get(a, 0.0) for a in in_topic)
-                print(f"  {m_text:<70} ->  UNGROUPED (all in-topic ancestors below "
-                      f"IC floor {MIN_ANCHOR_IC}; best was {best_ic:.3f})")
-                n_ungrouped += 1
-        else:
-            print(f"  {m_text:<70} ->  UNGROUPED (no IS-A ancestor in topic)")
-            n_ungrouped += 1
-
-    print(f"\n  Summary: {n_anchored} anchored, {n_ungrouped} ungrouped")
-
-
-for cui in FOCAL_CUIS:
-    trace(cui)
-
-print(f"\n{'='*110}")
-print("DONE")
+====================================================================================================
+DONE
+​
