@@ -1,244 +1,51 @@
 """
-build_topics.py
----------------
-End-to-end build: SNOMED CUIs -> clinical topics.
+trace_topic.py
+--------------
+Show the per-member anchor decision for one focal CUI's main topic.
+Pure IS-A only (matches build_topics.py).
 
-PIPELINE:
-  STAGE 0  : SY clustering — synonyms (REL=SY) merged into canonical CUI
-  STAGE A  : Flatten network graph through SY canonical_map
-  STAGE B  : Extract IS-A DAG (PAR/CHD/RB/RN only) + Seco IC
-  STAGE C  : Anchor per member = highest-IC IS-A ancestor in topic,
-             with IC >= MIN_ANCHOR_IC (filters grouper junk)
-  STAGE D  : Dedup by anchor — one final topic per anchor canonical
-  STAGE E  : Expand back to original CUIs (SY synonyms inherit topics)
-
-Inputs (notebook globals):
-  data, cache (with mrrel_rows), SNOMED_CUIS, LABELS
-
-Output:
-  topics.pkl + topics_debug.pkl
-
-Known cost: ~1.8% of CUIs end up in 0 topics because they have no IS-A
-parents in MRREL. Production handles these via NER expansion + direct
-CUI overlap.
+Reads topics_debug.pkl.
 """
 
 import pickle
-import datetime
-import hashlib
-import math
-import os
-import time
-from collections import defaultdict
 
 
-OUTPUT_PATH = "topics.pkl"
-
-# IS-A relation types from MRREL (hierarchical only)
-HIERARCHY_RELS = {"PAR", "CHD", "RB", "RN"}
-
-# Synonym relation (handled via clustering)
-SY_REL = "SY"
-
-# Minimum IC for an ancestor to qualify as an anchor.
-# Drops SNOMED grouper concepts ("Unapproved attribute" ~0.12, etc.) that
-# would otherwise produce junk-drawer hub topics with hundreds of unrelated
-# members.
+DEBUG_PATH = "topics_debug.pkl"
 MIN_ANCHOR_IC = 0.15
 
 
-# ============================================================================
-# Union-find for SY clustering
-# ============================================================================
-
-class UnionFind:
-    def __init__(self):
-        self.parent = {}
-    def find(self, x):
-        if x not in self.parent:
-            self.parent[x] = x
-            return x
-        root = x
-        while self.parent[root] != root:
-            root = self.parent[root]
-        while self.parent[x] != root:
-            self.parent[x], x = root, self.parent[x]
-        return root
-    def union(self, a, b):
-        ra, rb = self.find(a), self.find(b)
-        if ra != rb:
-            self.parent[ra] = rb
+FOCAL_CUIS = [
+    "C0032285",  # Pneumonia
+    "C0011849",  # Diabetes mellitus
+    "C0024109",  # Lung
+    "C2142181",  # Pain of left knee joint
+    "C0559470",  # Allergy to peanut
+    "C0013182",  # Allergy to drug
+    "C0002792",  # Anaphylaxis
+    "C0007113",  # Rectal cancer  (will be ungrouped — orphan)
+    "C0007121",  # Bronchogenic carcinoma  (orphan)
+]
 
 
-# ============================================================================
-# STAGE 0: SY clusters
-# ============================================================================
+with open(DEBUG_PATH, "rb") as f:
+    d = pickle.load(f)
 
-def build_sy_canonical_map(mrrel_rows, snomed_cuis):
-    print("  [0] Building SY clusters...")
-    t0 = time.time()
-    uf = UnionFind()
-    sy_pairs = 0
-    for row in mrrel_rows:
-        if len(row) < 3:
-            continue
-        c1, c2, rel = row[0], row[1], row[2]
-        if rel != SY_REL:
-            continue
-        if c1 not in snomed_cuis or c2 not in snomed_cuis:
-            continue
-        if c1 == c2:
-            continue
-        uf.union(c1, c2)
-        sy_pairs += 1
-
-    cluster_members = defaultdict(set)
-    for c in uf.parent:
-        cluster_members[uf.find(c)].add(c)
-
-    canonical_map = {}
-    cluster_sizes = []
-    for members in cluster_members.values():
-        canonical = min(members)
-        for m in members:
-            canonical_map[m] = canonical
-        cluster_sizes.append(len(members))
-    for c in snomed_cuis:
-        if c not in canonical_map:
-            canonical_map[c] = c
-
-    n_clustered = sum(1 for c in snomed_cuis if c != canonical_map[c])
-    n_multi = sum(1 for s in cluster_sizes if s > 1)
-    print(f"      SY pairs: {sy_pairs:,}  | multi-member clusters: {n_multi:,}")
-    print(f"      CUIs merged into a synonym: {n_clustered:,}")
-    print(f"      Done in {time.time()-t0:.0f}s")
-
-    canonical_to_cluster = defaultdict(set)
-    for c, can in canonical_map.items():
-        canonical_to_cluster[can].add(c)
-    return canonical_map, dict(canonical_to_cluster)
+neighbors     = d["neighbors"]
+isa_parents   = d["isa_parents"]
+ic_scores     = d["ic_scores"]
+labels        = d["labels"]
+canonical_map = d.get("canonical_map", {})
 
 
-# ============================================================================
-# STAGE A: Flatten network graph
-# ============================================================================
-
-def flatten_graph(graph, snomed_cuis, canonical_map):
-    print("  [A] Flattening graph (with SY canonicalization)...")
-    t0 = time.time()
-    neighbors = defaultdict(set)
-    n = 0
-    for cui in snomed_cuis:
-        n += 1
-        if n % 50000 == 0:
-            print(f"      {n:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
-        if cui not in graph:
-            continue
-        can_cui = canonical_map.get(cui, cui)
-        for suffix_child in graph.successors(cui):
-            if "-" not in suffix_child:
-                continue
-            try:
-                base, _ = suffix_child.rsplit("-", 1)
-            except ValueError:
-                continue
-            if base != cui:
-                continue
-            for pred in graph.predecessors(suffix_child):
-                if pred == cui or "-" not in pred:
-                    continue
-                try:
-                    other, _ = pred.rsplit("-", 1)
-                except ValueError:
-                    continue
-                if other == cui or other not in snomed_cuis:
-                    continue
-                can_other = canonical_map.get(other, other)
-                if can_cui == can_other:
-                    continue
-                neighbors[can_cui].add(can_other)
-                neighbors[can_other].add(can_cui)
-
-    total_edges = sum(len(v) for v in neighbors.values()) // 2
-    print(f"      CUIs with edges: {len(neighbors):,}, edges: {total_edges:,}")
-    print(f"      Done in {time.time()-t0:.0f}s")
-    return neighbors
+def lbl(c, width=None):
+    s = labels.get(c, "?")
+    return s[:width].ljust(width) if width else s
 
 
-# ============================================================================
-# STAGE B: Extract IS-A DAG + IC
-# ============================================================================
-
-def extract_isa_dag(mrrel_rows, snomed_cuis, canonical_map):
-    print("  [B] Extracting IS-A DAG (PAR/CHD/RB/RN only)...")
-    t0 = time.time()
-    edges = set()
-    n_match = n_within = 0
-    for row in mrrel_rows:
-        if len(row) < 3:
-            continue
-        c1, c2, rel = row[0], row[1], row[2]
-        if rel not in HIERARCHY_RELS:
-            continue
-        if c1 not in snomed_cuis or c2 not in snomed_cuis:
-            continue
-        if c1 == c2:
-            continue
-        can_c1 = canonical_map.get(c1, c1)
-        can_c2 = canonical_map.get(c2, c2)
-        if can_c1 == can_c2:
-            n_within += 1
-            continue
-        if rel in ("PAR", "RB"):
-            edges.add((can_c1, can_c2))   # c1 child, c2 parent
-        else:  # CHD, RN
-            edges.add((can_c2, can_c1))
-        n_match += 1
-
-    isa_parents  = defaultdict(set)
-    isa_children = defaultdict(set)
-    for child, parent in edges:
-        isa_parents[child].add(parent)
-        isa_children[parent].add(child)
-
-    print(f"      IS-A rows: {n_match:,}  | unique edges: {len(edges):,}")
-    print(f"      Dropped (intra-SY-cluster): {n_within:,}")
-    print(f"      CUIs with IS-A parents: {len(isa_parents):,}")
-    print(f"      Done in {time.time()-t0:.0f}s")
-    return dict(isa_parents), dict(isa_children)
-
-
-def compute_ic(isa_children, all_nodes, total_universe):
-    print("  [B] Computing Seco IC...")
-    t0 = time.time()
-    descendant_sets = {}
-
-    def descendants(node, stack):
-        if node in descendant_sets:
-            return descendant_sets[node]
-        if node in stack:
-            return set()
-        stack = stack | {node}
-        result = set()
-        for child in isa_children.get(node, ()):
-            result.add(child)
-            result |= descendants(child, stack)
-        descendant_sets[node] = result
-        return result
-
-    for node in all_nodes:
-        descendants(node, set())
-
-    log_total = math.log(total_universe + 1)
-    ic = {n: 1.0 - math.log(len(d) + 1) / log_total
-          for n, d in descendant_sets.items()}
-    print(f"      IC computed for {len(ic):,} nodes in {time.time()-t0:.0f}s")
-    return ic
-
-
-def ancestor_closure(cui, isa_parents, cache):
-    if cui in cache:
-        return cache[cui]
+_closure = {}
+def ancestor_closure(cui):
+    if cui in _closure:
+        return _closure[cui]
     ancestors = set()
     stack = [cui]
     visited = set()
@@ -251,181 +58,68 @@ def ancestor_closure(cui, isa_parents, cache):
             if p not in ancestors:
                 ancestors.add(p)
                 stack.append(p)
-    cache[cui] = frozenset(ancestors)
-    return cache[cui]
+    _closure[cui] = frozenset(ancestors)
+    return _closure[cui]
 
 
-# ============================================================================
-# STAGE C + D: Build topics
-# ============================================================================
-
-def topic_id_for(canonical):
-    h = hashlib.sha1(canonical.encode()).hexdigest()[:12]
-    return f"tp_{h}"
+def canonical(c):
+    return canonical_map.get(c, c)
 
 
-def build_canonical_topics(canonical_cuis, neighbors, isa_parents, ic_scores):
-    print("  [C] Forming subgroups per main topic (IS-A only)...")
-    print(f"      Anchor rule: highest-IC IS-A ancestor in topic, "
-          f"IC >= {MIN_ANCHOR_IC}")
-    t0 = time.time()
+def trace(focal):
+    can_focal = canonical(focal)
+    print(f"\n{'='*110}")
+    print(f"FOCAL CUI: {focal}  '{labels.get(focal, '?')}'")
+    if can_focal != focal:
+        print(f"  Canonicalized to: {can_focal} '{labels.get(can_focal, '?')}'")
+    print(f"{'='*110}\n")
 
-    closure_cache = {}
-    canonical_to_members = defaultdict(set)
-    n_filtered_ic = 0
-    n = 0
+    members = {can_focal} | neighbors.get(can_focal, frozenset())
+    print(f"Main topic size: {len(members)} canonical members\n")
 
-    for focal in canonical_cuis:
-        n += 1
-        if n % 50000 == 0:
-            print(f"      {n:,}/{len(canonical_cuis):,} ({time.time()-t0:.0f}s)")
+    if len(members) < 2:
+        print("  (too small for anchor selection)")
+        return
 
-        members = {focal} | neighbors.get(focal, frozenset())
-        if len(members) < 2:
+    n_anchored = 0
+    n_no_candidate = 0
+    n_ic_filtered = 0
+
+    for m in sorted(members, key=lambda c: -ic_scores.get(c, 0.0)):
+        m_ic = ic_scores.get(m, 0.0)
+        m_text = f"{m} '{lbl(m,42)}' (IC={m_ic:.3f})"
+
+        closure = ancestor_closure(m)
+        in_topic = (closure & members) - {m}
+
+        if not in_topic:
+            print(f"  {m_text}")
+            print(f"     -> UNGROUPED (no IS-A ancestor in topic)")
+            n_no_candidate += 1
             continue
 
-        for m in members:
-            closure = ancestor_closure(m, isa_parents, closure_cache)
-            in_topic = (closure & members) - {m}
-            if not in_topic:
-                continue
-            qualified = {a for a in in_topic
-                         if ic_scores.get(a, 0.0) >= MIN_ANCHOR_IC}
-            if not qualified:
-                n_filtered_ic += 1
-                continue
-            anchor = max(qualified, key=lambda a: ic_scores.get(a, 0.0))
-            canonical_to_members[anchor].add(anchor)
-            canonical_to_members[anchor].add(m)
+        qualified = {a for a in in_topic
+                     if ic_scores.get(a, 0.0) >= MIN_ANCHOR_IC}
+        if not qualified:
+            best_ic = max(ic_scores.get(a, 0.0) for a in in_topic)
+            print(f"  {m_text}")
+            print(f"     -> UNGROUPED (all candidates below IC floor "
+                  f"{MIN_ANCHOR_IC}; best={best_ic:.3f})")
+            n_ic_filtered += 1
+            continue
 
-    print(f"      Done in {time.time()-t0:.0f}s")
-    print(f"      Closure cache size       : {len(closure_cache):,}")
-    print(f"      Filtered by IC floor     : {n_filtered_ic:,}")
-    print(f"      Unique canonical anchors : {len(canonical_to_members):,}")
-    return dict(canonical_to_members)
+        anchor = max(qualified, key=lambda a: ic_scores.get(a, 0.0))
+        anchor_ic = ic_scores.get(anchor, 0.0)
+        print(f"  {m_text}")
+        print(f"     -> {anchor} '{lbl(anchor,42)}' (IC={anchor_ic:.3f})")
+        n_anchored += 1
 
-
-# ============================================================================
-# STAGE E: Expand back to original CUIs
-# ============================================================================
-
-def expand_to_original_cuis(canonical_to_members, canonical_to_cluster,
-                             ic_scores):
-    print("  [E] Expanding back to original CUIs...")
-    t0 = time.time()
-    topic_id_to_topic     = {}
-    canonical_to_topic_id = {}
-    cui_to_topic_ids      = defaultdict(set)
-
-    for canonical, mems in canonical_to_members.items():
-        tp_id = topic_id_for(canonical)
-        expanded = set()
-        for m in mems:
-            expanded |= canonical_to_cluster.get(m, {m})
-        expanded_fs = frozenset(expanded)
-        topic_id_to_topic[tp_id] = {
-            "canonical":  canonical,
-            "members":    expanded_fs,
-            "size":       len(expanded_fs),
-            "anchor_ic":  ic_scores.get(canonical, 0.0),
-        }
-        canonical_to_topic_id[canonical] = tp_id
-        for m in expanded_fs:
-            cui_to_topic_ids[m].add(tp_id)
-
-    print(f"      Done in {time.time()-t0:.0f}s")
-    print(f"      Final topics       : {len(topic_id_to_topic):,}")
-    print(f"      CUIs participating : {len(cui_to_topic_ids):,}")
-
-    sizes = sorted(t["size"] for t in topic_id_to_topic.values())
-    if sizes:
-        print(f"      Topic size min/med/p90/p99/max: "
-              f"{sizes[0]} / {sizes[len(sizes)//2]} / "
-              f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
-              f"{sizes[-1]}")
-    return topic_id_to_topic, canonical_to_topic_id, cui_to_topic_ids
+    print(f"\n  Summary: anchored={n_anchored}, "
+          f"ungrouped_no_ancestor={n_no_candidate}, "
+          f"ungrouped_ic={n_ic_filtered}")
 
 
-# ============================================================================
-# Main
-# ============================================================================
+for cui in FOCAL_CUIS:
+    trace(cui)
 
-def main():
-    print(f"BUILD START — {datetime.datetime.now().isoformat()}")
-    t_total = time.time()
-
-    print(f"\nInputs:")
-    print(f"  data         : {type(data).__name__} "
-          f"({data.number_of_nodes():,} nodes)")
-    print(f"  SNOMED_CUIS  : {len(SNOMED_CUIS):,}")
-    print(f"  LABELS       : {len(LABELS):,}")
-    print(f"  cache keys   : {list(cache.keys())}")
-
-    print(f"\n[0] SY clusters")
-    canonical_map, canonical_to_cluster = build_sy_canonical_map(
-        cache["mrrel_rows"], SNOMED_CUIS)
-
-    print(f"\n[A] Flatten network graph")
-    neighbors = flatten_graph(data, SNOMED_CUIS, canonical_map)
-
-    print(f"\n[B] Extract IS-A DAG + IC")
-    isa_parents, isa_children = extract_isa_dag(
-        cache["mrrel_rows"], SNOMED_CUIS, canonical_map)
-    canonical_cuis = {canonical_map[c] for c in SNOMED_CUIS}
-    all_nodes = set(isa_parents.keys()) | set(isa_children.keys())
-    ic_scores = compute_ic(isa_children, all_nodes, len(canonical_cuis))
-
-    print(f"\n[C+D] Build topics")
-    canonical_to_members = build_canonical_topics(
-        canonical_cuis, neighbors, isa_parents, ic_scores)
-
-    print(f"\n[E] Expand to original CUIs")
-    topic_id_to_topic, canonical_to_topic_id, cui_to_topic_ids = \
-        expand_to_original_cuis(canonical_to_members, canonical_to_cluster,
-                                 ic_scores)
-
-    print(f"\n[Save] Writing {OUTPUT_PATH}")
-    payload = {
-        "topic_id_to_topic":     topic_id_to_topic,
-        "canonical_to_topic_id": canonical_to_topic_id,
-        "cui_to_topic_ids":      {c: sorted(s) for c, s
-                                  in cui_to_topic_ids.items()},
-        "labels":                LABELS,
-        "tags":                  globals().get("TAGS", {}),
-        "canonical_map":         canonical_map,
-        "config": {
-            "anchor_rule":     "highest-IC IS-A ancestor in topic, "
-                               f"with IC >= {MIN_ANCHOR_IC}",
-            "min_anchor_ic":   MIN_ANCHOR_IC,
-            "ic_formula":      "Seco: 1 - log(desc+1) / log(total)",
-            "isa_rels":        sorted(HIERARCHY_RELS),
-            "uses_sy_merging": True,
-            "uses_ro":         False,
-            "uses_sty_filter": False,
-        },
-        "built_at": datetime.datetime.now().isoformat(),
-    }
-    with open(OUTPUT_PATH, "wb") as f:
-        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-    print(f"        Wrote {os.path.getsize(OUTPUT_PATH)/1024/1024:.1f} MB")
-
-    debug_path = OUTPUT_PATH.replace(".pkl", "_debug.pkl")
-    print(f"\n[Save] Writing debug sidecar to {debug_path}")
-    debug_payload = {
-        "neighbors":            {c: frozenset(n) for c, n in neighbors.items()},
-        "isa_parents":          isa_parents,
-        "ic_scores":            ic_scores,
-        "labels":               LABELS,
-        "canonical_map":        canonical_map,
-        "canonical_to_cluster": canonical_to_cluster,
-        "built_at":             datetime.datetime.now().isoformat(),
-    }
-    with open(debug_path, "wb") as f:
-        pickle.dump(debug_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-    print(f"        Wrote {os.path.getsize(debug_path)/1024/1024:.1f} MB")
-
-    print(f"\nTOTAL: {time.time()-t_total:.0f}s")
-    print(f"DONE — {datetime.datetime.now().isoformat()}")
-
-
-main()
+print(f"\n{'='*110}\nDONE")
