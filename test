@@ -1,21 +1,19 @@
 """
 lookup.py
 ---------
-Simple lookup utility against topics.pkl.
+Look up topics for CUIs.
 
-Usage in notebook (after build):
+Usage (in notebook, after build):
     exec(open("lookup.py").read())
-    show("C0032285")                              # one CUI
-    show("C0032285", "C0011849", "C0013182")     # several
-    show_by_label("pneumonia", limit=5)           # search by label substring
-    show_topic("tp_abc123def456")                 # full topic by id
 
-For each CUI, prints:
-  - Label, STY (from TAGS), canonical CUI (if SY-merged)
-  - All topics it belongs to (smallest first)
-  - For each topic: id, anchor (canonical), anchor IC, size, sample members
+    # One or more CUIs -> topic IDs
+    topics_for("C0032285")
+    topics_for("C0032285", "C0011849", "C0013182")
 
-Loads topics.pkl on first use. Re-run exec() to reload after a rebuild.
+    # As a flat list
+    topics_for_cuis(["C0032285", "C0011849"])
+
+Returns / prints: each CUI mapped to its list of topic IDs.
 """
 
 import pickle
@@ -30,117 +28,32 @@ def _load():
         return
     with open(_PKL_PATH, "rb") as f:
         p = pickle.load(f)
-    _state["topic_id_to_topic"]     = p["topic_id_to_topic"]
-    _state["cui_to_topic_ids"]      = p["cui_to_topic_ids"]
-    _state["canonical_to_topic_id"] = p["canonical_to_topic_id"]
-    _state["canonical_map"]         = p.get("canonical_map", {})
-    _state["labels"]                = p["labels"]
-    _state["tags"]                  = p.get("tags", {})
-    n_topics = len(p["topic_id_to_topic"])
-    n_cuis   = len(p["cui_to_topic_ids"])
-    print(f"Loaded topics.pkl: {n_topics:,} topics, {n_cuis:,} CUIs with topics")
+    _state["cui_to_topic_ids"] = p["cui_to_topic_ids"]
+    _state["labels"]           = p["labels"]
+    print(f"Loaded topics.pkl: {len(p['cui_to_topic_ids']):,} CUIs with topics")
 
 
-def _lbl(cui, w=None):
-    s = _state["labels"].get(cui, "?")
-    return s[:w] if w else s
-
-
-def _stys(cui):
-    raw = _state["tags"].get(cui)
-    if not raw:
-        return []
-    if isinstance(raw, str):
-        return [raw]
-    return sorted(raw)
-
-
-def show(*cuis, max_members=12):
-    """Show topics for one or more CUIs."""
+def topics_for(*cuis):
+    """Look up topic IDs for one or more CUIs. Prints and returns the result."""
     _load()
+    out = {}
     for cui in cuis:
-        _show_one(cui, max_members)
+        tids = _state["cui_to_topic_ids"].get(cui, [])
+        out[cui] = tids
+        label = _state["labels"].get(cui, "?")
+        print(f"{cui}  '{label}'  -> {len(tids)} topic(s)")
+        for tid in tids:
+            print(f"    {tid}")
+    return out
 
 
-def _show_one(cui, max_members):
-    labels    = _state["labels"]
-    tags      = _state["tags"]
-    cui_to_t  = _state["cui_to_topic_ids"]
-    t_to_top  = _state["topic_id_to_topic"]
-    canon_map = _state["canonical_map"]
-
-    print(f"\n{'='*80}")
-    print(f"CUI    : {cui}")
-    print(f"Label  : {labels.get(cui, '?')}")
-    print(f"STYs   : {_stys(cui) or '(none)'}")
-    can = canon_map.get(cui, cui)
-    if can != cui:
-        print(f"SY-canonical: {can} '{labels.get(can, '?')}'")
-
-    topic_ids = cui_to_t.get(cui, [])
-    if not topic_ids:
-        print(f"  (no topics — CUI not in any final topic)")
-        return
-
-    # Sort by topic size ascending (tightest first)
-    topics = [(tid, t_to_top[tid]) for tid in topic_ids]
-    topics.sort(key=lambda r: r[1]["size"])
-
-    print(f"In {len(topics)} topic(s) (smallest first):\n")
-    for tid, t in topics:
-        anchor = t["canonical"]
-        print(f"  {tid}  size={t['size']:>4}  IC={t['anchor_ic']:.3f}  "
-              f"anchor={anchor} '{labels.get(anchor, '?')}'")
-        members = sorted(t["members"], key=lambda c: labels.get(c, ""))
-        for m in members[:max_members]:
-            tag = " <-- self" if m == cui else ""
-            print(f"      {m}  '{labels.get(m, '?')}'{tag}")
-        if len(members) > max_members:
-            print(f"      ... and {len(members) - max_members} more")
-        print()
-
-
-def show_topic(topic_id, max_members=30):
-    """Show full detail of a single topic by id."""
-    _load()
-    t = _state["topic_id_to_topic"].get(topic_id)
-    if not t:
-        print(f"No such topic: {topic_id}")
-        return
-    labels = _state["labels"]
-    anchor = t["canonical"]
-    print(f"\n{topic_id}")
-    print(f"  Anchor   : {anchor}  '{labels.get(anchor, '?')}'")
-    print(f"  Anchor IC: {t['anchor_ic']:.3f}")
-    print(f"  Size     : {t['size']} members")
-    print(f"  STYs     : {_stys(anchor) or '(none)'}")
-    print(f"  Members:")
-    members = sorted(t["members"], key=lambda c: -len(_state["tags"].get(c, ())))
-    for m in members[:max_members]:
-        print(f"    {m}  '{labels.get(m, '?')}'  stys={_stys(m)}")
-    if len(members) > max_members:
-        print(f"    ... and {len(members)-max_members} more")
-
-
-def show_by_label(query, limit=10, max_members=8):
-    """Find CUIs whose label contains the query (case-insensitive),
-    then show their topics."""
-    _load()
-    q = query.lower()
-    matches = [(c, l) for c, l in _state["labels"].items()
-               if q in l.lower()]
-    matches.sort(key=lambda r: (len(r[1]), r[1]))
-    print(f"\nFound {len(matches)} CUI(s) matching '{query}'. Showing first {limit}:\n")
-    for cui, lab in matches[:limit]:
-        print(f"  {cui}  '{lab}'")
-    print()
-    for cui, _ in matches[:limit]:
-        _show_one(cui, max_members)
+def topics_for_cuis(cui_list):
+    """Same as topics_for but accepts a list/set/iterable."""
+    return topics_for(*cui_list)
 
 
 _load()
-print("\nReady. Try:")
-print("  show('C0032285')")
-print("  show('C0032285', 'C0011849')")
-print("  show_by_label('pneumonia')")
-print("  show_topic('tp_xxxxxxxxxxxx')")
+print("\nUsage:")
+print("  topics_for('C0032285')")
+print("  topics_for('C0032285', 'C0011849')")
+print("  topics_for_cuis(['C0032285', 'C0011849'])")
