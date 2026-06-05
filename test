@@ -1,8 +1,15 @@
-================================================================================
-C0007113  |  Rectal cancer
-STY: Neoplastic Process
--> 0 TOPIC(S)
-  (no topics — this CUI has no IS-A ancestor in any of its main topics)
+FOCAL CUI: C0007113  'Rectal cancer'
+Main topic size: 4 canonical members
+==============================================================================================================
 
-================================================================================
+  MEMBER                                                                 ->  ANCHOR                                                       IC     
+  ---------------------------------------------------------------------- --- ------------------------------------------------------------ -------
+  C0149978 'Adenocarcinoma of rectum (disorder)               ' (IC=0.914) ->  C0949022 'Malignant tumour of rectum              '          0.716
+  C1335690 'Squamous cell carcinoma of rectum                 ' (IC=0.914) ->  C0949022 'Malignant tumour of rectum              '          0.716
+  C0949022 'Malignant tumour of rectum                        ' (IC=0.716) ->  UNGROUPED (no IS-A ancestor in topic)
+  C0007113 'Rectal cancer                                     ' (IC=0.000) ->  UNGROUPED (no IS-A ancestor in topic)
+
+  Summary: 2 anchored, 2 ungrouped
+
+==============================================================================================================
 DONE
