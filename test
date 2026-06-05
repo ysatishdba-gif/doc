@@ -1,129 +1,62 @@
-"""
-trace_topic.py
---------------
-Show the per-member anchor decision for one focal CUI's main topic.
-For each member, prints:
-  Member CUI '<label>'  (IC=...)
-  -> Anchor CUI '<label>'  (IC=...)
-  OR -> UNGROUPED (no IS-A ancestor in topic)
+================================================================================
+C0205082  |  High grade
+STY: Finding
+-> 3 TOPIC(S)
 
-This is the detail behind Stage C of the build. Use this to validate
-"why did this CUI get this anchor."
+  Topic ID : tp_a5323e94f3a0
+  Canonical: C0205082
+  Label    : High grade
+  Size     : 2 CUIs
+  IC       : 0.946
+  Members  :
+    C0205082  'High grade'
+    C3641272  'Very severely'
 
-Inputs:
-  topics_debug.pkl  : sidecar from build_topics.py
-                      Contains: neighbors, isa_parents, ic_scores, labels
+  Topic ID : tp_9b72779edaaf
+  Canonical: C0439793
+  Label    : Severity
+  Size     : 9 CUIs
+  IC       : 0.821
+  Members  :
+    C0205081  'Moderate severity'
+    C0205082  'High grade'
+    C0439793  'Severity'
+    C1299392  'Mild to moderate'
+    C1299393  'Moderate to severe'
+    C1302234  'Fatal (qualifier value)'
+    C2711184  'Life threatening severity'
+    C2945599  'Mild (qualifier value)'
+    C4316743  'Not severe'
 
-Edit FOCAL_CUIS to trace different CUIs. Re-running is instant —
-no rebuild needed.
-"""
-
-import pickle
-
-DEBUG_PATH = "topics_debug.pkl"
-
-FOCAL_CUIS = [
-    "C0032285",  # Pneumonia
-    "C0011849",  # Diabetes mellitus
-    "C0021368",  # Inflammation
-    "C0024109",  # Lung
-    "C2142181",  # Pain of left knee joint
-    "C0559470",  # Allergy to peanut
-    "C0013182",  # Allergy to drug
-    "C0002792",  # Anaphylaxis
-]
-
-
-with open(DEBUG_PATH, "rb") as f:
-    d = pickle.load(f)
-
-neighbors    = d["neighbors"]
-isa_parents  = d["isa_parents"]
-ic_scores    = d["ic_scores"]
-labels       = d["labels"]
-
-
-def lbl(c, width=None):
-    s = labels.get(c, "?")
-    if width:
-        return s[:width].ljust(width)
-    return s
-
-
-# ============================================================================
-# Memoized closure
-# ============================================================================
-
-_closure_cache = {}
-
-
-def ancestor_closure(cui):
-    if cui in _closure_cache:
-        return _closure_cache[cui]
-    ancestors = set()
-    stack = [cui]
-    visited = set()
-    while stack:
-        node = stack.pop()
-        if node in visited:
-            continue
-        visited.add(node)
-        for p in isa_parents.get(node, set()):
-            if p not in ancestors:
-                ancestors.add(p)
-                stack.append(p)
-    _closure_cache[cui] = frozenset(ancestors)
-    return _closure_cache[cui]
-
-
-# ============================================================================
-# Trace one focal CUI
-# ============================================================================
-
-def trace(focal):
-    members = {focal} | neighbors.get(focal, frozenset())
-
-    print(f"\n{'='*110}")
-    print(f"FOCAL CUI: {focal}  '{labels.get(focal, '?')}'")
-    print(f"Main topic size: {len(members)} members")
-    print(f"{'='*110}\n")
-
-    if len(members) < 2:
-        print("  (main topic too small to form subgroups)\n")
-        return
-
-    # Header
-    print(f"  {'MEMBER':<70} {'->':<3} {'ANCHOR':<60} {'IC':<7}")
-    print(f"  {'-'*70} --- {'-'*60} {'-'*7}")
-
-    # Sort members by IC descending (most-specific first)
-    sorted_members = sorted(members, key=lambda c: -ic_scores.get(c, 0.0))
-
-    n_anchored = 0
-    n_ungrouped = 0
-
-    for m in sorted_members:
-        m_ic = ic_scores.get(m, 0.0)
-        m_text = f"{m} '{lbl(m, 50)}' (IC={m_ic:.3f})"
-
-        closure = ancestor_closure(m)
-        in_topic = (closure & members) - {m}
-
-        if in_topic:
-            anchor = max(in_topic, key=lambda a: ic_scores.get(a, 0.0))
-            anchor_ic = ic_scores.get(anchor, 0.0)
-            anchor_text = f"{anchor} '{lbl(anchor, 40)}'"
-            print(f"  {m_text:<70} ->  {anchor_text:<60} {anchor_ic:.3f}")
-            n_anchored += 1
-        else:
-            print(f"  {m_text:<70} ->  UNGROUPED (no IS-A ancestor in topic)")
-            n_ungrouped += 1
-
-    print(f"\n  Summary: {n_anchored} anchored, {n_ungrouped} ungrouped")
-
-
-for cui in FOCAL_CUIS:
-    trace(cui)
-
-print(f"\n{'='*110}")
-print("DONE")
+  Topic ID : tp_bf40b6103c51
+  Canonical: C1443286
+  Label    : Unapproved attribute
+  Size     : 209 CUIs
+  IC       : 0.120
+  Members  :
+    C0004083  'Association (attribute)'
+    C0009647  'Conditioning, function (observable entity)'
+    C0011121  'Decontamination'
+    C0011155  'Deficiency of'
+    C0011682  'Desiccation - action'
+    C0022423  'Judgement (observable entity)'
+    C0023185  'Learning, function'
+    C0025361  'Thought process (observable entity)'
+    C0028884  'With odor'
+    C0029235  'Organism'
+    C0034754  'Reading'
+    C0036525  'Metastatic to'
+    C0037775  'Distribution (attribute)'
+    C0039476  'Temperature (observable entity)'
+    C0079809  'Measure'
+    C0162425  'Intention'
+    C0184933  'Scraping (procedure)'
+    C0205081  'Moderate severity'
+    C0205082  'High grade'
+    C0205145  'Site (attribute)'
+    C0231448  'Extension'
+    C0234856  'Speaking (observable entity)'
+    C0237477  'Arrested (qualifier value)'
+    C0242656  'Course of illness'
+    C0332261  'Spreading'
+    ... and 184 more
