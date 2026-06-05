@@ -1,247 +1,407 @@
 """
-build_topics_unified.py
------------------------
-Build the topic lookup structure end-to-end from the network graph.
+build_topics.py
+---------------
+Unified end-to-end build with SY-cluster pre-merging.
 
-Pipeline:
-  1. FLATTEN the network graph (suffix-bridge → direct CUI-CUI edges)
-     For each SNOMED CUI A, A's neighbors = {B in SNOMED : ∃ suffix bridge
-     A-i  ↔  B-j in the graph}.
-  2. MAIN TOPICS: each CUI's main topic = {self} ∪ direct neighbors
-     (= 2-hop reachable CUIs via suffix bridges)
-  3. SUB-TOPICS: for each main topic, find all maximal cliques of size ≥ 2
-     in the induced subgraph. Each clique becomes a sub-topic with a
-     stable hashed ID (st_<14 hex chars>).
-  4. INDEXES: forward, reverse, and CUI-level lookups for both layers.
+PIPELINE (all stages internal, intermediate state not saved):
 
-Inputs (notebook globals expected):
-  data         : networkx DiGraph (24M nodes, suffix-bridge structure)
-  SNOMED_CUIS  : set of 374K SNOMED CUIs
-  LABELS       : dict cui -> label
-  TAGS         : dict cui -> set of STY codes (optional, carried through)
+  STAGE 0: Extract SY clusters from MRREL (REL=SY rows).
+           Build canonical_map: every CUI -> its cluster's canonical CUI.
+           This makes synonymous CUIs (e.g. C0007113 Rectal cancer and
+           C0949022 Malignant tumour of rectum) into one concept.
+
+  STAGE A: Flatten the suffix-bridge network graph, applying canonical_map.
+           Each canonical CUI's main topic = canonical CUIs of its
+           network neighbors.
+
+  STAGE B: Extract IS-A from MRREL (PAR/CHD/RB/RN), applying canonical_map.
+           Compute Seco IC on canonical-CUI level.
+
+  STAGE C: For each canonical CUI's main topic, find anchor per member
+           (highest-IC IS-A ancestor in topic, with IC >= MIN_ANCHOR_IC).
+
+  STAGE D: Dedup by anchor — one final topic per anchor canonical.
+
+  STAGE E: Expand back to all original CUIs.
+           Each original CUI inherits its canonical's topic memberships.
+           Each topic's members expand to include all SY-cluster members.
+
+Inputs (notebook globals):
+  data, cache (with mrrel_rows), SNOMED_CUIS, LABELS, TAGS (optional)
 
 Output:
-  topic_lookup.pkl with:
-    topic_to_cuis              : cui -> frozenset(main topic members)
-    flattened_neighbors        : cui -> frozenset(direct CUI neighbors)
-    main_topic_to_subtopic_ids : main_topic_cui -> list of subtopic_ids
-    subtopic_id_to_cuis        : sid -> frozenset of member CUIs
-    subtopic_id_to_main_topics : sid -> set of main topics that contain it
-    cui_to_subtopic_ids        : cui -> set of all sids containing it
-    subtopic_metadata          : sid -> {size}
-    snomed_cuis, labels, tags  : pass-through
-    config                     : build settings
+  topics.pkl + topics_debug.pkl (sidecar)
 """
 
 import pickle
 import datetime
 import hashlib
-import time
+import math
 import os
-from collections import defaultdict
+import time
+from collections import defaultdict, Counter
 
 
-OUTPUT_PATH     = "topic_lookup.pkl"
-MIN_CLIQUE_SIZE = 2          # keep size-2 cliques too; production filters by size
-MAX_CLIQUES_PER_TOPIC = 200  # safety cap per main topic
+OUTPUT_PATH = "topics.pkl"
+
+# IS-A relation types from MRREL (hierarchical only)
+HIERARCHY_RELS = {"PAR", "CHD", "RB", "RN"}
+
+# Synonym relation type — used for clustering
+SY_REL = "SY"
+
+# Minimum IC for an ancestor to qualify as an anchor.
+MIN_ANCHOR_IC = 0.15
 
 
 # ============================================================================
-# Step 1: Flatten the suffix-bridge graph
+# STAGE 0: Build SY clusters via union-find
 # ============================================================================
 
-def flatten_graph(graph, snomed_cuis):
-    """For each SNOMED CUI A, find its directly-connected SNOMED neighbors
-    via the suffix-bridge pattern.
-    
-    Pattern: A has suffix children (A-1, A-2, ...). Each A-k is connected
-    in the graph to some B-j (B's suffix child). Extract B from B-j; that's
-    a neighbor of A.
-    
-    Conservative version: only walk predecessors of each suffix node.
-    (Empirically equivalent to inclusive on this graph — see transcript.)
-    """
-    print("  Flattening suffix-bridge graph to direct CUI-CUI edges...")
+class UnionFind:
+    def __init__(self):
+        self.parent = {}
+
+    def find(self, x):
+        if x not in self.parent:
+            self.parent[x] = x
+            return x
+        # Path compression
+        root = x
+        while self.parent[root] != root:
+            root = self.parent[root]
+        while self.parent[x] != root:
+            self.parent[x], x = root, self.parent[x]
+        return root
+
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.parent[ra] = rb
+
+
+def build_sy_canonical_map(mrrel_rows, snomed_cuis):
+    """Find SY clusters, return canonical_map: CUI -> canonical CUI."""
+    print("  [0] Building SY clusters from MRREL...")
     t0 = time.time()
-    
+
+    uf = UnionFind()
+    sy_pairs = 0
+    for row in mrrel_rows:
+        if len(row) < 3:
+            continue
+        c1, c2, rel = row[0], row[1], row[2]
+        if rel != SY_REL:
+            continue
+        if c1 not in snomed_cuis or c2 not in snomed_cuis:
+            continue
+        if c1 == c2:
+            continue
+        uf.union(c1, c2)
+        sy_pairs += 1
+
+    # Build canonical_map: for each CUI in any cluster, map to root
+    # Then pick deterministic canonical per cluster (lex-min CUI)
+    cluster_members = defaultdict(set)
+    for c in uf.parent:
+        cluster_members[uf.find(c)].add(c)
+
+    canonical_map = {}
+    cluster_sizes = []
+    for root, members in cluster_members.items():
+        # Canonical = lex-min CUI in cluster
+        canonical = min(members)
+        for m in members:
+            canonical_map[m] = canonical
+        cluster_sizes.append(len(members))
+
+    # CUIs not in any cluster map to themselves (singleton)
+    for c in snomed_cuis:
+        if c not in canonical_map:
+            canonical_map[c] = c
+
+    n_clustered = sum(1 for c in snomed_cuis if c != canonical_map[c])
+    n_clusters_multi = sum(1 for s in cluster_sizes if s > 1)
+
+    print(f"      SY pairs scanned          : {sy_pairs:,}")
+    print(f"      Multi-member clusters     : {n_clusters_multi:,}")
+    print(f"      CUIs merged into a synonym: {n_clustered:,}")
+    if cluster_sizes:
+        cluster_sizes.sort()
+        print(f"      Cluster size min/med/p99/max: "
+              f"{cluster_sizes[0]} / {cluster_sizes[len(cluster_sizes)//2]} / "
+              f"{cluster_sizes[int(0.99*len(cluster_sizes))]} / "
+              f"{cluster_sizes[-1]}")
+    print(f"      Done in {time.time()-t0:.0f}s")
+
+    # Reverse map: canonical -> all CUIs in its cluster
+    canonical_to_cluster = defaultdict(set)
+    for c, can in canonical_map.items():
+        canonical_to_cluster[can].add(c)
+
+    return canonical_map, dict(canonical_to_cluster)
+
+
+# ============================================================================
+# STAGE A: Flatten network graph (with canonical mapping)
+# ============================================================================
+
+def flatten_graph(graph, snomed_cuis, canonical_map):
+    """Same as before, but maps neighbors through canonical_map.
+    Result: per-canonical-CUI neighbor sets."""
+    print("  [A] Flattening suffix-bridge graph (with SY canonicalization)...")
+    t0 = time.time()
+
     neighbors = defaultdict(set)
     n_processed = 0
-    
     for cui in snomed_cuis:
         n_processed += 1
         if n_processed % 50000 == 0:
-            print(f"    {n_processed:,}/{len(snomed_cuis):,} "
+            print(f"      {n_processed:,}/{len(snomed_cuis):,} "
                   f"({time.time()-t0:.0f}s)")
-        
+
         if cui not in graph:
             continue
-        
-        # Walk A → A-k (successors) → predecessors of A-k → extract other CUI
+        can_cui = canonical_map.get(cui, cui)
+
         for suffix_child in graph.successors(cui):
             if "-" not in suffix_child:
                 continue
-            # Verify it's A's own suffix (starts with A-)
             try:
                 base, _ = suffix_child.rsplit("-", 1)
             except ValueError:
                 continue
             if base != cui:
                 continue
-            
-            # Predecessors of A-k include A itself and possibly other suffix nodes B-j
+
             for pred in graph.predecessors(suffix_child):
-                if pred == cui:
-                    continue
-                if "-" not in pred:
+                if pred == cui or "-" not in pred:
                     continue
                 try:
-                    other_cui, _ = pred.rsplit("-", 1)
+                    other, _ = pred.rsplit("-", 1)
                 except ValueError:
                     continue
-                if other_cui == cui:
+                if other == cui or other not in snomed_cuis:
                     continue
-                if other_cui not in snomed_cuis:
-                    continue
-                neighbors[cui].add(other_cui)
-                neighbors[other_cui].add(cui)  # symmetric
-    
-    print(f"  Done in {time.time()-t0:.0f}s")
-    
-    # Convert to frozensets for the pickle
-    neighbors_frozen = {c: frozenset(n) for c, n in neighbors.items()}
-    
-    n_with_edges = len(neighbors_frozen)
-    total_edges = sum(len(n) for n in neighbors_frozen.values()) // 2
-    print(f"    CUIs with at least one edge : {n_with_edges:,}")
-    print(f"    Total undirected edges      : {total_edges:,}")
-    
-    return neighbors_frozen
+                can_other = canonical_map.get(other, other)
+                if can_cui == can_other:
+                    continue  # don't add self-loop within cluster
+                neighbors[can_cui].add(can_other)
+                neighbors[can_other].add(can_cui)
+
+    n_with_edges = len(neighbors)
+    total_edges = sum(len(n) for n in neighbors.values()) // 2
+    print(f"      Done in {time.time()-t0:.0f}s")
+    print(f"      Canonical CUIs with edges : {n_with_edges:,}")
+    print(f"      Total undirected edges    : {total_edges:,}")
+    return neighbors
 
 
 # ============================================================================
-# Step 2: Build main topics
+# STAGE B: Extract IS-A from MRREL (with canonical mapping) + compute IC
 # ============================================================================
 
-def build_main_topics(snomed_cuis, neighbors):
-    """Each CUI's main topic = {self} ∪ direct neighbors."""
-    print("  Building main topics ({self} U direct neighbors)...")
+def extract_isa_dag(mrrel_rows, snomed_cuis, canonical_map):
+    """Same as before, but maps both endpoints through canonical_map.
+    Edges within same SY cluster get dropped (self-loop on canonical)."""
+    print("  [B] Extracting IS-A edges from MRREL (with SY canonicalization)...")
     t0 = time.time()
-    
-    topic_to_cuis = {}
-    for cui in snomed_cuis:
-        members = {cui} | neighbors.get(cui, frozenset())
-        topic_to_cuis[cui] = frozenset(members)
-    
-    print(f"  Done in {time.time()-t0:.0f}s")
-    sizes = sorted(len(m) for m in topic_to_cuis.values())
-    print(f"    Topics built              : {len(topic_to_cuis):,}")
-    print(f"    Size min/median/p90/p99/max : "
-          f"{sizes[0]} / {sizes[len(sizes)//2]} / "
-          f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
-          f"{sizes[-1]}")
-    
-    return topic_to_cuis
+
+    edges = set()
+    n_match = 0
+    n_dropped_cluster_internal = 0
+
+    for row in mrrel_rows:
+        if len(row) < 3:
+            continue
+        c1, c2, rel = row[0], row[1], row[2]
+        if rel not in HIERARCHY_RELS:
+            continue
+        if c1 not in snomed_cuis or c2 not in snomed_cuis:
+            continue
+        if c1 == c2:
+            continue
+
+        can_c1 = canonical_map.get(c1, c1)
+        can_c2 = canonical_map.get(c2, c2)
+        if can_c1 == can_c2:
+            n_dropped_cluster_internal += 1
+            continue  # within-cluster relation, ignore
+
+        if rel in ("PAR", "RB"):
+            edges.add((can_c1, can_c2))
+        else:  # CHD, RN
+            edges.add((can_c2, can_c1))
+        n_match += 1
+
+    isa_parents  = defaultdict(set)
+    isa_children = defaultdict(set)
+    for child, parent in edges:
+        isa_parents[child].add(parent)
+        isa_children[parent].add(child)
+
+    print(f"      MRREL rows scanned        : {len(mrrel_rows):,}")
+    print(f"      IS-A matches              : {n_match:,}")
+    print(f"      Dropped (within cluster)  : {n_dropped_cluster_internal:,}")
+    print(f"      Unique IS-A edges (post)  : {len(edges):,}")
+    print(f"      Canonical CUIs with parents: {len(isa_parents):,}")
+    print(f"      Done in {time.time()-t0:.0f}s")
+    return dict(isa_parents), dict(isa_children)
 
 
-# ============================================================================
-# Step 3: Build size-2+ clique sub-topics
-# ============================================================================
-
-def subtopic_id(members_frozenset):
-    """Stable hashed ID for a sub-topic."""
-    sorted_members = "|".join(sorted(members_frozenset))
-    h = hashlib.sha1(sorted_members.encode()).hexdigest()[:14]
-    return f"st_{h}"
-
-
-def induced_subgraph(members, neighbors):
-    members_set = set(members)
-    return {cui: neighbors.get(cui, frozenset()) & members_set
-            for cui in members}
-
-
-def bron_kerbosch(R, P, X, sub_adj, results, min_size, max_results):
-    """Standard Bron-Kerbosch without pivoting. Capped to avoid runaway."""
-    if len(results) >= max_results:
-        return
-    if not P and not X:
-        if len(R) >= min_size:
-            results.append(frozenset(R))
-        return
-    for v in list(P):
-        if len(results) >= max_results:
-            return
-        Nv = sub_adj.get(v, set())
-        bron_kerbosch(R | {v}, P & Nv, X & Nv, sub_adj, results,
-                      min_size, max_results)
-        P = P - {v}
-        X = X | {v}
-
-
-def find_cliques(sub_adj, min_size, max_results):
-    results = []
-    bron_kerbosch(set(), set(sub_adj.keys()), set(), sub_adj, results,
-                  min_size, max_results)
-    return results
-
-
-def build_subtopics(topic_to_cuis, neighbors, min_size, max_per_topic):
-    """For each main topic, find all maximal cliques of size >= min_size."""
-    print(f"  Building sub-topics (cliques >= size {min_size})...")
+def compute_ic(isa_children, all_nodes, total_universe):
+    """Seco IC."""
+    print("  [B] Computing IC scores...")
     t0 = time.time()
-    
-    main_topic_to_subtopic_ids = defaultdict(list)
-    subtopic_id_to_cuis        = {}
-    subtopic_id_to_main_topics = defaultdict(set)
-    cui_to_subtopic_ids        = defaultdict(set)
-    subtopic_metadata          = {}
-    
+    descendant_sets = {}
+
+    def descendants(node, stack):
+        if node in descendant_sets:
+            return descendant_sets[node]
+        if node in stack:
+            return set()
+        stack = stack | {node}
+        result = set()
+        for child in isa_children.get(node, ()):
+            result.add(child)
+            result |= descendants(child, stack)
+        descendant_sets[node] = result
+        return result
+
+    for node in all_nodes:
+        descendants(node, set())
+
+    log_total = math.log(total_universe + 1)
+    ic = {n: 1.0 - math.log(len(d) + 1) / log_total
+          for n, d in descendant_sets.items()}
+
+    print(f"      IC computed for {len(ic):,} canonical nodes "
+          f"in {time.time()-t0:.0f}s")
+    return ic
+
+
+def ancestor_closure(cui, isa_parents, cache):
+    if cui in cache:
+        return cache[cui]
+    ancestors = set()
+    stack = [cui]
+    visited = set()
+    while stack:
+        node = stack.pop()
+        if node in visited:
+            continue
+        visited.add(node)
+        for p in isa_parents.get(node, set()):
+            if p not in ancestors:
+                ancestors.add(p)
+                stack.append(p)
+    cache[cui] = frozenset(ancestors)
+    return cache[cui]
+
+
+# ============================================================================
+# STAGE C+D: Build topics on canonical CUIs
+# ============================================================================
+
+def topic_id_for(canonical):
+    h = hashlib.sha1(canonical.encode()).hexdigest()[:12]
+    return f"tp_{h}"
+
+
+def build_canonical_topics(canonical_cuis, neighbors, isa_parents, ic_scores):
+    """Form granular subgroups on canonical CUIs, dedup by anchor."""
+    print("  [C] Forming granular subgroups per canonical main topic...")
+    print(f"      Anchor rule: highest-IC IS-A ancestor in topic with "
+          f"IC >= {MIN_ANCHOR_IC}")
+    t0 = time.time()
+
+    closure_cache = {}
+    canonical_to_members = defaultdict(set)
+
     n_processed = 0
-    for main_topic, members in topic_to_cuis.items():
+    for focal in canonical_cuis:
         n_processed += 1
         if n_processed % 50000 == 0:
-            print(f"    {n_processed:,}/{len(topic_to_cuis):,} "
-                  f"(sub-topics so far: {len(subtopic_id_to_cuis):,}, "
-                  f"{time.time()-t0:.0f}s)")
-        
-        if len(members) < min_size:
+            print(f"      {n_processed:,}/{len(canonical_cuis):,} "
+                  f"({time.time()-t0:.0f}s)")
+
+        members = {focal} | neighbors.get(focal, frozenset())
+        if len(members) < 2:
             continue
-        
-        sub_adj = induced_subgraph(members, neighbors)
-        cliques = find_cliques(sub_adj, min_size, max_per_topic)
-        
-        for clq in cliques:
-            sid = subtopic_id(clq)
-            if sid not in subtopic_id_to_cuis:
-                subtopic_id_to_cuis[sid] = clq
-                subtopic_metadata[sid] = {"size": len(clq)}
-            main_topic_to_subtopic_ids[main_topic].append(sid)
-            subtopic_id_to_main_topics[sid].add(main_topic)
-            for c in clq:
-                cui_to_subtopic_ids[c].add(sid)
-    
-    print(f"  Done in {time.time()-t0:.0f}s")
-    print(f"    Unique sub-topics             : "
-          f"{len(subtopic_id_to_cuis):,}")
-    print(f"    Main topics with sub-topics   : "
-          f"{len(main_topic_to_subtopic_ids):,}")
-    print(f"    CUIs in at least one sub      : "
-          f"{len(cui_to_subtopic_ids):,}")
-    
-    sizes = sorted(meta["size"] for meta in subtopic_metadata.values())
+
+        for m in members:
+            closure = ancestor_closure(m, isa_parents, closure_cache)
+            in_topic = closure & members
+            if not in_topic:
+                continue
+            qualified = {a for a in in_topic
+                         if ic_scores.get(a, 0.0) >= MIN_ANCHOR_IC}
+            if not qualified:
+                continue
+            anchor = max(qualified, key=lambda a: ic_scores.get(a, 0.0))
+            canonical_to_members[anchor].add(anchor)
+            canonical_to_members[anchor].add(m)
+
+    print(f"      Done in {time.time()-t0:.0f}s")
+    print(f"      Closure cache size        : {len(closure_cache):,}")
+    print(f"      Unique anchors            : {len(canonical_to_members):,}")
+    return dict(canonical_to_members)
+
+
+# ============================================================================
+# STAGE E: Expand back to original CUIs
+# ============================================================================
+
+def expand_to_original_cuis(canonical_to_members, canonical_to_cluster,
+                             canonical_map, labels, ic_scores):
+    """Expand topic members and lookups to include all SY-cluster members."""
+    print("  [E] Expanding back to original (non-canonical) CUIs...")
+    t0 = time.time()
+
+    topic_id_to_topic     = {}
+    canonical_to_topic_id = {}
+    cui_to_topic_ids      = defaultdict(set)
+
+    for canonical, mems in canonical_to_members.items():
+        tp_id = topic_id_for(canonical)
+
+        # Expand member list: each canonical member -> include all its cluster
+        expanded_members = set()
+        for m in mems:
+            expanded_members |= canonical_to_cluster.get(m, {m})
+
+        expanded_members_fs = frozenset(expanded_members)
+        topic_id_to_topic[tp_id] = {
+            "canonical":  canonical,
+            "members":    expanded_members_fs,
+            "size":       len(expanded_members_fs),
+            "anchor_ic":  ic_scores.get(canonical, 0.0),
+        }
+        canonical_to_topic_id[canonical] = tp_id
+
+        # Every expanded member's lookup gets this topic
+        for m in expanded_members_fs:
+            cui_to_topic_ids[m].add(tp_id)
+
+    print(f"      Done in {time.time()-t0:.0f}s")
+    print(f"      Final topics              : {len(topic_id_to_topic):,}")
+    print(f"      CUIs participating        : {len(cui_to_topic_ids):,}")
+
+    sizes = sorted(t["size"] for t in topic_id_to_topic.values())
+    topics_per_cui = sorted(len(s) for s in cui_to_topic_ids.values())
     if sizes:
-        print(f"    Sub-topic size min/med/p90/p99/max : "
+        print(f"      Topic size min/med/p90/p99/max : "
               f"{sizes[0]} / {sizes[len(sizes)//2]} / "
               f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
               f"{sizes[-1]}")
-    
-    return {
-        "main_topic_to_subtopic_ids": dict(main_topic_to_subtopic_ids),
-        "subtopic_id_to_cuis":        subtopic_id_to_cuis,
-        "subtopic_id_to_main_topics": dict(subtopic_id_to_main_topics),
-        "cui_to_subtopic_ids":        dict(cui_to_subtopic_ids),
-        "subtopic_metadata":          subtopic_metadata,
-    }
+    if topics_per_cui:
+        print(f"      Topics-per-CUI min/med/p90/p99/max : "
+              f"{topics_per_cui[0]} / {topics_per_cui[len(topics_per_cui)//2]} / "
+              f"{topics_per_cui[int(0.9*len(topics_per_cui))]} / "
+              f"{topics_per_cui[int(0.99*len(topics_per_cui))]} / "
+              f"{topics_per_cui[-1]}")
+
+    return topic_id_to_topic, canonical_to_topic_id, cui_to_topic_ids
 
 
 # ============================================================================
@@ -251,49 +411,79 @@ def build_subtopics(topic_to_cuis, neighbors, min_size, max_per_topic):
 def main():
     print(f"BUILD START — {datetime.datetime.now().isoformat()}")
     t_total = time.time()
-    
+
     print(f"\nInputs:")
-    print(f"  data (graph)      : {type(data).__name__} "
-          f"with {data.number_of_nodes():,} nodes, "
-          f"{data.number_of_edges():,} edges")
-    print(f"  SNOMED_CUIS       : {len(SNOMED_CUIS):,}")
-    print(f"  LABELS            : {len(LABELS):,}")
-    if 'TAGS' in globals():
-        print(f"  TAGS              : {len(TAGS):,}")
-    
-    print(f"\n[1] Flatten suffix-bridge graph")
-    neighbors = flatten_graph(data, SNOMED_CUIS)
-    
-    print(f"\n[2] Build main topics")
-    topic_to_cuis = build_main_topics(SNOMED_CUIS, neighbors)
-    
-    print(f"\n[3] Build sub-topics")
-    subtopic_data = build_subtopics(topic_to_cuis, neighbors,
-                                     MIN_CLIQUE_SIZE,
-                                     MAX_CLIQUES_PER_TOPIC)
-    
-    print(f"\n[4] Assemble pickle")
+    print(f"  data (graph) : {type(data).__name__} with "
+          f"{data.number_of_nodes():,} nodes, {data.number_of_edges():,} edges")
+    print(f"  SNOMED_CUIS  : {len(SNOMED_CUIS):,}")
+    print(f"  LABELS       : {len(LABELS):,}")
+    print(f"  cache keys   : {list(cache.keys())}")
+
+    print(f"\n[0] Build SY clusters")
+    canonical_map, canonical_to_cluster = build_sy_canonical_map(
+        cache["mrrel_rows"], SNOMED_CUIS)
+
+    print(f"\n[A] Flatten graph (on canonicals)")
+    neighbors = flatten_graph(data, SNOMED_CUIS, canonical_map)
+
+    print(f"\n[B] Extract IS-A DAG + IC (on canonicals)")
+    isa_parents, isa_children = extract_isa_dag(
+        cache["mrrel_rows"], SNOMED_CUIS, canonical_map)
+    canonical_cuis = {canonical_map[c] for c in SNOMED_CUIS}
+    all_nodes = set(isa_parents.keys()) | set(isa_children.keys())
+    ic_scores = compute_ic(isa_children, all_nodes, len(canonical_cuis))
+
+    print(f"\n[C+D] Build topics on canonical CUIs")
+    canonical_to_members = build_canonical_topics(
+        canonical_cuis, neighbors, isa_parents, ic_scores)
+
+    print(f"\n[E] Expand back to original CUIs")
+    topic_id_to_topic, canonical_to_topic_id, cui_to_topic_ids = \
+        expand_to_original_cuis(canonical_to_members, canonical_to_cluster,
+                                 canonical_map, LABELS, ic_scores)
+
+    print(f"\n[Save] Writing to {OUTPUT_PATH}")
     payload = {
-        "topic_to_cuis":       topic_to_cuis,
-        "flattened_neighbors": neighbors,
-        "snomed_cuis":         SNOMED_CUIS,
-        "labels":              LABELS,
-        "tags":                globals().get("TAGS", {}),
-        **subtopic_data,
+        "topic_id_to_topic":       topic_id_to_topic,
+        "canonical_to_topic_id":   canonical_to_topic_id,
+        "cui_to_topic_ids":        {c: sorted(s) for c, s
+                                    in cui_to_topic_ids.items()},
+        "labels":                  LABELS,
+        "tags":                    globals().get("TAGS", {}),
+        "canonical_map":           canonical_map,
         "config": {
-            "min_clique_size":       MIN_CLIQUE_SIZE,
-            "max_cliques_per_topic": MAX_CLIQUES_PER_TOPIC,
-            "flatten_rule":          "conservative (predecessors only)",
+            "anchor_rule":     "highest-IC IS-A ancestor in topic, "
+                               f"with IC >= {MIN_ANCHOR_IC}",
+            "min_anchor_ic":   MIN_ANCHOR_IC,
+            "ic_formula":      "Seco: 1 - log(desc+1) / log(total)",
+            "hierarchy_rels":  sorted(HIERARCHY_RELS),
+            "sy_merging":      True,
+            "topic_dedup":     "one topic per unique canonical anchor; "
+                               "synonyms expanded in members and lookups",
         },
         "built_at": datetime.datetime.now().isoformat(),
     }
-    
-    print(f"\n[5] Save to {OUTPUT_PATH}")
     with open(OUTPUT_PATH, "wb") as f:
         pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
     size_mb = os.path.getsize(OUTPUT_PATH) / 1024 / 1024
-    print(f"    Wrote {size_mb:.1f} MB")
-    
+    print(f"        Wrote {size_mb:.1f} MB")
+
+    debug_path = OUTPUT_PATH.replace(".pkl", "_debug.pkl")
+    print(f"\n[Save] Writing debug sidecar to {debug_path}")
+    debug_payload = {
+        "neighbors":            {c: frozenset(n) for c, n in neighbors.items()},
+        "isa_parents":          isa_parents,
+        "ic_scores":            ic_scores,
+        "labels":               LABELS,
+        "canonical_map":        canonical_map,
+        "canonical_to_cluster": canonical_to_cluster,
+        "built_at":             datetime.datetime.now().isoformat(),
+    }
+    with open(debug_path, "wb") as f:
+        pickle.dump(debug_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    size_mb = os.path.getsize(debug_path) / 1024 / 1024
+    print(f"        Wrote {size_mb:.1f} MB")
+
     print(f"\nTOTAL: {time.time()-t_total:.0f}s")
     print(f"DONE — {datetime.datetime.now().isoformat()}")
 
