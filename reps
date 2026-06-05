@@ -1,18 +1,16 @@
 ==============================================================================================================
-FOCAL CUI: C0205082  'High grade'
-Main topic size: 6 members
+FOCAL CUI: C0007113  'Rectal cancer'
+Main topic size: 4 members
 ==============================================================================================================
 
   MEMBER                                                                 ->  ANCHOR                                                       IC     
   ---------------------------------------------------------------------- --- ------------------------------------------------------------ -------
-  C0522510 'With intensity (attribute)                        ' (IC=1.000) ->  UNGROUPED (no IS-A ancestor in topic)
-  C0475271 'Tumour grade G3                                   ' (IC=1.000) ->  UNGROUPED (no IS-A ancestor in topic)
-  C3641272 'Very severely                                     ' (IC=1.000) ->  C0205082 'High grade                              '          0.946
-  C0205082 'High grade                                        ' (IC=0.946) ->  C0439793 'Severity                                '          0.821
-  C0439793 'Severity                                          ' (IC=0.821) ->  UNGROUPED (no IS-A ancestor in topic)
-  C0919553 'Histologic grade of neoplasm (observable entity)  ' (IC=0.663) ->  UNGROUPED (no IS-A ancestor in topic)
+  C0149978 'Adenocarcinoma of rectum (disorder)               ' (IC=0.914) ->  C0949022 'Malignant tumour of rectum              '          0.717
+  C1335690 'Squamous cell carcinoma of rectum                 ' (IC=0.914) ->  C0949022 'Malignant tumour of rectum              '          0.717
+  C0949022 'Malignant tumour of rectum                        ' (IC=0.717) ->  UNGROUPED (no IS-A ancestor in topic)
+  C0007113 'Rectal cancer                                     ' (IC=0.000) ->  UNGROUPED (no IS-A ancestor in topic)
 
-  Summary: 2 anchored, 4 ungrouped
+  Summary: 2 anchored, 2 ungrouped
 
 ==============================================================================================================
 DONE
