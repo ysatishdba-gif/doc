@@ -1,50 +1,54 @@
-C0032285  'Pneumonia (disorder)'  -> 12 topic(s)
-    tp_1ae839747126
-    tp_35bd3a69f6da
-    tp_3f2168c5806e
-    tp_4385b55dfcd9
-    tp_49e9108d1829
-    tp_5df0c267588e
-    tp_757239d34a68
-    tp_addea0dd84fd
-    tp_ebcd7467b58a
-    tp_eef2bb7e70fc
-    tp_f65e676f9759
-    tp_f76b3d6b54eb
-C0011849  'Diabetes mellitus'  -> 12 topic(s)
-    tp_01a20f6a90a2
-    tp_3cd8dd624b79
-    tp_42e31507c18a
-    tp_6db1986379b2
-    tp_9e69ea8b525c
-    tp_aadaea44daf8
-    tp_ab21a5d21e71
-    tp_ac21fa560b8e
-    tp_aeea67caebcf
-    tp_b857071bd7d9
-    tp_dc3787c01d5a
-    tp_f9a9a53315b5
-{'C0032285': ['tp_1ae839747126',
-  'tp_35bd3a69f6da',
-  'tp_3f2168c5806e',
-  'tp_4385b55dfcd9',
-  'tp_49e9108d1829',
-  'tp_5df0c267588e',
-  'tp_757239d34a68',
-  'tp_addea0dd84fd',
-  'tp_ebcd7467b58a',
-  'tp_eef2bb7e70fc',
-  'tp_f65e676f9759',
-  'tp_f76b3d6b54eb'],
- 'C0011849': ['tp_01a20f6a90a2',
-  'tp_3cd8dd624b79',
-  'tp_42e31507c18a',
-  'tp_6db1986379b2',
-  'tp_9e69ea8b525c',
-  'tp_aadaea44daf8',
-  'tp_ab21a5d21e71',
-  'tp_ac21fa560b8e',
-  'tp_aeea67caebcf',
-  'tp_b857071bd7d9',
-  'tp_dc3787c01d5a',
-  'tp_f9a9a53315b5']}
+"""
+lookup.py
+---------
+Pass a CUI, get back its topics with the CUIs in each topic.
+
+    exec(open("lookup.py").read())
+    lookup("C0032285")
+    lookup("C0032285", "C0011849")
+"""
+
+import pickle
+
+
+_PKL_PATH = "topics.pkl"
+_state = {}
+
+
+def _load():
+    if _state:
+        return
+    with open(_PKL_PATH, "rb") as f:
+        p = pickle.load(f)
+    _state["topic_id_to_topic"] = p["topic_id_to_topic"]
+    _state["cui_to_topic_ids"]  = p["cui_to_topic_ids"]
+    _state["labels"]            = p["labels"]
+
+
+def lookup(*cuis):
+    _load()
+    labels   = _state["labels"]
+    cui_to_t = _state["cui_to_topic_ids"]
+    topics   = _state["topic_id_to_topic"]
+
+    for cui in cuis:
+        tids = cui_to_t.get(cui, [])
+        print(f"\n{'='*78}")
+        print(f"{cui}  '{labels.get(cui, '?')}'  -> {len(tids)} topic(s)")
+        print('='*78)
+        # Show smallest topic first (tightest match)
+        rows = [(tid, topics[tid]) for tid in tids]
+        rows.sort(key=lambda r: r[1]["size"])
+        for tid, t in rows:
+            anchor = t["canonical"]
+            print(f"\n  {tid}  size={t['size']}  IC={t['anchor_ic']:.3f}")
+            print(f"    Anchor: {anchor} '{labels.get(anchor, '?')}'")
+            for m in sorted(t["members"], key=lambda c: labels.get(c, "")):
+                mark = "  <-- self" if m == cui else ""
+                print(f"      {m}  '{labels.get(m, '?')}'{mark}")
+
+
+_load()
+print(f"Loaded topics.pkl ({len(_state['cui_to_topic_ids']):,} CUIs)\n")
+print("Try:  lookup('C0032285')")
+print("      lookup('C0032285', 'C0011849')")
