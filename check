@@ -1,52 +1,564 @@
-Indexing MRREL by CUI...
-Indexed 5,496,444 CUI-row pairs
+"""
+build_topics.py
+---------------
+Unified end-to-end build.
+
+PIPELINE:
+
+  STAGE 0: Build SY clusters from MRREL (REL=SY). Pre-merge synonymous
+           CUIs so they share IS-A relations.
+
+  STAGE A: Flatten the network graph (suffix-bridge -> direct CUI-CUI
+           neighbors). Maps neighbors through canonical_map.
+
+  STAGE B: Extract relations from MRREL:
+             - IS-A DAG: PAR / CHD / RB / RN (transitive)
+             - RO neighbors (direct 1-hop only)
+           Compute Seco IC on IS-A DAG (RO doesn't affect IC).
+
+  STAGE C: For each main topic, pick anchor per member:
+             1. Candidates = IS-A ancestors UNION direct RO neighbors,
+                intersected with main topic
+             2. Filter by IC >= MIN_ANCHOR_IC
+             3. Filter by SemGroup match (member and anchor share at
+                least one UMLS semantic group)
+             4. Pick highest IC
+
+  STAGE D: Dedup by anchor.
+
+  STAGE E: Expand back to original CUIs (synonyms inherit topics).
+
+Inputs (notebook globals):
+  data, cache (with mrrel_rows), SNOMED_CUIS, LABELS, TAGS
+  TAGS: dict cui -> iterable of TUI codes (e.g., 'T047' for Disease or Syndrome)
+
+Output:
+  topics.pkl + topics_debug.pkl
+"""
+
+import pickle
+import datetime
+import hashlib
+import math
+import os
+import time
+from collections import defaultdict
 
 
-====================================================================================================
-CUI: C0007113  'Rectal cancer'
-====================================================================================================
-  Total MRREL rows: 6
+OUTPUT_PATH = "topics.pkl"
 
-  Breakdown by REL:
-        RO  : 6
+# Hierarchical relations (transitive closure)
+HIERARCHY_RELS = {"PAR", "CHD", "RB", "RN"}
 
-  Breakdown by RELA (top 10):
-    possibly_equivalent_to                   : 6
+# Synonym relation (handled via clustering)
+SY_REL = "SY"
 
-  All rows (other_cui | REL | RELA | other label | in SNOMED?):
+# Cross-axis relation (direct neighbors only, filtered by SemGroup)
+RO_REL = "RO"
 
-    --- REL=RO (6 rows) ---
-      C0149978  [possibly_equivalent_to   ]  [SNOMED]  'Adenocarcinoma of rectum (disorder)'
-      C1306294  [possibly_equivalent_to   ]  [SNOMED]  'Primary malignant neoplasm of rectum'
-      C0149978  [possibly_equivalent_to   ]  [SNOMED]  'Adenocarcinoma of rectum (disorder)'
-      C0149978  [possibly_equivalent_to   ]  [SNOMED]  'Adenocarcinoma of rectum (disorder)'
-      C1306294  [possibly_equivalent_to   ]  [SNOMED]  'Primary malignant neoplasm of rectum'
-      C0149978  [possibly_equivalent_to   ]  [SNOMED]  'Adenocarcinoma of rectum (disorder)'
+# Minimum IC for an ancestor to qualify as an anchor.
+MIN_ANCHOR_IC = 0.15
 
-====================================================================================================
-CUI: C0007121  'Bronchogenic carcinoma'
-====================================================================================================
-  Total MRREL rows: 0
-  (no rows at all)
 
-====================================================================================================
-CUI: C0003838  'Arterial occlusive disease'
-====================================================================================================
-  Total MRREL rows: 0
-  (no rows at all)
+# ============================================================================
+# UMLS Semantic Group mapping (TUI -> SemGroup abbrev)
+# Reference: https://lhncbc.nlm.nih.gov/semanticnetwork/download/sg.txt
+# ============================================================================
 
-====================================================================================================
-CUI: C0002884  'Hypochromic anaemia'
-====================================================================================================
-  Total MRREL rows: 0
-  (no rows at all)
+TUI_TO_SEMGROUP = {}
+_SEMGROUP_TUIS = {
+    "ACTI": ["T052", "T053", "T054", "T055", "T056", "T057", "T064", "T066"],
+    "ANAT": ["T017", "T029", "T023", "T030", "T031", "T022", "T025", "T026",
+             "T018", "T021", "T024"],
+    "CHEM": ["T116", "T195", "T123", "T122", "T118", "T103", "T120", "T104",
+             "T200", "T111", "T196", "T126", "T131", "T125", "T129", "T130",
+             "T197", "T119", "T124", "T114", "T109", "T115", "T121", "T192",
+             "T110", "T127"],
+    "CONC": ["T185", "T077", "T169", "T102", "T078", "T170", "T171", "T080",
+             "T081", "T089", "T082", "T079"],
+    "DEVI": ["T203", "T074", "T075"],
+    "DISO": ["T020", "T190", "T049", "T019", "T047", "T050", "T033", "T037",
+             "T048", "T191", "T046", "T184"],
+    "GENE": ["T087", "T088", "T028", "T085", "T086"],
+    "GEOG": ["T083"],
+    "LIVB": ["T100", "T011", "T008", "T194", "T007", "T012", "T204", "T099",
+             "T013", "T004", "T096", "T016", "T015", "T001", "T101", "T002",
+             "T098", "T097", "T014", "T010", "T005"],
+    "OBJC": ["T071", "T168", "T073", "T072", "T167"],
+    "OCCU": ["T091", "T090"],
+    "ORGA": ["T093", "T092", "T094", "T095"],
+    "PHEN": ["T038", "T069", "T068", "T034", "T070", "T067"],
+    "PHYS": ["T043", "T201", "T045", "T041", "T044", "T032", "T040", "T042",
+             "T039"],
+    "PROC": ["T060", "T065", "T058", "T059", "T063", "T062", "T061"],
+}
+for group, tuis in _SEMGROUP_TUIS.items():
+    for tui in tuis:
+        TUI_TO_SEMGROUP[tui] = group
 
-====================================================================================================
-CUI: C0006370  'Bulimia'
-====================================================================================================
-  Total MRREL rows: 0
-  (no rows at all)
 
-====================================================================================================
-DONE
-​
+def cui_semgroups(cui, tags):
+    """Return set of SemGroups for a CUI based on its TUIs.
+    
+    Handles different TAGS formats (TUI strings, name strings, mixed)."""
+    raw = tags.get(cui)
+    if not raw:
+        return set()
+    if isinstance(raw, str):
+        raw = [raw]
+    groups = set()
+    for entry in raw:
+        if not entry:
+            continue
+        # Accept either 'T047' or 'T047|...' or just the bare TUI
+        if entry.startswith("T") and len(entry) >= 4:
+            tui = entry[:4]
+            if tui in TUI_TO_SEMGROUP:
+                groups.add(TUI_TO_SEMGROUP[tui])
+    return groups
+
+
+def semgroup_compatible(cui_a, cui_b, tags):
+    """True if cui_a and cui_b share at least one SemGroup.
+    
+    Fail-open: if either is missing STY info, treat as compatible."""
+    ga = cui_semgroups(cui_a, tags)
+    gb = cui_semgroups(cui_b, tags)
+    if not ga or not gb:
+        return True   # fail open — don't punish missing STY
+    return bool(ga & gb)
+
+
+# ============================================================================
+# STAGE 0: SY clusters
+# ============================================================================
+
+class UnionFind:
+    def __init__(self):
+        self.parent = {}
+    def find(self, x):
+        if x not in self.parent:
+            self.parent[x] = x
+            return x
+        root = x
+        while self.parent[root] != root:
+            root = self.parent[root]
+        while self.parent[x] != root:
+            self.parent[x], x = root, self.parent[x]
+        return root
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.parent[ra] = rb
+
+
+def build_sy_canonical_map(mrrel_rows, snomed_cuis):
+    print("  [0] Building SY clusters...")
+    t0 = time.time()
+    uf = UnionFind()
+    sy_pairs = 0
+    for row in mrrel_rows:
+        if len(row) < 3:
+            continue
+        c1, c2, rel = row[0], row[1], row[2]
+        if rel != SY_REL:
+            continue
+        if c1 not in snomed_cuis or c2 not in snomed_cuis:
+            continue
+        if c1 == c2:
+            continue
+        uf.union(c1, c2)
+        sy_pairs += 1
+
+    cluster_members = defaultdict(set)
+    for c in uf.parent:
+        cluster_members[uf.find(c)].add(c)
+    canonical_map = {}
+    cluster_sizes = []
+    for members in cluster_members.values():
+        canonical = min(members)
+        for m in members:
+            canonical_map[m] = canonical
+        cluster_sizes.append(len(members))
+    for c in snomed_cuis:
+        if c not in canonical_map:
+            canonical_map[c] = c
+
+    n_clustered = sum(1 for c in snomed_cuis if c != canonical_map[c])
+    n_multi = sum(1 for s in cluster_sizes if s > 1)
+    print(f"      SY pairs: {sy_pairs:,}  | multi-member clusters: {n_multi:,}")
+    print(f"      CUIs merged into a synonym: {n_clustered:,}")
+    print(f"      Done in {time.time()-t0:.0f}s")
+
+    canonical_to_cluster = defaultdict(set)
+    for c, can in canonical_map.items():
+        canonical_to_cluster[can].add(c)
+    return canonical_map, dict(canonical_to_cluster)
+
+
+# ============================================================================
+# STAGE A: Flatten graph
+# ============================================================================
+
+def flatten_graph(graph, snomed_cuis, canonical_map):
+    print("  [A] Flattening graph (with canonicalization)...")
+    t0 = time.time()
+    neighbors = defaultdict(set)
+    n = 0
+    for cui in snomed_cuis:
+        n += 1
+        if n % 50000 == 0:
+            print(f"      {n:,}/{len(snomed_cuis):,} ({time.time()-t0:.0f}s)")
+        if cui not in graph:
+            continue
+        can_cui = canonical_map.get(cui, cui)
+        for suffix_child in graph.successors(cui):
+            if "-" not in suffix_child:
+                continue
+            try:
+                base, _ = suffix_child.rsplit("-", 1)
+            except ValueError:
+                continue
+            if base != cui:
+                continue
+            for pred in graph.predecessors(suffix_child):
+                if pred == cui or "-" not in pred:
+                    continue
+                try:
+                    other, _ = pred.rsplit("-", 1)
+                except ValueError:
+                    continue
+                if other == cui or other not in snomed_cuis:
+                    continue
+                can_other = canonical_map.get(other, other)
+                if can_cui == can_other:
+                    continue
+                neighbors[can_cui].add(can_other)
+                neighbors[can_other].add(can_cui)
+
+    total_edges = sum(len(n) for n in neighbors.values()) // 2
+    print(f"      CUIs with edges: {len(neighbors):,}, "
+          f"edges: {total_edges:,}")
+    print(f"      Done in {time.time()-t0:.0f}s")
+    return neighbors
+
+
+# ============================================================================
+# STAGE B: Extract IS-A DAG + RO neighbors + IC
+# ============================================================================
+
+def extract_relations(mrrel_rows, snomed_cuis, canonical_map):
+    """Return (isa_parents, isa_children, ro_neighbors).
+    isa_*: transitive hierarchy via PAR/CHD/RB/RN
+    ro_neighbors: direct 1-hop only, bidirectional."""
+    print("  [B] Extracting IS-A DAG and RO neighbors...")
+    t0 = time.time()
+
+    isa_edges = set()
+    ro_edges = set()
+    n_isa = n_ro = n_within = 0
+
+    for row in mrrel_rows:
+        if len(row) < 3:
+            continue
+        c1, c2, rel = row[0], row[1], row[2]
+        if c1 not in snomed_cuis or c2 not in snomed_cuis:
+            continue
+        if c1 == c2:
+            continue
+        can_c1 = canonical_map.get(c1, c1)
+        can_c2 = canonical_map.get(c2, c2)
+        if can_c1 == can_c2:
+            n_within += 1
+            continue
+
+        if rel in HIERARCHY_RELS:
+            if rel in ("PAR", "RB"):
+                isa_edges.add((can_c1, can_c2))   # c1 -> c2 (parent)
+            else:  # CHD, RN
+                isa_edges.add((can_c2, can_c1))
+            n_isa += 1
+        elif rel == RO_REL:
+            # Bidirectional candidate-neighbor relation
+            ro_edges.add((can_c1, can_c2))
+            ro_edges.add((can_c2, can_c1))
+            n_ro += 1
+
+    isa_parents  = defaultdict(set)
+    isa_children = defaultdict(set)
+    for child, parent in isa_edges:
+        isa_parents[child].add(parent)
+        isa_children[parent].add(child)
+
+    ro_neighbors = defaultdict(set)
+    for a, b in ro_edges:
+        ro_neighbors[a].add(b)
+
+    print(f"      IS-A rows matched: {n_isa:,}  | unique IS-A edges: {len(isa_edges):,}")
+    print(f"      RO rows matched  : {n_ro:,}  | RO neighbor pairs : {len(ro_edges)//2:,}")
+    print(f"      Dropped (intra-cluster): {n_within:,}")
+    print(f"      CUIs with IS-A parents : {len(isa_parents):,}")
+    print(f"      CUIs with RO neighbors : {len(ro_neighbors):,}")
+    print(f"      Done in {time.time()-t0:.0f}s")
+    return dict(isa_parents), dict(isa_children), dict(ro_neighbors)
+
+
+def compute_ic(isa_children, all_nodes, total_universe):
+    print("  [B] Computing Seco IC on IS-A DAG...")
+    t0 = time.time()
+    descendant_sets = {}
+
+    def descendants(node, stack):
+        if node in descendant_sets:
+            return descendant_sets[node]
+        if node in stack:
+            return set()
+        stack = stack | {node}
+        result = set()
+        for child in isa_children.get(node, ()):
+            result.add(child)
+            result |= descendants(child, stack)
+        descendant_sets[node] = result
+        return result
+
+    for node in all_nodes:
+        descendants(node, set())
+
+    log_total = math.log(total_universe + 1)
+    ic = {n: 1.0 - math.log(len(d) + 1) / log_total
+          for n, d in descendant_sets.items()}
+    print(f"      IC computed for {len(ic):,} nodes in {time.time()-t0:.0f}s")
+    return ic
+
+
+def ancestor_closure(cui, isa_parents, cache):
+    if cui in cache:
+        return cache[cui]
+    ancestors = set()
+    stack = [cui]
+    visited = set()
+    while stack:
+        node = stack.pop()
+        if node in visited:
+            continue
+        visited.add(node)
+        for p in isa_parents.get(node, set()):
+            if p not in ancestors:
+                ancestors.add(p)
+                stack.append(p)
+    cache[cui] = frozenset(ancestors)
+    return cache[cui]
+
+
+# ============================================================================
+# STAGE C+D: Build topics with SemGroup filter
+# ============================================================================
+
+def topic_id_for(canonical):
+    h = hashlib.sha1(canonical.encode()).hexdigest()[:12]
+    return f"tp_{h}"
+
+
+def build_canonical_topics(canonical_cuis, neighbors, isa_parents,
+                            ro_neighbors, ic_scores, tags, canonical_map):
+    print(f"  [C] Forming subgroups (IS-A + RO candidates, SemGroup filter)...")
+    print(f"      Anchor rule: highest-IC candidate in topic, same SemGroup")
+    print(f"      Min IC: {MIN_ANCHOR_IC}")
+    t0 = time.time()
+
+    closure_cache = {}
+    canonical_to_members = defaultdict(set)
+    n_via_isa = n_via_ro_only = n_filtered_ic = n_filtered_sty = 0
+    n_processed = 0
+
+    for focal in canonical_cuis:
+        n_processed += 1
+        if n_processed % 50000 == 0:
+            print(f"      {n_processed:,}/{len(canonical_cuis):,} "
+                  f"({time.time()-t0:.0f}s)")
+
+        members = {focal} | neighbors.get(focal, frozenset())
+        if len(members) < 2:
+            continue
+
+        for m in members:
+            # Candidate set: IS-A ancestors + direct RO neighbors
+            isa_anc = ancestor_closure(m, isa_parents, closure_cache)
+            ro_direct = ro_neighbors.get(m, frozenset())
+            candidates = (isa_anc | ro_direct) & members
+            candidates = candidates - {m}
+            if not candidates:
+                continue
+
+            # IC floor
+            qualified = {a for a in candidates
+                         if ic_scores.get(a, 0.0) >= MIN_ANCHOR_IC}
+            if not qualified:
+                n_filtered_ic += 1
+                continue
+
+            # SemGroup filter — must share at least one group
+            same_group = {a for a in qualified
+                          if semgroup_compatible(m, a, tags)}
+            if not same_group:
+                n_filtered_sty += 1
+                continue
+
+            anchor = max(same_group, key=lambda a: ic_scores.get(a, 0.0))
+            canonical_to_members[anchor].add(anchor)
+            canonical_to_members[anchor].add(m)
+
+            # Track source for stats
+            if anchor in isa_anc:
+                n_via_isa += 1
+            else:
+                n_via_ro_only += 1
+
+    print(f"      Done in {time.time()-t0:.0f}s")
+    print(f"      Closure cache size       : {len(closure_cache):,}")
+    print(f"      Anchors via IS-A         : {n_via_isa:,}")
+    print(f"      Anchors via RO-only      : {n_via_ro_only:,}")
+    print(f"      Filtered by IC floor     : {n_filtered_ic:,}")
+    print(f"      Filtered by SemGroup     : {n_filtered_sty:,}")
+    print(f"      Unique canonical anchors : {len(canonical_to_members):,}")
+    return dict(canonical_to_members)
+
+
+# ============================================================================
+# STAGE E: Expand back to original CUIs
+# ============================================================================
+
+def expand_to_original_cuis(canonical_to_members, canonical_to_cluster,
+                             ic_scores):
+    print("  [E] Expanding back to original CUIs...")
+    t0 = time.time()
+    topic_id_to_topic = {}
+    canonical_to_topic_id = {}
+    cui_to_topic_ids = defaultdict(set)
+
+    for canonical, mems in canonical_to_members.items():
+        tp_id = topic_id_for(canonical)
+        expanded = set()
+        for m in mems:
+            expanded |= canonical_to_cluster.get(m, {m})
+        expanded_fs = frozenset(expanded)
+        topic_id_to_topic[tp_id] = {
+            "canonical":  canonical,
+            "members":    expanded_fs,
+            "size":       len(expanded_fs),
+            "anchor_ic":  ic_scores.get(canonical, 0.0),
+        }
+        canonical_to_topic_id[canonical] = tp_id
+        for m in expanded_fs:
+            cui_to_topic_ids[m].add(tp_id)
+
+    print(f"      Done in {time.time()-t0:.0f}s")
+    print(f"      Final topics       : {len(topic_id_to_topic):,}")
+    print(f"      CUIs participating : {len(cui_to_topic_ids):,}")
+
+    sizes = sorted(t["size"] for t in topic_id_to_topic.values())
+    if sizes:
+        print(f"      Topic size min/med/p90/p99/max: "
+              f"{sizes[0]} / {sizes[len(sizes)//2]} / "
+              f"{sizes[int(0.9*len(sizes))]} / {sizes[int(0.99*len(sizes))]} / "
+              f"{sizes[-1]}")
+    return topic_id_to_topic, canonical_to_topic_id, cui_to_topic_ids
+
+
+# ============================================================================
+# Main
+# ============================================================================
+
+def main():
+    print(f"BUILD START — {datetime.datetime.now().isoformat()}")
+    t_total = time.time()
+
+    print(f"\nInputs:")
+    print(f"  data         : {type(data).__name__} "
+          f"({data.number_of_nodes():,} nodes)")
+    print(f"  SNOMED_CUIS  : {len(SNOMED_CUIS):,}")
+    print(f"  LABELS       : {len(LABELS):,}")
+    print(f"  cache keys   : {list(cache.keys())}")
+    tags_obj = globals().get("TAGS", {})
+    print(f"  TAGS         : {len(tags_obj):,}")
+
+    if not tags_obj:
+        print("\n  WARNING: TAGS is empty. SemGroup filter will fail-open "
+              "(no filtering). RO noise WILL NOT be filtered effectively.")
+
+    # Sample one TAGS entry to verify format
+    sample_cui = next(iter(tags_obj), None) if tags_obj else None
+    if sample_cui:
+        print(f"  TAGS sample  : {sample_cui} -> {tags_obj[sample_cui]}")
+
+    print(f"\n[0] SY clusters")
+    canonical_map, canonical_to_cluster = build_sy_canonical_map(
+        cache["mrrel_rows"], SNOMED_CUIS)
+
+    print(f"\n[A] Flatten network graph")
+    neighbors = flatten_graph(data, SNOMED_CUIS, canonical_map)
+
+    print(f"\n[B] Extract relations + IC")
+    isa_parents, isa_children, ro_neighbors = extract_relations(
+        cache["mrrel_rows"], SNOMED_CUIS, canonical_map)
+    canonical_cuis = {canonical_map[c] for c in SNOMED_CUIS}
+    all_nodes = set(isa_parents.keys()) | set(isa_children.keys())
+    ic_scores = compute_ic(isa_children, all_nodes, len(canonical_cuis))
+
+    print(f"\n[C+D] Build topics")
+    canonical_to_members = build_canonical_topics(
+        canonical_cuis, neighbors, isa_parents, ro_neighbors,
+        ic_scores, tags_obj, canonical_map)
+
+    print(f"\n[E] Expand to original CUIs")
+    topic_id_to_topic, canonical_to_topic_id, cui_to_topic_ids = \
+        expand_to_original_cuis(canonical_to_members, canonical_to_cluster,
+                                 ic_scores)
+
+    print(f"\n[Save] Writing {OUTPUT_PATH}")
+    payload = {
+        "topic_id_to_topic":     topic_id_to_topic,
+        "canonical_to_topic_id": canonical_to_topic_id,
+        "cui_to_topic_ids":      {c: sorted(s) for c, s
+                                  in cui_to_topic_ids.items()},
+        "labels":                LABELS,
+        "tags":                  tags_obj,
+        "canonical_map":         canonical_map,
+        "config": {
+            "anchor_rule":     "highest-IC candidate (IS-A or RO) in topic, "
+                               f"with IC >= {MIN_ANCHOR_IC} and SemGroup match",
+            "min_anchor_ic":   MIN_ANCHOR_IC,
+            "ic_formula":      "Seco: 1 - log(desc+1) / log(total)",
+            "isa_rels":        sorted(HIERARCHY_RELS),
+            "uses_ro_direct":  True,
+            "uses_sy_merging": True,
+            "uses_semgroup":   True,
+        },
+        "built_at": datetime.datetime.now().isoformat(),
+    }
+    with open(OUTPUT_PATH, "wb") as f:
+        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    print(f"        Wrote {os.path.getsize(OUTPUT_PATH)/1024/1024:.1f} MB")
+
+    debug_path = OUTPUT_PATH.replace(".pkl", "_debug.pkl")
+    print(f"\n[Save] Writing debug sidecar to {debug_path}")
+    debug_payload = {
+        "neighbors":            {c: frozenset(n) for c, n in neighbors.items()},
+        "isa_parents":          isa_parents,
+        "ro_neighbors":         ro_neighbors,
+        "ic_scores":            ic_scores,
+        "labels":               LABELS,
+        "tags":                 tags_obj,
+        "canonical_map":        canonical_map,
+        "canonical_to_cluster": canonical_to_cluster,
+        "built_at":             datetime.datetime.now().isoformat(),
+    }
+    with open(debug_path, "wb") as f:
+        pickle.dump(debug_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    print(f"        Wrote {os.path.getsize(debug_path)/1024/1024:.1f} MB")
+
+    print(f"\nTOTAL: {time.time()-t_total:.0f}s")
+    print(f"DONE — {datetime.datetime.now().isoformat()}")
+
+
+main()
