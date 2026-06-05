@@ -1,73 +1,118 @@
-BUILD START — 2026-06-05T16:44:39.164914
+"""
+inspect_cache.py
+----------------
+Print what's actually in `cache` and `TAGS` so we know what data we have
+for building the SemGroup mapping without hardcoding.
 
-Inputs:
-  data         : DiGraph (24,055,828 nodes)
-  SNOMED_CUIS  : 374,538
-  LABELS       : 374,538
-  cache keys   : ['schema_version', 'fetched_at', 'config', 'cuis', 'mrrel_rows', 'tags', 'labels']
-  TAGS         : 370,670
-  TAGS sample  : C0000163 -> frozenset({'Organic Chemical', 'Hormone'})
+Reports:
+  - All cache keys with type and size
+  - Sample of mrrel_rows
+  - Detailed TAGS inspection (format, value types, sample CUIs)
+  - Looks for any STY/TUI/semantic-network-related data
 
-[0] SY clusters
-  [0] Building SY clusters...
-      SY pairs: 2,238  | multi-member clusters: 869
-      CUIs merged into a synonym: 921
-      Done in 1s
+Requires notebook globals:
+  cache, TAGS, SNOMED_CUIS
+"""
 
-[A] Flatten network graph
-  [A] Flattening graph (with canonicalization)...
-      50,000/374,538 (9s)
-      100,000/374,538 (15s)
-      150,000/374,538 (20s)
-      200,000/374,538 (26s)
-      250,000/374,538 (33s)
-      300,000/374,538 (38s)
-      350,000/374,538 (44s)
-      CUIs with edges: 372,862, edges: 673,008
-      Done in 46s
+from collections import Counter
+import pprint
 
-[B] Extract relations + IC
-  [B] Extracting IS-A DAG and RO neighbors...
-      IS-A rows matched: 1,236,720  | unique IS-A edges: 612,198
-      RO rows matched  : 1,507,504  | RO neighbor pairs : 677,714
-      Dropped (intra-cluster): 3,998
-      CUIs with IS-A parents : 367,217
-      CUIs with RO neighbors : 272,984
-      Done in 8s
-  [B] Computing Seco IC on IS-A DAG...
-      IC computed for 367,267 nodes in 3s
 
-[C+D] Build topics
-  [C] Forming subgroups (IS-A + RO candidates, SemGroup filter)...
-      Anchor rule: highest-IC candidate in topic, same SemGroup
-      Min IC: 0.15
-      50,000/373,617 (6s)
-      100,000/373,617 (11s)
-      150,000/373,617 (15s)
-      200,000/373,617 (18s)
-      250,000/373,617 (21s)
-      300,000/373,617 (24s)
-      350,000/373,617 (26s)
-      Done in 27s
-      Closure cache size       : 372,862
-      Anchors via IS-A         : 991,537
-      Anchors via RO-only      : 123,842
-      Filtered by IC floor     : 2,916
-      Filtered by SemGroup     : 0
-      Unique canonical anchors : 172,292
+def describe(obj, name=""):
+    """Print a structural description of an object."""
+    t = type(obj).__name__
+    if isinstance(obj, (dict,)):
+        n = len(obj)
+        print(f"  {name}: {t} with {n:,} keys")
+    elif isinstance(obj, (list, tuple, set, frozenset)):
+        n = len(obj)
+        print(f"  {name}: {t} with {n:,} items")
+    elif isinstance(obj, str):
+        print(f"  {name}: str ({len(obj)} chars) = {obj[:80]!r}")
+    else:
+        print(f"  {name}: {t} = {obj!r}")
 
-[E] Expand to original CUIs
-  [E] Expanding back to original CUIs...
-      Done in 2s
-      Final topics       : 172,292
-      CUIs participating : 367,886
-      Topic size min/med/p90/p99/max: 2 / 3 / 9 / 38 / 2540
 
-[Save] Writing topics.pkl
-        Wrote 57.5 MB
+print(f"\n{'='*80}")
+print("CACHE TOP-LEVEL KEYS")
+print('='*80)
+for k in cache.keys():
+    print(f"\n  Key: {k!r}")
+    describe(cache[k], "    value")
 
-[Save] Writing debug sidecar to topics_debug.pkl
-        Wrote 70.5 MB
 
-TOTAL: 95s
-DONE — 2026-06-05T16:46:13.779636
+print(f"\n{'='*80}")
+print("MRREL_ROWS DETAILED")
+print('='*80)
+rows = cache.get("mrrel_rows", [])
+print(f"  Total rows: {len(rows):,}")
+if rows:
+    print(f"  First row type: {type(rows[0]).__name__}")
+    print(f"  First row length: {len(rows[0])}")
+    print(f"  First 5 rows:")
+    for r in rows[:5]:
+        print(f"    {r}")
+    # REL distribution
+    rel_counter = Counter()
+    for r in rows[:200000]:  # sample for speed
+        if len(r) >= 3:
+            rel_counter[r[2]] += 1
+    print(f"\n  REL distribution (first 200k rows):")
+    for rel, n in rel_counter.most_common():
+        print(f"    {rel}: {n:,}")
+
+
+print(f"\n{'='*80}")
+print("TAGS DETAILED")
+print('='*80)
+print(f"  Total entries: {len(TAGS):,}")
+if TAGS:
+    # Look at a few entries
+    sample_cuis = list(TAGS.keys())[:10]
+    print(f"\n  Sample entries:")
+    for cui in sample_cuis:
+        val = TAGS[cui]
+        print(f"    {cui}: {type(val).__name__} = {val!r}")
+
+    # Inspect value types and distinct values
+    value_types = Counter()
+    all_values = Counter()
+    sample_n = 5000
+    counted = 0
+    for cui, val in TAGS.items():
+        if counted >= sample_n:
+            break
+        value_types[type(val).__name__] += 1
+        if isinstance(val, (set, frozenset, list, tuple)):
+            for v in val:
+                all_values[v] += 1
+        else:
+            all_values[val] += 1
+        counted += 1
+
+    print(f"\n  Value container types (sample {sample_n}):")
+    for t, n in value_types.most_common():
+        print(f"    {t}: {n}")
+
+    print(f"\n  Top 30 distinct STY values (sample {sample_n} CUIs):")
+    for v, n in all_values.most_common(30):
+        print(f"    '{v}'  ({n} CUIs)")
+
+    print(f"\n  Total distinct STY values seen: {len(all_values):,}")
+
+
+print(f"\n{'='*80}")
+print("SEARCHING CACHE FOR SEMANTIC-TYPE DATA")
+print('='*80)
+print("  Looking for keys related to semantic types / TUIs / SemGroups...")
+for k in cache.keys():
+    lk = str(k).lower()
+    interesting = any(s in lk for s in ['sty', 'tui', 'sem', 'sg', 'srdef',
+                                          'srgr', 'srstre', 'semgroup'])
+    if interesting:
+        print(f"  FOUND: {k}")
+        describe(cache[k], "    ")
+
+print(f"\n{'='*80}")
+print("DONE — paste this output to decide on SemGroup mapping approach")
+print('='*80)
