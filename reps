@@ -1,4 +1,5 @@
-C0456953 has 3 ancestors. Top by descendant count:
-  C2720507  desc=366970  'SNOMED CT has been created by combining SNOMED RT and a comp'
-  C1285164  desc=123380  'Qualifier value'
-  C0282354  desc= 42849  'Descriptor'
+# In notebook:
+ancestors = closure("C0026918")
+ranked = sorted(ancestors, key=lambda c: -desc_count.get(c, 0))
+for c in ranked[:20]:
+    print(f"  {c}  desc={desc_count.get(c,0):>6}  '{labels.get(c,'?')[:60]}'")
