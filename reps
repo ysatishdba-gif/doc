@@ -1,98 +1,86 @@
-================================================================================
-C0041296  |  Infection caused by Mycobacterium tuberculosis
-STY: Disease or Syndrome
--> 3 TOPIC(S)
+"""
+lookup_sty.py
+-------------
+For a CUI, show its topics with STY comparison:
+  - Query CUI's STY
+  - Each topic's anchor STY
+  - Whether they share an STY (✓ same, ✗ different)
+  - All STYs present among the topic's members (to see diversity)
 
-  Topic ID : tp_9109941743b9
-  Canonical: C0026918
-  Label    : Mycobacteriosis (disorder)
-  Size     : 18 CUIs
-  IC       : 0.522
-  Members  :
-    C0023343  'Infection due to Mycobacterium leprae'
-    C0026918  'Mycobacteriosis (disorder)'
-    C0026919  'Infection due to non-TB (tuberculous) mycobacteria'
-    C0041296  'Infection caused by Mycobacterium tuberculosis'
-    C0275705  'Pulmonary disease caused by Mycobacteria'
-    C0275707  'Cutaneous infectious disease caused by Mycobacteria'
-    C0343431  'Disseminated mycobacteriosis'
-    C1320199  'Mycobacterial infection of the central nervous system'
-    C1720238  'Mycobacteriosis with AIDS (acquired immunodeficiency syndrome)'
-    C1960555  'Mycobacterial keratitis'
-    C2315962  'Infection caused by Mycobacterium resistant to multiple antimycobacterial agents'
-    C5396420  'Mycobacterial tenosynovitis'
-    C5566258  'Mycobacterial arthritis'
-    C5566259  'Mycobacterial bursitis'
-    C5566650  'Mycobacterial myositis'
-    C5567318  'Mycobacterial oesophagitis'
-    C5567319  'Mycobacterial gastritis'
-    C5569194  'Mycobacterial enteritis of intestine'
+Lets you visually judge whether STY-matching is a useful filter.
 
-  Topic ID : tp_e7516417cb8f
-  Canonical: C0456953
-  Label    : Morphological descriptors
-  Size     : 67 CUIs
-  IC       : 0.520
-  Members  :
-    C0005699  'Blastic phase chronic myeloid leukemia (disorder)'
-    C0016024  'Fibroadenosis'
-    C0024525  'Malakoplakia'
-    C0027707  'IN - Interstitial nephritis'
-    C0029974  'Ovum structure'
-    C0041296  'Infection caused by Mycobacterium tuberculosis'
-    C0041349  'Tubulointerstitial nephritis'
-    C0205180  'Anicteric'
-    C0205192  'Cicatricial'
-    C0205226  'Exfoliative'
-    C0205268  'Intertriginous'
-    C0205273  'Isomorphous'
-    C0205274  'Laminar (qualifier value)'
-    C0205323  'Pitting (qualifier value)'
-    C0230704  'Lipid droplets'
-    C0332204  'Angiolupoid'
-    C0332207  'Acinar'
-    C0332235  'Lepromatous'
-    C0332244  'Rupial'
-    C0332250  'Tubercular'
-    C0333316  'Rice bodies'
-    C0392634  'Inguinal bubo'
-    C0429186  'Oil droplets'
-    C0440790  'Solid organ'
-    C0442806  'Increased - homogenous'
-    ... and 42 more
+Run:  exec(open("lookup_sty.py").read())
+      lookup_sty("C0041296")
+"""
 
-  Topic ID : tp_bedf9e3c83eb
-  Canonical: C0041296
-  Label    : Infection caused by Mycobacterium tuberculosis
-  Size     : 82 CUIs
-  IC       : 0.562
-  Members  :
-    C0007943  'Tuberculous chancre'
-    C0014014  'Tuberculous empyema'
-    C0021386  'Necrotizing granulomatous inflammation'
-    C0037118  'Silicotuberculosis'
-    C0041295  'Tuberculoma'
-    C0041296  'Infection caused by Mycobacterium tuberculosis'
-    C0041307  'Infection caused by Mycobacterium bovis'
-    C0041309  'Cutaneous tuberculosis'
-    C0041312  'Tuberculosis of gastrointestinal tract'
-    C0041313  'Tuberculosis of liver (disorder)'
-    C0041315  'Laryngeal tuberculosis'
-    C0041316  'Tuberculosis of lymph node'
-    C0041321  'Miliary tuberculosis'
-    C0041322  'Ocular tuberculosis'
-    C0041323  'Oral tuberculosis'
-    C0041324  'Tuberculosis of bones and/or joints (disorder)'
-    C0041325  'Tuberculous peritonitis'
-    C0041326  'Tuberculosis of pleura'
-    C0041327  'Pulmonary tuberculosis'
-    C0041331  'Tuberculosis of spleen (disorder)'
-    C0041333  'Urogenital tuberculosis'
-    C0041336  'Tuberculous fibrosis of lung'
-    C0151332  'Active tuberculosis'
-    C0152545  'Primary tuberculosis'
-    C0152600  'Tuberculous pneumothorax'
-    ... and 57 more
+import pickle
+from collections import Counter
 
-================================================================================
-DONE
+
+with open("topics.pkl", "rb") as f:
+    P = pickle.load(f)
+
+topic_id_to_topic = P["topic_id_to_topic"]
+cui_to_topic_ids  = P["cui_to_topic_ids"]
+labels            = P["labels"]
+
+
+def _stys(cui):
+    raw = TAGS.get(cui)
+    if not raw:
+        return frozenset()
+    if isinstance(raw, str):
+        return frozenset([raw])
+    return frozenset(raw)
+
+
+def lookup_sty(*cuis, max_members_shown=8):
+    for cui in cuis:
+        q_stys = _stys(cui)
+        tids = cui_to_topic_ids.get(cui, [])
+
+        print(f"\n{'='*82}")
+        print(f"QUERY CUI: {cui}  '{labels.get(cui, '?')}'")
+        print(f"  STY: {sorted(q_stys) if q_stys else '(none)'}")
+        print(f"  In {len(tids)} topic(s)")
+        print(f"{'='*82}")
+
+        # Sort topics smallest first
+        rows = [(tid, topic_id_to_topic[tid]) for tid in tids]
+        rows.sort(key=lambda r: r[1]["size"])
+
+        for tid, t in rows:
+            anchor = t["canonical"]
+            a_stys = _stys(anchor)
+            shared = q_stys & a_stys
+            verdict = "✓ STY MATCH" if shared else "✗ STY DIFFER"
+
+            print(f"\n  {verdict}  {tid}  size={t['size']}  IC={t['anchor_ic']:.3f}")
+            print(f"    Anchor:    {anchor} '{labels.get(anchor, '?')}'")
+            print(f"    Query STY: {sorted(q_stys) or '(none)'}")
+            print(f"    Anchor STY:{sorted(a_stys) or '(none)'}")
+            if shared:
+                print(f"    Shared:    {sorted(shared)}")
+
+            # STY diversity inside the topic
+            sty_count = Counter()
+            for m in t["members"]:
+                for s in _stys(m):
+                    sty_count[s] += 1
+            print(f"    Member STY mix (top 5):")
+            for s, n in sty_count.most_common(5):
+                print(f"        {n:>3}x  {s}")
+
+            # Sample members
+            print(f"    Sample members:")
+            for m in sorted(t["members"], key=lambda c: labels.get(c, ""))[:max_members_shown]:
+                m_stys = sorted(_stys(m))
+                print(f"        {m}  STY={m_stys}  '{labels.get(m, '?')[:50]}'")
+            if t["size"] > max_members_shown:
+                print(f"        ... and {t['size'] - max_members_shown} more")
+
+
+print("Loaded. Try:")
+print("  lookup_sty('C0041296')                     # TB")
+print("  lookup_sty('C0041296', 'C0032285')         # TB + Pneumonia")
+print("  lookup_sty('C0011849')                     # Diabetes")
