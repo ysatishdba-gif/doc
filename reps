@@ -1,69 +1,131 @@
-BUILD START — 2026-06-08T20:44:00.163508
+================================================================================
+C0041296  |  Infection caused by Mycobacterium tuberculosis
+STY: Disease or Syndrome
+-> 4 TOPIC(S)
 
-Inputs:
-  data         : DiGraph (24,055,828 nodes)
-  SNOMED_CUIS  : 374,538
-  LABELS       : 374,538
-  cache keys   : ['schema_version', 'fetched_at', 'config', 'cuis', 'mrrel_rows', 'tags', 'labels']
-  config       : INCLUDE_RB_RN=True, MIN_ANCHOR_IC=0.15
+  Topic ID : tp_9109941743b9
+  Canonical: C0026918
+  Label    : Mycobacteriosis (disorder)
+  Size     : 18 CUIs
+  IC       : 0.522
+  Members  :
+    C0023343  'Infection due to Mycobacterium leprae'
+    C0026918  'Mycobacteriosis (disorder)'
+    C0026919  'Infection due to non-TB (tuberculous) mycobacteria'
+    C0041296  'Infection caused by Mycobacterium tuberculosis'
+    C0275705  'Pulmonary disease caused by Mycobacteria'
+    C0275707  'Cutaneous infectious disease caused by Mycobacteria'
+    C0343431  'Disseminated mycobacteriosis'
+    C1320199  'Mycobacterial infection of the central nervous system'
+    C1720238  'Mycobacteriosis with AIDS (acquired immunodeficiency syndrome)'
+    C1960555  'Mycobacterial keratitis'
+    C2315962  'Infection caused by Mycobacterium resistant to multiple antimycobacterial agents'
+    C5396420  'Mycobacterial tenosynovitis'
+    C5566258  'Mycobacterial arthritis'
+    C5566259  'Mycobacterial bursitis'
+    C5566650  'Mycobacterial myositis'
+    C5567318  'Mycobacterial oesophagitis'
+    C5567319  'Mycobacterial gastritis'
+    C5569194  'Mycobacterial enteritis of intestine'
 
-[0] SY clusters
-  [0] Building SY clusters...
-      SY pairs: 2,238  | multi-member clusters: 869
-      CUIs merged into a synonym: 921
-      Done in 1s
+  Topic ID : tp_e7516417cb8f
+  Canonical: C0456953
+  Label    : Morphological descriptors
+  Size     : 67 CUIs
+  IC       : 0.520
+  Members  :
+    C0005699  'Blastic phase chronic myeloid leukemia (disorder)'
+    C0016024  'Fibroadenosis'
+    C0024525  'Malakoplakia'
+    C0027707  'IN - Interstitial nephritis'
+    C0029974  'Ovum structure'
+    C0041296  'Infection caused by Mycobacterium tuberculosis'
+    C0041349  'Tubulointerstitial nephritis'
+    C0205180  'Anicteric'
+    C0205192  'Cicatricial'
+    C0205226  'Exfoliative'
+    C0205268  'Intertriginous'
+    C0205273  'Isomorphous'
+    C0205274  'Laminar (qualifier value)'
+    C0205323  'Pitting (qualifier value)'
+    C0230704  'Lipid droplets'
+    C0332204  'Angiolupoid'
+    C0332207  'Acinar'
+    C0332235  'Lepromatous'
+    C0332244  'Rupial'
+    C0332250  'Tubercular'
+    C0333316  'Rice bodies'
+    C0392634  'Inguinal bubo'
+    C0429186  'Oil droplets'
+    C0440790  'Solid organ'
+    C0442806  'Increased - homogenous'
+    ... and 42 more
 
-[A] Flatten network graph
-  [A] Flattening graph (with SY canonicalization)...
-      50,000/374,538 (4s)
-      100,000/374,538 (8s)
-      150,000/374,538 (12s)
-      200,000/374,538 (17s)
-      250,000/374,538 (22s)
-      300,000/374,538 (26s)
-      350,000/374,538 (30s)
-      CUIs with edges: 372,862, edges: 673,008
-      Done in 32s
+  Topic ID : tp_bedf9e3c83eb
+  Canonical: C0041296
+  Label    : Infection caused by Mycobacterium tuberculosis
+  Size     : 82 CUIs
+  IC       : 0.562
+  Members  :
+    C0007943  'Tuberculous chancre'
+    C0014014  'Tuberculous empyema'
+    C0021386  'Necrotizing granulomatous inflammation'
+    C0037118  'Silicotuberculosis'
+    C0041295  'Tuberculoma'
+    C0041296  'Infection caused by Mycobacterium tuberculosis'
+    C0041307  'Infection caused by Mycobacterium bovis'
+    C0041309  'Cutaneous tuberculosis'
+    C0041312  'Tuberculosis of gastrointestinal tract'
+    C0041313  'Tuberculosis of liver (disorder)'
+    C0041315  'Laryngeal tuberculosis'
+    C0041316  'Tuberculosis of lymph node'
+    C0041321  'Miliary tuberculosis'
+    C0041322  'Ocular tuberculosis'
+    C0041323  'Oral tuberculosis'
+    C0041324  'Tuberculosis of bones and/or joints (disorder)'
+    C0041325  'Tuberculous peritonitis'
+    C0041326  'Tuberculosis of pleura'
+    C0041327  'Pulmonary tuberculosis'
+    C0041331  'Tuberculosis of spleen (disorder)'
+    C0041333  'Urogenital tuberculosis'
+    C0041336  'Tuberculous fibrosis of lung'
+    C0151332  'Active tuberculosis'
+    C0152545  'Primary tuberculosis'
+    C0152600  'Tuberculous pneumothorax'
+    ... and 57 more
 
-[B] Extract IS-A DAG + IC
-  [B] Extracting IS-A DAG...
-      INCLUDE_RB_RN=True, using rels=['CHD', 'PAR', 'RB', 'RN']
-      IS-A rows: 1,236,720  | unique edges: 612,198
-      Dropped (intra-SY-cluster): 696
-      Per REL: PAR=610,757  CHD=610,757  RB=2,192  RN=2,192
-      PAR/CHD: 610,757  |  RB/RN: 2,192  |  RB/RN-only (not in PAR/CHD): 1,441
-      CUIs with IS-A parents: 367,217
-      Done in 4s
-  [B] Computing Seco IC + descendant counts...
-      IC + desc_count computed for 367,267 nodes in 3s
+  Topic ID : tp_c33cdf9aedb3
+  Canonical: C0009450
+  Label    : Communicable disease
+  Size     : 139 CUIs
+  IC       : 0.297
+  Members  :
+    C0004623  'Bacterial infection'
+    C0009186  'Coccidioidomycosis (disorder)'
+    C0009450  'Communicable disease'
+    C0010356  'Cross infection'
+    C0010418  'Cryptosporidiosis'
+    C0014055  'Arthropod-borne viral encephalitis, vector unknown (navigational concept)'
+    C0014061  'Tick-borne encephalitis'
+    C0016397  'Localized infection (disorder)'
+    C0019104  'Viral hemorrhagic fever'
+    C0023240  'Legionellosis'
+    C0024449  'Mycetomata'
+    C0025229  'Infection due to Burkholderia pseudomallei'
+    C0026946  'Mycosis'
+    C0028242  'Nocardiosis'
+    C0029118  'Opportunistic infectious disease'
+    C0030499  'Parasitic disease'
+    C0033740  'Protozoan infection'
+    C0034189  'Pyemia'
+    C0034223  'Pyoureter'
+    C0035243  'Respiratory tract infection'
+    C0035436  'Rheumatic fever'
+    C0035921  'Congenital rubella syndrome'
+    C0036916  'Sexually transmitted disease'
+    C0037278  'Infection of skin'
+    C0038826  'Suprainfection'
+    ... and 114 more
 
-[C+D] Build topics
-  [C] Forming subgroups per main topic (IS-A only)...
-      Anchor rule: highest-IC IS-A ancestor in topic, IC >= 0.15
-      50,000/373,617 (5s)
-      100,000/373,617 (8s)
-      150,000/373,617 (10s)
-      200,000/373,617 (12s)
-      250,000/373,617 (13s)
-      300,000/373,617 (14s)
-      350,000/373,617 (15s)
-      Done in 15s
-      Closure cache size       : 372,862
-      Filtered by IC floor     : 2,932
-      Unique canonical anchors : 128,452
-
-[E] Expand to original CUIs
-  [E] Expanding back to original CUIs...
-      Done in 2s
-      Final topics       : 128,452
-      CUIs participating : 367,770
-      Topic size min/med/p90/p99/max: 2 / 3 / 10 / 45 / 2315
-
-[Save] Writing topics.pkl
-        Wrote 53.9 MB
-
-[Save] Writing debug sidecar to topics_debug.pkl
-        Wrote 50.7 MB
-
-TOTAL: 63s
-DONE — 2026-06-08T20:45:03.374754
+================================================================================
+DONE
