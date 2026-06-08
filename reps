@@ -1,7 +1,7 @@
 ================================================================================
 C0041296  |  Infection caused by Mycobacterium tuberculosis
 STY: Disease or Syndrome
--> 4 TOPIC(S)
+-> 3 TOPIC(S)
 
   Topic ID : tp_9109941743b9
   Canonical: C0026918
@@ -93,39 +93,6 @@ STY: Disease or Syndrome
     C0152545  'Primary tuberculosis'
     C0152600  'Tuberculous pneumothorax'
     ... and 57 more
-
-  Topic ID : tp_c33cdf9aedb3
-  Canonical: C0009450
-  Label    : Communicable disease
-  Size     : 139 CUIs
-  IC       : 0.297
-  Members  :
-    C0004623  'Bacterial infection'
-    C0009186  'Coccidioidomycosis (disorder)'
-    C0009450  'Communicable disease'
-    C0010356  'Cross infection'
-    C0010418  'Cryptosporidiosis'
-    C0014055  'Arthropod-borne viral encephalitis, vector unknown (navigational concept)'
-    C0014061  'Tick-borne encephalitis'
-    C0016397  'Localized infection (disorder)'
-    C0019104  'Viral hemorrhagic fever'
-    C0023240  'Legionellosis'
-    C0024449  'Mycetomata'
-    C0025229  'Infection due to Burkholderia pseudomallei'
-    C0026946  'Mycosis'
-    C0028242  'Nocardiosis'
-    C0029118  'Opportunistic infectious disease'
-    C0030499  'Parasitic disease'
-    C0033740  'Protozoan infection'
-    C0034189  'Pyemia'
-    C0034223  'Pyoureter'
-    C0035243  'Respiratory tract infection'
-    C0035436  'Rheumatic fever'
-    C0035921  'Congenital rubella syndrome'
-    C0036916  'Sexually transmitted disease'
-    C0037278  'Infection of skin'
-    C0038826  'Suprainfection'
-    ... and 114 more
 
 ================================================================================
 DONE
