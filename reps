@@ -1,164 +1,268 @@
-"""
-trace_topic.py
---------------
-Show the per-member anchor decision for one focal CUI's main topic.
-Uses STY-direct compatibility: two CUIs compatible if they share at least
-one STY (semantic type name) in TAGS.
+Looking at the code versus the topic-selection idea you described ("find the first major expansion point in the hierarchy"), there is a significant mismatch.
 
-Reads topics_debug.pkl.
-"""
+What the code is actually doing
 
-import pickle
+The anchor selection is here:
 
+qualified = {a for a in in_topic
+             if ic_scores.get(a, 0.0) >= MIN_ANCHOR_IC}
 
-DEBUG_PATH = "topics_debug.pkl"
-MIN_ANCHOR_IC = 0.15
+anchor = max(qualified, key=lambda a: ic_scores.get(a, 0.0))
 
+Since Seco IC is:
 
-FOCAL_CUIS = [
-    "C0032285",  # Pneumonia
-    "C0011849",  # Diabetes mellitus
-    "C0024109",  # Lung
-    "C2142181",  # Pain of left knee joint
-    "C0559470",  # Allergy to peanut
-    "C0013182",  # Allergy to drug
-    "C0002792",  # Anaphylaxis
-    "C0007113",  # Rectal cancer
-    "C0007121",  # Bronchogenic carcinoma
-]
+IC = 1 - log(descendants+1)/log(total)
 
+higher IC = fewer descendants = more specific.
 
-with open(DEBUG_PATH, "rb") as f:
-    d = pickle.load(f)
+Therefore you're selecting:
 
-neighbors     = d["neighbors"]
-isa_parents   = d["isa_parents"]
-ro_neighbors  = d.get("ro_neighbors", {})
-ic_scores     = d["ic_scores"]
-labels        = d["labels"]
-tags          = d.get("tags", {})
-canonical_map = d.get("canonical_map", {})
+"the most specific ancestor inside the topic"
 
+not
 
-def lbl(c, width=None):
-    s = labels.get(c, "?")
-    return s[:width].ljust(width) if width else s
+"the ancestor immediately before the first major descendant-count explosion"
 
+These are very different.
 
-def cui_stys(c):
-    raw = tags.get(c)
-    if not raw:
-        return set()
-    if isinstance(raw, str):
-        return {raw}
-    return set(raw)
+What's missing for your proposed approach
 
+You need:
 
-def sty_compatible(a, b):
-    sa, sb = cui_stys(a), cui_stys(b)
-    if not sa or not sb:
-        return True
-    return bool(sa & sb)
+Descendant counts
 
+You already compute them indirectly:
 
-_closure = {}
-def ancestor_closure(cui):
-    if cui in _closure:
-        return _closure[cui]
-    ancestors = set()
-    stack = [cui]
-    visited = set()
-    while stack:
-        node = stack.pop()
-        if node in visited:
-            continue
-        visited.add(node)
-        for p in isa_parents.get(node, set()):
-            if p not in ancestors:
-                ancestors.add(p)
-                stack.append(p)
-    _closure[cui] = frozenset(ancestors)
-    return _closure[cui]
+descendant_sets[node]
 
+but throw them away.
 
-def canonical(c):
-    return canonical_map.get(c, c)
+You only keep:
 
+ic[node]
 
-def trace(focal):
-    can_focal = canonical(focal)
-    print(f"\n{'='*110}")
-    print(f"FOCAL CUI: {focal}  '{labels.get(focal, '?')}'")
-    if can_focal != focal:
-        print(f"  Canonicalized to: {can_focal} '{labels.get(can_focal, '?')}'")
-    sty_list = sorted(cui_stys(focal)) or ['(none)']
-    print(f"  STYs: {sty_list}")
-    print(f"{'='*110}\n")
+Instead retain:
 
-    members = {can_focal} | neighbors.get(can_focal, frozenset())
-    print(f"Main topic size: {len(members)} canonical members\n")
+desc_count[node] = len(descendant_sets[node])
+Ancestor path analysis
 
-    if len(members) < 2:
-        print("  (too small for anchor selection)")
-        return
+Currently:
 
-    n_anchored = 0
-    n_no_candidate = 0
-    n_ic_filtered = 0
-    n_sty_filtered = 0
+closure = ancestor_closure(m, isa_parents, closure_cache)
 
-    for m in sorted(members, key=lambda c: -ic_scores.get(c, 0.0)):
-        m_ic = ic_scores.get(m, 0.0)
-        m_stys = sorted(cui_stys(m)) or ["(none)"]
-        m_sty_short = ",".join(s[:8] for s in m_stys)
-        m_text = f"{m} '{lbl(m,40)}' (IC={m_ic:.3f}, sty={m_sty_short})"
+returns an unordered set.
 
-        isa_anc = ancestor_closure(m)
-        ro_direct = ro_neighbors.get(m, set())
-        candidates = (isa_anc | ro_direct) & members
-        candidates = candidates - {m}
+Your jump heuristic requires paths:
 
-        if not candidates:
-            print(f"  {m_text}")
-            print(f"     -> UNGROUPED (no IS-A ancestors or RO neighbors in topic)")
-            n_no_candidate += 1
-            continue
+Tuberculosis
+→ Mycobacterial Infections
+→ Bacterial Infections
+→ Infectious Diseases
 
-        qualified = {a for a in candidates
-                     if ic_scores.get(a, 0.0) >= MIN_ANCHOR_IC}
-        if not qualified:
-            print(f"  {m_text}")
-            print(f"     -> UNGROUPED (all candidates below IC floor {MIN_ANCHOR_IC})")
-            n_ic_filtered += 1
-            continue
+not merely:
 
-        same_sty = {a for a in qualified if sty_compatible(m, a)}
-        if not same_sty:
-            print(f"  {m_text}")
-            print(f"     -> UNGROUPED (no STY-compatible candidates)")
-            rejected = sorted(qualified, key=lambda c: -ic_scores.get(c,0))[:3]
-            for r in rejected:
-                rs = sorted(cui_stys(r)) or ["(none)"]
-                rsty = ",".join(s[:12] for s in rs)
-                print(f"        rejected: {r} '{lbl(r,30)}' sty={rsty}")
-            n_sty_filtered += 1
-            continue
+{
+  Mycobacterial Infections,
+  Bacterial Infections,
+  Infectious Diseases
+}
 
-        anchor = max(same_sty, key=lambda a: ic_scores.get(a, 0.0))
-        anchor_ic = ic_scores.get(anchor, 0.0)
-        source = "IS-A" if anchor in isa_anc else "RO"
-        anchor_stys = sorted(cui_stys(anchor)) or ["(none)"]
-        anchor_sty_short = ",".join(s[:8] for s in anchor_stys)
-        print(f"  {m_text}")
-        print(f"     -> {anchor} '{lbl(anchor,40)}' (IC={anchor_ic:.3f}, "
-              f"sty={anchor_sty_short}) via {source}")
-        n_anchored += 1
+You lose ordering.
 
-    print(f"\n  Summary: anchored={n_anchored}, ungrouped_no_candidate={n_no_candidate}, "
-          f"ungrouped_ic={n_ic_filtered}, ungrouped_sty={n_sty_filtered}")
+Multiple inheritance
 
+UMLS/SNOMED is a DAG.
 
-for cui in FOCAL_CUIS:
-    trace(cui)
+Example:
 
-print(f"\n{'='*110}\nDONE")
+Tuberculosis
+ ├── Infectious Disease
+ └── Granulomatous Disease
+
+Your desired algorithm said:
+
+if they traverse more than one path, it's OK to have more than one topic
+
+Current code collapses everything into:
+
+closure & members
+
+which loses path identity.
+
+You need path enumeration.
+
+Biggest conceptual problem
+
+This line:
+
+in_topic = (closure & members) - {m}
+
+means:
+
+only consider ancestors that are already members of the graph neighborhood.
+
+That is extremely restrictive.
+
+Example:
+
+Tuberculosis
+neighbors:
+    Leprosy
+    Nocardiosis
+
+Ancestors:
+    Mycobacterial Infections
+    Bacterial Infections
+    Infectious Diseases
+
+The ancestor likely isn't in members.
+
+Then:
+
+in_topic = {}
+
+and the concept gets no anchor.
+
+You're forcing:
+
+ancestor ∈ topic-members
+
+which is generally not true.
+
+For retrieval-topic extraction you usually want:
+
+ancestor ∉ member set
+
+because the ancestor is the label/category.
+
+Sibling information is missing
+
+Your intuition about expansion depends on siblings.
+
+Example:
+
+Mycobacterial Infections
+├─ Tuberculosis
+├─ Leprosy
+├─ Buruli ulcer
+
+The jump is caused by gaining sibling branches.
+
+Current code never computes:
+
+siblings
+branching factor
+subtree expansion
+
+It only computes IC.
+
+Topic collapse issue
+
+Current dedup:
+
+canonical_to_members[anchor].add(m)
+
+creates topics keyed by anchor.
+
+But because anchor = highest IC ancestor,
+
+many topics will anchor to highly specific concepts.
+
+You may get:
+
+Pulmonary tuberculosis
+Tuberculosis meningitis
+Miliary tuberculosis
+
+as separate anchors,
+
+when your retrieval goal likely wants:
+
+Tuberculosis
+
+or
+
+Mycobacterial Infections
+Another issue: PAR/CHD/RB/RN
+
+You are treating:
+
+HIERARCHY_RELS = {"PAR","CHD","RB","RN"}
+
+as equivalent.
+
+In UMLS:
+
+PAR/CHD = parent-child
+RB/RN = broader-narrower
+
+RB/RN are not guaranteed to be clean IS-A.
+
+For topic extraction this can create weird jumps.
+
+I'd separately measure:
+
+isa_edges
+broader_edges
+
+and compare outputs.
+
+What I would add
+
+During compute_ic:
+
+desc_count = {
+    n: len(descendant_sets[n])
+    for n in descendant_sets
+}
+
+Then for each path:
+
+Tuberculosis
+→ Mycobacterial Infections
+→ Bacterial Infections
+→ Infectious Diseases
+→ Diseases
+
+compute:
+
+ratio[i] =
+desc_count[parent]
+/
+max(1, desc_count[child])
+
+Find:
+
+largest_ratio
+
+and select:
+
+child_before_jump
+
+Example:
+
+20
+80
+2500
+12000
+100000
+
+Ratios:
+
+4
+31
+4.8
+8.3
+
+Topic:
+
+Mycobacterial Infections
+Most important missing pieces
+Paths are lost (only ancestor closure retained).
+Descendant counts are discarded after IC computation.
+No expansion/jump analysis is performed.
+Ancestors must already be in topic members (closure & members) which excludes most useful topic labels.
+Multiple inheritance paths are collapsed into a set, preventing multiple topics per CUI.
+IC selects the most specific ancestor, which is almost the opposite of your new "expansion point" heuristic.
+
+Those six items are the biggest gaps between the current implementation and the retrieval-topic approach you've been describing.
