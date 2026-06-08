@@ -1,5 +1,10 @@
-# In notebook:
-ancestors = closure("C0026918")
-ranked = sorted(ancestors, key=lambda c: -desc_count.get(c, 0))
-for c in ranked[:20]:
-    print(f"  {c}  desc={desc_count.get(c,0):>6}  '{labels.get(c,'?')[:60]}'")
+C2720507  desc=366970  'SNOMED CT has been created by combining SNOMED RT and a comp'
+  C0037088  desc=130974  'Clinical finding (finding)'
+  C0574125  desc=101065  'Functional finding'
+  C0277543  desc= 93190  'Functional disease present'
+  C0277542  desc= 93188  'Organic disease present'
+  C0012634  desc= 93187  'Diseases'
+  C1298232  desc= 25852  'Special concept'
+  C1285556  desc= 25851  'Navigational concept'
+  C0009450  desc=  8309  'Communicable disease'
+  C0004623  desc=  2793  'Bacterial infection'
