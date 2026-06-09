@@ -1,13 +1,160 @@
+"""
+server.py
+---------
+Run ONCE, leave running in its own terminal. Loads all pickles + builds all
+clients once, holds them in memory, serves query/doc requests over a local
+socket so the client runs fast with no reload.
+
+    python server.py        # leave this terminal open
+
+QUERY side : LLM nature-breakdown -> per-concept CUI extract -> summarize -> topics
+DOC side   : NO LLM. per-chunk (blob) CUI extract -> union -> summarize -> topics
+MATCH      : query topic-IDs vs each doc topic-IDs, all scoring metrics
+"""
+
+from multiprocessing.connection import Listener
+
+import config  # loads hierarchy / ic / topics once
+from intents import ContextualIntentPipeline
+from cui_core import CUIExtractor
+from cui_summarizer import CUISummarizer
+from topic_adaptor import TopicAdaptor
+from config import (
+    PROJECT_ID, LOCATION, MODEL_VERSION,
+    API_URL, TOP_K, TOP_P, CLUSTER_SET, COMBINED,
+)
+
+print(f">>> PROJECT_ID={PROJECT_ID!r}  LOCATION={LOCATION!r}  MODEL={MODEL_VERSION!r}")
+print("Building clients (once)...")
+
+pipeline   = ContextualIntentPipeline(project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION)
+extractor  = CUIExtractor(API_URL, top_k=TOP_K, top_p=TOP_P, cluster_set=CLUSTER_SET, combined=COMBINED)
+summarizer = CUISummarizer()
+adaptor    = TopicAdaptor()
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def split_path(p):
+    return [s.strip() for s in p.split(">>") if s.strip()]
+
+
+def flat(raw):
+    """raw: {phrase: {"cuis": {cui: distance}}} -> ordered unique cui list."""
+    out, seen = [], set()
+    for d in raw.values():
+        for c in d.get("cuis", {}):
+            if c and c not in seen:
+                seen.add(c)
+                out.append(c)
+    return out
+
+
+def _summarize_and_topics(tr, cuis):
+    """Shared tail: summarize CUIs -> topics. Mutates tr in place."""
+    if not cuis:
+        tr["surviving"] = []
+        tr["removed"] = []
+        tr["topics"] = []
+        tr["topic_ids"] = []
+        tr["metrics"] = {}
+        return
+
+    summ = summarizer.summarize(cuis, sources=["SNOMEDCT_US"])
+    tr["metrics"] = summ.get("metrics", {})
+    tr["surviving"] = [
+        {"cui": r["cui"], "term": r.get("preferred_term", r["cui"]), "ic": r.get("ic", 0.0)}
+        for r in summ["surviving_cuis"]
+    ]
+    tr["removed"] = [
+        {"cui": r["cui"], "term": r.get("preferred_term", r["cui"]),
+         "by": r.get("retained_by", ""), "reason": r.get("reason", "")}
+        for r in summ.get("removed_cuis", [])
+    ]
+    surv = [r["cui"] for r in summ["surviving_cuis"]]
+    tps = adaptor.cuis_to_topics(surv)
+    tr["topics"] = [
+        {"tp": tp, "size": adaptor.topic_size(tp),
+         "ic": round(adaptor.topic_anchor_ic(tp), 3),
+         "label": adaptor.topic_label(tp)}
+        for tp in sorted(tps, key=adaptor.topic_size)
+    ]
+    tr["topic_ids"] = list(tps)
+
+
+# ---------------------------------------------------------------------------
+# QUERY side — WITH LLM nature breakdown
+# ---------------------------------------------------------------------------
+
+def _trace_query(text):
+    tr = {"text": text}
+
+    full = pipeline.run(query=text, output_format="full_pipeline")
+    tr["expanded"] = full.get("expanded_query", "")
+    tr["is_clinical"] = full.get("is_clinical", False)
+    if not tr["is_clinical"]:
+        tr["reason"] = full.get("reason")
+        return tr
+
+    intents_view = []
+    cuis, seen = [], set()
+    for it in full.get("intents", []):
+        iv = {
+            "intent": it.get("intent_title", ""),
+            "nature": it.get("nature", ""),
+            "description": it.get("description", ""),
+            "sub_natures": [],
+        }
+        for sn in it.get("sub_natures", []):
+            path = sn.get("category_path", "")
+            atoms = sn.get("atomic_concepts", []) or []
+            snv = {"path": path, "atomic": list(atoms),
+                   "path_cuis": [], "atomic_cuis": []}
+
+            for seg in split_path(path):
+                got = flat(extractor.extract([seg], [seg]))
+                snv["path_cuis"].append({"text": seg, "cuis": got})
+                for c in got:
+                    if c not in seen:
+                        seen.add(c); cuis.append(c)
+
+            for a in atoms:
+                a = (a or "").strip()
+                if not a:
+                    continue
+                got = flat(extractor.extract([a], [a]))
+                snv["atomic_cuis"].append({"text": a, "cuis": got})
+                for c in got:
+                    if c not in seen:
+                        seen.add(c); cuis.append(c)
+
+            iv["sub_natures"].append(snv)
+        intents_view.append(iv)
+
+    tr["intents"] = intents_view
+    tr["extracted_cuis"] = list(cuis)
+    _summarize_and_topics(tr, cuis)
+    return tr
+
+
+# ---------------------------------------------------------------------------
+# DOC side — NO LLM, per-chunk (blob) extraction
+# ---------------------------------------------------------------------------
+
 def _trace_doc(doc):
-    """DOC side: NO LLM. Per-chunk CUI extract -> union -> summarize -> topics.
-    `doc` is the dict from document.get_document()."""
-    tr = {"text": f"{doc['label']}  ({doc['category']})",
-          "doc_id": doc["doc_id"],
-          "is_clinical": True,
-          "chunks": []}
+    """`doc` is the dict from document.get_document():
+       {doc_id, label, category, chunks: [str, ...], ...}"""
+    tr = {
+        "text": f"{doc.get('label','')}  ({doc.get('category','')})",
+        "doc_id": doc["doc_id"],
+        "is_clinical": True,
+        "chunks": [],
+    }
 
     cuis, seen = [], set()
-    for ci, chunk in enumerate(doc["chunks"]):
+    for ci, chunk in enumerate(doc.get("chunks", [])):
         got = flat(extractor.extract([chunk], [chunk]))
         tr["chunks"].append({
             "i": ci,
@@ -21,3 +168,43 @@ def _trace_doc(doc):
     tr["extracted_cuis"] = list(cuis)
     _summarize_and_topics(tr, cuis)
     return tr
+
+
+# ---------------------------------------------------------------------------
+# Request handler
+# ---------------------------------------------------------------------------
+
+def handle(req):
+    q = _trace_query(req["query"])
+    di = {}
+    for d in req["docs"]:                 # req["docs"] is a LIST of doc dicts
+        tr = _trace_doc(d)
+        di[d["doc_id"]] = tr
+    q_ids = set(q.get("topic_ids", []))
+    doc_ids = {k: set(v.get("topic_ids", [])) for k, v in di.items()}
+    matches = adaptor.search(q_ids, doc_ids, top_k=10, rank_by="sum_inv_size")
+    return {"query_result": q, "doc_results": di, "matches": matches}
+
+
+# ---------------------------------------------------------------------------
+# Serve
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    addr = ("localhost", 6000)
+    listener = Listener(addr, authkey=b"cui")
+    print(f"Server ready on {addr}. Leave this terminal open.")
+    while True:
+        conn = listener.accept()
+        try:
+            req = conn.recv()
+            conn.send(handle(req))
+        except EOFError:
+            pass
+        except Exception as e:
+            try:
+                conn.send({"error": str(e)})
+            except Exception:
+                pass
+        finally:
+            conn.close()
