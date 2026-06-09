@@ -1,56 +1,23 @@
-import networkx as nx
-import math
+C0032285  Pneumonia
+  ancestors  : 29
+  descendants: 183
+  sample ancestors  : ['C0575479', 'C1290884', 'C0039978', 'C1285340', 'C1320355', 'C0149725', 'C0425442', 'C0577910']
+  sample descendants: ['C0264522', 'C4039451', 'C0023241', 'C0276678', 'C0155860', 'C4041068', 'C1290337', 'C2585749']
 
-# netw = your network DiGraph (already loaded)
-ROOT = 'SNOMEDCT_US.isa'
+C0011849  Diabetes mellitus
+  ancestors  : 8
+  descendants: 127
+  sample ancestors  : ['C0025517', 'C0012634', 'C1285159', 'C0037088', 'C0149670', 'C0014130', 'C1257958', 'C2720507']
+  sample descendants: ['C1859965', 'C2931296', 'C1263962', 'C2732401', 'C0342274', 'C0271663', 'C0342277', 'C3495814']
 
-def clean(nodes):
-    """strip the -suffix, keep base CUIs, drop the root itself."""
-    out = set()
-    for n in nodes:
-        if isinstance(n, str) and '-' in n:
-            out.add(n.split('-')[0])
-    return out
+C0559470  Allergy to peanut
+  ancestors  : 11
+  descendants: 0
+  sample ancestors  : ['C2227759', 'C1630648', 'C3539909', 'C0016470', 'C0851444', 'C3662243', 'C0037088', 'C1096735']
+  sample descendants: []
 
-def cui_isa_nodes(cui):
-    """the suffix-bridge nodes of `cui` that sit under the isa root."""
-    nodes = []
-    for s in netw.successors(cui):
-        if nx.has_path(netw, ROOT, s):
-            nodes.append(s)
-    return nodes
-
-def ancestors_of(cui):
-    """is-a ancestors (more general concepts above cui)."""
-    anc = set()
-    for node in cui_isa_nodes(cui):
-        anc |= set(nx.ancestors(netw, node))
-    return clean(anc)
-
-def descendants_of(cui):
-    """is-a descendants (more specific concepts below cui)."""
-    desc = set()
-    for node in cui_isa_nodes(cui):
-        desc |= set(nx.descendants(netw, node))
-    return clean(desc)
-
-
-# ---- TEST on a few known concepts ----
-TESTS = {
-    "C0032285": "Pneumonia",
-    "C0011849": "Diabetes mellitus",
-    "C0559470": "Allergy to peanut",
-    "C0006277": "Bronchitis",
-}
-
-for cui, name in TESTS.items():
-    if cui not in netw:
-        print(f"\n{cui} {name}: NOT in network"); continue
-    anc = ancestors_of(cui)
-    desc = descendants_of(cui)
-    print(f"\n{cui}  {name}")
-    print(f"  ancestors  : {len(anc)}")
-    print(f"  descendants: {len(desc)}")
-    # show a few ancestors (should be MORE GENERAL: pneumonia -> lung infection -> disease)
-    print(f"  sample ancestors  : {list(anc)[:8]}")
-    print(f"  sample descendants: {list(desc)[:8]}")
+C0006277  Bronchitis
+  ancestors  : 26
+  descendants: 116
+  sample ancestors  : ['C0575479', 'C1290884', 'C0577913', 'C0039978', 'C1285340', 'C0425442', 'C0577910', 'C0035204']
+  sample descendants: ['C0340130', 'C4039451', 'C4041068', 'C1290337', 'C0040586', 'C5395603', 'C0555996', 'C0339929']
