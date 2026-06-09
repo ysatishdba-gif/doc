@@ -1,6 +1,17 @@
-from config import (PROJECT_ID, LOCATION, MODEL_VERSION,
-                    API_URL, TOP_K, TOP_P, CLUSTER_SET, COMBINED)
+def __init__(
+        self,
+        project: str,
+        location: str = "us-central1",
+        model: str = "gemini-2.5-flash",
+    ):
+        self.project = project
+        self.location = location
+        self.model_name = model
+        self._tls = threading.local()
 
-print(f"PROJECT_ID={PROJECT_ID!r}  LOCATION={LOCATION!r}  MODEL={MODEL_VERSION!r}")
-
-pipeline = ContextualIntentPipeline(project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION)
+    @property
+    def client(self) -> "genai.Client":
+        c = getattr(self._tls, "client", None)
+        if c is None:
+            c = genai.Client(
+                vertexai=True, project=self.project, location=self.location
