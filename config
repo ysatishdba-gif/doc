@@ -1,125 +1,21 @@
-======================================================================
-PICKLE: reconstructed_obj.pk  (7,651,913 bytes)
-======================================================================
-top-level type: dict
-root: dict (500 keys)
-  key=0 (int)
-    value: dict (2 keys)
-      key='raw_document' (str)
-        value: str (len 17) -> 'Discharge Summary'
-      key='reconstructed' (str)
-        value: dict (8 keys)
-          key='text' (str)
-            value: str (len 3253) -> 'DISCHARGE SUMMARY\nPatient Name: JANE DOE DOB: 01/15/1960 MRN: 12345678\nAdmission Date: 03/10/2023 Discharge Date: 03/15/2023\nAttending Physician: Dr. '
-          key='pages' (str)
-            value: int -> 1
-          key='document' (str)
-            value: str (len 109) -> 'Medical Record > Hospital Document > Discharge Summary > Cardiac Event Discharge > Post-PCI Discharge Summary'
-          ... (5 more)
-  key=1 (int)
-    value: dict (2 keys)
-      key='raw_document' (str)
-        value: str (len 10) -> 'Lab Report'
-      key='reconstructed' (str)
-        value: dict (8 keys)
-          key='text' (str)
-            value: str (len 1402) -> 'LABORATORY REPORT\nPatient Name: JANE DOE\nMedical Record #: JDOE12345\nDOB: 1985-03-15\nGender: Female\nCollection Date: 2023-10-26 08:30 AM\nOrdering Phys'
-          key='pages' (str)
-            value: int -> 1
-          key='document' (str)
-            value: str (len 93) -> 'Medical Report > Laboratory Report > Hematology > Complete Blood Count (CBC) > Result Summary'
-          ... (5 more)
-  key=2 (int)
-    value: dict (2 keys)
-      key='raw_document' (str)
-        value: str (len 27) -> 'Patient Consultation Report'
-      key='reconstructed' (str)
-        value: dict (8 keys)
-          key='text' (str)
-            value: str (len 4868) -> 'PATIENT CONSULTATION REPORT\n\nPatient Name: Eleanor Vance\nDOB: 1968-07-14\nMRN: 987654321\nDate of Visit: 2023-10-26\nReferring Physician: Dr. Sarah Chen\n'
-          key='pages' (str)
-            value: int -> 2
-          key='document' (str)
-            value: str (len 108) -> 'Medical Document > Patient Record > Consultation Report > Specialist Consultation > Pulmonology Consultation'
-          ... (5 more)
-  key=3 (int)
-    value: dict (2 keys)
-      key='raw_document' (str)
-        value: str (len 17) -> 'Discharge Summary'
-      key='reconstructed' (str)
-        value: dict (8 keys)
-          key='text' (str)
-            value: str (len 5929) -> 'DISCHARGE SUMMARY\nPatlent Name: John D. Smith\nMRN: 123456789\nDOB: 1950-03-15 Sex: Male\nAdmission Date: 2023-11-01\nDischarge Date: 2023-11-08\nAttending'
-          key='pages' (str)
-            value: int -> 4
-          key='document' (str)
-            value: str (len 107) -> 'Medical Document > Clinical Note > Discharge Summary > Hospital Discharge Summary > Acute Coronary Syndrome'
-          ... (5 more)
-  key=4 (int)
-    value: dict (2 keys)
-      key='raw_document' (str)
-        value: str (len 22) -> 'Clinical Progress Note'
-      key='reconstructed' (str)
-        value: dict (8 keys)
-          key='text' (str)
-            value: str (len 4254) -> 'Patient Name: Doe, John A. DOB: 05/15/1955 MRN: 1234567890 Gender: Male\nCLINICAL PROGRESS NOTE Date of Visit: 2023-10-26 Time: 10:30 AM Attending Phys'
-          key='pages' (str)
-            value: int -> 3
-          key='document' (str)
-            value: str (len 113) -> 'Medical Note > Clinical Progress Note > Follow-up Visit Note > Respiratory Conditions Follow-up > COPD Management'
-          ... (5 more)
-  ... (495 more)
+import pickle
 
-======================================================================
-PICKLE: sampling_1_stats.pk  (76,720 bytes)
-======================================================================
-top-level type: dict
-root: dict (2 keys)
-  key='sampling_id' (str)
-    value: str (len 10) -> 'sampling_1'
-  key='samples' (str)
-    value: dict (121 keys)
-      key=0 (int)
-        value: dict (5 keys)
-          key='cases' (str)
-            value: list (len 1)
-              [0]: int -> 111
-          key='data_documents' (str)
-            value: list (len 1)
-              [0]: str (len 21) -> 'Patient Progress Note'
-          key='reconstructed_documents' (str)
-            value: list (len 1)
-              [0]: str (len 136) -> 'Medical Document > Clinical Record > Multi-Patient Chart > Comprehensive Patient Documentation > Clinical Notes & Administrative Records'
-          ... (2 more)
-      key=1 (int)
-        value: dict (5 keys)
-          key='cases' (str)
-            value: list (len 1)
-              [0]: int -> 28
-          key='data_documents' (str)
-            value: list (len 1)
-              [0]: str (len 22) -> 'Clinical Progress Note'
-          key='reconstructed_documents' (str)
-            value: list (len 1)
-              [0]: str (len 90) -> 'Medical Document > Clinical Note > Progress Note > Outpatient Visit Note > Follow-up Visit'
-          ... (2 more)
-      key=2 (int)
-        value: dict (5 keys)
-          key='cases' (str)
-            value: list (len 1)
-              [0]: int -> 159
-          key='data_documents' (str)
-            value: list (len 1)
-              [0]: str (len 25) -> 'Patient Discharge Summary'
-          key='reconstructed_documents' (str)
-            value: list (len 1)
-              [0]: str (len 116) -> 'Medical Record > Hospital Document > Discharge Summary > Surgical Discharge Summary > Appendectomy Discharge Summary'
-          ... (2 more)
-      ... (118 more)
+with open("reconstructed_obj.pk", "rb") as f:
+    RECON = pickle.load(f)
 
-======================================================================
-TEXT FROM sample_101.pdf
-======================================================================
-[pdfplumber] 2 pages, 1 chars
-
---- FIRST 2000 CHARS ---
+doc = RECON[0]
+print("TOP KEYS:", list(doc.keys()))
+print("\nRECONSTRUCTED KEYS:", list(doc["reconstructed"].keys()))
+print()
+for k, v in doc["reconstructed"].items():
+    t = type(v).__name__
+    if isinstance(v, str):
+        print(f"  {k}: str (len {len(v)}) -> {v[:100]!r}")
+    elif isinstance(v, (list, tuple)):
+        print(f"  {k}: {t} (len {len(v)})")
+        if v:
+            print(f"      [0] = {type(v[0]).__name__}: {repr(v[0])[:150]}")
+    elif isinstance(v, dict):
+        print(f"  {k}: dict (keys: {list(v.keys())})")
+    else:
+        print(f"  {k}: {t} -> {repr(v)[:100]}")
