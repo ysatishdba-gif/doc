@@ -1,8 +1,18 @@
 import pickle
-DOC_INDEX = 0
-CHUNK_NO  = 7      # which chunk to show
+
+DOC_INDEX = 0      # <-- change to the document you want
 
 RECON = pickle.load(open("reconstructed_obj.pk", "rb"))
-blobs = [b for b in (RECON[DOC_INDEX]["reconstructed"].get("blobs") or []) if b and b.strip()]
-print(f"[CHUNK {CHUNK_NO}] of {len(blobs)}:\n")
-print(blobs[CHUNK_NO])
+d = RECON[DOC_INDEX]
+r = d["reconstructed"]
+blobs = [b for b in (r.get("blobs") or []) if b and b.strip()]
+
+print(f"Document [{DOC_INDEX}]: {d['raw_document']}")
+print(f"Category: {r.get('document','')}")
+print(f"Total chunks: {len(blobs)}\n")
+print("="*70)
+for i, chunk in enumerate(blobs):
+    print(f"\n[CHUNK {i}]")
+    print("-"*70)
+    print(chunk)
+    print("="*70)
