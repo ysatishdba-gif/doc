@@ -1,75 +1,109 @@
-def _trace_one(text):
-    """Full structured trace for one text blob. No printing here — the
-    client prints. Atomic+path CUIs unioned, summarized once."""
-    tr = {"text": text}
+"""
+test_manual.py — run as often as you want. server.py must be running.
+Edit query / docs, then:  python test_manual.py
+"""
+from multiprocessing.connection import Client
 
-    full = pipeline.run(query=text, output_format="full_pipeline")
-    tr["expanded"] = full.get("expanded_query", "")
-    tr["is_clinical"] = full.get("is_clinical", False)
-    if not tr["is_clinical"]:
-        tr["reason"] = full.get("reason")
-        return tr
-
-    # PASS 1 structure + PASS 2 extraction
-    intents_view = []
-    cuis, seen = [], set()
-    for it in full.get("intents", []):
-        iv = {"intent": it.get("intent_title",""),
-              "nature": it.get("nature",""),
-              "description": it.get("description",""),
-              "sub_natures": []}
-        for sn in it.get("sub_natures", []):
-            path = sn.get("category_path","")
-            atoms = sn.get("atomic_concepts",[]) or []
-            snv = {"path": path, "atomic": list(atoms),
-                   "path_cuis": [], "atomic_cuis": []}
-            # path segments
-            for seg in split_path(path):
-                got = flat(extractor.extract([seg],[seg]))
-                snv["path_cuis"].append({"text": seg, "cuis": got})
-                for c in got:
-                    if c not in seen: seen.add(c); cuis.append(c)
-            # atomic concepts
-            for a in atoms:
-                a = (a or "").strip()
-                if not a: continue
-                got = flat(extractor.extract([a],[a]))
-                snv["atomic_cuis"].append({"text": a, "cuis": got})
-                for c in got:
-                    if c not in seen: seen.add(c); cuis.append(c)
-            iv["sub_natures"].append(snv)
-        intents_view.append(iv)
-    tr["intents"] = intents_view
-    tr["extracted_cuis"] = list(cuis)
-
-    if not cuis:
-        tr["surviving"] = []; tr["topics"] = []; tr["topic_ids"] = []
-        return tr
-
-    # PASS 2 summarize (union, once)
-    summ = summarizer.summarize(cuis, sources=["SNOMEDCT_US"])
-    tr["metrics"] = summ.get("metrics", {})
-    tr["surviving"] = [{"cui": r["cui"], "term": r.get("preferred_term", r["cui"]),
-                        "ic": r.get("ic", 0.0)} for r in summ["surviving_cuis"]]
-    tr["removed"] = [{"cui": r["cui"], "term": r.get("preferred_term", r["cui"]),
-                      "by": r.get("retained_by",""), "reason": r.get("reason","")}
-                     for r in summ.get("removed_cuis", [])]
-
-    # PASS 3 topics via adaptor
-    surv = [r["cui"] for r in summ["surviving_cuis"]]
-    tps = adaptor.cuis_to_topics(surv)
-    tr["topics"] = [{"tp": tp, "size": adaptor.topic_size(tp),
-                     "ic": round(adaptor.topic_anchor_ic(tp),3),
-                     "label": adaptor.topic_label(tp)}
-                    for tp in sorted(tps, key=adaptor.topic_size)]
-    tr["topic_ids"] = list(tps)
-    return tr
+# ====== EDIT THESE ======
+query = "Do you have constipation or diarrhea?"
+docs = {
+    "doc1": "Patient with chronic constipation and abdominal pain.",
+    "doc2": "History of pneumonia and respiratory infection.",
+    "doc3": "Screening for colon cancer and rectal cancer.",
+}
+# ========================
 
 
-def handle(req):
-    q = _trace_one(req["query"])
-    di = {d: _trace_one(t) for d, t in req["docs"].items()}
-    q_ids = set(q.get("topic_ids", []))
-    doc_ids = {d: set(v.get("topic_ids", [])) for d, v in di.items()}
-    matches = adaptor.search(q_ids, doc_ids, top_k=10, rank_by="sum_inv_size")
-    return {"query_result": q, "doc_results": di, "matches": matches}
+def hr(ch="=", n=70): print(ch * n)
+def cl(cuis): return ", ".join(cuis) if cuis else "(none)"
+
+
+def show(label, tr):
+    hr("=")
+    print(f"{label}: {tr['text']!r}")
+    hr("=")
+
+    if not tr.get("is_clinical"):
+        print(f"  NON-CLINICAL: {tr.get('reason')}")
+        return
+
+    # PASS 1 — structure
+    print(f"\nExpanded: {tr.get('expanded','')!r}")
+    print(f"Total intents: {len(tr.get('intents',[]))}")
+    for i, iv in enumerate(tr.get("intents", []), 1):
+        print(); hr("-")
+        print(f"  INTENT {i}: {iv['intent']}")
+        print(f"    Nature:      {iv['nature']}")
+        print(f"    Description: {iv['description']}")
+        print(f"\n    Sub-natures ({len(iv['sub_natures'])}):")
+        for sn in iv["sub_natures"]:
+            print(f"      - {sn['path']}")
+            for a in sn["atomic"]:
+                print(f"          atomic: {a}")
+
+    # PASS 2 — extraction + summarization
+    print(); hr("-")
+    print("  PASS 2 — CUI EXTRACTION")
+    hr("-")
+    for iv in tr["intents"]:
+        print(f"\n  INTENT: {iv['intent']}")
+        for sn in iv["sub_natures"]:
+            print(f"    sub_nature: {sn['path']}")
+            for pc in sn["path_cuis"]:
+                print(f"      [path]   {pc['text']!r:30s} -> "
+                      f"{len(pc['cuis'])} CUIs: {cl(pc['cuis'])}")
+            for ac in sn["atomic_cuis"]:
+                print(f"      [atomic] {ac['text']!r:30s} -> "
+                      f"{len(ac['cuis'])} CUIs: {cl(ac['cuis'])}")
+
+    m = tr.get("metrics", {})
+    print(f"\n  --- SUMMARIZATION (union of all intents) ---")
+    print(f"  {m.get('input_code_count','?')} in -> "
+          f"{m.get('output_code_count','?')} out")
+    print(f"\n  Surviving CUIs:")
+    for s in tr.get("surviving", []):
+        print(f"      {s['cui']}  {s['term']}  IC={s['ic']}")
+    if tr.get("removed"):
+        print(f"\n  Removed CUIs:")
+        for r in tr["removed"]:
+            print(f"      {r['cui']}  {r['term']}  <- {r['by']} ({r['reason']})")
+
+    # PASS 3 — topics
+    print(); hr("-")
+    print("  PASS 3 — TOPICS")
+    hr("-")
+    tops = tr.get("topics", [])
+    print(f"  {len(tops)} topics:")
+    for t in tops:
+        print(f"    {t['tp']}  size={t['size']:>4}  IC={t['ic']}  '{t['label']}'")
+
+
+# ---- connect ----
+conn = Client(("localhost", 6000), authkey=b"cui")
+conn.send({"query": query, "docs": docs})
+res = conn.recv()
+conn.close()
+
+# ---- QUERY SIDE ----
+print("\n" + "#"*70 + "\n#  QUERY SIDE\n" + "#"*70)
+show("QUERY", res["query_result"])
+
+# ---- DOCUMENT SIDE ----
+print("\n" + "#"*70 + "\n#  DOCUMENT SIDE\n" + "#"*70)
+for d, dr in res["doc_results"].items():
+    print()
+    show(f"DOC {d}", dr)
+
+# ---- MATCH ----
+print("\n" + "#"*70 + "\n#  ADAPTOR MATCH / RETRIEVAL\n" + "#"*70)
+matches = res["matches"]
+if not matches:
+    print("  no documents shared any topic with the query.")
+for r in matches:
+    print(f"\n  {r['doc_id']}:")
+    print(f"    count={r['count']}  sum_inv_size={r['sum_inv_size']}  "
+          f"min_inv_size={r['min_inv_size']}  max_anchor_ic={r['max_anchor_ic']}")
+    print(f"    shared topics:")
+    for sh in r["shared"]:
+        print(f"      {sh['tp_id']}  size={sh['size']:>4}  "
+              f"IC={sh['anchor_ic']}  '{sh['label']}'")
