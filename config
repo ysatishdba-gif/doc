@@ -1,17 +1,88 @@
-import pickle
-
-TOPIC_ID = "tp_4385b55dfcd9"      # <-- change this, re-run
-
-P = pickle.load(open("topics.pkl", "rb"))
-t = P["topic_id_to_topic"].get(TOPIC_ID)
-labels = P.get("labels", {})
-
-if not t:
-    print(f"No such topic: {TOPIC_ID}")
-else:
-    anchor = t["canonical"]
-    print(f"Topic {TOPIC_ID}  |  anchor {anchor} '{labels.get(anchor, anchor)}'  "
-          f"|  size {t['size']}  |  IC {t['anchor_ic']:.3f}\n")
-    for cui in sorted(t["members"]):
-        mark = "  <-- anchor" if cui == anchor else ""
-        print(f"  {cui}  '{labels.get(cui, cui)}'{mark}")
+Server ready on ('localhost', 6000). Leave this terminal open.
+14:26:49     Extraction: 31 CUIs across 1 phrases
+14:27:02     Extraction: 67 CUIs across 1 phrases
+14:27:12     Extraction: 92 CUIs across 1 phrases
+14:27:15     Extraction: 92 CUIs across 1 phrases
+14:27:16     Extraction: 31 CUIs across 1 phrases
+14:27:25     Extraction: 86 CUIs across 1 phrases
+14:27:28     Extraction: 46 CUIs across 1 phrases
+14:27:37     Extraction: 84 CUIs across 1 phrases
+14:27:42     Extraction: 73 CUIs across 1 phrases
+14:27:53     Extraction: 74 CUIs across 1 phrases
+14:28:03     Extraction: 116 CUIs across 1 phrases
+14:28:03     Extraction: 31 CUIs across 1 phrases
+14:28:06     Extraction: 46 CUIs across 1 phrases
+14:28:09     Extraction: 44 CUIs across 1 phrases
+14:28:09     Extraction: 31 CUIs across 1 phrases
+14:28:17     Extraction: 55 CUIs across 1 phrases
+14:28:22     Extraction: 74 CUIs across 1 phrases
+14:28:24     Extraction: 78 CUIs across 1 phrases
+14:28:25     Extraction: 31 CUIs across 1 phrases
+14:28:31     Extraction: 63 CUIs across 1 phrases
+14:28:37     Extraction: 82 CUIs across 1 phrases
+14:28:43     Extraction: 87 CUIs across 1 phrases
+14:28:43     Extraction: 31 CUIs across 1 phrases
+14:28:44     Extraction: 67 CUIs across 1 phrases
+14:28:48     Extraction: 66 CUIs across 1 phrases
+14:28:49     Extraction: 66 CUIs across 1 phrases
+14:28:49     Extraction: 31 CUIs across 1 phrases
+14:28:54     Extraction: 51 CUIs across 1 phrases
+14:29:01     Extraction: 94 CUIs across 1 phrases
+14:29:03     Extraction: 61 CUIs across 1 phrases
+14:29:09     Extraction: 60 CUIs across 1 phrases
+14:29:10     Extraction: 31 CUIs across 1 phrases
+14:29:10     Extraction: 51 CUIs across 1 phrases
+14:29:17     Extraction: 94 CUIs across 1 phrases
+14:29:18     Extraction: 37 CUIs across 1 phrases
+14:29:31     Extraction: 118 CUIs across 1 phrases
+14:29:31     Extraction: 31 CUIs across 1 phrases
+14:29:34     Extraction: 61 CUIs across 1 phrases
+14:29:35     Extraction: 42 CUIs across 1 phrases
+14:29:37     Extraction: 59 CUIs across 1 phrases
+14:29:41     Extraction: 74 CUIs across 1 phrases
+14:29:46     Extraction: 70 CUIs across 1 phrases
+14:29:47     Extraction: 31 CUIs across 1 phrases
+14:29:48     Extraction: 67 CUIs across 1 phrases
+14:29:48     Extraction: 92 CUIs across 1 phrases
+14:29:49     Extraction: 92 CUIs across 1 phrases
+14:29:50     Extraction: 31 CUIs across 1 phrases
+14:29:50     Extraction: 63 CUIs across 1 phrases
+14:29:51     Extraction: 82 CUIs across 1 phrases
+14:29:52     Extraction: 83 CUIs across 1 phrases
+14:29:52     Extraction: 31 CUIs across 1 phrases
+14:29:53     Extraction: 67 CUIs across 1 phrases
+14:29:53     Extraction: 66 CUIs across 1 phrases
+14:29:54     Extraction: 66 CUIs across 1 phrases
+14:29:54     Extraction: 31 CUIs across 1 phrases
+14:29:55     Extraction: 51 CUIs across 1 phrases
+14:29:56     Extraction: 94 CUIs across 1 phrases
+14:29:56     Extraction: 61 CUIs across 1 phrases
+14:30:01     Extraction: 63 CUIs across 1 phrases
+14:30:01     Extraction: 31 CUIs across 1 phrases
+14:30:02     Extraction: 51 CUIs across 1 phrases
+14:30:02     Extraction: 94 CUIs across 1 phrases
+14:30:03     Extraction: 37 CUIs across 1 phrases
+14:30:06     Extraction: 62 CUIs across 1 phrases
+14:30:06     Extraction: 31 CUIs across 1 phrases
+14:30:07     Extraction: 61 CUIs across 1 phrases
+14:30:07     Extraction: 42 CUIs across 1 phrases
+14:30:08     Extraction: 69 CUIs across 1 phrases
+14:30:11     Extraction: 81 CUIs across 1 phrases
+14:30:12     Extraction: 85 CUIs across 1 phrases
+14:30:14     Extraction: 83 CUIs across 1 phrases
+14:30:45     Embeddings: 675/675 (100.0%) | dim=3072
+14:30:55     Component depth: 2 (ancestor_depth=5)
+14:30:55       Component hub exclusion: 2 ancestors (degree=0, freq=2, freq_threshold=25)
+14:30:55     Graph Components: 675 CUIs -> 675 components (max=1, singletons=675, hub_ancestors_excluded=2)
+14:30:56     Extraction: 58 CUIs across 1 phrases
+14:31:05     Extraction: 85 CUIs across 1 phrases
+14:31:11     Extraction: 120 CUIs across 1 phrases
+14:31:16     Extraction: 70 CUIs across 1 phrases
+14:31:17     Extraction: 53 CUIs across 1 phrases
+14:31:24     Extraction: 80 CUIs across 1 phrases
+14:31:26     Extraction: 119 CUIs across 1 phrases
+14:31:27     Extraction: 51 CUIs across 1 phrases
+14:31:28     Extraction: 57 CUIs across 1 phrases
+14:31:35     Extraction: 110 CUIs across 1 phrases
+14:31:36     Extraction: 35 CUIs across 1 phrases
+14:31:39     Extraction: 94 CUIs across 1 phrases
