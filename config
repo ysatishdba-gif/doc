@@ -1,21 +1,17 @@
-import pickle
+TOP KEYS: ['raw_document', 'reconstructed']
 
-with open("reconstructed_obj.pk", "rb") as f:
-    RECON = pickle.load(f)
+RECONSTRUCTED KEYS: ['text', 'pages', 'document', 'blobs', 'sections', 'topics', 'tables', 'figures']
 
-doc = RECON[0]
-print("TOP KEYS:", list(doc.keys()))
-print("\nRECONSTRUCTED KEYS:", list(doc["reconstructed"].keys()))
-print()
-for k, v in doc["reconstructed"].items():
-    t = type(v).__name__
-    if isinstance(v, str):
-        print(f"  {k}: str (len {len(v)}) -> {v[:100]!r}")
-    elif isinstance(v, (list, tuple)):
-        print(f"  {k}: {t} (len {len(v)})")
-        if v:
-            print(f"      [0] = {type(v[0]).__name__}: {repr(v[0])[:150]}")
-    elif isinstance(v, dict):
-        print(f"  {k}: dict (keys: {list(v.keys())})")
-    else:
-        print(f"  {k}: {t} -> {repr(v)[:100]}")
+  text: str (len 3253) -> 'DISCHARGE SUMMARY\nPatient Name: JANE DOE DOB: 01/15/1960 MRN: 12345678\nAdmission Date: 03/10/2023 Di'
+  pages: int -> 1
+  document: str (len 109) -> 'Medical Record > Hospital Document > Discharge Summary > Cardiac Event Discharge > Post-PCI Discharg'
+  blobs: list (len 21)
+      [0] = str: 'DISCHARGE SUMMARY Patient Name: JANE DOE DOB: 01/15/1960 MRN: 12345678 Admission Date: 03/10/2023 Discharge Date: 03/15/2023 Attending Physician: Dr.
+  sections: list (len 21)
+      [0] = dict: {'Section': 'DISCHARGE SUMMARY', 'SampleText': 'DISCHARGE SUMMARY Patient Name: JANE DOE DOB: 01/15/1960 MRN: 12345678'}
+  topics: list (len 23)
+      [0] = str: 'Patient Demographics'
+  tables: list (len 1)
+      [0] = dict: {'Detected': True, 'Topic': 'Medications at Discharge', 'SampleText': 'Medication Dosage Frequency Route Notes Aspirin 81 mg Daily PO Take with food M
+  figures: list (len 1)
+      [0] = dict: {'Contained': False, 'Topic': 'NA', 'Description': 'A standard medical discharge summary typically does not contain figures such as charts, graphs, or
