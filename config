@@ -1,17 +1,32 @@
-def __init__(
-        self,
-        project: str,
-        location: str = "us-central1",
-        model: str = "gemini-2.5-flash",
-    ):
-        self.project = project
-        self.location = location
-        self.model_name = model
-        self._tls = threading.local()
+#######################################################################
+#  QUERY SIDE
+########################################################################
 
-    @property
-    def client(self) -> "genai.Client":
-        c = getattr(self._tls, "client", None)
-        if c is None:
-            c = genai.Client(
-                vertexai=True, project=self.project, location=self.location
+========================================================================
+QUERY: 'colon cancer?'
+========================================================================
+  NON-CLINICAL: LLM call failed
+
+########################################################################
+#  DOCUMENT SIDE
+########################################################################
+
+========================================================================
+DOC doc1: 'Patient with chronic constipation and abdominal pain.'
+========================================================================
+  NON-CLINICAL: LLM call failed
+
+========================================================================
+DOC doc2: 'History of pneumonia and respiratory infection.'
+========================================================================
+  NON-CLINICAL: LLM call failed
+
+========================================================================
+DOC doc3: 'Screening for colon cancer and rectal cancer.'
+========================================================================
+  NON-CLINICAL: LLM call failed
+
+########################################################################
+#  ADAPTOR MATCH / RETRIEVAL
+########################################################################
+  no documents shared any topic with the query.
