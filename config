@@ -1,32 +1,6 @@
-########################################################################
-#  QUERY SIDE
-########################################################################
+from config import (PROJECT_ID, LOCATION, MODEL_VERSION,
+                    API_URL, TOP_K, TOP_P, CLUSTER_SET, COMBINED)
 
-========================================================================
-QUERY: 'colon cancer?'
-========================================================================
-  NON-CLINICAL: LLM call failed
+print(f"PROJECT_ID={PROJECT_ID!r}  LOCATION={LOCATION!r}  MODEL={MODEL_VERSION!r}")
 
-########################################################################
-#  DOCUMENT SIDE
-########################################################################
-
-========================================================================
-DOC doc1: 'Patient with chronic constipation and abdominal pain.'
-========================================================================
-  NON-CLINICAL: LLM call failed
-
-========================================================================
-DOC doc2: 'History of pneumonia and respiratory infection.'
-========================================================================
-  NON-CLINICAL: LLM call failed
-
-========================================================================
-DOC doc3: 'Screening for colon cancer and rectal cancer.'
-========================================================================
-  NON-CLINICAL: LLM call failed
-
-########################################################################
-#  ADAPTOR MATCH / RETRIEVAL
-########################################################################
-  no documents shared any topic with the query.
+pipeline = ContextualIntentPipeline(project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION)
