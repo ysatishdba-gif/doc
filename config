@@ -1,18 +1,17 @@
-import requests
-import google.auth
-import google.auth.transport.requests
-from google.oauth2 import id_token
+import pickle
 
-API_URL = "https://<your-url>"
+TOPIC_ID = "tp_4385b55dfcd9"      # <-- change this, re-run
 
-# get an identity token for the target URL, in-process (no gcloud binary)
-auth_req = google.auth.transport.requests.Request()
-token = id_token.fetch_id_token(auth_req, API_URL)
-print("token length:", len(token))
+P = pickle.load(open("topics.pkl", "rb"))
+t = P["topic_id_to_topic"].get(TOPIC_ID)
+labels = P.get("labels", {})
 
-r = requests.post(API_URL,
-    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-    json={"cluster_set": "umls", "text_list": ["pneumonia"], "context_list": ["pneumonia"],
-          "top_k": 5, "top_p": 30, "combined": True}, timeout=60)
-print("STATUS:", r.status_code)
-print("BODY:", r.text[:800])
+if not t:
+    print(f"No such topic: {TOPIC_ID}")
+else:
+    anchor = t["canonical"]
+    print(f"Topic {TOPIC_ID}  |  anchor {anchor} '{labels.get(anchor, anchor)}'  "
+          f"|  size {t['size']}  |  IC {t['anchor_ic']:.3f}\n")
+    for cui in sorted(t["members"]):
+        mark = "  <-- anchor" if cui == anchor else ""
+        print(f"  {cui}  '{labels.get(cui, cui)}'{mark}")
