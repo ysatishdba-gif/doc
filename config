@@ -1,20 +1,7 @@
 import requests, subprocess
-
 API_URL = "https://<paste-your-url-here>"
-
-# same gcloud auth path cui_core.py uses (Windows)
 GCLOUD = r'C:\Users\M271333\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd'
-token = subprocess.run([GCLOUD, "auth", "print-identity-token"],
-                       stdout=subprocess.PIPE, universal_newlines=True).stdout.strip()
-
-r = requests.post(
-    API_URL,
-    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-    json={"cluster_set": "umls",
-          "text_list": ["pneumonia"],
-          "context_list": ["pneumonia"],
-          "top_k": 5, "top_p": 30, "combined": True},
-    timeout=60,
-)
+token = subprocess.run([GCLOUD, "auth", "print-identity-token"], stdout=subprocess.PIPE, universal_newlines=True).stdout.strip()
+r = requests.post(API_URL, headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}, json={"cluster_set": "umls", "text_list": ["pneumonia"], "context_list": ["pneumonia"], "top_k": 5, "top_p": 30, "combined": True}, timeout=60)
 print("STATUS:", r.status_code)
 print("BODY:", r.text[:800])
