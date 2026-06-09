@@ -1,9 +1,143 @@
-# All heavy pickles come from artifacts (loaded once per kernel).
-from artifacts import (
-    hierarchy,
-    ic_precomputed,
-    medlineplus,
-    topics,
-    TOPICS_PATH,
-    TOPICS_AVAILABLE,
-)
+"""
+topic_adaptor.py
+----------------
+Loads topics (from topics.pkl, built by build_topics.py) and matches
+topic-ID sets between a query and documents.
+
+Default source: config.topics (loaded once per kernel via artifacts.py).
+Pass an explicit path only if you want a different/standalone pickle.
+
+  cuis_to_topics(cuis)             : CUI list -> set of topic IDs (tp_<hash>)
+  match(query_tp_ids, doc_tp_ids)  : one pair, ALL scoring metrics reported
+  search(query_tp_ids, doc_index)  : rank many docs, all metrics per doc
+
+Match key = topic ID. Every scoring metric is reported so the winning
+metric can be chosen from real output:
+  count          - number of shared topics
+  min_inv_size   - 1 / min(size of shared)        [old spec]
+  sum_inv_size   - sum(1/size) over shared
+  max_anchor_ic  - max anchor IC among shared
+  sum_anchor_ic  - sum of anchor ICs among shared
+"""
+
+import pickle
+
+# Process-level cache for explicit-path loads, so repeated
+# TopicAdaptor("x.pkl") in the same kernel loads "x.pkl" only once.
+_SHARED = {}
+
+
+class TopicAdaptor:
+    def __init__(self, topics_pkl=None):
+        """
+        topics_pkl=None  -> use config.topics (shared, loaded once via artifacts)
+        topics_pkl="..." -> load that pickle directly (cached per path)
+        """
+        if topics_pkl is None:
+            from config import topics, TOPICS_PATH
+            if topics is None:
+                raise FileNotFoundError(
+                    f"{TOPICS_PATH} not found — run build_topics.py first")
+            p = topics
+        else:
+            if topics_pkl not in _SHARED:
+                with open(topics_pkl, "rb") as f:
+                    _SHARED[topics_pkl] = pickle.load(f)
+            p = _SHARED[topics_pkl]
+
+        self.cui_to_topic_ids  = p["cui_to_topic_ids"]      # cui   -> [tp_ids]
+        self.topic_id_to_topic = p["topic_id_to_topic"]     # tp_id -> {canonical, members, size, anchor_ic}
+        self.labels            = p.get("labels", {})
+        self.config            = p.get("config", {})
+
+        print(f"TopicAdaptor: {len(self.topic_id_to_topic):,} topics, "
+              f"{len(self.cui_to_topic_ids):,} CUIs with topics")
+
+    # ---- CUI set -> topic IDs ----
+
+    def cuis_to_topics(self, cuis):
+        """Map a list/set of CUIs to the union of their topic IDs."""
+        out = set()
+        for c in cuis:
+            out.update(self.cui_to_topic_ids.get(c, ()))
+        return out
+
+    # ---- topic lookups ----
+
+    def topic_size(self, tp_id):
+        t = self.topic_id_to_topic.get(tp_id)
+        return t["size"] if t else 0
+
+    def topic_anchor(self, tp_id):
+        t = self.topic_id_to_topic.get(tp_id)
+        return t["canonical"] if t else None
+
+    def topic_anchor_ic(self, tp_id):
+        t = self.topic_id_to_topic.get(tp_id)
+        return t["anchor_ic"] if t else 0.0
+
+    def topic_members(self, tp_id):
+        t = self.topic_id_to_topic.get(tp_id)
+        return t["members"] if t else frozenset()
+
+    def topic_label(self, tp_id):
+        anchor = self.topic_anchor(tp_id)
+        return self.labels.get(anchor, anchor) if anchor else tp_id
+
+    # ---- scoring: one query vs one doc ----
+
+    def match(self, query_tp_ids, doc_tp_ids):
+        """Return all candidate scores for one query-vs-doc pair."""
+        q = set(query_tp_ids)
+        d = set(doc_tp_ids)
+        shared = q & d
+        if not shared:
+            return {
+                "count": 0, "min_inv_size": 0.0, "sum_inv_size": 0.0,
+                "max_anchor_ic": 0.0, "sum_anchor_ic": 0.0, "shared": [],
+            }
+
+        details, sizes, ics = [], [], []
+        for tp in shared:
+            sz = self.topic_size(tp)
+            ic = self.topic_anchor_ic(tp)
+            sizes.append(sz)
+            ics.append(ic)
+            details.append({
+                "tp_id": tp,
+                "size": sz,
+                "anchor_ic": round(ic, 4),
+                "label": self.topic_label(tp),
+            })
+        details.sort(key=lambda r: r["size"])  # most specific first
+
+        valid_sizes = [s for s in sizes if s > 0]
+        min_size = min(valid_sizes) if valid_sizes else 0
+        return {
+            "count":         len(shared),
+            "min_inv_size":  round(1.0 / min_size, 4) if min_size else 0.0,
+            "sum_inv_size":  round(sum(1.0 / s for s in valid_sizes), 4),
+            "max_anchor_ic": round(max(ics), 4) if ics else 0.0,
+            "sum_anchor_ic": round(sum(ics), 4),
+            "shared":        details,
+        }
+
+    # ---- search over many docs ----
+
+    def search(self, query_tp_ids, doc_index, top_k=10, rank_by="sum_inv_size"):
+        """
+        doc_index : {doc_id: set/list of tp_ids}
+        rank_by   : which reported metric to sort on
+                    (count | min_inv_size | sum_inv_size | max_anchor_ic | sum_anchor_ic)
+        Returns ranked list; each entry is the match() dict plus doc_id.
+        """
+        q = set(query_tp_ids)
+        results = []
+        for doc_id, doc_tps in doc_index.items():
+            m = self.match(q, doc_tps)
+            if m["count"] == 0:
+                continue
+            m["doc_id"] = doc_id
+            results.append(m)
+        results.sort(key=lambda r: -r.get(rank_by, 0))
+        return results[:top_k]
