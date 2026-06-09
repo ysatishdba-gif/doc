@@ -1,271 +1,1580 @@
-"""
-server.py
----------
-Run ONCE, leave running. Loads pickles + builds clients once. Processes the
-demo DOCUMENT once and caches it. Each request runs only the QUERY side and
-reuses the cached document. Retrieval returns shared topics + the document
-CUIs under them + the chunk text those CUIs came from.
+######################################################################
+#  DOCUMENT SIDE (cached — processed once at startup)
+######################################################################
+======================================================================
+DOC doc_0_Discharge_Summary: 'Discharge Summary  (Medical Record > Hospital Document > Discharge Summary > Cardiac Event Discharge > Post-PCI Discharge Summary)'
+======================================================================
+  21 chunks -> 1491 CUIs extracted
 
-    python server.py        # leave this terminal open
+  SUMMARIZATION: 1491 in -> 313 out
+  Surviving CUIs:
+      C0743221  Discharge summary  IC=13.1913
+      C4302949  Physician discharge concise summary  IC=14.8007
+      C1998401  History of allergy to latex  IC=14.8007
+      C0260486  Personal history of allergy to sulfonamides  IC=14.8007
+      C0455609  H/O: multiple allergies  IC=14.8007
+      C0455590  allergic reaction to penicillins  IC=12.8548
+      C0455602  H/O: co-trimoxazole allergy  IC=14.8007
+      C0481617  [V]Personal history of non-drug allergy  IC=14.8007
+      C0475698  allergic reaction to sulfa drugs  IC=12.8548
+      C0455608  H/O: plant allergy  IC=14.8007
+      C0455595  allergy to cephalosporins  IC=14.8007
+      C5397161  Allergy to ampicillin and/or floxacillin  IC=13.7021
+      C0730015  [V]Personal history of aspirin allergy  IC=14.8007
+      C0455596  History of tetracycline allergy  IC=14.8007
+      C4749632  Allergic reaction caused by sulfonamide  IC=14.1075
+      C0260484  Personal history of allergy to penicillin  IC=14.8007
+      C0030824  Allergy to penicillin  IC=10.7403
+      C4749629  Allergic reaction caused by penicillin  IC=14.1075
+      C0481615  [V]Personal history of unspecified drug allergy  IC=14.8007
+      C1998306  Allergy to sulfonamide antibiotic  IC=12.2357
+      C0571490  Allergy to mafenide  IC=14.8007
+      C0571636  Allergy to sulfonylurea  IC=12.3158
+      C0571486  Allergy to sulfamethazine  IC=14.8007
+      C0571133  Allergy to probenecid  IC=14.8007
+      C0571483  Allergy to sulfalene  IC=14.8007
+      C0571489  Allergy to sulfanilylurea  IC=14.8007
+      C0038757  Allergy to sulfonamide  IC=10.8304
+      C0571894  Thiazide diuretic allergy  IC=12.7213
+      C0570834  Allergy to sulpiride  IC=14.8007
+      C0571644  Allergy to glymidine  IC=14.8007
+      C0571903  Allergy to furosemide  IC=14.8007
+      C0571929  Allergy to metolazone  IC=14.8007
+      C4305385  Allergy to rosuvastatin  IC=14.8007
+      C1640727  Allergy to sulfonamide diuretic  IC=12.7213
+      C0571904  Allergy to bumetanide  IC=14.8007
+      C0570556  Allergy to sulindac  IC=14.8007
+      C0571932  Allergy to dichlorphenamide  IC=14.8007
+      C0571639  Allergy to glyburide  IC=14.8007
+      C0571933  Allergy to acetazolamide  IC=14.8007
+      C0571642  Allergy to glipizide  IC=14.8007
+      C0571926  Allergy to chlorthalidone  IC=14.8007
+      C0585891  H/O: Myocardial infarction in last year  IC=14.1075
+      C4274366  History of acute ST segment elevation myocardial infarction  IC=14.8007
+      C0455528  H/O: myocardial infarct at less than 60  IC=14.8007
+      C0455529  H/O: myocardial infarct at greater than 60  IC=14.8007
+      C3662187  History of myocardial infarction in last eight weeks  IC=14.8007
+      C3698570  History of non-ST segment elevation myocardial infarction  IC=14.8007
+      C0559158  H/O: myocardial problem  IC=12.3158
+      C1997578  History of cardiac arrest  IC=14.8007
+      C4512001  History of chest pain  IC=14.8007
+      C1320647  History of percutaneous coronary intervention  IC=14.8007
+      C0585892  H/O: Angina in last year  IC=14.8007
+      C4075953  Coronary arteriosclerosis in patient with history of previous myocardial infarction  IC=14.8007
+      C1997319  History of placement of stent in anterior descending branch of left coronary artery  IC=14.8007
+      C0455530  H/O: angina pectoris  IC=14.1075
+      C0585894  H/O: Treatment for ischemic heart disease  IC=14.8007
+      C1275835  History of myocardial infarction  IC=12.6035
+      C1997490  History of placement of stent in circumflex branch of left coronary artery  IC=14.8007
+      C5438408  History of myocardial infarction due to atherothrombotic coronary artery disease  IC=14.8007
+      C1542544  H/O: cardiovascular disease (& [heart disorder] or [myocardial problem])  IC=16.9959
+      C0476718  Observation for suspected myocardial infarction  IC=14.8007
+      C0232326  EKG ST segment changes  IC=10.4569
+      C3531778  Acute ST segment elevation myocardial infarction involving left anterior descending coronary artery  IC=12.8548
+      C5438311  History of myocardial infarction due to demand ischemia  IC=14.8007
+      C4706737  Acute ST segment elevation myocardial infarction of inferolateral wall  IC=14.8007
+      C4039964  Acute ST segment elevation myocardial infarction due to left coronary artery occlusion  IC=12.0281
+      C0264711  Past myocardial infarction diagnosed on ECG AND/OR other special investigation, but currently presenting no symptoms  IC=14.8007
+      C0429101  Reverse tick ST segment  IC=14.8007
+      C5395627  Acute ST segment elevation myocardial infarction due to occlusion of septal branch of anterior descending branch of left coronary artery  IC=14.8007
+      C5396558  Acute ST segment elevation myocardial infarction due to occlusion of mid portion of right coronary artery  IC=14.8007
+      C5395459  Acute ST segment elevation myocardial infarction due to occlusion of anterior descending branch of left coronary artery  IC=13.4144
+      C5817880  Acute ST segment elevation myocardial infarction due to mid left circumflex coronary artery occlusion  IC=14.8007
+      C5396553  Acute ST segment elevation myocardial infarction due to occlusion of proximal portion of right coronary artery  IC=14.8007
+      C5395649  Acute ST segment elevation myocardial infarction due to occlusion of intermediate artery  IC=14.8007
+      C0429029  ST segment  IC=10.4569
+      C4551366  Acute ST segment elevation myocardial infarction due to occlusion of circumflex branch of left coronary artery  IC=13.4144
+      C0264704  Acute myocardial infarction of high lateral wall  IC=14.8007
+      C5395250  Acute ST segment elevation myocardial infarction due to proximal left anterior descending coronary artery occlusion  IC=14.8007
+      C0455335  No significant social history  IC=14.8007
+      C1287236  Social history baseline finding  IC=14.8007
+      C0740860  Denies alcohol abuse  IC=14.8007
+      C3875333  Denies alcohol use  IC=14.8007
+      C4047911  Family history: maternal grandmother alive and well  IC=14.8007
+      C0557468  Patient themselves providing care  IC=11.5426
+      C4047909  Family history: paternal grandmother alive and well  IC=14.8007
+      C1266850  Social context finding  IC=6.9711
+      C2586137  Mother does not smoke  IC=14.1075
+      C1318616  H/O: recreational drug use  IC=14.8007
+      C0556388  Has never misused drugs  IC=14.1075
+      C0455500  H/O: alcoholism  IC=14.8007
+      C0260460  Personal history of alcoholism  IC=14.8007
+      C4076447  Alcohol misuser in household  IC=14.8007
+      C0221628  history of alcohol abuse  IC=14.8007
+      C0478622  Family history of other substance abuse  IC=14.8007
+      C0559555  Family history of alcoholism  IC=12.8548
+      C2186257  reported family history of alcoholism in both parents (history)  IC=14.8007
+      C2316287  Family history of diabetes mellitus type 2  IC=14.1075
+      C0455405  Family history: Hypertension  IC=14.8007
+      C1277321  FH myocardial infarction female first degree age known  IC=14.8007
+      C0424905  Family history with explicit context pertaining to sister  IC=13.7021
+      C1277322  FH myocardial infarction female first degree age unknown  IC=14.8007
+      C0455348  No FH: Hypertension  IC=14.8007
+      C2585258  Family history of cardiovascular disease in first degree male relative less than 55 years of age  IC=14.8007
+      C0455406  Family history: Myocardial infarction  IC=12.6035
+      C0260535  Family history of other condition  IC=10.7063
+      C0573986  Family history observations  IC=9.6245
+      C1276023  FH: Myocardial infarct in 1st degree male relative <55 years  IC=14.8007
+      C1261139  Diabetic relative  IC=14.1075
+      C0455678  No family history of diabetes mellitus  IC=14.8007
+      C1536768  [V] Family history of: [ischemic heart disease] or [myocardial infarction]  IC=16.9959
+      C1276032  FH: Angina in 1st degree male relative <55 years  IC=14.8007
+      C1562166  Family history of diabetes mellitus in first degree relative  IC=14.8007
+      C1579475  FH: Myocardial infarction > 60  IC=16.9959
+      C1534281  No FH: Ischemic heart disease (& [angina])  IC=16.9959
+      C1277320  FH myocardial infarction male first degree age unknown  IC=14.8007
+      C4510820  Family history of hyperlipidemia  IC=12.7213
+      C2317524  Family history of coronary arteriosclerosis  IC=14.1075
+      C4047908  Family history: Paternal grandfather alive and well  IC=14.8007
+      C0424885  Family history with explicit context pertaining to paternal grandfather  IC=14.1075
+      C4047910  Family history: maternal grandfather alive and well  IC=14.8007
+      C0424907  FH: Sister alive with problem  IC=14.8007
+      C2919333  High troponin I level  IC=14.8007
+      C0586984  Cardiac enzymes abnormal - first set  IC=14.8007
+      C1278065  Serum troponin I measurement  IC=14.8007
+      C0920210  Troponin I measurement  IC=12.8548
+      C1278063  Plasma troponin I measurement  IC=14.8007
+      C0523952  Troponin measurement  IC=12.2357
+      C0523953  Troponin T cardiac measurement  IC=14.8007
+      C0020538  Hypertensive disease  IC=7.7342
+      C0264703  Acute myocardial infarction, basal-lateral  IC=14.8007
+      C1696708  Prehypertension  IC=14.8007
+      C5817881  Acute ST segment elevation myocardial infarction due to distal left circumflex coronary artery occlusion  IC=14.8007
+      C2349195  Acute Anterior Wall Myocardial Infarction  IC=11.3042
+      C0348591  Acute transmural myocardial infarction of unspecified site  IC=14.8007
+      C5817879  Acute ST segment elevation myocardial infarction due to proximal left circumflex coronary artery occlusion  IC=14.8007
+      C3698282  Acute myocardial infarction due to left coronary artery occlusion  IC=12.0926
+      C0392462  Benign hypertensive heart disease without congestive heart failure  IC=14.8007
+      C1541655  Hypertensive heart disease NOS without congestive cardic failure  IC=16.9959
+      C3697762  Hypertensive heart AND chronic kidney disease stage 1  IC=14.8007
+      C4048003  Benign hypertensive heart disease and chronic renal disease stage 3  IC=14.8007
+      C3532953  Hypertensive heart AND chronic kidney disease stage 3  IC=14.8007
+      C3532954  Hypertensive heart AND chronic kidney disease stage 2  IC=14.8007
+      C4048002  Benign hypertensive heart disease and chronic renal disease stage 2  IC=14.8007
+      C4048001  Benign hypertensive heart disease and chronic renal disease stage 1  IC=14.8007
+      C5396575  Percutaneous coronary intervention of anterior descending branch of left coronary artery  IC=14.8007
+      C0583691  Seen by cardiology service  IC=14.8007
+      C0199297  MEDICAL CONSULTATIONS - OFFICE - OUTPATIENT - EMERGENCY DEPARTMENT  IC=12.8548
+      C0583557  Seen by cardiologist  IC=14.8007
+      C0586084  Referral to cardiologist  IC=14.1075
+      C0580136  Private referral to cardiologist  IC=14.8007
+      C0583598  Seen by cardiothoracic surgeon  IC=13.7021
+      C1273964  Discussed with consultant  IC=14.8007
+      C0422277  Seen by consultant  IC=14.8007
+      C0199305  Medical consultation on inpatient  IC=12.3158
+      C0199306  Medical consultation on hospital inpatient  IC=14.8007
+      C0583764  Seen by cardiothoracic surgery service  IC=13.7021
+      C5788979  Group consultation  IC=14.1075
+      C0583781  Seen by urology service  IC=14.8007
+      C0451624  Seen in cardiac clinic  IC=14.1075
+      C0583559  Seen by thoracic physician  IC=14.8007
+      C0422268  Seen by social worker  IC=13.7021
+      C0583600  Seen by cardiac surgeon  IC=14.8007
+      C4316478  Discussed with specialist  IC=14.8007
+      C0583599  Seen by thoracic surgeon  IC=14.8007
+      C0584235  Seen by cardiac surgery service  IC=14.8007
+      C0583574  Seen by care of the elderly physician  IC=14.8007
+      C0583769  Seen by general surgery service  IC=14.8007
+      C0583712  Seen by nuclear medicine service  IC=14.8007
+      C0583425  Under care of cardiac surgeon  IC=14.8007
+      C4284587  Physician consulting initial evaluation note  IC=14.8007
+      C1269802  Clinical consultation report  IC=9.2752
+      C0558857  Abdominal rigidity absent  IC=14.8007
+      C1827038  On examination - lungs normal  IC=16.9959
+      C0422822  Nil abnormal on examination  IC=14.8007
+      C0577151  Shifting abdominal dullness absent  IC=14.8007
+      C0437437  O/E - abdominal reflex normal  IC=14.8007
+      C0577820  Heart murmur absent  IC=14.8007
+      C0436945  O/E - no rebound tenderness  IC=14.8007
+      C0577259  Prostate non-tender  IC=14.8007
+      C0426624  No excessive upper gastrointestinal gas  IC=14.8007
+      C0438122  Abdomen examined - NAD  IC=14.8007
+      C0436956  O/E - no abdominal rigidity  IC=14.8007
+      C0436770  O/E - pulse character normal  IC=14.8007
+      C0427043  No stiff neck  IC=14.8007
+      C0437002  O/E - ascites not demonstrated  IC=14.8007
+      C0436934  O/E - no guarding on palpation  IC=14.8007
+      C0577291  Spleen non-tender  IC=14.8007
+      C0437025  O/E - bowel sounds normal  IC=14.8007
+      C0577145  No abdominal guarding on palpation  IC=14.8007
+      C0424826  Abdomen not distended  IC=14.8007
+      C0438107  General examination - nil abnormal  IC=14.8007
+      C0588114  O/E - no gallop rhythm  IC=14.8007
+      C0578586  No eye discharge  IC=14.8007
+      C0436568  O/E patient well  IC=14.1075
+      C0436911  On examination - abdominal wall moves normally  IC=14.8007
+      C0437767  O/E - vesicles not present  IC=14.8007
+      C0425555  No hiccough  IC=14.8007
+      C0426663  Abdomen soft  IC=14.8007
+      C0436915  On examination - abdominal wall contour normal  IC=14.8007
+      C0437021  O/E-percussion of abdomen NAD  IC=14.8007
+      C5395763  No pain in abdominal region on palpation  IC=14.8007
+      C0436822  O/E - heart sounds normal  IC=14.8007
+      C0437665  O/E - no discharge from ear  IC=14.8007
+      C1299454  Patient discharged alive  IC=14.8007
+      C0730368  O/E - BP reading: no postural drop  IC=14.8007
+      C0436795  O/E - BP stable  IC=14.8007
+      C1290982  Vital signs finding  IC=8.1517
+      C0436786  O/E - BP reading normal  IC=14.8007
+      C0581844  Patient's condition satisfactory  IC=14.8007
+      C0438953  Discharged from hospital  IC=13.1913
+      C0577837  Pulse rate stable  IC=14.8007
+      C0436759  O/E - pulse rate normal  IC=14.8007
+      C2314972  Ready for discharge  IC=14.8007
+      C1628333  Verbalizes discharge instructions regarding activity plan  IC=14.8007
+      C1640390  Tolerates activity for discharge setting  IC=14.8007
+      C3871203  At discharge  IC=14.8007
+      C0420296  Discharged from inpatient care  IC=14.8007
+      C3872865  Inpatient management not required  IC=14.8007
+      C0586514  Discharge status  IC=11.9103
+      C1563138  Discharged from accident and emergency (finding)  IC=14.8007
+      C1997685  Medically fit for discharge  IC=14.8007
+      C0420300  Discharged from hospital care NOS  IC=14.8007
+      C0584269  Discharge by physician  IC=10.2468
+      C0584271  Discharge by cardiologist  IC=14.8007
+      C0584343  Discharge by vascular surgeon  IC=14.8007
+      C0584422  Discharge from cardiology service  IC=14.8007
+      C0184714  Patient discharge, to home, ambulatory  IC=14.8007
+      C1320654  Already on aspirin  IC=14.8007
+      C4081517  Medication prescription not provided at discharge  IC=14.8007
+      C2315089  Aspirin given  IC=13.7021
+      C5569148  Aspirin- and atorvastatin- and clopidogrel-containing product in oral dose form  IC=14.8007
+      C5569145  Aspirin 75 mg and atorvastatin (as atorvastatin calcium) 20 mg and clopidogrel (as clopidogrel bisulfate) 75 mg oral capsule  IC=14.8007
+      C1329076  {30 (aspirin 81 MG Oral Tablet) / 30 (pravastatin sodium 40 MG Oral Tablet) } Pack  IC=14.1075
+      C1319917  Clopidogrel declined  IC=14.8007
+      C1276380  Taking aspirin education  IC=14.8007
+      C1277232  Aspirin indicated  IC=14.8007
+      C4756601  Hydrochlorothiazide and metoprolol only product in oral dose form  IC=14.8007
+      C3216463  hydrochlorothiazide / metoprolol Oral Product  IC=13.1913
+      C4753497  Hydrochlorothiazide and metoprolol only product  IC=14.8007
+      C0717827  hydrochlorothiazide / metoprolol  IC=13.1913
+      C4053458  Dietary Approaches To Stop Hypertension  IC=14.8007
+      C0420183  Low salt diet - prophylaxis  IC=14.8007
+      C0566604  Recommendation to change sodium intake  IC=14.1075
+      C5566623  Dietary sodium intake normal  IC=14.8007
+      C0012169  Low sodium diet  IC=13.0089
+      C0418846  Low salt diet education  IC=14.8007
+      C1633736  Recommendation to change diet  IC=11.6652
+      C0562663  Recommendation to change dietary intake  IC=10.9295
+      C3494667  Recommendation to continue current diet  IC=14.8007
+      C2243019  Low cholesterol-low saturated fat diet  IC=14.8007
+      C0418844  Low fat diet education  IC=14.8007
+      C3661825  General healthful diet  IC=14.8007
+      C0521974  Diet, High-Fat  IC=14.8007
+      C4082209  Increased sodium diet  IC=14.8007
+      C1276372  Recommendation to avoid nut intake  IC=14.8007
+      C0184625  Normal diet  IC=13.4144
+      C0418856  Patient advised about diet NOS  IC=14.8007
+      C0452298  Low saturated fat diet  IC=14.1075
+      C0452373  Low monosodium glutamate diet  IC=14.8007
+      C0418850  Low protein diet education  IC=14.8007
+      C0311137  Sodium restricted diet, 90 milliequivalents  IC=14.8007
+      C0452340  High sodium diet  IC=14.8007
+      C0425434  Dietary sodium - low  IC=14.8007
+      C2316118  Excessive dietary intake of potassium  IC=16.9959
+      C0425436  Dietary sodium - high  IC=14.8007
+      C2316117  Inadequate dietary intake of potassium  IC=16.9959
+      C0425437  Dietary potassium - low  IC=14.8007
+      C0425431  Dietary salt intake NOS  IC=14.8007
+      C0425440  dietary fat intake  IC=8.4799
+      C2315043  Inadequate dietary mineral intake  IC=16.9959
+      C1287880  Dietary fat intake - finding  IC=16.9959
+      C0425433  Dietary sodium intake  IC=13.1913
+      C5437796  Excessive intake of potassium  IC=14.8007
+      C2315515  Inadequate dietary intake of calcium  IC=16.9959
+      C0425439  Dietary potassium - high  IC=14.8007
+      C3714388  Inadequate sodium intake  IC=14.8007
+      C0418829  Postoperative procedure education  IC=14.1075
+      C2585426  Postoperative follow-up visit  IC=14.1075
+      C2584756  Postoperative physical examination  IC=14.1075
+      C4302491  Postoperative blood pressure measurement  IC=14.8007
+      C0205903  Postoperative Procedures  IC=11.9103
+      C4545324  Education about internal cardiac defibrillator  IC=14.8007
+      C4040266  History of removal of cardiac device  IC=14.8007
+      C2733619  Automatic implantable cardiac defibrillator in situ (finding)  IC=14.1075
+      C2711273  Cardiac defibrillator in situ  IC=13.4144
+      C1319386  Patient advised about cardiovascular disorder  IC=16.9959
+      C2584973  Visit with doctor at next appointment requested  IC=14.8007
+      C0420318  Medical follow-up  IC=14.1075
+      C1278504  Attending cardiology clinic  IC=16.9959
+      C3650862  Scheduling of follow up appointment  IC=14.8007
+      C0420331  Follow-up 1 week  IC=14.8007
+      C0419818  Follow-up cardiac assessment  IC=14.8007
+      C0184760  Patient follow-up planned and scheduled  IC=14.8007
+      C0421172  Next hospital appointment  IC=14.8007
+      C3494669  Patient informed - arrange follow-up care  IC=14.8007
+      C1446243  Patient asked to make an appointment  IC=16.9959
+      C0420329  Follow-up 2-3 days  IC=14.8007
+      C0422322  Follow-up consultation  IC=13.7021
+      C1276006  Chiropody follow-up  IC=14.8007
+      C0420328  Follow-up 1 day  IC=14.8007
+      C0589121  Follow-up visit  IC=11.1631
+      C0420298  Discharged from private hospital  IC=14.8007
+      C1542036  No follow-up: [none arranged] or [discharged]  IC=16.9959
+      C0567449  Declined consent for surgical procedure  IC=14.8007
+      C1446381  Patient non-compliant - declined intervention / support  IC=14.8007
+      C1320725  Physician consent obtained  IC=14.8007
+      C4544792  Declined consent for treatment  IC=14.1075
+      C4040366  Patient notified of treatment plan  IC=14.8007
+      C2585055  Referral declined by patient  IC=11.5426
+      C3875415  Consent declined for examination of respiratory system  IC=14.8007
+      C3875291  Consent declined for examination of cardiovascular system  IC=14.8007
+      C1320724  Self consent  IC=14.8007
+      C4706267  Follow-up encounter declined  IC=13.7021
+  TOPICS (218):
+    tp_31a26e032c11  size=   2  IC=0.829  'Product containing hydrochlorothiazide and metoprolol in oral dose form (medicinal product form)'
+    tp_17931bf2d005  size=   2  IC=0.946  'Allergic reaction caused by sulfonamide'
+    tp_a27e502f548f  size=   2  IC=0.946  'H/O: angina pectoris'
+    tp_1f18dab8bd57  size=   2  IC=0.946  'History of alcohol use disorder'
+    tp_ad204cb13329  size=   2  IC=0.946  'Automatic implantable cardiac defibrillator in situ'
+    tp_dbd02ff3910a  size=   2  IC=0.946  'Postoperative procedure education'
+    tp_a3ac2ea0fde0  size=   2  IC=0.946  'Family history with explicit context pertaining to paternal grandmother'
+    tp_208f691f30c7  size=   2  IC=0.946  'Family history of diabetes mellitus type 2'
+    tp_c3ff85d18be8  size=   2  IC=0.946  'Seen in cardiac clinic'
+    tp_b115be43c3b3  size=   2  IC=0.914  'History of chest pain'
+    tp_b24ad623ed97  size=   2  IC=0.946  'Referral to cardiologist'
+    tp_358c07ef0757  size=   2  IC=0.946  'Group consultation'
+    tp_4f95fcd82ead  size=   2  IC=0.946  'Mother does not smoke'
+    tp_e600f6f2028d  size=   2  IC=0.946  'Family history of substance dependency'
+    tp_f7d6b70a13ca  size=   2  IC=0.946  'Dietary sodium intake - finding'
+    tp_be1a4ee2259a  size=   2  IC=0.914  'Saturated fat modified diet'
+    tp_7143686fddfa  size=   2  IC=0.946  'Finding of consistency of abdomen'
+    tp_04fc1d237535  size=   2  IC=0.946  'Family history of coronary arteriosclerosis'
+    tp_7bbad52381e7  size=   2  IC=0.946  'Postoperative physical examination'
+    tp_374d34bd4c8e  size=   2  IC=0.914  'History of cardiac arrest'
+    tp_802d0021e66f  size=   2  IC=0.914  'Aspirin- and atorvastatin- and clopidogrel-containing product in oral dose form'
+    tp_5dc86c003652  size=   2  IC=0.914  'FH: Atherosclerosis'
+    tp_f1a836303a94  size=   2  IC=0.946  'Declined consent for treatment'
+    tp_3e5f7a151609  size=   2  IC=0.946  'Has never misused drugs'
+    tp_e3229345a5c7  size=   2  IC=0.946  'H/O: Myocardial infarction in last year'
+    tp_4fb4005ece9c  size=   2  IC=0.946  'Family history with explicit context pertaining to maternal grandfather'
+    tp_81f3aaf30bd3  size=   2  IC=0.946  'Family history with explicit context pertaining to paternal grandfather'
+    tp_dade5f491a71  size=   2  IC=0.946  'Recommendation to change fruit and nut intake'
+    tp_4d388634c958  size=   2  IC=0.946  'FH: Maternal grandmother'
+    tp_e8334614446f  size=   2  IC=0.875  'Acute myocardial infarction due to occlusion of circumflex branch of left coronary artery'
+    tp_98e6d71be3b6  size=   2  IC=0.946  'Allergic reaction caused by penicillin'
+    tp_3c28740c6344  size=   2  IC=0.946  'Aspirin and atorvastatin and clopidogrel only product in oral dose form'
+    tp_7aaab9a6cb9f  size=   2  IC=0.946  'Low saturated fat diet'
+    tp_861c9a10069a  size=   2  IC=0.914  'Family history of hypertension'
+    tp_035ba8fb5b91  size=   3  IC=0.914  'Acute ST segment elevation myocardial infarction of lateral wall'
+    tp_6ed150441aae  size=   3  IC=0.914  'Hypertensive heart disease without congestive heart failure'
+    tp_64a1c7c4d438  size=   3  IC=0.821  'Sodium modified diet'
+    tp_69a0215c1088  size=   3  IC=0.775  'Recommendation to change dietary intake'
+    tp_7b8e4b5d36df  size=   3  IC=0.892  'Cardiac defibrillator in situ'
+    tp_b17e1f0e50eb  size=   3  IC=0.848  'Follow-up visit'
+    tp_af79457e9ea8  size=   3  IC=0.838  'Troponin measurement (procedure)'
+    tp_6dd3cedd214e  size=   3  IC=0.914  'Seen by cardiothoracic surgeon'
+    tp_a8b4ccc216c5  size=   3  IC=0.86  'Atorvastatin- and clopidogrel-containing product in oral dose form'
+    tp_bd4e88eb53e2  size=   3  IC=0.914  'Troponin I measurement'
+    tp_ce7b4bffaa8e  size=   3  IC=0.914  'Under care of cardiothoracic surgeon'
+    tp_bcf2725b8cc3  size=   3  IC=0.914  'Follow-up consultation'
+    tp_01d87e548634  size=   3  IC=0.914  'No abdominal pain'
+    tp_0f87b3175e92  size=   3  IC=0.914  'Medical consultation on inpatient'
+    tp_59e5ef8276a7  size=   3  IC=0.914  'Allergy to ampicillin and/or floxacillin'
+    tp_b469eaaa6118  size=   3  IC=0.813  'Hydrochlorothiazide- and metoprolol-containing product'
+    tp_3528ece93b7f  size=   3  IC=0.914  'Seen by chest physician'
+    tp_3daf3e23dd1a  size=   3  IC=0.875  'Aspirin- and atorvastatin- and clopidogrel-containing product'
+    tp_08974477692f  size=   3  IC=0.914  'Aspirin given'
+    tp_32364c1b4dba  size=   3  IC=0.914  'Follow-up encounter declined'
+    tp_0e4dc766bd13  size=   3  IC=0.892  'Does not misuse drugs'
+    tp_aaa9ecccdfcf  size=   3  IC=0.914  'Seen by social worker'
+    tp_4bcccfe3fb12  size=   3  IC=0.821  'FH: Raised blood lipids'
+    tp_2272e56e5d88  size=   3  IC=0.892  'Allergic reaction caused by antibacterial agent'
+    tp_03940e001c04  size=   3  IC=0.914  'History of substance dependency'
+    tp_b1f6ee60cc78  size=   3  IC=0.914  'Seen by cardiothoracic surgery service'
+    tp_7d625f516054  size=   4  IC=0.838  'Family history of hyperlipidaemia'
+    tp_9fd36bb14263  size=   4  IC=0.892  'Family history with explicit context pertaining to sister'
+    tp_1d0b13e078a4  size=   4  IC=0.892  'History of placement of stent for coronary artery disease'
+    tp_50ed10e46497  size=   4  IC=0.784  'Acute myocardial infarction due to left coronary artery occlusion'
+    tp_f4cd4ead7f2c  size=   4  IC=0.806  'Clopidogrel-containing product in oral dose form'
+    tp_f5f6258a04b4  size=   4  IC=0.848  'Acute ST segment elevation myocardial infarction involving left anterior descending coronary artery'
+    tp_ee06858fae5d  size=   4  IC=0.669  'ST segment - finding'
+    tp_14919b059820  size=   4  IC=0.821  'Summary clinical document'
+    tp_bd4e6dd9b759  size=   4  IC=0.892  'Troponin T measurement'
+    tp_27474e9194c5  size=   4  IC=0.794  'H/O: myocardial problem'
+    tp_5413485a8688  size=   4  IC=0.875  'Postoperative follow-up visit'
+    tp_4412dae30ca3  size=   4  IC=0.892  'Acute ST segment elevation myocardial infarction due to occlusion of circumflex branch of left coronary artery'
+    tp_6826c04e547e  size=   4  IC=0.892  'Normal diet (finding)'
+    tp_0e076e494fb1  size=   4  IC=0.892  'Swelling absent'
+    tp_f2accc6049fa  size=   4  IC=0.892  'Acute ST segment elevation myocardial infarction due to occlusion of anterior descending branch of left coronary artery'
+    tp_626e20695491  size=   4  IC=0.892  'Low food preservative diet'
+    tp_279494640aef  size=   4  IC=0.892  'Clinical consultation report'
+    tp_52cb251ec7a5  size=   4  IC=0.892  'Aspirin therapy finding'
+    tp_c8603b53ca8c  size=   5  IC=0.875  'Discharge to home'
+    tp_aac40d260f48  size=   5  IC=0.821  'Scheduling (procedure)'
+    tp_173962c92a24  size=   5  IC=0.759  'Family history of ischaemic heart disease'
+    tp_ac46bb6378a2  size=   5  IC=0.875  'Discharged from hospital (finding)'
+    tp_e3f2d7bad6b0  size=   5  IC=0.875  'Acute myocardial infarction of inferolateral wall'
+    tp_2a4d4e7965f8  size=   5  IC=0.813  'History of cardiac arrhythmia'
+    tp_2d5a9501cfd4  size=   5  IC=0.875  'Chronic kidney disease stage 1 due to hypertension'
+    tp_80c1992f764b  size=   5  IC=0.848  'Discharge summary'
+    tp_780db893bbe0  size=   5  IC=0.875  'Chronic kidney disease stage 2 due to hypertension'
+    tp_e4bc06b2f737  size=   5  IC=0.794  'Pravastatin-containing product in oral dose form'
+    tp_cd49076acadf  size=   5  IC=0.759  'Recommendation to change diet'
+    tp_c7cd396365d7  size=   5  IC=0.68  'ST segment'
+    tp_0ff369862eb3  size=   6  IC=0.732  'Temporal periods relating to procedure'
+    tp_35a48c650812  size=   6  IC=0.86  'Chronic kidney disease stage 3 due to hypertension'
+    tp_d09afa17ee73  size=   6  IC=0.794  'Cardiac implant in situ'
+    tp_9ac5b0c7d4f4  size=   6  IC=0.829  'Family history: Diabetes mellitus'
+    tp_d4e82afa30d3  size=   6  IC=0.86  'Verbalizes activity tolerance'
+    tp_60aa4014dc77  size=   6  IC=0.813  'Patient notified'
+    tp_c3415d271c57  size=   6  IC=0.732  'Metoprolol-containing product in oral dose form'
+    tp_8c5b6864a37b  size=   6  IC=0.789  'Postoperative procedure'
+    tp_49a63ddc9dbd  size=   6  IC=0.779  'Sodium, potassium AND/OR calcium diet'
+    tp_69bd15658572  size=   6  IC=0.784  'Encounter report'
+    tp_9cb15a848f15  size=   7  IC=0.794  'Acute myocardial infarction of lateral wall'
+    tp_11d10bb6894d  size=   7  IC=0.775  'Acute myocardial infarction of anterior wall'
+    tp_1015c763f86b  size=   7  IC=0.838  'Postoperative evaluation'
+    tp_10a188c0f99f  size=   7  IC=0.8  'Acute ST segment elevation myocardial infarction due to left coronary artery occlusion'
+    tp_c6b227c00db3  size=   7  IC=0.611  'Pulse rate finding'
+    tp_cbb23639921b  size=   7  IC=0.838  'Low salt diet'
+    tp_bc7680bb6333  size=   7  IC=0.848  'Aspirin and pravastatin only product in oral dose form'
+    tp_bed354481094  size=   7  IC=0.848  'Acute ST segment elevation myocardial infarction due to right coronary artery occlusion'
+    tp_488e5909e7fc  size=   7  IC=0.838  'No FH: Cardiovascular disease'
+    tp_71f493d0e72f  size=   8  IC=0.806  'Old myocardial infarction'
+    tp_401482433de9  size=   8  IC=0.806  'Low fat diet (finding)'
+    tp_65bb7407e237  size=   8  IC=0.705  'Metoprolol (substance)'
+    tp_418931c09d75  size=   8  IC=0.838  'Recommendation to change nutrient intake'
+    tp_c62d3aa34a0e  size=   8  IC=0.838  'Sulphonamide diuretic allergy'
+    tp_13691b4be575  size=   8  IC=0.838  'Hydrochlorothiazide and metoprolol only product in oral dose form'
+    tp_d176dc54b60c  size=   9  IC=0.489  'Vital signs finding'
+    tp_316ea4dec772  size=   9  IC=0.829  'Percutaneous coronary intervention of left coronary artery'
+    tp_70b0c574d6e0  size=   9  IC=0.829  'Hydrochlorothiazide and metoprolol only product'
+    tp_7eb370d98571  size=   9  IC=0.821  'Blood pressure taking (procedure)'
+    tp_3dc54385560c  size=   9  IC=0.829  'Family history of myocardial infarction'
+    tp_b08c4f6340bb  size=   9  IC=0.829  'Allergy to 3-hydroxy-3-methylglutaryl-coenzyme A reductase inhibitor'
+    tp_a5ce802e5dff  size=   9  IC=0.775  'Follow-up encounter'
+    tp_6d313b37d2a1  size=  10  IC=0.705  'Sulphonamide adverse reaction'
+    tp_b5149f5c1afb  size=  10  IC=0.821  'Benign hypertensive heart disease'
+    tp_0fc70ccc6bc1  size=  10  IC=0.813  'History of myocardial infarction (situation)'
+    tp_93d050f16d24  size=  10  IC=0.723  'Penicillin adverse reaction'
+    tp_eb37c4bee57e  size=  10  IC=0.779  'Low mineral diet'
+    tp_3dce03951c92  size=  10  IC=0.6  'Discharge by health worker'
+    tp_84138f8c525d  size=  10  IC=0.767  'NFH'
+    tp_3ded8119379c  size=  10  IC=0.714  'Sulfonamide allergy'
+    tp_cdb42ef1ce5b  size=  10  IC=0.821  'FH: Angina'
+    tp_dfa3cf725153  size=  11  IC=0.672  'EKG ST segment changes'
+    tp_fe5c8fea64fd  size=  11  IC=0.813  'Sulfonylurea allergy'
+    tp_d351b84da777  size=  11  IC=0.67  'Energy and stamina finding'
+    tp_db2e8a1bffa6  size=  12  IC=0.784  'Discharge status (finding)'
+    tp_be08e50477fd  size=  12  IC=0.759  'Prescription status'
+    tp_ce9564335002  size=  12  IC=0.637  'ECG waveform'
+    tp_a37919f62806  size=  12  IC=0.8  'Abdominal tenderness absent'
+    tp_a8c0b3902b3b  size=  13  IC=0.714  'Acute ST segment elevation myocardial infarction (disorder)'
+    tp_7a84dbd09118  size=  13  IC=0.784  'Allergic reaction to chemical'
+    tp_afc54d36a54d  size=  13  IC=0.8  'Allergy to sulphonamide antibiotic'
+    tp_ca8ebdf59240  size=  14  IC=0.713  'H/O: heart disorder'
+    tp_5cc188206f1c  size=  14  IC=0.711  'Admission statuses'
+    tp_df51f8a9d2d6  size=  14  IC=0.789  'Drug indicated'
+    tp_07c707790dd0  size=  15  IC=0.698  'Family history of cardiac disorder'
+    tp_eec142039aad  size=  15  IC=0.756  'Patient themselves providing care'
+    tp_70a5669c7adc  size=  15  IC=0.732  'Patient condition finding'
+    tp_b82e61af5a19  size=  16  IC=0.784  'Hypertensive heart and chronic kidney disease (disorder)'
+    tp_91efe4b68a25  size=  17  IC=0.779  'Follow-up arranged'
+    tp_3688e2542e30  size=  17  IC=0.779  'Excessive mineral intake'
+    tp_92e9a808a8b8  size=  17  IC=0.775  'Referral to private doctor'
+    tp_d0208c613a82  size=  17  IC=0.709  'Follow-up status (finding)'
+    tp_d9fc14392bef  size=  17  IC=0.533  'Cardiovascular test finding'
+    tp_96575dc97790  size=  17  IC=0.779  'Inadequate mineral intake'
+    tp_ce2afe093258  size=  18  IC=0.581  'Seen by health professional'
+    tp_152c940ec47a  size=  18  IC=0.746  'Referral declined by patient'
+    tp_f09c451db259  size=  19  IC=0.666  'FH: Cardiovascular disease'
+    tp_85467b2006a3  size=  20  IC=0.746  'Penicillin allergy'
+    tp_66562698fa77  size=  20  IC=0.618  'Clinical document (record artifact)'
+    tp_6268de7fd885  size=  20  IC=0.732  'Seen by surgical service'
+    tp_f71a8a4492f9  size=  20  IC=0.65  'AMI - Acute myocardial infarction'
+    tp_e481dad786d2  size=  20  IC=0.735  'Discharge by surgeon'
+    tp_c63cdf31c53a  size=  21  IC=0.629  'History of injury'
+    tp_e5a71c299ad1  size=  21  IC=0.735  'Seen by surgeon'
+    tp_fb1fcbe33a64  size=  22  IC=0.749  'Discharge from medical service'
+    tp_bcfb4216089f  size=  24  IC=0.749  'Seen by medical service'
+    tp_79973b0ee3f7  size=  24  IC=0.688  'Blood pressure finding (finding)'
+    tp_47e21aa730a7  size=  25  IC=0.68  'Family history with explicit context pertaining to mother'
+    tp_8a67c273506a  size=  25  IC=0.711  'Family history: Metabolic disorder'
+    tp_a63abd9cce69  size=  27  IC=0.723  'Medication given'
+    tp_3641031bc679  size=  27  IC=0.707  'No history of'
+    tp_e61091275ecc  size=  27  IC=0.623  'HTN - Hypertension'
+    tp_425a04f460a1  size=  28  IC=0.622  'Finding relating to alcohol drinking behavior'
+    tp_83b75c302cfe  size=  29  IC=0.571  'Patient status finding'
+    tp_f3a3d2ec179c  size=  31  IC=0.732  'Allergy to non-steroidal anti-inflammatory agent'
+    tp_aba03160996e  size=  32  IC=0.549  'Dietary regime (regime/therapy)'
+    tp_63edd015ec8a  size=  32  IC=0.595  'Product containing hydrochlorothiazide in oral dose form (medicinal product form)'
+    tp_9b993165b4b8  size=  33  IC=0.568  'HCTZ'
+    tp_7a4fb3ef2c8c  size=  34  IC=0.535  'Diets'
+    tp_91c906f9a876  size=  34  IC=0.68  'Diet education (procedure)'
+    tp_ede7d53dbf0a  size=  35  IC=0.684  'Medication education'
+    tp_52333476628b  size=  37  IC=0.659  'Consent status'
+    tp_c3ac8124ba4a  size=  38  IC=0.697  'Medication declined'
+    tp_3425ee070446  size=  38  IC=0.527  'Social context finding'
+    tp_f579c04c73f2  size=  38  IC=0.409  'Social and personal history finding'
+    tp_8b8245d1abfd  size=  39  IC=0.645  'Discharge by physician'
+    tp_23570703151c  size=  41  IC=0.617  'Advice to'
+    tp_1fd1d5b10bd7  size=  41  IC=0.675  'H/O cardiac surgery'
+    tp_4e2ba1c64fef  size=  45  IC=0.41  'Hypersensitivity reaction (disorder)'
+    tp_ae3402840f15  size=  49  IC=0.634  'Seen by specialist physician'
+    tp_be4ff3abb4a9  size=  49  IC=0.604  'Referral to doctor'
+    tp_abbb3c570443  size=  53  IC=0.658  'Procedure requested'
+    tp_43fc34949418  size=  59  IC=0.271  'Finding of abdomen'
+    tp_f3765a74421e  size=  60  IC=0.404  'Administrative statuses'
+    tp_48574c7fc8e7  size=  64  IC=0.6  'Left ventricular abnormality'
+    tp_de9eb961050e  size=  65  IC=0.366  'Physical examination'
+    tp_18affb04d3ad  size=  65  IC=0.64  'Consultation (procedure)'
+    tp_82d1b2878416  size=  69  IC=0.482  'History of procedure'
+    tp_4208fba9d141  size=  69  IC=0.621  'Clinical finding present'
+    tp_7ab4f89fe708  size=  70  IC=0.297  'Cardiovascular disease'
+    tp_c8bb84f861db  size=  74  IC=0.509  'Family history of disorder'
+    tp_4ae2cb17d844  size=  76  IC=0.505  'Cardiomyopathy'
+    tp_41aef4403862  size=  80  IC=0.463  'Protein level - finding'
+    tp_a51cd0963737  size=  85  IC=0.589  'Electrocardiogram abnormal'
+    tp_b9fe61df1909  size=  89  IC=0.64  'Seen in clinic'
+    tp_ac5cb962a3bb  size=  89  IC=0.483  'Family medical history'
+    tp_26d75783048e  size=  91  IC=0.411  'Therapy'
+    tp_e2b5eecd3b8d  size=  95  IC=0.451  'History of clinical finding in subject'
+    tp_37d074426ff8  size= 103  IC=0.287  'Cardiovascular observations'
+    tp_459015b9ca14  size= 105  IC=0.553  'Procedure declined (situation)'
+    tp_067671ddf49a  size= 123  IC=0.288  'Procedure with explicit context'
+    tp_92189052f32e  size= 128  IC=0.436  'Serum/plasma protein test'
+    tp_ad421af205b3  size= 140  IC=0.438  'Education procedure'
+    tp_554934252df6  size= 164  IC=0.539  'Cardiac complication'
+    tp_ac524d20e417  size= 181  IC=0.437  'Allergic disposition'
+    tp_0b7771d230be  size= 194  IC=0.527  'Clinical finding absent'
+    tp_a1d7a3403e78  size= 311  IC=0.369  'Protein measurement (procedure)'
+    tp_040e78072525  size= 565  IC=0.456  'Allergy to drug'
 
-Change DEMO_DOC_INDEX + restart to use a different document.
-Changing the query needs no restart (client sends query only).
-"""
+######################################################################
+#  QUERY SIDE (LLM nature-breakdown)
+######################################################################
+======================================================================
+QUERY: 'family history'
+======================================================================
 
-from multiprocessing.connection import Listener
+Expanded: 'Comprehensive family medical history, including but not limited to cardiovascular diseases (e.g., coronary artery disease, myocardial infarction, hypertension, stroke), diabetes mellitus, various types of cancers, autoimmune disorders, neurological conditions, psychiatric disorders, genetic conditions, renal diseases, and endocrine disorders, for first-degree and second-degree relatives.'
+Total intents: 1
 
-import config  # loads hierarchy / ic / topics once
-from intents import ContextualIntentPipeline
-from cui_core import CUIExtractor
-from cui_summarizer import CUISummarizer
-from topic_adaptor import TopicAdaptor
-from document import get_document
-from config import (
-    PROJECT_ID, LOCATION, MODEL_VERSION,
-    API_URL, TOP_K, TOP_P, CLUSTER_SET, COMBINED,
-)
+----------------------------------------------------------------------
+  INTENT 1: Family Medical History
+    Nature:      Patient Context / Risk Assessment & Screening
+    Description: This intent captures the comprehensive medical history of a patient's first-degree and second-degree relatives, focusing on a wide range of inherited or familial conditions. This information is crucial for risk assessment, early detection, and personalized preventive care.
+    Sub-natures (10):
+      - Family History >> Kinship
+          atomic: first-degree relatives
+          atomic: second-degree relatives
+      - Family History >> Conditions >> Cardiovascular
+          atomic: coronary artery disease
+          atomic: myocardial infarction
+          atomic: hypertension
+          atomic: stroke
+      - Family History >> Conditions >> Metabolic
+          atomic: diabetes mellitus
+      - Family History >> Conditions >> Oncological
+          atomic: cancers
+      - Family History >> Conditions >> Autoimmune
+          atomic: autoimmune disorders
+      - Family History >> Conditions >> Neurological
+          atomic: neurological conditions
+      - Family History >> Conditions >> Psychiatric
+          atomic: psychiatric disorders
+      - Family History >> Conditions >> Genetic
+          atomic: genetic conditions
+      - Family History >> Conditions >> Renal
+          atomic: renal diseases
+      - Family History >> Conditions >> Endocrine
+          atomic: endocrine disorders
 
-print(f">>> PROJECT_ID={PROJECT_ID!r}  LOCATION={LOCATION!r}  MODEL={MODEL_VERSION!r}")
-print("Building clients (once)...")
+----------------------------------------------------------------------
+  CUI EXTRACTION
+----------------------------------------------------------------------
 
-pipeline   = ContextualIntentPipeline(project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION)
-extractor  = CUIExtractor(API_URL, top_k=TOP_K, top_p=TOP_P, cluster_set=CLUSTER_SET, combined=COMBINED)
-summarizer = CUISummarizer()
-adaptor    = TopicAdaptor()
+  INTENT: Family Medical History
+    sub_nature: Family History >> Kinship
+      [path]   'Family History'             -> 51 CUIs: C0518360, C4721446, C0489533, C0424987, C1827205, C0424897, C0573986, C1287133, C2733371, C0424884, C1319349, C1397163, C2599444, C0683520, C0424887, C0424886, C4699174, C1397164, C1287131, C0424889, C1392042, C2129171, C2135565, C1540733, C0425130, C0850707, C0481639, C0680074, C3176490, C5934828, C2317554, C4545528, C0424885, C0574102, C0455391, C0424905, C2584452, C2135566, C1705495, C0557092, C0559550, C2316281, C1545291, C5937736, C4316528, C5189176, C2317529, C0424893, C5442541, C0559115, C0424892
+      [path]   'Kinship'                    -> 34 CUIs: C0870772, C0680081, C0870773, C1959567, C0242284, C0870774, C0680025, C5543317, C0683568, C0680017, C0682317, C0598429, C0080103, C1320306, C2034534, C3854490, C0680039, C0682199, C2347083, C0858350, C5819678, C0858351, C2349980, C1403673, C0683569, C5703164, C0814572, C0682316, C3639750, C1266852, C0680028, C1273800, C0870340, C2347452
+      [atomic] 'first-degree relatives'     -> 89 CUIs: C1266851, C2733545, C1517194, C5453180, C5787026, C3698428, C2034534, C3639750, C3697463, C2347083, C5205796, C3854490, C1518469, C1273520, C5767638, C5818563, C0080103, C4544361, C2347452, C5817422, C1273521, C5817421, C4763618, C1266852, C4708017, C5204998, C0337583, C4288953, C0557090, C4288586, C0557085, C2318840, C2318847, C2371717, C2348890, C2318830, C5205040, C0424987, C2318844, C2318826, C0424892, C5238696, C2318839, C2318837, C2318841, C2319148, C2318846, C1562166, C2318827, C0260515, C1261326, C2316286, C2349991, C4540928, C2318829, C2186266, C2924475, C2319051, C2319144, C0489533, C2318681, C2320845, C1261139, C2318833, C2318848, C2318843, C2319484, C2321101, C2318834, C2317320, C1540744, C2319069, C2318800, C2318709, C2318906, C2320909, C2319145, C2320351, C0455405, C0559550, C2599444, C2319919, C1261325, C1261367, C1561978, C4521021, C2319895, C2319067, C0683520
+      [atomic] 'second-degree relatives'    -> 78 CUIs: C3698428, C3697463, C5205796, C4708017, C5767638, C5818563, C3639750, C1519210, C0337586, C2348890, C0337587, C5817422, C2347083, C2319867, C5817421, C2319145, C1273526, C1273521, C2319851, C2318709, C2319849, C0337583, C2319489, C2319452, C5818721, C2318847, C2319835, C2319149, C2319148, C2318840, C2133706, C2733545, C2348895, C2319819, C2320184, C2346667, C1266851, C4544361, C2319158, C2319205, C2348676, C0337580, C4288586, C1274025, C2348536, C2318827, C3844805, C2320594, C3272869, C2318844, C2318706, C2319199, C1273800, C2318947, C2318830, C2318713, C2319071, C2318677, C2320786, C2319072, C2319073, C2319144, C2318841, C2319159, C2320563, C2320813, C2319201, C2319069, C2320833, C2320197, C2319111, C2319480, C2318846, C2318839, C2318681, C2318826, C2320562, C2318837
+    sub_nature: Family History >> Conditions >> Cardiovascular
+      [path]   'Family History'             -> 51 CUIs: C0518360, C4721446, C0489533, C0424987, C1827205, C0424897, C0573986, C1287133, C2733371, C0424884, C1319349, C1397163, C2599444, C0683520, C0424887, C0424886, C4699174, C1397164, C1287131, C0424889, C1392042, C2129171, C2135565, C1540733, C0425130, C0850707, C0481639, C0680074, C3176490, C5934828, C2317554, C4545528, C0424885, C0574102, C0455391, C0424905, C2584452, C2135566, C1705495, C0557092, C0559550, C2316281, C1545291, C5937736, C4316528, C5189176, C2317529, C0424893, C5442541, C0559115, C0424892
+      [path]   'Conditions'                 -> 87 CUIs: C4698036, C1552577, C4700184, C4698037, C5856725, C5551567, C0449910, C4522149, C0449908, C2359469, C3844735, C2707268, C3897247, C1718360, C1718239, C5885245, C1718236, C2985574, C3242153, C2359476, C5856700, C0260019, C1705253, C5856718, C3840985, C5960398, C5960396, C1701901, C1549034, C5667429, C1550520, C4062502, C4060919, C1275743, C5960395, C1716788, C4482549, C1292730, C0033213, C2826676, C5890513, C4534505, C5708312, C2359477, C0184775, C0243082, C5555348, C4745084, C5935102, C5551568, C5552395, C1883726, C1718359, C1444752, C1547228, C0449438, C4699586, C5238667, C5963540, C4531657, C3830105, C3843066, C5425822, C1879742, C2598248, C0348080, C0039058, C0743630, C3844184, C3841830, C1998882, C3176928, C3842882, C4264539, C3843647, C3853087, C0436353, C2359472, C2896437, C0497289, C0158370, C2017951, C0839021, C0477631, C1261130, C0947768, C0409195
+      [path]   'Cardiovascular'             -> 30 CUIs: C3887460, C1971640, C0578149, C1320716, C0007227, C0199659, C3179393, C0809779, C5220297, C1536646, C0440759, C0849157, C1268109, C0577868, C0849557, C0679562, C4086133, C5399718, C0184522, C2958674, C0560570, C4512826, C2015790, C1971641, C4324389, C5220298, C0851722, C2697969, C0948955, C5549885
+      [atomic] 'coronary artery disease'    -> 56 CUIs: C4698911, C0742827, C4534432, C5906950, C3650190, C2321373, C0242231, C0742833, C1735363, C3805196, C1842247, C1299432, C0742829, C1956346, C0542052, C0549517, C0264683, C1389622, C0856171, C0742826, C2882165, C0742828, C0742830, C0742825, C0742832, C2736955, C0856737, C0852149, C0742834, C3161090, C3161193, C4537586, C2003996, C0151814, C2882167, C1636672, C2882162, C3809268, C1961074, C0837134, C2366973, C0852153, C3508162, C0742846, C3267166, C0742847, C0742848, C5922450, C5768504, C1290385, C5768505, C5768506, C5768509, C5768507, C5768513, C2040208
+      [atomic] 'myocardial infarction'      -> 85 CUIs: C0746721, C5243908, C0746720, C5243907, C4698918, C2063306, C5784462, C0743418, C1534922, C2063860, C0746716, C2062875, C3843082, C1869049, C0746714, C0746715, C2063307, C0340305, C2063314, C0746717, C0948089, C4699470, C2104634, C0262567, C3277063, C0155626, C1112663, C2063779, C4509203, C4324552, C2063301, C0262563, C3839322, C0155643, C0746731, C2063303, C3650460, C0340315, C1400513, C0494578, C1273976, C0548840, C1561923, C2924341, C2063302, C1633725, C1142185, C5243911, C3650461, C0746737, C2882101, C0281915, C2063772, C1142184, C4290138, C4290140, C2063770, C4068226, C0155655, C2063775, C1868996, C2063305, C0948369, C0264700, C3650465, C2063782, C0948866, C2063862, C4230384, C2029786, C1112769, C2924486, C0340324, C1998297, C0865603, C0949079, C0746722, C1112645, C0746726, C0155664, C0948865, C0340294, C0489577, C0746711, C0340292
+      [atomic] 'hypertension'               -> 93 CUIs: C5205099, C3843080, C0745114, C4546218, C4698916, C3842021, C4529970, C0745129, C1400060, C0520539, C0745116, C0745134, C0857121, C3825107, C1610114, C2240377, C4714857, C4714995, C0848910, C0221155, C2186528, C1533269, C4749211, C4534350, C4718254, C1385162, C0598428, C0745117, C0422554, C4290132, C1846430, C5231205, C1400059, C0085580, C1963138, C3829824, C1696708, C0020538, C0596515, C0235222, C0585941, C3843189, C0731141, C1139180, C3715181, C3532916, C0003364, C2169456, C1875332, C4040036, C2204032, C2980165, C1828880, C0350167, C3251094, C2879512, C0573921, C3843190, C2980131, C0413939, C0413949, C1874305, C0869094, C0573920, C0412879, C0684167, C0354333, C2346947, C2054151, C2926598, C4726869, C1516018, C0216784, C2925917, C3834166, C3219147, C3653717, C4529652, C0722119, C3212802, C3653604, C1256629, C2348129, C4051507, C5909614, C1449988, C0718639, C0699178, C0122908, C2699939, C0358685, C2732023, C4753484
+      [atomic] 'stroke'                     -> 114 CUIs: C4717014, C4717887, C1394288, C0576165, C3889040, C3662061, C2363781, C3844825, C1836785, C0848212, C0742048, C3203642, C0742047, C4274262, C0850564, C4716345, C3698284, C0585893, C3697821, C3257979, C4534437, C2063394, C3258196, C3662049, C4062290, C0850299, C1540598, C0742934, C3840832, C4269170, C5387953, C5570625, C0850298, C1964097, C3662097, C3805136, C3697633, C4268527, C4269182, C0281994, C4269183, C4269176, C3648325, C4269148, C1168072, C2315652, C4269186, C4269159, C4269187, C4536559, C4536558, C2167165, C3810297, C4062307, C3472497, C4270816, C4269188, C4269164, C1964096, C4269163, C4269149, C2882592, C4543291, C3648287, C4269161, C3648323, C4269158, C4269166, C2316860, C2034120, C3648284, C3648919, C3648282, C2030465, C2911327, C4534346, C3648921, C3662092, C0481607, C4536560, C2882663, C0877546, C4520329, C4520330, C5192534, C3648285, C3648920, C0559159, C3662023, C4269165, C3494981, C4269167, C2585352, C4269160, C0744749, C3662060, C3494554, C3494994, C3662041, C3662044, C3494993, C0750404, C3662098, C4510861, C0742494, C0742956, C4039739, C2317445, C0744750, C4075944, C4269162, C0742955, C4280844, C4269168
+    sub_nature: Family History >> Conditions >> Metabolic
+      [path]   'Family History'             -> 51 CUIs: C0518360, C4721446, C0489533, C0424987, C1827205, C0424897, C0573986, C1287133, C2733371, C0424884, C1319349, C1397163, C2599444, C0683520, C0424887, C0424886, C4699174, C1397164, C1287131, C0424889, C1392042, C2129171, C2135565, C1540733, C0425130, C0850707, C0481639, C0680074, C3176490, C5934828, C2317554, C4545528, C0424885, C0574102, C0455391, C0424905, C2584452, C2135566, C1705495, C0557092, C0559550, C2316281, C1545291, C5937736, C4316528, C5189176, C2317529, C0424893, C5442541, C0559115, C0424892
+      [path]   'Conditions'                 -> 87 CUIs: C4698036, C1552577, C4700184, C4698037, C5856725, C5551567, C0449910, C4522149, C0449908, C2359469, C3844735, C2707268, C3897247, C1718360, C1718239, C5885245, C1718236, C2985574, C3242153, C2359476, C5856700, C0260019, C1705253, C5856718, C3840985, C5960398, C5960396, C1701901, C1549034, C5667429, C1550520, C4062502, C4060919, C1275743, C5960395, C1716788, C4482549, C1292730, C0033213, C2826676, C5890513, C4534505, C5708312, C2359477, C0184775, C0243082, C5555348, C4745084, C5935102, C5551568, C5552395, C1883726, C1718359, C1444752, C1547228, C0449438, C4699586, C5238667, C5963540, C4531657, C3830105, C3843066, C5425822, C1879742, C2598248, C0348080, C0039058, C0743630, C3844184, C3841830, C1998882, C3176928, C3842882, C4264539, C3843647, C3853087, C0436353, C2359472, C2896437, C0497289, C0158370, C2017951, C0839021, C0477631, C1261130, C0947768, C0409195
+      [path]   'Metabolic'                  -> 55 CUIs: C0746554, C0452399, C2945675, C4263342, C1391382, C2362507, C0587059, C1879397, C1393263, C1864620, C0848663, C2707259, C0455489, C0025517, C1372744, C0854153, C3841737, C4714891, C1263722, C0696138, C1290840, C0848271, C0746555, C2198091, C0580374, C0430174, C5775665, C0494362, C3280895, C0870882, C0268378, C0849681, C0455367, C0548932, C0424581, C0740740, C0746557, C0002177, C1392122, C0873029, C0420187, C0746556, C0545431, C1410109, C0280606, C0429621, C0677568, C4727969, C3853758, C0438213, C4315326, C0481878, C0854642, C5765066, C1285356
+      [atomic] 'diabetes mellitus'          -> 85 CUIs: C4698940, C4318564, C0865162, C0743114, C1802373, C0235398, C1535389, C0543567, C1832605, C0743113, C0235399, C0011849, C3250485, C0348447, C2873917, C5570689, C1864068, C0342298, C5231105, C3250511, C2873934, C1854125, C1832474, C3250566, C0342313, C3532679, C1863594, C0948092, C1832387, C5930240, C2188006, C0743129, C0743131, C0477821, C2873880, C2183118, C4295763, C2063017, C2873932, C0743112, C0341898, C3841294, C0840898, C0743128, C2873944, C2873937, C0271635, C1283034, C0375113, C0375115, C0743117, C0743108, C2183120, C0837091, C2874123, C2873935, C0837093, C0743107, C2183119, C0342260, C0348939, C0348938, C2873913, C0348931, C2873946, C0348932, C2362567, C0837110, C2874134, C0376128, C0494300, C0837128, C0837109, C0837114, C2874126, C0837076, C0837116, C0837075, C0837121, C0837072, C2171194, C2874141, C0375151, C0837115, C0837105
+    sub_nature: Family History >> Conditions >> Oncological
+      [path]   'Family History'             -> 51 CUIs: C0518360, C4721446, C0489533, C0424987, C1827205, C0424897, C0573986, C1287133, C2733371, C0424884, C1319349, C1397163, C2599444, C0683520, C0424887, C0424886, C4699174, C1397164, C1287131, C0424889, C1392042, C2129171, C2135565, C1540733, C0425130, C0850707, C0481639, C0680074, C3176490, C5934828, C2317554, C4545528, C0424885, C0574102, C0455391, C0424905, C2584452, C2135566, C1705495, C0557092, C0559550, C2316281, C1545291, C5937736, C4316528, C5189176, C2317529, C0424893, C5442541, C0559115, C0424892
+      [path]   'Conditions'                 -> 87 CUIs: C4698036, C1552577, C4700184, C4698037, C5856725, C5551567, C0449910, C4522149, C0449908, C2359469, C3844735, C2707268, C3897247, C1718360, C1718239, C5885245, C1718236, C2985574, C3242153, C2359476, C5856700, C0260019, C1705253, C5856718, C3840985, C5960398, C5960396, C1701901, C1549034, C5667429, C1550520, C4062502, C4060919, C1275743, C5960395, C1716788, C4482549, C1292730, C0033213, C2826676, C5890513, C4534505, C5708312, C2359477, C0184775, C0243082, C5555348, C4745084, C5935102, C5551568, C5552395, C1883726, C1718359, C1444752, C1547228, C0449438, C4699586, C5238667, C5963540, C4531657, C3830105, C3843066, C5425822, C1879742, C2598248, C0348080, C0039058, C0743630, C3844184, C3841830, C1998882, C3176928, C3842882, C4264539, C3843647, C3853087, C0436353, C2359472, C2896437, C0497289, C0158370, C2017951, C0839021, C0477631, C1261130, C0947768, C0409195
+      [path]   'Oncological'                -> 83 CUIs: C0205478, C5578033, C3853943, C2064683, C2242489, C0259990, C5785323, C4060839, C3272901, C4294904, C3845863, C1979775, C5885885, C0596960, C0740692, C3825527, C5142756, C1555459, C0851630, C5418865, C3272902, C5886347, C5142761, C5668307, C5142759, C5705515, C5220398, C0583351, C5142772, C1274034, C1518288, C0746405, C5142757, C5142753, C0935681, C0587558, C1874311, C0199939, C0586804, C0587443, C5142764, C3898102, C0588026, C1518577, C4725957, C1875309, C0085169, C1516024, C5142771, C5142767, C0025098, C1875310, C5388344, C0920690, C1442220, C1875339, C3826285, C3697965, C4505220, C5827390, C1515090, C5142760, C1579411, C0356777, C0499161, C3173319, C0597030, C0920425, C0541659, C4751301, C1875338, C1516276, C1552534, C5676258, C3846182, C5783063, C5886240, C5545761, C0920424, C0476668, C1618877, C0376659, C1302396
+      [atomic] 'cancers'                    -> 84 CUIs: C4489210, C1442220, C1442219, C1271092, C5225781, C5775760, C4267832, C3826449, C0346953, C1707251, C0809971, C5225775, C1385102, C2064683, C5394275, C5225777, C4716420, C5225778, C1516225, C0920425, C1516190, C5453899, C0006826, C3825195, C0751177, C0030793, C5454771, C3824734, C4230501, C0242594, C3826285, C5226042, C1306632, C4270794, C1516193, C4534429, C5454778, C3172269, C5225790, C4313796, C3166313, C4697846, C0178250, C3825724, C5225785, C0810239, C5225809, C1542585, C0684842, C0742562, C1306467, C0278659, C5225798, C1299288, C4267833, C2314937, C5883399, C0947861, C5225803, C0751075, C5225773, C0854175, C5225774, C0559079, C0555264, C2919144, C0153662, C0153660, C0852202, C0864875, C3164697, C0017185, C5848476, C0864870, C0037073, C1306548, C0742635, C0864885, C1306155, C0153471, C0851440, C0153445, C0947859, C0002757
+    sub_nature: Family History >> Conditions >> Autoimmune
+      [path]   'Family History'             -> 51 CUIs: C0518360, C4721446, C0489533, C0424987, C1827205, C0424897, C0573986, C1287133, C2733371, C0424884, C1319349, C1397163, C2599444, C0683520, C0424887, C0424886, C4699174, C1397164, C1287131, C0424889, C1392042, C2129171, C2135565, C1540733, C0425130, C0850707, C0481639, C0680074, C3176490, C5934828, C2317554, C4545528, C0424885, C0574102, C0455391, C0424905, C2584452, C2135566, C1705495, C0557092, C0559550, C2316281, C1545291, C5937736, C4316528, C5189176, C2317529, C0424893, C5442541, C0559115, C0424892
+      [path]   'Conditions'                 -> 87 CUIs: C4698036, C1552577, C4700184, C4698037, C5856725, C5551567, C0449910, C4522149, C0449908, C2359469, C3844735, C2707268, C3897247, C1718360, C1718239, C5885245, C1718236, C2985574, C3242153, C2359476, C5856700, C0260019, C1705253, C5856718, C3840985, C5960398, C5960396, C1701901, C1549034, C5667429, C1550520, C4062502, C4060919, C1275743, C5960395, C1716788, C4482549, C1292730, C0033213, C2826676, C5890513, C4534505, C5708312, C2359477, C0184775, C0243082, C5555348, C4745084, C5935102, C5551568, C5552395, C1883726, C1718359, C1444752, C1547228, C0449438, C4699586, C5238667, C5963540, C4531657, C3830105, C3843066, C5425822, C1879742, C2598248, C0348080, C0039058, C0743630, C3844184, C3841830, C1998882, C3176928, C3842882, C4264539, C3843647, C3853087, C0436353, C2359472, C2896437, C0497289, C0158370, C2017951, C0839021, C0477631, C1261130, C0947768, C0409195
+      [path]   'Autoimmune'                 -> 30 CUIs: C4551524, C1820724, C4700039, C0004368, C0443146, C4061100, C5436988, C0004364, C5562070, C3888523, C3688823, C0301932, C1328835, C5562027, C0146158, C1842112, C3888522, C0850560, C1285175, C3149422, C2895206, C3809993, C5848750, C1842979, C0312822, C0741109, C4324720, C0004358, C4697009, C0205734
+      [atomic] 'autoimmune disorders'       -> 36 CUIs: C4700039, C3824805, C0850560, C0004364, C3149422, C4551524, C5562070, C5562027, C0004368, C1820724, C4061100, C4324720, C0851816, C5193072, C0178468, C5848750, C3840565, C1328837, C0852004, C0751872, C2895206, C1328842, C0312822, C1328836, C0949027, C3825262, C0751871, C1328839, C0852003, C1328835, C1844667, C5680965, C5561976, C1285175, C0878654, C0342508
+    sub_nature: Family History >> Conditions >> Neurological
+      [path]   'Family History'             -> 51 CUIs: C0518360, C4721446, C0489533, C0424987, C1827205, C0424897, C0573986, C1287133, C2733371, C0424884, C1319349, C1397163, C2599444, C0683520, C0424887, C0424886, C4699174, C1397164, C1287131, C0424889, C1392042, C2129171, C2135565, C1540733, C0425130, C0850707, C0481639, C0680074, C3176490, C5934828, C2317554, C4545528, C0424885, C0574102, C0455391, C0424905, C2584452, C2135566, C1705495, C0557092, C0559550, C2316281, C1545291, C5937736, C4316528, C5189176, C2317529, C0424893, C5442541, C0559115, C0424892
+      [path]   'Conditions'                 -> 87 CUIs: C4698036, C1552577, C4700184, C4698037, C5856725, C5551567, C0449910, C4522149, C0449908, C2359469, C3844735, C2707268, C3897247, C1718360, C1718239, C5885245, C1718236, C2985574, C3242153, C2359476, C5856700, C0260019, C1705253, C5856718, C3840985, C5960398, C5960396, C1701901, C1549034, C5667429, C1550520, C4062502, C4060919, C1275743, C5960395, C1716788, C4482549, C1292730, C0033213, C2826676, C5890513, C4534505, C5708312, C2359477, C0184775, C0243082, C5555348, C4745084, C5935102, C5551568, C5552395, C1883726, C1718359, C1444752, C1547228, C0449438, C4699586, C5238667, C5963540, C4531657, C3830105, C3843066, C5425822, C1879742, C2598248, C0348080, C0039058, C0743630, C3844184, C3841830, C1998882, C3176928, C3842882, C4264539, C3843647, C3853087, C0436353, C2359472, C2896437, C0497289, C0158370, C2017951, C0839021, C0477631, C1261130, C0947768, C0409195
+      [path]   'Neurological'               -> 43 CUIs: C1533281, C1320718, C1408154, C4061795, C0235027, C1397161, C2359473, C4273975, C1112537, C1276414, C4531023, C0746866, C0848771, C2707261, C0437208, C4699390, C0421226, C0849508, C0587041, C2066541, C0234143, C5382027, C0560167, C0422837, C1319813, C0746859, C1709219, C0235030, C0852414, C1535530, C0583390, C0581401, C4699657, C3275580, C0746858, C1410757, C4697763, C4540194, C3279165, C5543409, C0027854, C5562970, C5394332
+      [atomic] 'neurological conditions'    -> 39 CUIs: C2359473, C2015799, C0029551, C4699656, C4699657, C0154725, C4699390, C1408154, C0270607, C1112108, C2066541, C4273975, C0849508, C5452739, C0848771, C1276414, C5225828, C0587041, C0549638, C2911226, C0235019, C0393419, C2712564, C4042764, C1392146, C0581448, C4061795, C0849645, C0852414, C1399561, C1533281, C0524851, C5570692, C1320718, C4531023, C2193209, C5543409, C1717461, C1319813
+    sub_nature: Family History >> Conditions >> Psychiatric
+      [path]   'Family History'             -> 51 CUIs: C0518360, C4721446, C0489533, C0424987, C1827205, C0424897, C0573986, C1287133, C2733371, C0424884, C1319349, C1397163, C2599444, C0683520, C0424887, C0424886, C4699174, C1397164, C1287131, C0424889, C1392042, C2129171, C2135565, C1540733, C0425130, C0850707, C0481639, C0680074, C3176490, C5934828, C2317554, C4545528, C0424885, C0574102, C0455391, C0424905, C2584452, C2135566, C1705495, C0557092, C0559550, C2316281, C1545291, C5937736, C4316528, C5189176, C2317529, C0424893, C5442541, C0559115, C0424892
+      [path]   'Conditions'                 -> 87 CUIs: C4698036, C1552577, C4700184, C4698037, C5856725, C5551567, C0449910, C4522149, C0449908, C2359469, C3844735, C2707268, C3897247, C1718360, C1718239, C5885245, C1718236, C2985574, C3242153, C2359476, C5856700, C0260019, C1705253, C5856718, C3840985, C5960398, C5960396, C1701901, C1549034, C5667429, C1550520, C4062502, C4060919, C1275743, C5960395, C1716788, C4482549, C1292730, C0033213, C2826676, C5890513, C4534505, C5708312, C2359477, C0184775, C0243082, C5555348, C4745084, C5935102, C5551568, C5552395, C1883726, C1718359, C1444752, C1547228, C0449438, C4699586, C5238667, C5963540, C4531657, C3830105, C3843066, C5425822, C1879742, C2598248, C0348080, C0039058, C0743630, C3844184, C3841830, C1998882, C3176928, C3842882, C4264539, C3843647, C3853087, C0436353, C2359472, C2896437, C0497289, C0158370, C2017951, C0839021, C0477631, C1261130, C0947768, C0409195
+      [path]   'Psychiatric'                -> 70 CUIs: C0205487, C0748063, C0243154, C4316204, C2142955, C0233402, C1306597, C4013650, C1548362, C1709763, C0204506, C3526598, C0748054, C2142951, C1095967, C0597312, C4697757, C0233401, C0748064, C0033867, C0748061, C0204507, C0810229, C0871169, C1550477, C0850516, C0551700, C4285334, C1830612, C3526594, C0748059, C3526592, C1555653, C1548428, C1718246, C0552595, C2062747, C3841918, C4540108, C3526593, C0020021, C0451628, C5220462, C5552240, C0021694, C1548378, C0551699, C5543255, C1291707, C2174681, C2142949, C1709762, C3176458, C0489538, C5220459, C0259948, C2599943, C1320675, C3845098, C1112445, C1869109, C0583409, C4542597, C0178055, C0583748, C0583640, C1096414, C0584006, C0583592, C0583410
+      [atomic] 'psychiatric disorders'      -> 34 CUIs: C1718246, C2015805, C0025360, C1306597, C4013650, C0748063, C2707264, C0233402, C4316204, C2013984, C0748057, C3841734, C0852264, C0851576, C4540108, C0852569, C4555206, C2939345, C0852554, C3511494, C0236988, C0003469, C0205487, C2142955, C0233401, C0009241, C3526598, C3842870, C0489538, C1404970, C0851575, C0847493, C1717074, C5830047
+    sub_nature: Family History >> Conditions >> Genetic
+      [path]   'Family History'             -> 51 CUIs: C0518360, C4721446, C0489533, C0424987, C1827205, C0424897, C0573986, C1287133, C2733371, C0424884, C1319349, C1397163, C2599444, C0683520, C0424887, C0424886, C4699174, C1397164, C1287131, C0424889, C1392042, C2129171, C2135565, C1540733, C0425130, C0850707, C0481639, C0680074, C3176490, C5934828, C2317554, C4545528, C0424885, C0574102, C0455391, C0424905, C2584452, C2135566, C1705495, C0557092, C0559550, C2316281, C1545291, C5937736, C4316528, C5189176, C2317529, C0424893, C5442541, C0559115, C0424892
+      [path]   'Conditions'                 -> 87 CUIs: C4698036, C1552577, C4700184, C4698037, C5856725, C5551567, C0449910, C4522149, C0449908, C2359469, C3844735, C2707268, C3897247, C1718360, C1718239, C5885245, C1718236, C2985574, C3242153, C2359476, C5856700, C0260019, C1705253, C5856718, C3840985, C5960398, C5960396, C1701901, C1549034, C5667429, C1550520, C4062502, C4060919, C1275743, C5960395, C1716788, C4482549, C1292730, C0033213, C2826676, C5890513, C4534505, C5708312, C2359477, C0184775, C0243082, C5555348, C4745084, C5935102, C5551568, C5552395, C1883726, C1718359, C1444752, C1547228, C0449438, C4699586, C5238667, C5963540, C4531657, C3830105, C3843066, C5425822, C1879742, C2598248, C0348080, C0039058, C0743630, C3844184, C3841830, C1998882, C3176928, C3842882, C4264539, C3843647, C3853087, C0436353, C2359472, C2896437, C0497289, C0158370, C2017951, C0839021, C0477631, C1261130, C0947768, C0409195
+      [path]   'Genetic'                    -> 48 CUIs: C0314603, C5667419, C0314639, C0017395, C0678922, C0243064, C4510149, C2010913, C4263506, C1507365, C0683227, C2717776, C0032529, C3270166, C1136352, C2010873, C3826279, C0678919, C2827447, C5236727, C2010914, C0314641, C1136308, C0813959, C0583381, C0017344, C0036576, C1513776, C5548127, C0199234, C3845275, C0017399, C2350469, C0440471, C5392087, C3826280, C3262868, C0017390, C1517513, C0026343, C3824713, C5165564, C0678950, C1821079, C0596125, C2189736, C5958924, C1948182
+      [atomic] 'genetic conditions'         -> 31 CUIs: C3648695, C5667419, C3826579, C3824889, C5680750, C1285298, C3649644, C5546758, C1456603, C0744353, C1285421, C5680582, C1948182, C0743921, C0243064, C2079580, C0583381, C5680588, C2827447, C5681256, C4273024, C3873519, C5165564, C5243546, C0019247, C1285363, C3824973, C1285182, C5680574, C5680528, C1408156
+    sub_nature: Family History >> Conditions >> Renal
+      [path]   'Family History'             -> 51 CUIs: C0518360, C4721446, C0489533, C0424987, C1827205, C0424897, C0573986, C1287133, C2733371, C0424884, C1319349, C1397163, C2599444, C0683520, C0424887, C0424886, C4699174, C1397164, C1287131, C0424889, C1392042, C2129171, C2135565, C1540733, C0425130, C0850707, C0481639, C0680074, C3176490, C5934828, C2317554, C4545528, C0424885, C0574102, C0455391, C0424905, C2584452, C2135566, C1705495, C0557092, C0559550, C2316281, C1545291, C5937736, C4316528, C5189176, C2317529, C0424893, C5442541, C0559115, C0424892
+      [path]   'Conditions'                 -> 87 CUIs: C4698036, C1552577, C4700184, C4698037, C5856725, C5551567, C0449910, C4522149, C0449908, C2359469, C3844735, C2707268, C3897247, C1718360, C1718239, C5885245, C1718236, C2985574, C3242153, C2359476, C5856700, C0260019, C1705253, C5856718, C3840985, C5960398, C5960396, C1701901, C1549034, C5667429, C1550520, C4062502, C4060919, C1275743, C5960395, C1716788, C4482549, C1292730, C0033213, C2826676, C5890513, C4534505, C5708312, C2359477, C0184775, C0243082, C5555348, C4745084, C5935102, C5551568, C5552395, C1883726, C1718359, C1444752, C1547228, C0449438, C4699586, C5238667, C5963540, C4531657, C3830105, C3843066, C5425822, C1879742, C2598248, C0348080, C0039058, C0743630, C3844184, C3841830, C1998882, C3176928, C3842882, C4264539, C3843647, C3853087, C0436353, C2359472, C2896437, C0497289, C0158370, C2017951, C0839021, C0477631, C1261130, C0947768, C0409195
+      [path]   'Renal'                      -> 60 CUIs: C0522493, C1406176, C5546528, C0232804, C0748338, C1171215, C3249896, C2170224, C3810103, C1372860, C1404707, C4696088, C1857414, C0748292, C0748293, C0597372, C0947831, C0748304, C0727675, C2170220, C2922666, C1395361, C3893738, C5681617, C4692536, C1372863, C5681504, C1443497, C0184571, C3549566, C1408327, C1403606, C0156738, C3468934, C2063195, C0156587, C0840899, C3468935, C1391609, C0269673, C0404939, C0748312, C1405788, C2903746, C2170235, C1391606, C0411177, C1408278, C2903748, C5688292, C2104707, C1405789, C2903747, C2063625, C5438899, C1578845, C2104748, C2048757, C3697709, C0404947
+      [atomic] 'renal diseases'             -> 60 CUIs: C0549526, C0851590, C0748293, C0852163, C5681617, C0260039, C0852162, C0236152, C0268730, C0851462, C1406176, C0748292, C1328179, C0564763, C0748338, C0810034, C1857414, C1408265, C3825108, C0852161, C0859242, C1404707, C3824723, C0403466, C0022661, C3275991, C0947831, C1171215, C5681504, C2063195, C0403359, C0840899, C0269673, C1578845, C0156738, C1403606, C3825330, C1405789, C2903746, C3468934, C0158801, C3697709, C2104747, C1408249, C3468935, C1391609, C5438899, C5438900, C0869103, C0411177, C2909780, C1408259, C2903747, C1398789, C3662225, C0404821, C3536816, C0156736, C1391600, C1391606
+    sub_nature: Family History >> Conditions >> Endocrine
+      [path]   'Family History'             -> 51 CUIs: C0518360, C4721446, C0489533, C0424987, C1827205, C0424897, C0573986, C1287133, C2733371, C0424884, C1319349, C1397163, C2599444, C0683520, C0424887, C0424886, C4699174, C1397164, C1287131, C0424889, C1392042, C2129171, C2135565, C1540733, C0425130, C0850707, C0481639, C0680074, C3176490, C5934828, C2317554, C4545528, C0424885, C0574102, C0455391, C0424905, C2584452, C2135566, C1705495, C0557092, C0559550, C2316281, C1545291, C5937736, C4316528, C5189176, C2317529, C0424893, C5442541, C0559115, C0424892
+      [path]   'Conditions'                 -> 87 CUIs: C4698036, C1552577, C4700184, C4698037, C5856725, C5551567, C0449910, C4522149, C0449908, C2359469, C3844735, C2707268, C3897247, C1718360, C1718239, C5885245, C1718236, C2985574, C3242153, C2359476, C5856700, C0260019, C1705253, C5856718, C3840985, C5960398, C5960396, C1701901, C1549034, C5667429, C1550520, C4062502, C4060919, C1275743, C5960395, C1716788, C4482549, C1292730, C0033213, C2826676, C5890513, C4534505, C5708312, C2359477, C0184775, C0243082, C5555348, C4745084, C5935102, C5551568, C5552395, C1883726, C1718359, C1444752, C1547228, C0449438, C4699586, C5238667, C5963540, C4531657, C3830105, C3843066, C5425822, C1879742, C2598248, C0348080, C0039058, C0743630, C3844184, C3841830, C1998882, C3176928, C3842882, C4264539, C3843647, C3853087, C0436353, C2359472, C2896437, C0497289, C0158370, C2017951, C0839021, C0477631, C1261130, C0947768, C0409195
+      [path]   'Endocrine'                  -> 32 CUIs: C1396606, C0154220, C3841737, C1285281, C5393845, C5441369, C0038900, C1392954, C2364126, C2565760, C5546811, C4313440, C1263949, C0271519, C2564174, C0011909, C0014136, C0949002, C0549526, C5885887, C1579035, C3873544, C0549525, C3840824, C0679569, C1168289, C0154223, C0178257, C2960670, C2564175, C3242884, C0583431
+      [atomic] 'endocrine disorders'        -> 35 CUIs: C0154223, C2103402, C0271519, C2103403, C5393845, C0014130, C0154220, C0549525, C1659988, C1397856, C1392954, C1263949, C0851520, C3266490, C0949002, C1401672, C2359470, C5225741, C0271535, C1396606, C0311354, C0455484, C0553665, C0851430, C1276224, C0029793, C5163265, C1335007, C1396608, C4290100, C0342242, C0543552, C1409582, C0178257, C3873544
 
-# ---- which document to use for the whole demo session ----
-DEMO_DOC_INDEX = 0
-_DOC_CACHE = None
+  SUMMARIZATION: 1401 in -> 372 out
+  Surviving CUIs:
+      C0424987  Member of medical family  IC=14.8007
+      C1827205  Family history section  IC=14.8007
+      C0424897  Family history with explicit context pertaining to son  IC=13.4144
+      C0573986  Family history observations  IC=9.6245
+      C1287133  Details of family - finding  IC=10.4966
+      C2733371  Family history of smoking  IC=13.7021
+      C0424884  Family history with explicit context pertaining to maternal grandfather  IC=14.1075
+      C1319349  FH: Not known - Adopted  IC=14.8007
+      C0424887  Family history with explicit context pertaining to paternal grandmother  IC=14.1075
+      C0424886  FH: Maternal grandmother  IC=14.1075
+      C1287131  Details of relatives - finding  IC=13.7021
+      C0424889  Family history with explicit context pertaining to uncle  IC=14.8007
+      C1540733  Family: [problems] or [circumstance NOS]  IC=16.9959
+      C0425130  Imprisonment of family member  IC=13.7021
+      C0481639  Personal/Family history  IC=14.8007
+      C2317554  Family history of amnesia  IC=14.8007
+      C4545528  Family history of relative killed  IC=14.8007
+      C0424885  Family history with explicit context pertaining to paternal grandfather  IC=14.1075
+      C0574102  Family history by relative  IC=10.0733
+      C0455391  Family history: Cerebral palsy  IC=14.8007
+      C0424905  Family history with explicit context pertaining to sister  IC=13.7021
+      C2584452  Family history of hearing loss  IC=13.4144
+      C0557092  Details of family  IC=8.9035
+      C0559550  Family history of disorder  IC=8.8527
+      C2316281  Family history of tinnitus  IC=14.8007
+      C4316528  Family history of tall stature  IC=14.8007
+      C2317529  Family history of operative procedure  IC=12.6035
+      C0424893  Family history with explicit context pertaining to daughter  IC=13.4144
+      C0559115  Family history: Carcinoma - Neoplasm  IC=14.8007
+      C0424892  FH: Relative OS  IC=10.7576
+      C0080103  Relative (related person)  IC=9.0355
+      C1320306  Relatives involved with care  IC=12.3158
+      C2347083  Maternal Relative  IC=12.0926
+      C1266852  Biological Relative  IC=10.611
+      C1273800  Other related persons  IC=16.9959
+      C2347452  Paternal Relative  IC=12.4981
+      C1266851  First degree blood relative  IC=11.0395
+      C2733545  First degree blood relative of subject  IC=16.9959
+      C3698428  Second degree blood relative  IC=13.1913
+      C3697463  Second degree blood relative of subject  IC=16.9959
+      C1273520  Immediate family member  IC=10.444
+      C5767638  Second degree female blood relative  IC=14.1075
+      C5818563  Second degree male blood relative  IC=14.1075
+      C4544361  Maternal first cousin  IC=14.8007
+      C5817422  Third degree blood relative  IC=12.8548
+      C1273521  Non-immediate family member  IC=14.8007
+      C5817421  Fourth degree blood relative  IC=14.8007
+      C4708017  Second degree female blood relative of subject  IC=16.9959
+      C0337583  First cousin  IC=12.7213
+      C0557090  Closest relatives  IC=14.8007
+      C0557085  Details of relatives  IC=11.0395
+      C1562166  Family history of diabetes mellitus in first degree relative  IC=14.8007
+      C0260515  Family history of cancer  IC=10.4832
+      C1261326  Family history of leukemia  IC=14.1075
+      C2316286  Family history of diabetes mellitus type 1  IC=14.1075
+      C1261139  Diabetic relative  IC=14.1075
+      C2317320  Family history of malignant neoplasm of breast in first degree relative  IC=14.1075
+      C1540744  Relative - chronic medical disorder (& [diabetic child])  IC=16.9959
+      C0455405  Family history: Hypertension  IC=14.8007
+      C1261325  Family history of malignant neoplasm of breast  IC=13.0089
+      C1261367  Family history of stroke  IC=14.1075
+      C1561978  FH: Hypercholesterolemia in first degree relative  IC=14.8007
+      C4521021  Relative dying  IC=14.8007
+      C0337586  Second cousin  IC=13.7021
+      C0337587  Female second cousin  IC=14.8007
+      C1273526  Distant relative  IC=14.8007
+      C5818721  Natural great grandparent  IC=14.8007
+      C0337580  Cousin  IC=11.7562
+      C1274025  Extended family member  IC=10.8304
+      C3844805  Maternal cousin  IC=14.1075
+      C0449910  Test conditions  IC=14.8007
+      C0449908  Conditions for acquisition  IC=14.8007
+      C1275743  Co-morbid conditions  IC=14.1075
+      C1292730  Condition severity  IC=14.8007
+      C0033213  Problem  IC=5.5135
+      C0184775  Disease condition determination, slightly controlled  IC=14.8007
+      C1444752  Status during  IC=14.8007
+      C0449438  Status  IC=6.5627
+      C0348080  Condition  IC=9.8662
+      C3853087  One to two times  IC=14.8007
+      C0436353  Has symptom every few hours  IC=14.8007
+      C0497289  Other musculoskeletal disorder  IC=14.8007
+      C0158370  Other soft tissue disorders  IC=4.5552
+      C0477631  Other specified dorsopathies  IC=12.4981
+      C1261130  Other specified diseases of musculoskeletal or connective tissue  IC=14.8007
+      C0409195  Other specified musculoskeletal disorders  IC=14.8007
+      C1971640  Cardiovascular disease (& [circulatory] or [heart])  IC=16.9959
+      C0578149  Cardiovascular function finding  IC=10.4966
+      C1320716  Cardiovascular event  IC=14.8007
+      C0007227  Cardiovascular Physiological Phenomena  IC=8.0311
+      C0199659  Cardiovascular measure  IC=8.251
+      C1536646  Examination of cardiovascular system (& [vascular system])  IC=16.9959
+      C0440759  Cardiovascular material  IC=11.9675
+      C1268109  Cardiovascular organ part  IC=11.4334
+      C0577868  Cardiovascular system problem  IC=14.8007
+      C0184522  Cardiovascular system alteration  IC=13.1913
+      C0560570  Cardiovascular injury  IC=8.1753
+      C4512826  Entire heart, arteries and veins  IC=16.9959
+      C1971641  Cardiovascular system diseases (& [cardiac])  IC=16.9959
+      C5549885  High risk of cardiovascular disease  IC=14.8007
+      C0242231  Coronary Stenosis  IC=10.6898
+      C1299432  Multi vessel coronary artery disease  IC=14.8007
+      C1956346  Coronary Artery Disease  IC=7.8528
+      C0264683  Coronary artery atheroma  IC=14.8007
+      C2003996  Coronary (atherosclerosis or artery disease) or triple vessel disease of the heart  IC=16.9959
+      C0151814  Coronary Occlusion  IC=11.7562
+      C1636672  Obliterative coronary artery disease  IC=14.8007
+      C1961074  Coronary heart disease education  IC=14.8007
+      C3267166  Stenosis of right coronary artery  IC=12.7213
+      C5922450  Atherosclerosis of right coronary artery  IC=13.4144
+      C5768504  Stenosis of proximal portion of right coronary artery  IC=14.8007
+      C1290385  Right coronary artery occlusion  IC=12.8548
+      C5768505  Stenosis of mid portion of right coronary artery  IC=14.8007
+      C5768506  Stenosis of distal portion of right coronary artery  IC=14.8007
+      C5768509  Stenosis of posterior descending branch of right coronary artery  IC=14.8007
+      C5768507  Stenosis of marginal branch of right coronary artery  IC=14.8007
+      C5768513  Stenosis of ostium of right coronary artery  IC=14.8007
+      C1534922  Myocardial infarction (& [acute]) or coronary thrombosis  IC=16.9959
+      C0340305  Inferior Wall Myocardial Infarction  IC=14.8007
+      C0948089  Acute Coronary Syndrome  IC=9.1731
+      C0155626  Acute myocardial infarction  IC=9.2285
+      C3839322  Acute myocardial infarction of inferior wall involving right ventricle  IC=14.1075
+      C0746731  Acute myocardial ischemia  IC=14.1075
+      C0340315  Acute widespread myocardial infarction  IC=13.7021
+      C1273976  First myocardial infarction  IC=14.8007
+      C1633725  Myocardial infarction in recovery phase  IC=14.8007
+      C0264700  Acute Inferior Myocardial Infarction  IC=12.4028
+      C0340324  Silent myocardial infarction  IC=13.7021
+      C1998297  Recent myocardial infarction  IC=14.8007
+      C0340294  Other acute myocardial infarction NOS  IC=14.8007
+      C0340292  Other specified anterior myocardial infarction  IC=14.1075
+      C4546218  Diastolic hypertension and systolic hypertension  IC=14.8007
+      C0520539  Hypertensive episode  IC=14.8007
+      C2240377  High blood pressure (& [essential hypertension])  IC=16.9959
+      C0221155  Systolic Hypertension  IC=13.7021
+      C0422554  Hypertension monitoring check done  IC=14.8007
+      C5231205  Hypertension stage 2  IC=14.8007
+      C0085580  Essential Hypertension  IC=12.4028
+      C1696708  Prehypertension  IC=14.8007
+      C0020538  Hypertensive disease  IC=7.7342
+      C0235222  Diastolic hypertension  IC=13.1913
+      C0585941  Antihypertensive therapy  IC=14.1075
+      C3715181  Hypertension clinic  IC=14.8007
+      C3532916  Antihypertensive agent surveillance  IC=14.8007
+      C0003364  Antihypertensive Agents  IC=6.4667
+      C4040036  Antihypertensive agent surveillance done  IC=14.8007
+      C0350167  Antihypertensives, Other  IC=14.8007
+      C0573921  Intentional antihypertensive overdose  IC=12.0281
+      C0413939  Adverse reaction to other antihypertensives  IC=14.8007
+      C0413949  Antihypertensive adverse reaction  IC=9.8807
+      C0573920  Accidental antihypertensive overdose  IC=12.0281
+      C0412879  Other hypertensive agent poisoning  IC=12.7213
+      C0354333  Vasodilator antihypertensive drugs  IC=9.2792
+      C0216784  valsartan  IC=10.3699
+      C3834166  Amlodipine mesylate  IC=14.8007
+      C0358685  Nadolol+diuretic  IC=14.8007
+      C4753484  Hydralazine only product  IC=14.8007
+      C0576165  Stroke test positive  IC=14.8007
+      C3662061  Weakness of face muscles as sequela of stroke  IC=13.0089
+      C4274262  Face Arm Speech Test score  IC=14.8007
+      C3698284  Weakness as a late effect of stroke  IC=14.8007
+      C0585893  H/O: Stroke in last year  IC=14.8007
+      C3697821  Hemiplegia and/or hemiparesis following stroke  IC=12.3158
+      C3662049  Weakness of extremities as sequela of stroke  IC=14.8007
+      C1540598  (Cerebral infarct) or (cerebrovascular accident) or (undefined stroke/CVA) or (stroke NOS)  IC=16.9959
+      C3662097  Paralytic syndrome of all four limbs as sequela of stroke  IC=14.8007
+      C3697633  History of cerebrovascular accident in last eight weeks  IC=14.8007
+      C2315652  Paralytic syndrome of dominant side as late effect of stroke  IC=13.4144
+      C3472497  Assessment using National Institutes of Health stroke scale  IC=14.8007
+      C4543291  Monoplegia of right nondominant arm as late effect of stroke  IC=14.8007
+      C2316860  Paralytic syndrome of nondominant side as late effect of stroke  IC=13.4144
+      C3662092  Monoplegia of leg dominant side as sequela of cerebrovascular disease  IC=13.1913
+      C0481607  [V]Personal history of cerebrovascular accident (CVA)  IC=16.9959
+      C4520329  Monoplegia of nondominant lower limb due to and following ischemic cerebrovascular accident  IC=14.8007
+      C4520330  Monoplegia of right nondominant lower limb due to and following cerebrovascular accident  IC=14.8007
+      C5192534  History of cerebrovascular accident due to ischemia  IC=14.1075
+      C0559159  History of cerebrovascular accident  IC=11.5426
+      C3662023  Paralytic syndrome on one side of the body as late effect of cerebrovascular accident  IC=12.4028
+      C3494981  History of embolic stroke without residual deficits  IC=14.8007
+      C2585352  History of cerebrovascular accident with residual deficit  IC=12.7213
+      C3662060  History of hemorrhagic stroke with hemiplegia  IC=14.8007
+      C3494554  History of thrombotic stroke without residual deficits  IC=14.8007
+      C3494994  History of hemorrhagic stroke with residual hemiparesis  IC=14.8007
+      C3662041  History of embolic stroke with deficits  IC=14.8007
+      C3662044  History of lacunar cerebrovascular accident  IC=14.8007
+      C3494993  History of hemorrhagic stroke with residual hemiplegia  IC=14.8007
+      C3662098  History of hemorrhagic stroke with hemiparesis  IC=14.8007
+      C4510861  History of ischemic stroke without residual deficits  IC=14.8007
+      C4039739  History of cerebellar stroke  IC=14.8007
+      C2317445  History of cerebrovascular accident without residual deficits  IC=13.0089
+      C0744750  Residual hemiplegia  IC=14.8007
+      C4075944  History of ischemic cerebrovascular accident with residual deficit  IC=14.8007
+      C4280844  History of cerebrovascular accident greater than eight weeks in the past  IC=14.8007
+      C0452399  Metabolic diet  IC=14.8007
+      C0587059  Metabolic therapy  IC=11.063
+      C0455489  H/O: metabolic disorder  IC=12.2357
+      C0025517  Metabolic Diseases  IC=5.33
+      C1263722  Chronic metabolic disorder  IC=8.9866
+      C1290840  Acute metabolic disorder  IC=10.7403
+      C0580374  Fast metabolic rate  IC=14.8007
+      C0430174  Metabolic function test  IC=11.4685
+      C0494362  Other specified metabolic disorders  IC=10.0471
+      C0268378  Metabolic disease, NEC  IC=14.8007
+      C0455367  Family history of metabolic disorder  IC=10.994
+      C0424581  Energy / stamina  IC=8.2553
+      C0420187  Metabolic monitoring procedure  IC=12.7213
+      C0429621  Metabolic finding  IC=10.994
+      C0438213  Metabolic function outside reference range  IC=12.8548
+      C0481878  disorder; screening, metabolic  IC=16.9959
+      C1285356  Metabolic complication of procedures  IC=14.1075
+      C1535389  Diabetes mellitus: [adult onset, with no mention of complication] or [maturity onset] or [non-insulin dependent]  IC=16.9959
+      C0011849  Diabetes Mellitus  IC=7.2974
+      C0348447  Other specified diabetes mellitus  IC=10.444
+      C0342298  Severe hyperglycemia due to diabetes mellitus  IC=13.4144
+      C5231105  Hyperglycemia due to diabetes mellitus  IC=12.8548
+      C0342313  Hypoglycemia due to diabetes mellitus  IC=11.9103
+      C3532679  On subcutaneous insulin for diabetes mellitus  IC=14.8007
+      C0477821  Pre-existing diabetes mellitus, unspecified  IC=14.8007
+      C0341898  Diabetes mellitus - unspecified whether during pregnancy or the puerperium  IC=14.8007
+      C0271635  Diabetes mellitus without mention of complication  IC=13.1913
+      C1283034  Maternal diabetes mellitus  IC=16.9959
+      C0342260  Diabetes mellitus with other specified manifestation  IC=11.5049
+      C0348939  Unspecified diabetes mellitus with multiple complications  IC=13.4144
+      C0348938  Other specified diabetes mellitus with multiple complications  IC=13.4144
+      C0348931  Other specified diabetes mellitus with other specified complications  IC=11.8563
+      C0348932  Other specified diabetes mellitus with unspecified complications  IC=14.8007
+      C0205478  Oncologic  IC=14.8007
+      C0259990  Oncologists  IC=12.2357
+      C1555459  oncology services  IC=12.7213
+      C0583351  Under care of clinical oncologist  IC=13.7021
+      C1274034  Clinical Oncology  IC=14.8007
+      C0587558  Clinical oncology service  IC=13.7021
+      C0199939  Oncologic procedure, NOS  IC=9.9409
+      C0586804  Clinical oncologist  IC=14.1075
+      C0587443  Clinical oncology department  IC=13.4144
+      C0588026  Under care of medical oncologist  IC=14.8007
+      C0025098  Medical oncology specialty  IC=13.1913
+      C3697965  Surgical oncology service  IC=13.7021
+      C1515090  Surgical Oncology specialty  IC=14.1075
+      C0356777  Drugs used in malignant disease and for immunosuppression  IC=14.8007
+      C4751301  Antineoplastic therapeutic role  IC=14.8007
+      C5545761  Monoclonal antibody antineoplastic agent  IC=16.9959
+      C0476668  Follow-up examination after chemotherapy for malignant neoplasm  IC=14.8007
+      C1302396  Monitoring of patient with cancer  IC=13.7021
+      C1271092  Cancer confirmed  IC=14.8007
+      C0346953  Malignant neoplasm of specified site NOS  IC=14.8007
+      C0006826  Malignant Neoplasms  IC=3.0542
+      C0751177  Cancer of Head  IC=9.0641
+      C0030793  Pelvic Neoplasms  IC=6.9486
+      C1306632  Primary malignant neoplasm of gastrointestinal tract  IC=11.0165
+      C0178250  Malignant neoplasm of bone, connective tissue, skin and breast  IC=8.5881
+      C1542585  Brain secondary Ca  IC=16.9959
+      C0684842  Primary malignant neoplasm of intra-abdominal organs  IC=9.659
+      C1306467  Primary malignant neoplasm of head  IC=9.1695
+      C1299288  Primary malignant neoplasm of intestinal tract  IC=11.5049
+      C2314937  Malignant neoplasm of genital structure  IC=7.1978
+      C0751075  Cancer of Digestive System  IC=6.0967
+      C0559079  Ca rectum with Ca anus  IC=14.8007
+      C0555264  Malignant neoplasm of digestive organs and peritoneum  IC=7.2432
+      C0153662  Malignant neoplasm of abdomen  IC=6.5862
+      C0153660  Malignant neoplasm of head, face, and neck  IC=14.8007
+      C0864875  Malignant neoplasm of anorectum  IC=8.963
+      C3164697  Malignant neoplasm of intraabdominal organ  IC=7.0187
+      C0017185  Gastrointestinal Neoplasms  IC=5.7969
+      C5848476  Malignant neoplasm of cecum and/or colon and/or rectum (disorder)  IC=8.8218
+      C0037073  Sigmoid Neoplasms  IC=14.8007
+      C1306548  Primary malignant neoplasm of large intestine  IC=12.4981
+      C1306155  Primary malignant neoplasm of pelvis  IC=10.0216
+      C0153445  Malignant neoplasm of anal canal  IC=9.5749
+      C0004368  Autoimmune state  IC=9.2713
+      C0443146  Autoimmune reaction  IC=12.0281
+      C0004364  Autoimmune Diseases  IC=7.0631
+      C0301932  Autoimmune reaction, specific organ or cell type  IC=14.8007
+      C1285175  Autoimmune connective tissue disorder  IC=11.1898
+      C0004358  Autoantibodies  IC=7.4625
+      C0342508  Autoimmune primary ovarian failure  IC=14.8007
+      C1320718  Neurological event  IC=14.8007
+      C4273975  Neurological system care  IC=14.8007
+      C1276414  Care of neurological patient  IC=14.8007
+      C0746866  Neurological status  IC=12.2357
+      C0437208  Neurological Examination Finding  IC=9.5484
+      C0421226  Neurological symptom changes  IC=14.8007
+      C0587041  Neurological therapy  IC=14.8007
+      C0234143  Neurological muscle weakness  IC=14.1075
+      C0560167  Additional neurologic observation  IC=14.8007
+      C0422837  Neurological observations  IC=6.7198
+      C1319813  Neurological disorder confirmed  IC=13.7021
+      C1535530  Neurological disorder (& [nervous system disease] or [CNS diseases] or [sense organ disease])  IC=16.9959
+      C0583390  Under care of neurologist  IC=14.8007
+      C0581401  Neurological device  IC=9.1949
+      C0029551  Other conditions of brain  IC=7.9485
+      C0154725  Other disorders of nervous system  IC=4.7591
+      C0393419  Other conditions of brain OS  IC=9.0261
+      C0581448  Neurological equipment  IC=14.1075
+      C0205487  Psychiatric  IC=14.8007
+      C0233402  Psychiatric function, NOS  IC=14.8007
+      C0204506  Evaluation of psychiatric state of patient  IC=13.4144
+      C0233401  Psychiatric symptom  IC=14.8007
+      C0748064  Psychiatric inpatient  IC=13.7021
+      C0204507  Legal testimony of psychiatric state of patient  IC=14.8007
+      C0020021  Psychiatric hospital  IC=13.4144
+      C0451628  Seen in psychiatry clinic  IC=14.1075
+      C1291707  Psychiatric behavioral disability  IC=14.8007
+      C1320675  Attends psychiatric outpatient clinic  IC=16.9959
+      C0583409  Under care of psychiatrist  IC=12.8548
+      C0583748  Seen by mental handicap psychiatry - service  IC=14.8007
+      C0583640  Seen by psychiatric nurse  IC=14.8007
+      C0584006  referral to psychiatry services mental handicap  IC=14.8007
+      C0583592  Seen by psychiatrist for mental handicap  IC=14.8007
+      C0583410  Under care of child and adolescent psychiatrist  IC=14.8007
+      C0003469  Anxiety Disorders  IC=8.1954
+      C0009241  Cognition Disorders  IC=7.309
+      C0314639  Genetic behavior  IC=14.8007
+      C4510149  Genetic susceptibility to genetic disorder  IC=13.4144
+      C0032529  Genetic Polymorphism  IC=11.3995
+      C0314641  Genetic transfection  IC=14.8007
+      C0583381  Under care of geneticist  IC=13.4144
+      C0036576  Genetic Selection  IC=14.1075
+      C5548127  Post-transcriptional genetic ribonucleic acid processing  IC=14.8007
+      C0440471  Genetic Materials  IC=14.8007
+      C1285298  Genetic disorder of extremity  IC=14.8007
+      C5546758  Female infertility due to genetic disease  IC=13.4144
+      C1285421  Reproductive system hereditary disorder  IC=10.538
+      C3873519  Gingival disease due to genetic disorder  IC=14.1075
+      C0019247  Hereditary Diseases  IC=5.2821
+      C1285363  Hereditary disorder of musculoskeletal system  IC=7.9818
+      C1285182  Cardiovascular system hereditary disorder  IC=9.5226
+      C0522493  Transrenal  IC=14.8007
+      C5546528  Finding of renal function  IC=7.2058
+      C0232804  Renal function  IC=6.9592
+      C1171215  Renal care  IC=11.2743
+      C1443497  Renal care management  IC=14.8007
+      C0184571  Renal alteration  IC=14.8007
+      C0156738  Renal disorder in pregnancy  IC=12.1616
+      C0156587  Failed attempted termination of pregnancy complicated by renal failure  IC=13.4144
+      C0269673  Renal disease in pregnancy AND/OR puerperium without hypertension  IC=11.7562
+      C0404939  Incomplete illegal termination of pregnancy with renal failure  IC=14.8007
+      C0411177  Fetus or neonate affected by maternal renal &/or urinary disease  IC=14.8007
+      C5688292  Renal failure due to and following complete induced termination of pregnancy  IC=14.8007
+      C5438899  Fetal disorder due to maternal renal disease  IC=14.8007
+      C1578845  Renal disease in pregnancy (& [named variants without hypertension] or [unspecified])  IC=16.9959
+      C3697709  Fetal or neonatal effect of maternal renal disease  IC=16.9959
+      C0404947  Failed attempted termination of pregnancy with renal failure  IC=14.8007
+      C0260039  Nephrologists  IC=14.8007
+      C0564763  Other kidney/urinary diseases  IC=14.8007
+      C0403466  structural and functional abnormalities of kidney  IC=9.7008
+      C0022661  Kidney Failure, Chronic  IC=11.6652
+      C0403359  Other kidney disorders  IC=12.6035
+      C0158801  Maternal renal and urinary tract diseases affecting fetus or newborn  IC=14.8007
+      C5438900  Neonatal disorder due to maternal renal disease  IC=14.8007
+      C3662225  Fetal or neonatal effect of maternal renal or urinary disease  IC=16.9959
+      C0404821  Unspecified renal disease in pregnancy - not delivered  IC=14.8007
+      C0154220  Other combinations of endocrine dysfunction  IC=14.8007
+      C1285281  Exploration of endocrine system  IC=12.8548
+      C0038900  Endocrine Surgical Procedures  IC=7.1481
+      C2364126  Endocrine system alteration  IC=14.8007
+      C5546811  Normal endocrine system  IC=13.4144
+      C1263949  Combination of endocrine dysfunction  IC=14.8007
+      C0014136  Endocrine system  IC=1.8577
+      C1579035  Endocrine perinatal problems  IC=16.9959
+      C3873544  Endocrine disorder monitoring status  IC=14.1075
+      C0154223  other endocrine disorders  IC=7.4508
+      C0178257  Disorders of other endocrine glands (E20-E35)  IC=6.9997
+      C2960670  Evaluation of endocrine system  IC=9.3159
+      C0583431  Under care of endocrine surgeon  IC=14.8007
+      C0014130  Endocrine System Diseases  IC=5.3767
+      C3266490  Education about endocrine disorder  IC=14.1075
+      C0311354  Disorder of endocrine glands, NEC  IC=16.9959
+      C0455484  H/O: endocrine disorder  IC=11.0165
+      C1276224  Hereditary disorder of endocrine system  IC=9.2362
+      C0029793  Other specified endocrine disorders  IC=14.8007
+      C0342242  Disorder of glucose regulation  IC=10.9721
+  TOPICS (409):
+    tp_0b48bc875a49  size=   2  IC=0.946  'Maternal cousin'
+    tp_b4540e96b7f2  size=   2  IC=0.946  'Family history of malignant neoplasm of breast in first degree relative'
+    tp_c41958456892  size=   2  IC=0.946  'Acute myocardial infarction of inferior wall involving right ventricle'
+    tp_c2c39aa4f57b  size=   2  IC=0.946  'Clinical oncology service'
+    tp_3a09c4a65040  size=   2  IC=0.892  'Genetic susceptibility to genetic disorder'
+    tp_81f3aaf30bd3  size=   2  IC=0.946  'Family history with explicit context pertaining to paternal grandfather'
+    tp_0f8bac49ae7a  size=   2  IC=0.468  'Cardiovascular organ part'
+    tp_abfef4e0fc41  size=   2  IC=0.946  'Gingival disease due to genetic disorder'
+    tp_ba9d5ff00790  size=   2  IC=0.86  'Normal endocrine system'
+    tp_b7fd65048e07  size=   2  IC=0.946  'Relatives surviving - finding'
+    tp_67cd68f8baf6  size=   2  IC=0.875  'Family history of smoking'
+    tp_5e6514c84e99  size=   2  IC=0.946  'Imprisonment of family member'
+    tp_df9c39ea6e35  size=   2  IC=0.756  'End stage organ failure'
+    tp_c7ca7ca6d4b1  size=   2  IC=0.946  'History of cerebrovascular accident due to ischemia'
+    tp_48b3fcaee9e3  size=   2  IC=0.946  'Seen in psychiatry clinic'
+    tp_b639ff79eb1c  size=   2  IC=0.914  'Renal care management'
+    tp_861c9a10069a  size=   2  IC=0.914  'Family history of hypertension'
+    tp_39f072e65839  size=   2  IC=0.946  'Antihypertensive therapy'
+    tp_56bf807c6935  size=   2  IC=0.794  'Renal care (regime/therapy)'
+    tp_a3ac2ea0fde0  size=   2  IC=0.946  'Family history with explicit context pertaining to paternal grandmother'
+    tp_00b8113a845d  size=   2  IC=0.813  'Hemiplegia and/or hemiparesis following stroke'
+    tp_8cf1df66c1c8  size=   2  IC=0.946  'Family history of diabetes mellitus type 1'
+    tp_4fb4005ece9c  size=   2  IC=0.946  'Family history with explicit context pertaining to maternal grandfather'
+    tp_21dc62d298cf  size=   2  IC=0.914  'Acute myocardial ischaemia'
+    tp_d031667ecb95  size=   2  IC=0.946  'Surgical oncology'
+    tp_8899c5df4588  size=   2  IC=0.794  'Autoimmune AND/OR graft reaction'
+    tp_f1bb672113e8  size=   2  IC=0.875  'Monoplegia of leg dominant side as sequela of cerebrovascular disease'
+    tp_67344ec1d885  size=   2  IC=0.914  'Cardiovascular alteration'
+    tp_c4c446fd9a76  size=   2  IC=0.946  'Neurological equipment'
+    tp_4aa263ab94c9  size=   2  IC=0.946  'Monoplegia of right nondominant leg'
+    tp_10981ebb0048  size=   2  IC=0.892  'Hemiplegia of dominant side as late effect of cerebrovascular disease'
+    tp_637636f074c8  size=   2  IC=0.946  'Family history of leukaemia'
+    tp_ae13a3dffa4b  size=   2  IC=0.892  'Autoimmune state'
+    tp_2417a27d0018  size=   2  IC=0.946  'Endocrine disorder monitoring status'
+    tp_4904ffff63d5  size=   2  IC=0.946  'Family history unknown'
+    tp_ea46dd9d900d  size=   2  IC=0.946  'Asthenia due to disease'
+    tp_617bce033c43  size=   2  IC=0.946  'Monoplegia of right nondominant upper limb'
+    tp_1985065a012d  size=   2  IC=0.946  'Female infertility due to genetic disease'
+    tp_fb741cb4a935  size=   2  IC=0.875  'Severe hyperglycemia due to diabetes mellitus'
+    tp_a7743c184a96  size=   2  IC=0.946  'Neurological muscle weakness'
+    tp_11bd93da37ac  size=   2  IC=0.946  'Systolic hypertension'
+    tp_4d388634c958  size=   2  IC=0.946  'FH: Maternal grandmother'
+    tp_fc9e38602a9f  size=   2  IC=0.875  'Hemiplegia of nondominant side as late effect of cerebrovascular disease'
+    tp_16482eb89e77  size=   3  IC=0.8  'Monoplegia of lower limb as late effect of cerebrovascular disease'
+    tp_b160e4f1c276  size=   3  IC=0.838  'Hydralazine only product'
+    tp_1fe66c7f4f3b  size=   3  IC=0.914  'Acute widespread myocardial infarction'
+    tp_88fed9af931f  size=   3  IC=0.914  'Stroke test finding'
+    tp_2a7e71918df0  size=   3  IC=0.914  'Stroke test response'
+    tp_2f62021a211e  size=   3  IC=0.914  'Under care of clinical oncologist'
+    tp_d44ff30e5050  size=   3  IC=0.914  'Clinical oncology department'
+    tp_94dfe74ed2a0  size=   3  IC=0.914  'Female cousin'
+    tp_de811c3c533e  size=   3  IC=0.914  'Monitoring of patient with cancer'
+    tp_5280de3818de  size=   3  IC=0.914  'Neurological disorder confirmed'
+    tp_fb01526ced35  size=   3  IC=0.914  'Relatives involved with care'
+    tp_d11b890c7c72  size=   3  IC=0.875  'Metabolic complication of procedures'
+    tp_f706baf7f3c3  size=   3  IC=0.821  'Paralytic syndrome on one side of the body as late effect of cerebrovascular accident'
+    tp_20ae1bf2ec8c  size=   3  IC=0.914  'Paralytic syndrome of dominant side as late effect of stroke'
+    tp_9d4a122f5e1e  size=   3  IC=0.914  'Monoplegia of lower limb due to and following ischemic cerebrovascular accident'
+    tp_6e9999f10ab4  size=   3  IC=0.86  'Family history: Hypercholesterolaemia'
+    tp_0f208325b7ef  size=   3  IC=0.767  'Muscle weakness of limb'
+    tp_ca12ed6fc14f  size=   3  IC=0.914  'Psychiatric inpatient'
+    tp_f5a845d6b60b  size=   3  IC=0.838  'Hemiplegia as late effect of cerebrovascular accident'
+    tp_bd87e32e5559  size=   3  IC=0.914  'Malignant neoplasm of bone, connective tissue, skin and breast'
+    tp_f40567f7d4a6  size=   3  IC=0.892  'Education about endocrine disorder'
+    tp_d542ef7798c8  size=   3  IC=0.892  'Medical oncology (qualifier value)'
+    tp_4a673659bede  size=   3  IC=0.914  'History of embolic cerebrovascular accident'
+    tp_f6500e845cd0  size=   3  IC=0.914  'Second cousin'
+    tp_718d647ecc3c  size=   3  IC=0.914  'Surgical oncology service'
+    tp_05552f7f6d84  size=   4  IC=0.838  'Great grandparent'
+    tp_e9d5c876f900  size=   4  IC=0.892  'Failed attempted termination of pregnancy complicated by renal failure'
+    tp_19565f49e069  size=   4  IC=0.838  'FH: Breast disease'
+    tp_2fab732506e9  size=   4  IC=0.771  'High glucose level in blood'
+    tp_40e4f915ce95  size=   4  IC=0.892  'Under care of geneticist'
+    tp_60f8027b7587  size=   4  IC=0.875  'Cardiovascular therapy'
+    tp_f9466515e3dd  size=   4  IC=0.892  'Cardiovascular education'
+    tp_b0e65c329d05  size=   4  IC=0.848  'Oncology service'
+    tp_743479d100d2  size=   4  IC=0.892  'Family history with explicit context pertaining to son'
+    tp_a0acb9fa7777  size=   4  IC=0.892  'Condition'
+    tp_9926f0c622a6  size=   4  IC=0.73  'Cardiovascular material'
+    tp_dec5e26db6f0  size=   4  IC=0.752  'Polyglandular dysfunction AND/OR related disorder'
+    tp_aeea67caebcf  size=   4  IC=0.585  'Disorder of glucose metabolism'
+    tp_dd02a649b815  size=   4  IC=0.892  'Monoplegia of nondominant lower limb as a late effect of cerebrovascular accident'
+    tp_08ecf16e9d96  size=   4  IC=0.489  'Structure of breast and/or endocrine system'
+    tp_0423042ae7b0  size=   4  IC=0.892  'Renal disease in pregnancy AND/OR puerperium without hypertension'
+    tp_e1420fc10313  size=   4  IC=0.661  'Malignant neoplasm of anorectum'
+    tp_102ca0be128e  size=   4  IC=0.848  'Psychiatric sign or symptom'
+    tp_9fd36bb14263  size=   4  IC=0.892  'Family history with explicit context pertaining to sister'
+    tp_953be15d1075  size=   4  IC=0.892  'Family history of hearing loss'
+    tp_18cb8078cd76  size=   4  IC=0.838  'Family history of malignant haematopoietic neoplasm'
+    tp_6e0c8d54ea15  size=   4  IC=0.763  'First degree blood relative'
+    tp_1abe9488df49  size=   4  IC=0.892  'Neurological disorder monitoring status'
+    tp_128b82b0a17f  size=   4  IC=0.86  'Hospital patient (finding)'
+    tp_a8ef498f700c  size=   4  IC=0.759  'Abnormal immune process'
+    tp_25a514b51b8a  size=   4  IC=0.86  'Second degree male blood relative'
+    tp_b2456cb6ad29  size=   4  IC=0.892  'Evaluation of psychiatric state of patient'
+    tp_71dcacd4020e  size=   4  IC=0.892  'Family history with explicit context pertaining to daughter'
+    tp_2f3d52034312  size=   4  IC=0.892  'Paralytic syndrome of nondominant side as late effect of stroke'
+    tp_494f49573de4  size=   4  IC=0.892  'Monoplegia of nondominant upper limb as a late effect of cerebrovascular accident'
+    tp_5c9d8d837174  size=   4  IC=0.838  'Monoplegia of lower limb affecting dominant side'
+    tp_69cf3e0a6250  size=   4  IC=0.892  'Coronary ostium stenosis'
+    tp_c521554c7c95  size=   4  IC=0.658  'Primary malignant neoplasm of intestinal tract'
+    tp_60b40e26c514  size=   5  IC=0.614  'Family details and household composition - finding'
+    tp_eb61755f64da  size=   5  IC=0.875  'Fatigue due to and following cerebrovascular accident'
+    tp_f667655afd55  size=   5  IC=0.767  'Neoplasm of anal canal'
+    tp_29afee098408  size=   5  IC=0.875  'First cousin'
+    tp_3740f63a9fab  size=   5  IC=0.7  'Biological relative'
+    tp_6861dd844c0d  size=   5  IC=0.875  'Diastolic hypertension'
+    tp_bb80551de2dc  size=   5  IC=0.848  'Second degree female blood relative'
+    tp_1d8f74d58529  size=   5  IC=0.695  'Family details / household composition'
+    tp_32310928e02c  size=   5  IC=0.892  'Family history of familial hypercholesterolaemia'
+    tp_04e555915a94  size=   5  IC=0.749  'Paralytic syndrome of all four limbs'
+    tp_42e31507c18a  size=   5  IC=0.829  'Hyperglycaemia due to diabetes mellitus'
+    tp_9589fbba344f  size=   5  IC=0.848  'Finding of details of relatives'
+    tp_bd46b135c144  size=   5  IC=0.698  'Primary malignant neoplasm of large intestine'
+    tp_b223d1807a11  size=   5  IC=0.848  'Metabolic function outside reference range'
+    tp_9b71c11f0026  size=   5  IC=0.637  'Immediate family member'
+    tp_008e57704d05  size=   5  IC=0.684  'Urinary system function'
+    tp_0c2675802a62  size=   5  IC=0.875  'Atheroma of artery (disorder)'
+    tp_123b456efe9f  size=   5  IC=0.86  'Family history of neoplasm of breast'
+    tp_7e8ea41d6712  size=   5  IC=0.821  'Metabolic therapy'
+    tp_a20e55fab8b8  size=   6  IC=0.779  'Second degree blood relative'
+    tp_f8867ff8e473  size=   6  IC=0.86  'History of cerebrovascular accident without residual deficits'
+    tp_184062aae6f3  size=   6  IC=0.668  'Paralytic syndrome on one side of the body'
+    tp_17314b8b7696  size=   6  IC=0.738  'Tumor of sigmoid colon'
+    tp_25f89d72d9a6  size=   6  IC=0.441  'Cancer of digestive system'
+    tp_01b57317ac80  size=   6  IC=0.775  'Energy / stamina'
+    tp_ab1af6af8a2b  size=   6  IC=0.86  'Under care of psychiatrist'
+    tp_fd13d415ce78  size=   6  IC=0.838  'Notable event'
+    tp_036695da1fa1  size=   6  IC=0.589  'Neoplasm of caecum and/or colon and/or rectum'
+    tp_7f0e8490dbcf  size=   6  IC=0.86  'Weakness of face muscles as sequela of stroke'
+    tp_9191695d2b98  size=   6  IC=0.838  'Disorder confirmed'
+    tp_9ac5b0c7d4f4  size=   6  IC=0.829  'Family history: Diabetes mellitus'
+    tp_b6f3dc2307a7  size=   6  IC=0.608  'Malignant neoplasm of large intestine (disorder)'
+    tp_f63ba9b84781  size=   6  IC=0.838  'Extended family member'
+    tp_7f7e4297e463  size=   6  IC=0.838  'Oncologist'
+    tp_b72d89c951d8  size=   6  IC=0.838  'Acute inferior myocardial infarction'
+    tp_ef8bc7829c64  size=   6  IC=0.775  'Preventive monitoring (regime/therapy)'
+    tp_532a6ec9cfb0  size=   6  IC=0.86  'Hypertension monitoring status'
+    tp_ead5ac3200c8  size=   7  IC=0.746  'Coronary occlusion'
+    tp_c7c3c2d57214  size=   7  IC=0.8  'Cousin (person)'
+    tp_89eaa6141096  size=   7  IC=0.794  'Malignant tumour of anal canal'
+    tp_35c0e0810f92  size=   7  IC=0.806  'H/O: metabolic disorder'
+    tp_feb039317a2d  size=   7  IC=0.575  'Finding of renal function'
+    tp_b920f8ac727c  size=   7  IC=0.848  'Right coronary artery occlusion'
+    tp_3eaa94943d54  size=   7  IC=0.686  'Antihypertensive overdose'
+    tp_525dfd19821a  size=   7  IC=0.749  'At increased risk of cardiovascular disease'
+    tp_32383aa247c6  size=   7  IC=0.848  'Third degree blood relative'
+    tp_4d5221b945e0  size=   7  IC=0.821  'Diet for special test'
+    tp_86955c17e9dc  size=   7  IC=0.74  'Hydralazine'
+    tp_3f59205f35ba  size=   7  IC=0.727  'Glucose level outside reference range'
+    tp_0c33113157bb  size=   7  IC=0.806  'Hypoglycemia due to diabetes mellitus'
+    tp_d9bf95de1bee  size=   8  IC=0.714  'Paralytic syndrome as late effect of stroke'
+    tp_5a74240cd31f  size=   8  IC=0.838  'History of cerebrovascular accident with residual deficit'
+    tp_9e2886fa6132  size=   8  IC=0.597  'Primary malignant neoplasm of gastrointestinal tract'
+    tp_8f473fb66e20  size=   8  IC=0.8  'Neurological status'
+    tp_10fdd026777b  size=   8  IC=0.638  'Acute ischaemic heart disease'
+    tp_7991b46f81f5  size=   8  IC=0.838  'Stenosis of right coronary artery'
+    tp_34a5c9ed0981  size=   8  IC=0.8  'Essential hypertension'
+    tp_0fc9affcde05  size=   8  IC=0.838  'Metabolic monitoring procedure'
+    tp_85f6bb3fb22a  size=   9  IC=0.813  'Family history of movement disorder'
+    tp_38d6abe1378d  size=   9  IC=0.829  'Increased blood pressure'
+    tp_2738bda3eed2  size=   9  IC=0.618  'Cardiovascular function'
+    tp_a85354dc5cb9  size=   9  IC=0.695  'Monoplegia'
+    tp_72f4eb71bef2  size=   9  IC=0.829  'Family history of operative procedure'
+    tp_284a9212fc24  size=   9  IC=0.829  'Symptom findings in relation to frequency'
+    tp_ce312dd5d849  size=  10  IC=0.619  'Neoplasm of colon (disorder)'
+    tp_1c1dc33b15a2  size=  10  IC=0.681  'Medical therapy'
+    tp_022ddf71b126  size=  10  IC=0.694  'Valsartan'
+    tp_0fc70ccc6bc1  size=  10  IC=0.813  'History of myocardial infarction (situation)'
+    tp_e0b1830a3a6c  size=  10  IC=0.703  'Details of family'
+    tp_4fdb27238cab  size=  10  IC=0.821  'Disease condition finding'
+    tp_1e8847a456fd  size=  10  IC=0.613  'Tetrazole'
+    tp_cd73a83e9a12  size=  11  IC=0.784  'Accidental antihypertensive overdose'
+    tp_f9a63e3fdf0b  size=  11  IC=0.784  'Intentional antihypertensive overdose'
+    tp_2dfb53b5338a  size=  11  IC=0.51  'Malignant neoplasm of genital structure'
+    tp_f0ef6b0c41d5  size=  11  IC=0.572  'Intestinal cancer'
+    tp_06c4240c838f  size=  11  IC=0.759  'Weakness of face muscles (finding)'
+    tp_c89d2f2ceb41  size=  11  IC=0.759  'ESRD - End stage renal disease'
+    tp_3ce3db2e099c  size=  11  IC=0.48  'Malignant neoplasm of genitourinary organ'
+    tp_2ae1a6ac8871  size=  11  IC=0.794  'Premature ovarian failure'
+    tp_b282d230b3ef  size=  11  IC=0.606  'Disorder of glucose regulation'
+    tp_d567ad073058  size=  11  IC=0.713  'History of cerebrovascular disease'
+    tp_a2427a3fb8ea  size=  11  IC=0.752  'History of cerebrovascular accident (situation)'
+    tp_649bb483eedc  size=  12  IC=0.749  'Family history of procedure'
+    tp_feeb94effc38  size=  12  IC=0.8  'Autoimmune reaction (finding)'
+    tp_6d79b414d819  size=  12  IC=0.339  'Structure of cardiovascular system'
+    tp_fcaef7c0da43  size=  12  IC=0.342  'Body material'
+    tp_788e3f4ba11d  size=  12  IC=0.678  'TOP - Failed attempted termination of pregnancy'
+    tp_f6f06ae365f3  size=  12  IC=0.351  'Body tissue material'
+    tp_955498ec5d34  size=  13  IC=0.779  'Metabolic function test'
+    tp_16ec84a2ed08  size=  13  IC=0.621  'Malignant neoplasm of cecum and/or colon and/or rectum'
+    tp_cc30bbf2e4db  size=  13  IC=0.63  'Antihypertensive adverse reaction'
+    tp_b915c123cd2b  size=  13  IC=0.405  'Neoplasm of digestive system'
+    tp_baa24d689df0  size=  13  IC=0.759  'Relatives died'
+    tp_d9ade77e48dc  size=  13  IC=0.614  'Cardiovascular function finding'
+    tp_3cc9d0a3baae  size=  14  IC=0.509  'Endocrine structure'
+    tp_01e09aebc2f2  size=  14  IC=0.63  'Chronic renal insufficiency (disorder)'
+    tp_2451d42a3cf1  size=  14  IC=0.759  'Exploration of endocrine system'
+    tp_1f75e460d3ca  size=  14  IC=0.609  'Sequela of intracranial injury'
+    tp_7a436e43aaf1  size=  14  IC=0.513  'Neurological observable'
+    tp_7eba13ada77e  size=  14  IC=0.721  'Metabolic observable'
+    tp_9f4db65c4073  size=  14  IC=0.453  'Malignant neoplasm of intraabdominal organ'
+    tp_81ff7305ad8d  size=  14  IC=0.711  'Status (attribute)'
+    tp_29cf34e32142  size=  14  IC=0.57  'Tumour of large intestine'
+    tp_d16f42a98a54  size=  15  IC=0.589  'Medical practitioner'
+    tp_a135f252c680  size=  15  IC=0.481  'Primary malignant neoplasm of abdomen'
+    tp_5135cb6af2c1  size=  15  IC=0.756  'Fetal disorder due to disease in mother'
+    tp_3c3cf869855d  size=  15  IC=0.714  'Malignant tumour of anus'
+    tp_12942d510449  size=  15  IC=0.644  'Family history of neoplasm'
+    tp_7ec396722b5a  size=  16  IC=0.623  'Myocardial infarction'
+    tp_69753aed43a3  size=  16  IC=0.605  'Late effect of nervous system injury'
+    tp_c4af35245e82  size=  16  IC=0.721  'Coronary artery stenosis'
+    tp_4d24002f3a8d  size=  16  IC=0.651  'Details of family - finding'
+    tp_0e1f5f2ca21a  size=  16  IC=0.401  'Tumor of abdomen'
+    tp_46b8ad615f97  size=  16  IC=0.743  'Cognitive disorder'
+    tp_d3a04764f94c  size=  16  IC=0.767  'Family social history'
+    tp_96616436c7b5  size=  16  IC=0.756  'FH: Brain disorder'
+    tp_64805398f51b  size=  17  IC=0.516  'Anorectal disorder (disorder)'
+    tp_d9fc14392bef  size=  17  IC=0.533  'Cardiovascular test finding'
+    tp_7bb5b528e1e1  size=  17  IC=0.7  'Hemiplegia (disorder)'
+    tp_0e02fc9a48d6  size=  17  IC=0.702  'Renal function (observable entity)'
+    tp_0b599808dea0  size=  17  IC=0.592  'Under care of person'
+    tp_12dfbd6c23f4  size=  17  IC=0.48  'Tumour of gastrointestinal tract'
+    tp_e0fb8af9fd83  size=  18  IC=0.418  'Neoplasm of intra-abdominal organs'
+    tp_dc3787c01d5a  size=  18  IC=0.622  'Diabetes mellitus'
+    tp_69ba481850d6  size=  18  IC=0.617  'Hospital department'
+    tp_7a20bdf66dc5  size=  18  IC=0.516  'Malignant neoplasm of gastrointestinal tract'
+    tp_85298b968482  size=  18  IC=0.749  'Special information qualifier'
+    tp_a93f5a952b40  size=  18  IC=0.586  'Substance with angiotensin II receptor antagonist mechanism of action'
+    tp_c4b29aa18e6f  size=  18  IC=0.573  'Frequencies (qualifier value)'
+    tp_4732e5b201ba  size=  18  IC=0.648  'Renal failure syndrome (disorder)'
+    tp_40ac85232dea  size=  18  IC=0.689  'Abnormal metabolic state due to diabetes mellitus'
+    tp_8dc6e140dbb8  size=  19  IC=0.587  'Person in the family (person)'
+    tp_9d06075f1cfd  size=  19  IC=0.694  'Hypoglycaemia'
+    tp_f96d991106b1  size=  19  IC=0.767  'Seen by clinical nurse specialist'
+    tp_f09c451db259  size=  19  IC=0.666  'FH: Cardiovascular disease'
+    tp_9e285a32402c  size=  19  IC=0.546  'Malignant neoplasm of bone'
+    tp_c2c4f669016b  size=  19  IC=0.698  'History of head injury'
+    tp_ac835ca858a7  size=  19  IC=0.713  'Chronic disease monitoring'
+    tp_ed664851b85e  size=  20  IC=0.498  'Primary malignant neoplasm of intra-abdominal organs'
+    tp_87fbbc31a534  size=  20  IC=0.437  'Malignant neoplasm of abdomen'
+    tp_710118660588  size=  20  IC=0.709  'Surgical specialty'
+    tp_eaf4c39d9f79  size=  20  IC=0.7  'H/O: endocrine disorder'
+    tp_de1e08ea713c  size=  20  IC=0.697  'Failed attempted termination of pregnancy with complication'
+    tp_5e82d3920597  size=  20  IC=0.32  'Immunologic substance (substance)'
+    tp_f71a8a4492f9  size=  20  IC=0.65  'AMI - Acute myocardial infarction'
+    tp_b24659cff626  size=  20  IC=0.666  'General problem AND/OR complaint'
+    tp_92a0f7a79e77  size=  21  IC=0.467  'Neoplasm of pelvis'
+    tp_29a08d769567  size=  21  IC=0.702  'Autoimmune connective tissue disorder'
+    tp_467d6cbafb7c  size=  21  IC=0.7  'Autoimmune endocrine disease'
+    tp_a7298fa80974  size=  21  IC=0.455  'Malignant neoplasm of digestive organ'
+    tp_c32533d3869a  size=  22  IC=0.702  'Female infertility'
+    tp_e78eec40f8ab  size=  22  IC=0.732  'Under care of surgeon'
+    tp_55477e494641  size=  22  IC=0.647  'Physiologic measurement'
+    tp_6cd239a200f0  size=  22  IC=0.669  'Family history of malignant neoplasm'
+    tp_12acc486c013  size=  23  IC=0.638  'Metabolic finding'
+    tp_04c8596ad297  size=  23  IC=0.19  'Body system structure (body structure)'
+    tp_9908b1baee1f  size=  23  IC=0.506  'Malignant tumor of pelvis'
+    tp_70cbe578b332  size=  23  IC=0.673  'Acute metabolic disorder'
+    tp_bbf580bad496  size=  23  IC=0.566  'Feeling anxious'
+    tp_3fc9fe566277  size=  23  IC=0.655  'Right leg peripheral neuropathy'
+    tp_6dc5cf3dd560  size=  24  IC=0.541  'Disorder of carbohydrate metabolism'
+    tp_79973b0ee3f7  size=  24  IC=0.688  'Blood pressure finding (finding)'
+    tp_7da4e5118a0a  size=  24  IC=0.727  'Document section (record artifact)'
+    tp_af53c616171b  size=  24  IC=0.678  'H/O: brain disorder'
+    tp_f2d4265272fd  size=  24  IC=0.553  'Coronary artery finding'
+    tp_337ae27dadd8  size=  24  IC=0.652  'Sequela of complication of pregnancy childbirth and the puerperium'
+    tp_e03c61e3c9ed  size=  24  IC=0.711  'Coronary arteriosclerosis'
+    tp_5819b807bfec  size=  25  IC=0.589  'Myocardial ischemia'
+    tp_8a67c273506a  size=  25  IC=0.711  'Family history: Metabolic disorder'
+    tp_2caa8c70b31b  size=  25  IC=0.601  'Malignant tumour of mesothelial and soft tissue'
+    tp_eea507d7ddeb  size=  26  IC=0.495  'Primary malignant neoplasm of head'
+    tp_0ebf58760da2  size=  26  IC=0.549  'Primary malignant neoplasm of pelvis'
+    tp_cd00c637abb5  size=  26  IC=0.48  'Cardiovascular observable'
+    tp_d81d56ba5281  size=  26  IC=0.522  'Person'
+    tp_f43ba04767b5  size=  26  IC=0.451  'Neoplasm of musculoskeletal system'
+    tp_1778f9ccf2fd  size=  26  IC=0.377  'Antibody by target'
+    tp_ec79830e5cc5  size=  26  IC=0.565  'Coronary artery disease'
+    tp_5e4240a897fc  size=  26  IC=0.719  'Psychiatric procedure, interview AND/OR consultation'
+    tp_889c00b6123b  size=  27  IC=0.586  'Anxiety disorder'
+    tp_e0bac55fdd11  size=  27  IC=0.478  'Neoplasm of bone'
+    tp_a2fa2e00ca22  size=  27  IC=0.557  'Substance with dihydropyridine derivative structure and calcium channel blocker mechanism of action (substance)'
+    tp_d4cb2aa344e1  size=  27  IC=0.501  'Disability (finding)'
+    tp_9c20988663c4  size=  27  IC=0.565  'Blocked artery'
+    tp_e61091275ecc  size=  27  IC=0.623  'HTN - Hypertension'
+    tp_940d36c3bf3e  size=  27  IC=0.602  'Problem (finding)'
+    tp_a8a50d999310  size=  28  IC=0.591  'Malignant tumor of breast'
+    tp_3f72fb6d40cd  size=  28  IC=0.572  'Evaluation of endocrine system'
+    tp_30f27bdf2107  size=  28  IC=0.591  'Relative (person)'
+    tp_631bacdc734b  size=  29  IC=0.451  'Mass of pelvic structure (finding)'
+    tp_73510528f2a3  size=  29  IC=0.38  'Cardiovascular agent'
+    tp_813407e8c1c7  size=  29  IC=0.532  'Calcium channel blocker'
+    tp_bb13cffbc7fb  size=  29  IC=0.556  'Cardiovascular measure'
+    tp_d25af5b5957d  size=  29  IC=0.44  'Primary malignant neoplasm of trunk'
+    tp_aad180a795d6  size=  29  IC=0.64  'Sequela of cerebrovascular accident'
+    tp_38ca1f65478b  size=  29  IC=0.365  'Disorder of reproductive system'
+    tp_6716985b6aa9  size=  30  IC=0.476  'Impaired cognition'
+    tp_9b65998e417b  size=  30  IC=0.216  'Modifier related to clinical specialty AND/OR occupation'
+    tp_e5ce98680d86  size=  30  IC=0.599  'Stricture of artery'
+    tp_570e1b15e657  size=  31  IC=0.418  'Antihypertensive agent'
+    tp_9a2335406bd4  size=  31  IC=0.434  'Kidney finding'
+    tp_25f3995c2fd7  size=  31  IC=0.677  'Urinary sequelae of disorders'
+    tp_e6f7755d295b  size=  32  IC=0.584  'Immune system finding'
+    tp_5c547a08de1d  size=  32  IC=0.538  'Exploration procedure'
+    tp_380e9eb803a5  size=  32  IC=0.436  'Cardiovascular injury'
+    tp_d52d00f60fde  size=  33  IC=0.481  'Malignant neoplasm of skin (disorder)'
+    tp_4fc0db1fd41c  size=  33  IC=0.554  'Chronic disease monitoring status'
+    tp_75cfe9a86a39  size=  34  IC=0.585  'Sequelae of cardiovascular disorders'
+    tp_bf95c88b973f  size=  34  IC=0.192  'Procedure on body system'
+    tp_10b29e7a391a  size=  34  IC=0.35  'Neoplasm of trunk'
+    tp_931f8bc054fa  size=  35  IC=0.356  'Hereditary disorder by system'
+    tp_a645987986f8  size=  35  IC=0.472  'Operative procedure on endocrine system'
+    tp_66cd5e301953  size=  35  IC=0.561  'Endocrine finding (finding)'
+    tp_84aa17fa8a00  size=  36  IC=0.263  'Organ part'
+    tp_404107141e4e  size=  36  IC=0.658  'Surgical service'
+    tp_9f590ac8084c  size=  36  IC=0.574  'Hospital (environment)'
+    tp_c039e491de11  size=  38  IC=0.392  'Neoplasm of head'
+    tp_1164a1bc909f  size=  38  IC=0.647  'Under care of doctor'
+    tp_6dd975095323  size=  39  IC=0.422  'Malignant neoplasm of head and/or neck (disorder)'
+    tp_ae00c54e21d1  size=  41  IC=0.645  'Muscle weakness'
+    tp_ebeac4e3c8cc  size=  41  IC=0.554  'Gingival disease'
+    tp_e7ef8356eed9  size=  41  IC=0.672  'Disease process or condition education'
+    tp_d724a1df8b2d  size=  42  IC=0.648  'Specialised physician'
+    tp_4ef85dd30774  size=  43  IC=0.581  'Abs - Autoantibodies'
+    tp_8f432a7c0658  size=  43  IC=0.59  'Finding related to care and support circumstances and networks'
+    tp_fb1c5d77a1ac  size=  44  IC=0.584  'Care of patient states'
+    tp_2b4d7ad8d5c8  size=  44  IC=0.567  'Clinical specialty'
+    tp_360a2acff0df  size=  45  IC=0.697  'Care regimes surveillance'
+    tp_66d4ab5ec25b  size=  50  IC=0.392  'Mass of digestive structure'
+    tp_0c2b97569783  size=  50  IC=0.355  'Disorder of immune function'
+    tp_188bf11a79d1  size=  52  IC=0.55  'Monitoring of patient'
+    tp_3edf776bdf93  size=  52  IC=0.374  'Heart disease'
+    tp_4bef35da8390  size=  52  IC=0.388  'Cardiovascular investigation'
+    tp_8db63be1a7a9  size=  53  IC=0.429  'Care regime'
+    tp_b0169e563e5c  size=  55  IC=0.627  'Secondary myopathy'
+    tp_9747ec9c55c2  size=  57  IC=0.533  'Psychological finding'
+    tp_0d525062d0f0  size=  58  IC=0.361  'Antibody'
+    tp_47d96d7cf360  size=  58  IC=0.391  'Arteriopath'
+    tp_c257c631e7d4  size=  60  IC=0.408  'Mental disorder'
+    tp_ac21fa560b8e  size=  60  IC=0.395  'Endocrine system disease'
+    tp_7bb5a5ca2e47  size=  62  IC=0.323  'Urogenital disease'
+    tp_48574c7fc8e7  size=  64  IC=0.6  'Left ventricular abnormality'
+    tp_466c39d517b6  size=  65  IC=0.344  'Gastroenteropathy'
+    tp_ed9af0b38a0d  size=  66  IC=0.607  'Chronic metabolic disorder'
+    tp_fd8530ddd8ed  size=  70  IC=0.467  'H/O: Disorder'
+    tp_7ab4f89fe708  size=  70  IC=0.297  'Cardiovascular disease'
+    tp_8d14a84675fb  size=  70  IC=0.354  'Nervous system finding'
+    tp_be157a6bdb29  size=  71  IC=0.274  'Neoplasm (morphologic abnormality)'
+    tp_c8bb84f861db  size=  74  IC=0.509  'Family history of disorder'
+    tp_963d7192e488  size=  75  IC=0.587  'Drug therapy finding'
+    tp_f57564056d55  size=  76  IC=0.545  'Procedural approach'
+    tp_4ae2cb17d844  size=  76  IC=0.505  'Cardiomyopathy'
+    tp_0a84ecd25ae5  size=  76  IC=0.407  'Measurement finding outside reference range'
+    tp_6cfaf1abfffa  size=  78  IC=0.538  'Medical speciality'
+    tp_143849ea865b  size=  78  IC=0.648  'Reproductive system hereditary disorder'
+    tp_e080282ba8b4  size=  79  IC=0.375  'Chronic disease'
+    tp_6edad05092eb  size=  79  IC=0.624  'Therapeutic role'
+    tp_6238751a8be5  size=  79  IC=0.238  'Disorder of limb'
+    tp_bd468f7bd489  size=  79  IC=0.387  'Acute disease'
+    tp_a1ce645d18f2  size=  79  IC=0.231  'Traumatic or non-traumatic injury'
+    tp_b22ab67ee856  size=  79  IC=0.348  'Disorder of face'
+    tp_cca417648e66  size=  85  IC=0.249  'Mass (morphologic abnormality)'
+    tp_b9fe61df1909  size=  89  IC=0.64  'Seen in clinic'
+    tp_13bffe6324f4  size=  89  IC=0.63  'Topographical modifier'
+    tp_ac5cb962a3bb  size=  89  IC=0.483  'Family medical history'
+    tp_4233e1758dac  size=  92  IC=0.48  'Autoimmune disease'
+    tp_57479b4d96ca  size=  98  IC=0.27  'New growth'
+    tp_4752ab9b416f  size=  99  IC=0.455  'Complication of pregnancy, childbirth and/or puerperium (disorder)'
+    tp_6169c167c673  size= 101  IC=0.437  'Disease of kidney'
+    tp_37d074426ff8  size= 103  IC=0.287  'Cardiovascular observations'
+    tp_9affac9e9b64  size= 106  IC=0.361  'Disorder of pelvis'
+    tp_b6b7cc88b39b  size= 106  IC=0.401  'Complication of procedure'
+    tp_3a93ffb8c6c6  size= 109  IC=0.413  'Lesion of genitalia'
+    tp_391c1d0ae350  size= 110  IC=0.541  'Urinary complication'
+    tp_1b83d2f3bd2b  size= 112  IC=0.556  'Neurological device'
+    tp_6db1986379b2  size= 116  IC=0.377  'Metabolic disease'
+    tp_f412990e891a  size= 119  IC=0.407  'Examination of body system'
+    tp_10479c275589  size= 122  IC=0.235  'Disorder of musculoskeletal system (disorder)'
+    tp_0605a5e0eb74  size= 124  IC=0.532  'Healthcare services'
+    tp_c203f9088daa  size= 124  IC=0.33  'Function'
+    tp_3d6c7a118db7  size= 133  IC=0.461  'Measurement finding above reference range'
+    tp_75e6d2eeae5d  size= 134  IC=0.228  'Connective tissue disease'
+    tp_87f94bb081f3  size= 134  IC=0.61  'Clinic'
+    tp_869c1c0746b3  size= 137  IC=0.232  'Disorder of head'
+    tp_415fe71e8f33  size= 138  IC=0.482  'Neonatal disorder (disorder)'
+    tp_944edfe6cf08  size= 142  IC=0.55  'Care regimes management'
+    tp_770d6a388fc7  size= 144  IC=0.235  'Clinical history/examination observable'
+    tp_3ca1a76819fd  size= 144  IC=0.359  'Disorder of brain (disorder)'
+    tp_9fc26305ad52  size= 158  IC=0.526  'Genetic finding'
+    tp_37a5d8bdf1d3  size= 158  IC=0.387  'Adverse drug reaction'
+    tp_1cfa25447f83  size= 165  IC=0.216  'Surgical procedure (procedure)'
+    tp_2998212c2d3c  size= 168  IC=0.586  'Cardiovascular system hereditary disorder'
+    tp_4126134c42bb  size= 174  IC=0.295  'Measurement - action'
+    tp_b5d27d4841e9  size= 194  IC=0.557  'Hereditary disorder of endocrine system'
+    tp_b1902878866f  size= 218  IC=0.408  'Disorder following clinical procedure'
+    tp_b91482d86053  size= 226  IC=0.483  'Procedure carried out on subject'
+    tp_eac53f1112e5  size= 243  IC=0.544  'Drug therapy'
+    tp_2232f8e0ed20  size= 247  IC=0.334  'Hereditary disease'
+    tp_4ad64a0e94fc  size= 286  IC=0.309  'Malignant neoplasm'
+    tp_56bd57f44c72  size= 323  IC=0.525  'Intentional overdose'
+    tp_246c0717122b  size= 330  IC=0.525  'Accidental overdose'
+    tp_47a76632b363  size= 347  IC=0.281  'Medical device'
+    tp_ff631a93b07b  size= 354  IC=0.172  'Drug or medicament (substance)'
+    tp_60b57f58a789  size= 385  IC=0.213  'Evaluation - action'
+    tp_30def8aa858a  size= 421  IC=0.473  'Intentional poisoning by drug'
+    tp_caf8a4e6ac4a  size= 522  IC=0.203  'Observable entity (observable entity)'
+    tp_c08affbb5914  size= 608  IC=0.46  'Hereditary disorder of musculoskeletal system'
+    tp_5b76faab59c1  size= 649  IC=0.208  'Navigational concept'
+    tp_6aad6d543e97  size= 664  IC=0.488  'Assessment using assessment scale'
 
+######################################################################
+#  RETRIEVAL (shared topics -> doc CUIs -> chunk text)
+######################################################################
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+  shared topics: 21  |  count=21  sum_inv_size=3.3856  min_inv_size=0.5  max_anchor_ic=0.946
 
-def split_path(p):
-    return [s.strip() for s in p.split(">>") if s.strip()]
+  >>> SHARED TOPIC tp_a3ac2ea0fde0  size=2  IC=0.946  'Family history with explicit context pertaining to paternal grandmother'
+      doc CUIs under this topic:
+        C4047909  'Family history: paternal grandmother alive and well'
+      matching chunk(s) from the document:
+        [chunk 3] 'SOCIAL HISTORY: Lives alone, retired. Denies tobacco use. Occasional alcohol consumption. No illicit drug use. Has good social support from adult children.'
 
+  >>> SHARED TOPIC tp_4fb4005ece9c  size=2  IC=0.946  'Family history with explicit context pertaining to maternal grandfather'
+      doc CUIs under this topic:
+        C4047910  'Family history: maternal grandfather alive and well'
+      matching chunk(s) from the document:
+        [chunk 4] 'FAMILY HISTORY: Father died of MI at 55. Mother has hypertension. No known family history of cancer. Sister with type 2 diabetes.'
 
-def flat(raw):
-    """raw: {phrase: {"cuis": {cui: distance}}} -> ordered unique cui list."""
-    out, seen = [], set()
-    for d in raw.values():
-        for c in d.get("cuis", {}):
-            if c and c not in seen:
-                seen.add(c)
-                out.append(c)
-    return out
+  >>> SHARED TOPIC tp_861c9a10069a  size=2  IC=0.914  'Family history of hypertension'
+      doc CUIs under this topic:
+        C0455405  'Family history of hypertension'
+      matching chunk(s) from the document:
+        [chunk 4] 'FAMILY HISTORY: Father died of MI at 55. Mother has hypertension. No known family history of cancer. Sister with type 2 diabetes.'
 
+  >>> SHARED TOPIC tp_81f3aaf30bd3  size=2  IC=0.946  'Family history with explicit context pertaining to paternal grandfather'
+      doc CUIs under this topic:
+        C4047908  'Family history: Paternal grandfather alive and well'
+        C0424885  'Family history with explicit context pertaining to paternal grandfather'
+      matching chunk(s) from the document:
+        [chunk 4] 'FAMILY HISTORY: Father died of MI at 55. Mother has hypertension. No known family history of cancer. Sister with type 2 diabetes.'
 
-def _members(tp):
-    """Member CUIs of a topic (list)."""
-    if hasattr(adaptor, "topic_member_cuis"):
-        return adaptor.topic_member_cuis(tp, with_labels=False)
-    t = adaptor.topic_id_to_topic.get(tp)
-    return list(t["members"]) if t else []
+  >>> SHARED TOPIC tp_4d388634c958  size=2  IC=0.946  'FH: Maternal grandmother'
+      doc CUIs under this topic:
+        C4047911  'Family history: maternal grandmother alive and well'
+      matching chunk(s) from the document:
+        [chunk 3] 'SOCIAL HISTORY: Lives alone, retired. Denies tobacco use. Occasional alcohol consumption. No illicit drug use. Has good social support from adult children.'
 
+  >>> SHARED TOPIC tp_9fd36bb14263  size=4  IC=0.892  'Family history with explicit context pertaining to sister'
+      doc CUIs under this topic:
+        C0424907  'FH: Sister alive with problem'
+        C0424905  'Family history with explicit context pertaining to sister'
+      matching chunk(s) from the document:
+        [chunk 4] 'FAMILY HISTORY: Father died of MI at 55. Mother has hypertension. No known family history of cancer. Sister with type 2 diabetes.'
 
-def _summarize_and_topics(tr, cuis):
-    """Shared tail: summarize CUIs -> topics. Mutates tr in place."""
-    if not cuis:
-        tr["surviving"] = []
-        tr["removed"] = []
-        tr["topics"] = []
-        tr["topic_ids"] = []
-        tr["metrics"] = {}
-        return
+  >>> SHARED TOPIC tp_9ac5b0c7d4f4  size=6  IC=0.829  'Family history: Diabetes mellitus'
+      doc CUIs under this topic:
+        C1562166  'Family history: Diabetes mellitus in first degree relative'
+        C2316287  'Family history of diabetes mellitus type 2'
+      matching chunk(s) from the document:
+        [chunk 4] 'FAMILY HISTORY: Father died of MI at 55. Mother has hypertension. No known family history of cancer. Sister with type 2 diabetes.'
 
-    summ = summarizer.summarize(cuis, sources=["SNOMEDCT_US"])
-    tr["metrics"] = summ.get("metrics", {})
-    tr["surviving"] = [
-        {"cui": r["cui"], "term": r.get("preferred_term", r["cui"]), "ic": r.get("ic", 0.0)}
-        for r in summ["surviving_cuis"]
-    ]
-    tr["removed"] = [
-        {"cui": r["cui"], "term": r.get("preferred_term", r["cui"]),
-         "by": r.get("retained_by", ""), "reason": r.get("reason", "")}
-        for r in summ.get("removed_cuis", [])
-    ]
-    surv = [r["cui"] for r in summ["surviving_cuis"]]
-    tps = adaptor.cuis_to_topics(surv)
-    tr["topics"] = [
-        {"tp": tp, "size": adaptor.topic_size(tp),
-         "ic": round(adaptor.topic_anchor_ic(tp), 3),
-         "label": adaptor.topic_label(tp)}
-        for tp in sorted(tps, key=adaptor.topic_size)
-    ]
-    tr["topic_ids"] = list(tps)
+  >>> SHARED TOPIC tp_0fc70ccc6bc1  size=10  IC=0.813  'History of myocardial infarction (situation)'
+      doc CUIs under this topic:
+        C5438311  'History of myocardial infarction due to demand ischaemia'
+        C4274366  'History of acute ST segment elevation myocardial infarction'
+        C3698570  'History of non-ST segment elevation myocardial infarction'
+        C0585891  'H/O: Myocardial infarction in last year'
+        C0455528  'H/O: myocardial infarct at less than 60'
+        C5438408  'History of myocardial infarction due to atherothrombotic coronary artery disease'
+        C0455529  'H/O: myocardial infarct at greater than 60'
+        C1275835  'History of myocardial infarction (situation)'
+        C4075953  'Coronary arteriosclerosis in patient with history of previous myocardial infarction'
+      matching chunk(s) from the document:
+        [chunk 2] 'HISTORY OF PRESENT ILLNESS: Pt is a 63-year-old female admitted for chest pain. Onset was approximately 6 hours prior to presentation, described as substernal pressure radiating to the left arm. Pain was 8/10 at its worst. Associated symptoms included shortness of breath and diaphoresis. Denies feve'
+        [chunk 6] 'PRIMARY DIAGNOSES: 1. ACUTE MYOCARDIAL INFARCTION (ICD-10: I21.9) 2. HYPERTENSION (ICD-10: I10.9)'
 
+  >>> SHARED TOPIC tp_d9fc14392bef  size=17  IC=0.533  'Cardiovascular test finding'
+      doc CUIs under this topic:
+        C0020538  'HTN - Hypertension'
+      matching chunk(s) from the document:
+        [chunk 6] 'PRIMARY DIAGNOSES: 1. ACUTE MYOCARDIAL INFARCTION (ICD-10: I21.9) 2. HYPERTENSION (ICD-10: I10.9)'
 
-# ---------------------------------------------------------------------------
-# QUERY side — WITH LLM nature breakdown
-# ---------------------------------------------------------------------------
+  >>> SHARED TOPIC tp_f09c451db259  size=19  IC=0.666  'FH: Cardiovascular disease'
+      doc CUIs under this topic:
+        C0455405  'Family history of hypertension'
+        C2585258  'Family history of cardiovascular disease in first degree male relative less than 55 years of age'
+      matching chunk(s) from the document:
+        [chunk 4] 'FAMILY HISTORY: Father died of MI at 55. Mother has hypertension. No known family history of cancer. Sister with type 2 diabetes.'
 
-def _trace_query(text):
-    tr = {"text": text}
+  >>> SHARED TOPIC tp_f71a8a4492f9  size=20  IC=0.65  'AMI - Acute myocardial infarction'
+      doc CUIs under this topic:
+        C2349195  'Acute myocardial infarction of anterior wall'
+        C3698282  'Acute myocardial infarction due to left coronary artery occlusion'
+      matching chunk(s) from the document:
+        [chunk 6] 'PRIMARY DIAGNOSES: 1. ACUTE MYOCARDIAL INFARCTION (ICD-10: I21.9) 2. HYPERTENSION (ICD-10: I10.9)'
 
-    full = pipeline.run(query=text, output_format="full_pipeline")
-    tr["expanded"] = full.get("expanded_query", "")
-    tr["is_clinical"] = full.get("is_clinical", False)
-    if not tr["is_clinical"]:
-        tr["reason"] = full.get("reason")
-        return tr
+  >>> SHARED TOPIC tp_79973b0ee3f7  size=24  IC=0.688  'Blood pressure finding (finding)'
+      doc CUIs under this topic:
+        C1696708  'Prehypertension'
+      matching chunk(s) from the document:
+        [chunk 6] 'PRIMARY DIAGNOSES: 1. ACUTE MYOCARDIAL INFARCTION (ICD-10: I21.9) 2. HYPERTENSION (ICD-10: I10.9)'
 
-    intents_view = []
-    cuis, seen = [], set()
-    for it in full.get("intents", []):
-        iv = {
-            "intent": it.get("intent_title", ""),
-            "nature": it.get("nature", ""),
-            "description": it.get("description", ""),
-            "sub_natures": [],
-        }
-        for sn in it.get("sub_natures", []):
-            path = sn.get("category_path", "")
-            atoms = sn.get("atomic_concepts", []) or []
-            snv = {"path": path, "atomic": list(atoms),
-                   "path_cuis": [], "atomic_cuis": []}
+  >>> SHARED TOPIC tp_8a67c273506a  size=25  IC=0.711  'Family history: Metabolic disorder'
+      doc CUIs under this topic:
+        C4510820  'Family history of hyperlipidaemia'
+      matching chunk(s) from the document:
+        [chunk 4] 'FAMILY HISTORY: Father died of MI at 55. Mother has hypertension. No known family history of cancer. Sister with type 2 diabetes.'
 
-            for seg in split_path(path):
-                got = flat(extractor.extract([seg], [seg]))
-                snv["path_cuis"].append({"text": seg, "cuis": got})
-                for c in got:
-                    if c not in seen:
-                        seen.add(c); cuis.append(c)
+  >>> SHARED TOPIC tp_e61091275ecc  size=27  IC=0.623  'HTN - Hypertension'
+      doc CUIs under this topic:
+        C0020538  'HTN - Hypertension'
+      matching chunk(s) from the document:
+        [chunk 6] 'PRIMARY DIAGNOSES: 1. ACUTE MYOCARDIAL INFARCTION (ICD-10: I21.9) 2. HYPERTENSION (ICD-10: I10.9)'
 
-            for a in atoms:
-                a = (a or "").strip()
-                if not a:
-                    continue
-                got = flat(extractor.extract([a], [a]))
-                snv["atomic_cuis"].append({"text": a, "cuis": got})
-                for c in got:
-                    if c not in seen:
-                        seen.add(c); cuis.append(c)
+  >>> SHARED TOPIC tp_48574c7fc8e7  size=64  IC=0.6  'Left ventricular abnormality'
+      doc CUIs under this topic:
+        C0264704  'Acute myocardial infarction of high lateral wall'
+        C2349195  'Acute myocardial infarction of anterior wall'
+      matching chunk(s) from the document:
+        [chunk 2] 'HISTORY OF PRESENT ILLNESS: Pt is a 63-year-old female admitted for chest pain. Onset was approximately 6 hours prior to presentation, described as substernal pressure radiating to the left arm. Pain was 8/10 at its worst. Associated symptoms included shortness of breath and diaphoresis. Denies feve'
+        [chunk 6] 'PRIMARY DIAGNOSES: 1. ACUTE MYOCARDIAL INFARCTION (ICD-10: I21.9) 2. HYPERTENSION (ICD-10: I10.9)'
 
-            iv["sub_natures"].append(snv)
-        intents_view.append(iv)
+  >>> SHARED TOPIC tp_7ab4f89fe708  size=70  IC=0.297  'Cardiovascular disease'
+      doc CUIs under this topic:
+        C0020538  'HTN - Hypertension'
+      matching chunk(s) from the document:
+        [chunk 6] 'PRIMARY DIAGNOSES: 1. ACUTE MYOCARDIAL INFARCTION (ICD-10: I21.9) 2. HYPERTENSION (ICD-10: I10.9)'
 
-    tr["intents"] = intents_view
-    tr["extracted_cuis"] = list(cuis)
-    _summarize_and_topics(tr, cuis)
-    return tr
+  >>> SHARED TOPIC tp_c8bb84f861db  size=74  IC=0.509  'Family history of disorder'
+      doc CUIs under this topic:
+        C2317524  'Family history of coronary arteriosclerosis'
+        C0455405  'Family history of hypertension'
+      matching chunk(s) from the document:
+        [chunk 4] 'FAMILY HISTORY: Father died of MI at 55. Mother has hypertension. No known family history of cancer. Sister with type 2 diabetes.'
 
+  >>> SHARED TOPIC tp_4ae2cb17d844  size=76  IC=0.505  'Cardiomyopathy'
+      doc CUIs under this topic:
+        C0264704  'Acute myocardial infarction of high lateral wall'
+        C2349195  'Acute myocardial infarction of anterior wall'
+      matching chunk(s) from the document:
+        [chunk 2] 'HISTORY OF PRESENT ILLNESS: Pt is a 63-year-old female admitted for chest pain. Onset was approximately 6 hours prior to presentation, described as substernal pressure radiating to the left arm. Pain was 8/10 at its worst. Associated symptoms included shortness of breath and diaphoresis. Denies feve'
+        [chunk 6] 'PRIMARY DIAGNOSES: 1. ACUTE MYOCARDIAL INFARCTION (ICD-10: I21.9) 2. HYPERTENSION (ICD-10: I10.9)'
 
-# ---------------------------------------------------------------------------
-# DOC side — NO LLM, per-chunk extraction + provenance (CUI -> chunk)
-# ---------------------------------------------------------------------------
+  >>> SHARED TOPIC tp_b9fe61df1909  size=89  IC=0.64  'Seen in clinic'
+      doc CUIs under this topic:
+        C0451624  'Seen in cardiac clinic'
+      matching chunk(s) from the document:
+        [chunk 9] 'CONSULTATIONS: Cardiology, Internal Medicine, Social Work'
 
-def _trace_doc(doc):
-    """`doc` from document.get_document(): {doc_id, label, category, chunks:[str]}."""
-    tr = {
-        "text": f"{doc.get('label','')}  ({doc.get('category','')})",
-        "doc_id": doc["doc_id"],
-        "is_clinical": True,
-        "chunks": [],            # [{i, preview, full, cuis}]
-    }
+  >>> SHARED TOPIC tp_ac5cb962a3bb  size=89  IC=0.483  'Family medical history'
+      doc CUIs under this topic:
+        C0424905  'Family history with explicit context pertaining to sister'
+        C2586137  'Mother does not smoke'
+        C0424885  'Family history with explicit context pertaining to paternal grandfather'
+      matching chunk(s) from the document:
+        [chunk 3] 'SOCIAL HISTORY: Lives alone, retired. Denies tobacco use. Occasional alcohol consumption. No illicit drug use. Has good social support from adult children.'
+        [chunk 4] 'FAMILY HISTORY: Father died of MI at 55. Mother has hypertension. No known family history of cancer. Sister with type 2 diabetes.'
 
-    cuis, seen = [], set()
-    cui_to_chunks = {}           # cui -> set(chunk indices)
-    for ci, chunk in enumerate(doc.get("chunks", [])):
-        got = flat(extractor.extract([chunk], [chunk]))
-        tr["chunks"].append({
-            "i": ci,
-            "preview": chunk[:80].replace("\n", " "),
-            "full": chunk,
-            "cuis": got,
-        })
-        for c in got:
-            cui_to_chunks.setdefault(c, set()).add(ci)
-            if c not in seen:
-                seen.add(c); cuis.append(c)
-
-    tr["extracted_cuis"] = list(cuis)
-    tr["cui_to_chunks"] = {c: sorted(v) for c, v in cui_to_chunks.items()}
-    _summarize_and_topics(tr, cuis)
-
-    # for each doc topic: which doc CUIs fall under it
-    tr["topic_to_doc_cuis"] = {}
-    doc_cui_set = set(tr["extracted_cuis"])
-    for tp in tr.get("topic_ids", []):
-        hit = [c for c in _members(tp) if c in doc_cui_set]
-        tr["topic_to_doc_cuis"][tp] = hit
-    return tr
-
-
-def _build_doc_cache(index):
-    doc = get_document(index)
-    tr = _trace_doc(doc)
-    print(f"[doc cache] processed doc[{index}] '{doc['label']}' -> "
-          f"{len(tr.get('topic_ids',[]))} topics, "
-          f"{len(tr.get('surviving',[]))} surviving CUIs")
-    return tr
-
-
-# ---------------------------------------------------------------------------
-# Request handler — query only; reuse cached doc; rich retrieval
-# ---------------------------------------------------------------------------
-
-def handle(req):
-    global _DOC_CACHE
-    if _DOC_CACHE is None:
-        _DOC_CACHE = _build_doc_cache(req.get("doc_index", DEMO_DOC_INDEX))
-
-    q = _trace_query(req["query"])
-    doc = _DOC_CACHE
-
-    q_ids = set(q.get("topic_ids", []))
-    d_ids = set(doc.get("topic_ids", []))
-    shared = q_ids & d_ids
-
-    retrieval = []
-    for tp in sorted(shared, key=lambda t: adaptor.topic_size(t)):
-        doc_cuis = doc["topic_to_doc_cuis"].get(tp, [])
-        chunk_idxs = sorted({ci for c in doc_cuis
-                             for ci in doc["cui_to_chunks"].get(c, [])})
-        chunk_text = [{"i": ci,
-                       "preview": doc["chunks"][ci]["preview"],
-                       "full": doc["chunks"][ci]["full"]}
-                      for ci in chunk_idxs]
-        retrieval.append({
-            "tp_id": tp,
-            "label": adaptor.topic_label(tp),
-            "size": adaptor.topic_size(tp),
-            "anchor_ic": round(adaptor.topic_anchor_ic(tp), 3),
-            "doc_cuis": [(c, adaptor.labels.get(c, c)) for c in doc_cuis],
-            "chunks": chunk_text,
-        })
-
-    metrics = adaptor.match(q_ids, d_ids)
-    return {"doc_result": doc, "query_result": q,
-            "shared_count": len(shared), "metrics": metrics,
-            "retrieval": retrieval}
-
-
-# ---------------------------------------------------------------------------
-# Serve
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    addr = ("localhost", 6000)
-    listener = Listener(addr, authkey=b"cui")
-    print(f"Server ready on {addr}. Leave this terminal open.")
-    # pre-warm the document cache so the first query is fast
-    try:
-        _DOC_CACHE = _build_doc_cache(DEMO_DOC_INDEX)
-    except Exception as e:
-        print(f"[doc cache] deferred (will build on first request): {e}")
-    while True:
-        conn = listener.accept()
-        try:
-            req = conn.recv()
-            conn.send(handle(req))
-        except EOFError:
-            pass
-        except Exception as e:
-            try:
-                conn.send({"error": str(e)})
-            except Exception:
-                pass
-        finally:
-            conn.close()
+  >>> SHARED TOPIC tp_37d074426ff8  size=103  IC=0.287  'Cardiovascular observations'
+      doc CUIs under this topic:
+        C0020538  'HTN - Hypertension'
+      matching chunk(s) from the document:
+        [chunk 6] 'PRIMARY DIAGNOSES: 1. ACUTE MYOCARDIAL INFARCTION (ICD-10: I21.9) 2. HYPERTENSION (ICD-10: I10.9)'
