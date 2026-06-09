@@ -1,6 +1,11 @@
-isa subgraph H: 18,279,961 nodes, 18,279,960 edges  (412s)
-is DAG: True
-  Pneumonia        desc=  183
-  Diabetes         desc=  127
-  Peanut allergy   desc=    0
-  Bronchitis       desc=  116
+import time, random
+sample = random.sample(list(TARGET), 200)
+t0 = time.time()
+for cui in sample:
+    desc = set()
+    for s in cui_to_suffix[cui]:
+        desc |= nx.descendants(H, s)
+    _ = len({d.split('-')[0] for d in desc if '-' in d})
+dt = time.time() - t0
+print(f"200 CUIs took {dt:.1f}s  ->  est. for {len(TARGET):,}: "
+      f"{dt/200*len(TARGET)/60:.1f} min")
