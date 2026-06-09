@@ -1,36 +1,6 @@
-import math
-
-t0 = time.time()
-
-# descendants count for every node, computed once via reverse topological order
-# (so each node reuses its children's already-computed descendant sets)
-desc_count = {}
-if nx.is_directed_acyclic_graph(G):
-    order = list(nx.topological_sort(G))
-    desc_sets = {}
-    for n in reversed(order):           # specific -> general
-        s = set()
-        for child in G.successors(n):   # successors = more specific
-            s.add(child)
-            s |= desc_sets.get(child, set())
-        desc_sets[n] = s
-        desc_count[n] = len(s)
-    print(f"descendants computed for {len(desc_count):,} nodes "
-          f"({time.time()-t0:.0f}s)")
-else:
-    print("WARNING: isa graph has cycles — will handle with DFS+visited instead")
-
-# IC
-TOTAL = G.number_of_nodes()
-log_total = math.log(TOTAL + 1)
-ic = {n: 1.0 - math.log(desc_count.get(n, 0) + 1) / log_total for n in G.nodes()}
-
-# parents = predecessors in G (more general); ancestors = nx.ancestors(G, cui)
-print(f"IC done. TOTAL={TOTAL:,}")
-
-# sanity check
-for cui, name in [("C0032285","Pneumonia"), ("C0011849","Diabetes"),
-                  ("C0559470","Peanut allergy"), ("C0006277","Bronchitis")]:
-    if cui in G:
-        print(f"  {name:16s} desc={desc_count.get(cui,0):>5}  IC={ic[cui]:.3f}  "
-              f"parents={list(G.predecessors(cui))[:5]}")
+WARNING: isa graph has cycles — will handle with DFS+visited instead
+IC done. TOTAL=373,077
+  Pneumonia        desc=    0  IC=1.000  parents=['C0876973', 'C3714636']
+  Diabetes         desc=    0  IC=1.000  parents=['C0014130', 'C1257958']
+  Peanut allergy   desc=    0  IC=1.000  parents=['C1096735']
+  Bronchitis       desc=    0  IC=1.000  parents=['C4476770', 'C1290890', 'C1285331']
