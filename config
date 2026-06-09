@@ -1,1 +1,80 @@
->>> exec(open("test_manual.py").read())
+"""
+server.py — run ONCE, leave running. Loads everything, holds in memory,
+serves queries over a local socket.
+    python server.py
+"""
+import pickle
+from multiprocessing.connection import Listener
+
+import config  # loads the 1.6GB graph + ic + topics once
+from intents import ContextualIntentPipeline
+from cui_core import CUIExtractor
+from cui_summarizer import CUISummarizer
+from topic_adaptor import TopicAdaptor
+from config import (PROJECT_ID, LOCATION, MODEL_VERSION,
+                    API_URL, TOP_K, TOP_P, CLUSTER_SET, COMBINED)
+
+print("Building clients (once)...")
+pipeline   = ContextualIntentPipeline(project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION)
+extractor  = CUIExtractor(API_URL, top_k=TOP_K, top_p=TOP_P, cluster_set=CLUSTER_SET, combined=COMBINED)
+summarizer = CUISummarizer()
+adaptor    = TopicAdaptor()
+
+
+def split_path(p): return [s.strip() for s in p.split(">>") if s.strip()]
+def flat(raw):
+    out, seen = [], set()
+    for d in raw.values():
+        for c in d.get("cuis", {}):
+            if c and c not in seen: seen.add(c); out.append(c)
+    return out
+
+def text_to_topics(text):
+    full = pipeline.run(query=text, output_format="full_pipeline")
+    if not full.get("is_clinical"):
+        return {"non_clinical": full.get("reason")}
+    cuis, seen = [], set()
+    for it in full.get("intents", []):
+        for sn in it.get("sub_natures", []):
+            for seg in split_path(sn.get("category_path", "")):
+                for c in flat(extractor.extract([seg], [seg])):
+                    if c not in seen: seen.add(c); cuis.append(c)
+            for a in (sn.get("atomic_concepts") or []):
+                a = (a or "").strip()
+                if a:
+                    for c in flat(extractor.extract([a], [a])):
+                        if c not in seen: seen.add(c); cuis.append(c)
+    if not cuis: return {"cuis": [], "topics": []}
+    surv = [r["cui"] for r in summarizer.summarize(cuis, sources=["SNOMEDCT_US"])["surviving_cuis"]]
+    tps = adaptor.cuis_to_topics(surv)
+    return {"cuis": surv,
+            "topics": [{"tp": tp, "size": adaptor.topic_size(tp),
+                        "ic": round(adaptor.topic_anchor_ic(tp), 3),
+                        "label": adaptor.topic_label(tp)}
+                       for tp in sorted(tps, key=adaptor.topic_size)],
+            "topic_ids": list(tps)}
+
+def handle(req):
+    query = req["query"]
+    docs  = req["docs"]
+    q = text_to_topics(query)
+    di = {d: text_to_topics(t) for d, t in docs.items()}
+    q_ids = set(q.get("topic_ids", []))
+    doc_ids = {d: set(v.get("topic_ids", [])) for d, v in di.items()}
+    matches = adaptor.search(q_ids, doc_ids, top_k=10, rank_by="sum_inv_size")
+    return {"query_result": q, "doc_results": di, "matches": matches}
+
+
+if __name__ == "__main__":
+    addr = ("localhost", 6000)
+    listener = Listener(addr, authkey=b"cui")
+    print(f"Server ready on {addr}. Leave this running.")
+    while True:
+        conn = listener.accept()
+        try:
+            req = conn.recv()
+            conn.send(handle(req))
+        except EOFError:
+            pass
+        finally:
+            conn.close()
