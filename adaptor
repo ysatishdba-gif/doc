@@ -1,0 +1,82 @@
+# Search adaptor: matches precomputed query topic CUIs against precomputed
+# document topic CUIs. Pure set overlap on topic CUIs, with labels carried
+# through for readable output.
+
+from collections import defaultdict
+
+
+class SearchAdaptor:
+    """
+    Index: {doc_id: {topic_cui: label}} or {doc_id: iterable of topic_cuis}
+    Query: same shape as document entries
+    Match: set intersection on topic CUI, labels carried through.
+    """
+
+    def __init__(self, doc_topics):
+        """
+        doc_topics: {doc_id: {topic_cui: label}} OR {doc_id: iterable of topic_cuis}
+        Both shapes are accepted.
+        """
+        self._docs = {}
+        self._labels = {}   # topic_cui -> label
+
+        for doc_id, topics in doc_topics.items():
+            if isinstance(topics, dict):
+                self._docs[doc_id] = set(topics.keys())
+                for tcui, label in topics.items():
+                    self._labels[tcui] = label
+            else:
+                self._docs[doc_id] = set(topics)
+
+        # Inverted index: {topic_cui: set of doc_ids}
+        self._inverted = defaultdict(set)
+        for doc_id, topics in self._docs.items():
+            for t in topics:
+                self._inverted[t].add(doc_id)
+
+        print(f"SearchAdaptor: {len(self._docs):,} documents, "
+              f"{len(self._inverted):,} unique topic CUIs")
+
+    def search(self, query_topics, top_k=10):
+        """
+        query_topics: {topic_cui: label} OR iterable of topic CUIs
+        Returns list of dicts with shared/query/doc topics, each as
+        {topic_cui, topic_label} pairs for readable display.
+        """
+        if isinstance(query_topics, dict):
+            q = set(query_topics.keys())
+            for tcui, label in query_topics.items():
+                self._labels[tcui] = label
+        else:
+            q = set(query_topics)
+
+        if not q:
+            return []
+
+        # Candidates = docs sharing at least one topic
+        candidates = set()
+        for t in q:
+            candidates |= self._inverted.get(t, set())
+
+        results = []
+        for doc_id in candidates:
+            shared = q & self._docs[doc_id]
+            results.append({
+                "doc_id"       : doc_id,
+                "score"        : len(shared),
+                "shared_topics": [
+                    {"topic_cui": t, "topic_label": self._labels.get(t, t)}
+                    for t in sorted(shared)
+                ],
+                "query_topics" : [
+                    {"topic_cui": t, "topic_label": self._labels.get(t, t)}
+                    for t in sorted(q)
+                ],
+                "doc_topics"   : [
+                    {"topic_cui": t, "topic_label": self._labels.get(t, t)}
+                    for t in sorted(self._docs[doc_id])
+                ],
+            })
+
+        results.sort(key=lambda r: -r["score"])
+        return results[:top_k]
