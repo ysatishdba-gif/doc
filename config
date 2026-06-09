@@ -1,26 +1,6 @@
-import networkx as nx
-import time
-
-ROOT = 'SNOMEDCT_US.isa'
-
-# 1. extract the suffixed isa subgraph ONCE (small, should be a clean DAG)
-t0 = time.time()
-isa_sub_nodes = nx.descendants(netw, ROOT) | {ROOT}
-H = netw.subgraph(isa_sub_nodes).copy()
-print(f"isa subgraph H: {H.number_of_nodes():,} nodes, "
-      f"{H.number_of_edges():,} edges  ({time.time()-t0:.0f}s)")
-
-# 2. is it a clean DAG now? (should be True on the SUFFIXED graph)
-print("is DAG:", nx.is_directed_acyclic_graph(H))
-
-# 3. test descendant counts — collapse suffixes only at the END
-for cui, name in [("C0032285", "Pneumonia"),
-                  ("C0011849", "Diabetes"),
-                  ("C0559470", "Peanut allergy"),
-                  ("C0006277", "Bronchitis")]:
-    desc = set()
-    for s in netw.successors(cui):
-        if s in H:
-            desc |= nx.descendants(H, s)
-    base = {d.split('-')[0] for d in desc if '-' in d} - {cui}
-    print(f"  {name:16s} desc={len(base):>5}")
+isa subgraph H: 18,279,961 nodes, 18,279,960 edges  (412s)
+is DAG: True
+  Pneumonia        desc=  183
+  Diabetes         desc=  127
+  Peanut allergy   desc=    0
+  Bronchitis       desc=  116
