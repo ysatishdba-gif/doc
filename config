@@ -1,7 +1,16 @@
-import requests, subprocess
+import requests, subprocess, shutil
+
 API_URL = "https://<paste-your-url-here>"
-GCLOUD = r'C:\Users\M271333\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd'
-token = subprocess.run([GCLOUD, "auth", "print-identity-token"], stdout=subprocess.PIPE, universal_newlines=True).stdout.strip()
-r = requests.post(API_URL, headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}, json={"cluster_set": "umls", "text_list": ["pneumonia"], "context_list": ["pneumonia"], "top_k": 5, "top_p": 30, "combined": True}, timeout=60)
+
+# find gcloud automatically (PATH), fall back to common names
+gcloud_cmd = shutil.which("gcloud") or shutil.which("gcloud.cmd") or "gcloud"
+token = subprocess.run([gcloud_cmd, "auth", "print-identity-token"],
+                       stdout=subprocess.PIPE, universal_newlines=True).stdout.strip()
+print("token length:", len(token))   # 0 = gcloud not found / not authed
+
+r = requests.post(API_URL,
+    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    json={"cluster_set": "umls", "text_list": ["pneumonia"], "context_list": ["pneumonia"],
+          "top_k": 5, "top_p": 30, "combined": True}, timeout=60)
 print("STATUS:", r.status_code)
 print("BODY:", r.text[:800])
