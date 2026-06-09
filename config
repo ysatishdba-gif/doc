@@ -1,1 +1,75 @@
-WARNING:root:LLM call failed for QueryExpansionOutput (ClientError) after retry; using fallback: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'Publisher Model `projects/aif-usr-p/locations/us-central1/publishers/google/models/gemini-2.0-flash` was not found or your project do
+def _trace_one(text):
+    """Full structured trace for one text blob. No printing here — the
+    client prints. Atomic+path CUIs unioned, summarized once."""
+    tr = {"text": text}
+
+    full = pipeline.run(query=text, output_format="full_pipeline")
+    tr["expanded"] = full.get("expanded_query", "")
+    tr["is_clinical"] = full.get("is_clinical", False)
+    if not tr["is_clinical"]:
+        tr["reason"] = full.get("reason")
+        return tr
+
+    # PASS 1 structure + PASS 2 extraction
+    intents_view = []
+    cuis, seen = [], set()
+    for it in full.get("intents", []):
+        iv = {"intent": it.get("intent_title",""),
+              "nature": it.get("nature",""),
+              "description": it.get("description",""),
+              "sub_natures": []}
+        for sn in it.get("sub_natures", []):
+            path = sn.get("category_path","")
+            atoms = sn.get("atomic_concepts",[]) or []
+            snv = {"path": path, "atomic": list(atoms),
+                   "path_cuis": [], "atomic_cuis": []}
+            # path segments
+            for seg in split_path(path):
+                got = flat(extractor.extract([seg],[seg]))
+                snv["path_cuis"].append({"text": seg, "cuis": got})
+                for c in got:
+                    if c not in seen: seen.add(c); cuis.append(c)
+            # atomic concepts
+            for a in atoms:
+                a = (a or "").strip()
+                if not a: continue
+                got = flat(extractor.extract([a],[a]))
+                snv["atomic_cuis"].append({"text": a, "cuis": got})
+                for c in got:
+                    if c not in seen: seen.add(c); cuis.append(c)
+            iv["sub_natures"].append(snv)
+        intents_view.append(iv)
+    tr["intents"] = intents_view
+    tr["extracted_cuis"] = list(cuis)
+
+    if not cuis:
+        tr["surviving"] = []; tr["topics"] = []; tr["topic_ids"] = []
+        return tr
+
+    # PASS 2 summarize (union, once)
+    summ = summarizer.summarize(cuis, sources=["SNOMEDCT_US"])
+    tr["metrics"] = summ.get("metrics", {})
+    tr["surviving"] = [{"cui": r["cui"], "term": r.get("preferred_term", r["cui"]),
+                        "ic": r.get("ic", 0.0)} for r in summ["surviving_cuis"]]
+    tr["removed"] = [{"cui": r["cui"], "term": r.get("preferred_term", r["cui"]),
+                      "by": r.get("retained_by",""), "reason": r.get("reason","")}
+                     for r in summ.get("removed_cuis", [])]
+
+    # PASS 3 topics via adaptor
+    surv = [r["cui"] for r in summ["surviving_cuis"]]
+    tps = adaptor.cuis_to_topics(surv)
+    tr["topics"] = [{"tp": tp, "size": adaptor.topic_size(tp),
+                     "ic": round(adaptor.topic_anchor_ic(tp),3),
+                     "label": adaptor.topic_label(tp)}
+                    for tp in sorted(tps, key=adaptor.topic_size)]
+    tr["topic_ids"] = list(tps)
+    return tr
+
+
+def handle(req):
+    q = _trace_one(req["query"])
+    di = {d: _trace_one(t) for d, t in req["docs"].items()}
+    q_ids = set(q.get("topic_ids", []))
+    doc_ids = {d: set(v.get("topic_ids", [])) for d, v in di.items()}
+    matches = adaptor.search(q_ids, doc_ids, top_k=10, rank_by="sum_inv_size")
+    return {"query_result": q, "doc_results": di, "matches": matches}
