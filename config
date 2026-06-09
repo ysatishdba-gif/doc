@@ -1,11 +1,7 @@
-# Topics artifact (built by build_topics.py). Loaded if present; the build
-# script checks this flag and only rebuilds when missing.
-topics = None
-TOPICS_AVAILABLE = os.path.exists(TOPICS_PATH)
-if TOPICS_AVAILABLE:
-    with open(TOPICS_PATH, "rb") as f:
-        topics = pickle.load(f)
-    print(f"Config: topics.pkl loaded "
-          f"({len(topics.get('topic_id_to_topic', {})):,} topics)")
-else:
-    print(f"Config: {TOPICS_PATH} not found — run build_topics.py to create it")
+if __name__ == "__main__":
+    import os
+    if os.path.exists(OUTPUT_PATH):
+        print(f"{OUTPUT_PATH} already exists — skipping build. "
+              f"Delete it to force a rebuild.")
+    else:
+        main()
