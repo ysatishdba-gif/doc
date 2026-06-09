@@ -1,26 +1,36 @@
-import networkx as nx
-import time
-
-ROOT = 'SNOMEDCT_US.isa'
+import math
 
 t0 = time.time()
 
-# all nodes under the isa root (the hierarchy universe)
-isa_nodes = nx.descendants(netw, ROOT)
-print(f"nodes under isa root: {len(isa_nodes):,}  ({time.time()-t0:.0f}s)")
+# descendants count for every node, computed once via reverse topological order
+# (so each node reuses its children's already-computed descendant sets)
+desc_count = {}
+if nx.is_directed_acyclic_graph(G):
+    order = list(nx.topological_sort(G))
+    desc_sets = {}
+    for n in reversed(order):           # specific -> general
+        s = set()
+        for child in G.successors(n):   # successors = more specific
+            s.add(child)
+            s |= desc_sets.get(child, set())
+        desc_sets[n] = s
+        desc_count[n] = len(s)
+    print(f"descendants computed for {len(desc_count):,} nodes "
+          f"({time.time()-t0:.0f}s)")
+else:
+    print("WARNING: isa graph has cycles — will handle with DFS+visited instead")
 
-# Build a clean CUI-level isa DiGraph: parent_cui -> child_cui
-# Edges in netw under the isa root go root -> ... -> general -> specific.
-# We collapse suffix-bridge nodes to base CUIs.
-t0 = time.time()
-G = nx.DiGraph()
-for u, v in netw.subgraph(isa_nodes | {ROOT}).edges():
-    cu = u.split('-')[0] if isinstance(u, str) and '-' in u else u
-    cv = v.split('-')[0] if isinstance(v, str) and '-' in v else v
-    if cu == ROOT or cv == ROOT:
-        continue
-    if cu != cv:
-        G.add_edge(cu, cv)        # cu (more general) -> cv (more specific)
+# IC
+TOTAL = G.number_of_nodes()
+log_total = math.log(TOTAL + 1)
+ic = {n: 1.0 - math.log(desc_count.get(n, 0) + 1) / log_total for n in G.nodes()}
 
-print(f"isa CUI graph: {G.number_of_nodes():,} nodes, "
-      f"{G.number_of_edges():,} edges  ({time.time()-t0:.0f}s)")
+# parents = predecessors in G (more general); ancestors = nx.ancestors(G, cui)
+print(f"IC done. TOTAL={TOTAL:,}")
+
+# sanity check
+for cui, name in [("C0032285","Pneumonia"), ("C0011849","Diabetes"),
+                  ("C0559470","Peanut allergy"), ("C0006277","Bronchitis")]:
+    if cui in G:
+        print(f"  {name:16s} desc={desc_count.get(cui,0):>5}  IC={ic[cui]:.3f}  "
+              f"parents={list(G.predecessors(cui))[:5]}")
