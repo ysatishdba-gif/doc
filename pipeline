@@ -1,0 +1,274 @@
+from copy import deepcopy
+from typing import Any
+
+from config import (
+    API_URL, TOP_K, TOP_P, CLUSTER_SET, COMBINED,
+    PROJECT_ID, LOCATION, MODEL_VERSION,
+)
+from intents import ContextualIntentPipeline
+from cui_core import CUIExtractor
+from cui_summarizer import CUISummarizer
+from cui_topics import CUITopics
+from topic_labeler import TopicLabeler
+from siblingreach_compare import SiblingReachGrouper
+
+
+SIGNAL_FIELDS = (
+    "document_types",
+    "author_roles",
+    "temporal_signals",
+    "content_signals",
+    "clinical_setting",
+)
+
+
+def _split_path(path):
+    return [s.strip() for s in path.split(">>") if s.strip()]
+
+
+def _flatten_cuis(raw):
+    out, seen = [], set()
+    for phrase_data in raw.values():
+        for cid in phrase_data.get("cuis", {}):
+            if cid and cid not in seen:
+                seen.add(cid)
+                out.append(cid)
+    return out
+
+
+class PipelineResult:
+    """Output of one pipeline run.
+
+    .to_dict() returns a JSON-friendly view. By default path segments
+    show only summarized CUIs. .with_raw_path_cuis() returns a variant
+    that also includes the raw input CUIs per segment.
+    """
+
+    def __init__(self, query, is_clinical, intents, topics,
+                 error=None, _path_raw=None):
+        self.query = query
+        self.is_clinical = is_clinical
+        self.intents = intents
+        self.topics = topics
+        self.error = error
+        self._path_raw = _path_raw or {}
+        self._include_raw = False
+
+    def with_raw_path_cuis(self):
+        clone = PipelineResult(
+            self.query, self.is_clinical, self.intents, self.topics,
+            self.error, self._path_raw,
+        )
+        clone._include_raw = True
+        return clone
+
+    def to_dict(self):
+        if self.error:
+            return {
+                "query": self.query,
+                "is_clinical": self.is_clinical,
+                "error": self.error,
+            }
+
+        intents = deepcopy(self.intents)
+
+        if self._include_raw:
+            for i, intent in enumerate(intents):
+                for j, sn in enumerate(intent.get("sub_natures", [])):
+                    for seg in sn.get("path_segments", []):
+                        key = f"{i}::{j}::{seg['segment']}"
+                        seg["input_cuis"] = list(self._path_raw.get(key, []))
+
+        return {
+            "query": self.query,
+            "is_clinical": self.is_clinical,
+            "intents": intents,
+            "topics": self.topics,
+        }
+
+
+class ClinicalQueryPipeline:
+    """Long-lived pipeline. Instantiate once, call run() per query, close()
+    at shutdown. Components are not all thread-safe; gate run() with a
+    lock or use one instance per worker if serving concurrently.
+    """
+
+    def __init__(self, siblingreach_pickle="cui_topic_lookup.pkl"):
+        self._pipeline = ContextualIntentPipeline(
+            project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION,
+        )
+        self._extractor = CUIExtractor(
+            API_URL, top_k=TOP_K, top_p=TOP_P,
+            cluster_set=CLUSTER_SET, combined=COMBINED,
+        )
+        self._summarizer = CUISummarizer()
+        self._topics_mod = CUITopics()
+        self._labeler = TopicLabeler()
+        self._grouper = SiblingReachGrouper(siblingreach_pickle)
+        self._closed = False
+
+    def run(self, query):
+        if self._closed:
+            raise RuntimeError("pipeline is closed")
+
+        out = self._pipeline.run(query=query, output_format="full_pipeline")
+
+        if "error" in out:
+            return PipelineResult(query, False, [], {}, error=out["error"])
+
+        if not out.get("is_clinical"):
+            return PipelineResult(query, False, [], {}, error=out.get("reason"))
+
+        intents_out = []
+        path_raw = {}
+        for i, intent in enumerate(out.get("intents", [])):
+            data, raw = self._process_intent(intent, i)
+            intents_out.append(data)
+            path_raw.update(raw)
+
+        topics = self._build_topics(intents_out)
+
+        return PipelineResult(query, True, intents_out, topics, _path_raw=path_raw)
+
+    def close(self):
+        if self._closed:
+            return
+        for c in (self._summarizer, self._topics_mod, self._labeler):
+            try:
+                c.close()
+            except Exception:
+                pass
+        self._closed = True
+
+    def _process_intent(self, intent, intent_idx):
+        sub_natures = intent.get("sub_natures", []) or []
+        atomic_cuis, atomic_seen = [], set()
+        sub_natures_out = []
+        path_raw = {}
+
+        for sn_idx, sn in enumerate(sub_natures):
+            path = sn.get("category_path", "")
+            atoms = sn.get("atomic_concepts", []) or []
+
+            seg_inputs = {}
+            sn_path_cuis, sn_path_seen = [], set()
+
+            for seg in _split_path(path):
+                cuis = self._extract([seg])
+                seg_inputs[seg] = cuis
+                path_raw[f"{intent_idx}::{sn_idx}::{seg}"] = list(cuis)
+                for c in cuis:
+                    if c not in sn_path_seen:
+                        sn_path_seen.add(c)
+                        sn_path_cuis.append(c)
+
+            if sn_path_cuis:
+                s = self._summarizer.summarize(sn_path_cuis, sources=["SNOMEDCT_US"])
+                summarized_path = [c["cui"] for c in s["surviving_cuis"]]
+            else:
+                summarized_path = []
+
+            for concept in atoms:
+                concept = (concept or "").strip()
+                if not concept:
+                    continue
+                for c in self._extract([concept]):
+                    if c not in atomic_seen:
+                        atomic_seen.add(c)
+                        atomic_cuis.append(c)
+
+            sub_natures_out.append({
+                "category_path": path,
+                "atomic_concepts": list(atoms),
+                "path_segments": [
+                    {"segment": seg, "input_count": len(seg_inputs[seg])}
+                    for seg in seg_inputs
+                ],
+                "path_segment_summary": {
+                    "input_cui_count": len(sn_path_cuis),
+                    "output_cui_count": len(summarized_path),
+                    "summarized_cuis": summarized_path,
+                },
+            })
+
+        if atomic_cuis:
+            s = self._summarizer.summarize(atomic_cuis, sources=["SNOMEDCT_US"])
+            atomic_surviving = s["surviving_cuis"]
+        else:
+            atomic_surviving = []
+
+        return {
+            "intent_title": intent.get("intent_title", ""),
+            "nature": intent.get("nature", ""),
+            "description": intent.get("description", ""),
+            "sub_natures": sub_natures_out,
+            "atomic_surviving_cuis": atomic_surviving,
+            "signal_cuis_by_field": self._signal_cuis(intent),
+        }, path_raw
+
+    def _build_topics(self, intents):
+        all_cuis, seen = [], set()
+        for intent in intents:
+            for c in intent.get("atomic_surviving_cuis", []):
+                if c["cui"] not in seen:
+                    seen.add(c["cui"])
+                    all_cuis.append(c)
+
+        if not all_cuis:
+            return {"hierarchy": [], "embedding": [], "siblingreach": []}
+
+        cui_ids = [c["cui"] for c in all_cuis]
+        ic_map = {c["cui"]: c.get("ic", 0.0) for c in all_cuis}
+        term_map = {c["cui"]: c.get("preferred_term", c["cui"]) for c in all_cuis}
+
+        topics = {}
+        for strategy in ("hierarchy", "embedding"):
+            try:
+                t = self._topics_mod.build_topics(cui_ids, strategy=strategy)
+                topics[strategy] = self._labeler.relabel(t, ic_map=ic_map)
+            except Exception as e:
+                topics[strategy] = {"error": str(e)}
+
+        try:
+            topics["siblingreach"] = self._grouper.group(
+                cui_ids, ic_map=ic_map, term_map=term_map, min_members=1,
+            )
+        except Exception as e:
+            topics["siblingreach"] = {"error": str(e)}
+
+        return topics
+
+    def _extract(self, texts):
+        return _flatten_cuis(self._extractor.extract(texts, texts))
+
+    def _signal_cuis(self, intent):
+        # Collect signal terms unioned across candidates and the intent
+        terms_per_field = {f: set() for f in SIGNAL_FIELDS}
+
+        for fc in intent.get("final_candidates", []) or []:
+            sigs = fc.get("retrieval_signals", {}) or {}
+            for f in SIGNAL_FIELDS:
+                terms_per_field[f].update(v for v in (sigs.get(f) or []) if v)
+
+        for f in SIGNAL_FIELDS:
+            for v in (intent.get("retrieval_signals", {}) or {}).get(f, []) or []:
+                if v:
+                    terms_per_field[f].add(v)
+
+        out = {}
+        for f in SIGNAL_FIELDS:
+            terms = sorted(terms_per_field[f])
+            out[f] = self._extract(terms) if terms else []
+        return out
+
+
+def run_pipeline(query, include_raw_path_cuis=False):
+    """One-shot run. Pays full instantiation cost each call."""
+    pipe = ClinicalQueryPipeline()
+    try:
+        result = pipe.run(query)
+        if include_raw_path_cuis:
+            result = result.with_raw_path_cuis()
+        return result.to_dict()
+    finally:
+        pipe.close()
