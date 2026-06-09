@@ -1,11 +1,83 @@
-QUERY: 'Do you have olon cancer'
+def text_to_topics(text):
+    """Returns full trace dict for one text blob."""
+    trace = {"text": text, "steps": []}
 
-DOC doc1:
+    full = pipeline.run(query=text, output_format="full_pipeline")
 
-DOC doc2:
+    if not full.get("is_clinical"):
+        trace["non_clinical"] = full.get("reason")
+        return trace
 
-DOC doc3:
+    # --- nature breakdown ---
+    trace["expanded"] = full.get("expanded_query", "")
+    intents_view = []
+    cuis, seen = [], set()
+    per_concept = []   # (intent, kind, text, [cuis])
 
-############################################################
-MATCH
-############################################################
+    for it in full.get("intents", []):
+        iv = {"intent": it.get("intent_title", ""),
+              "nature": it.get("nature", ""),
+              "sub_natures": []}
+        for sn in it.get("sub_natures", []):
+            path = sn.get("category_path", "")
+            atoms = sn.get("atomic_concepts", []) or []
+            iv["sub_natures"].append({"path": path, "atomic": list(atoms)})
+
+            # path segments
+            for seg in split_path(path):
+                got = flat(extractor.extract([seg], [seg]))
+                per_concept.append({"intent": it.get("intent_title",""),
+                                    "kind": "path", "text": seg, "cuis": got})
+                for c in got:
+                    if c not in seen: seen.add(c); cuis.append(c)
+            # atomic concepts
+            for a in atoms:
+                a = (a or "").strip()
+                if not a: continue
+                got = flat(extractor.extract([a], [a]))
+                per_concept.append({"intent": it.get("intent_title",""),
+                                    "kind": "atomic", "text": a, "cuis": got})
+                for c in got:
+                    if c not in seen: seen.add(c); cuis.append(c)
+        intents_view.append(iv)
+
+    trace["intents"] = intents_view
+    trace["per_concept"] = per_concept
+    trace["extracted_cuis"] = list(cuis)
+
+    if not cuis:
+        trace["surviving"] = []
+        trace["topics"] = []
+        trace["topic_ids"] = []
+        return trace
+
+    # --- summarize ---
+    summ = summarizer.summarize(cuis, sources=["SNOMEDCT_US"])
+    surv = [r["cui"] for r in summ["surviving_cuis"]]
+    trace["surviving"] = [{"cui": r["cui"],
+                           "term": r.get("preferred_term", r["cui"]),
+                           "ic": r.get("ic", 0.0)}
+                          for r in summ["surviving_cuis"]]
+    trace["removed"] = [{"cui": r["cui"], "term": r.get("preferred_term", r["cui"]),
+                         "by": r.get("retained_by",""), "reason": r.get("reason","")}
+                        for r in summ.get("removed_cuis", [])]
+
+    # --- topics ---
+    tps = adaptor.cuis_to_topics(surv)
+    trace["topics"] = [{"tp": tp, "size": adaptor.topic_size(tp),
+                        "ic": round(adaptor.topic_anchor_ic(tp), 3),
+                        "label": adaptor.topic_label(tp)}
+                       for tp in sorted(tps, key=adaptor.topic_size)]
+    trace["topic_ids"] = list(tps)
+    return trace
+
+
+def handle(req):
+    query = req["query"]
+    docs  = req["docs"]
+    q = text_to_topics(query)
+    di = {d: text_to_topics(t) for d, t in docs.items()}
+    q_ids = set(q.get("topic_ids", []))
+    doc_ids = {d: set(v.get("topic_ids", [])) for d, v in di.items()}
+    matches = adaptor.search(q_ids, doc_ids, top_k=10, rank_by="sum_inv_size")
+    return {"query_result": q, "doc_results": di, "matches": matches}
