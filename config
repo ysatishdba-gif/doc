@@ -1,1 +1,7 @@
-import config, os; print(config.HIERARCHY_PATH); print(os.path.exists(config.HIERARCHY_PATH)); print(type(config.hierarchy))
+>>> import config, os; print(config.HIERARCHY_PATH); print(os.path.exists(config.HIERARCHY_PATH)); print(type(config.hierarchy))
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "C:\cuisummary\config.py", line 31, in <module>
+    hierarchy = pickle.load(f)
+                ^^^^^^^^^^^^^^
+_pickle.UnpicklingError: pickle data was truncated
