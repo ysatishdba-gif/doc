@@ -1,1 +1,1 @@
-from config import API_URL; print(repr(API_URL))
+print([l for l in open("config.py") if "API_URL" in l])
