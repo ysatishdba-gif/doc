@@ -1,34 +1,12 @@
 """
 test_manual.py
 --------------
-End-to-end manual-text test, query side and document side identical.
-
-Flow per text blob (text_to_topics):
-    text
-      -> LLM pipeline: expand -> intents -> sub_natures (path + atomic)   [ContextualIntentPipeline]
-      -> CUI extraction per path segment AND atomic concept              [CUIExtractor, real API]
-      -> CUISummarizer: metadata/IC/SAB/hierarchy/embedding dedup        [real, BigQuery]
-      -> TopicAdaptor.cuis_to_topics -> set of tp_<hash>                 [topics.pkl]
-
-Then: adaptor matches query topic-IDs vs each doc topic-IDs, ALL scores reported.
-
-PREREQS:
-  - config filled: PROJECT_ID, DATASET_ID, EMBEDDING_TABLE, API_URL
-  - topics.pkl present (from build_topics.py)
-  - BigQuery access (CUISummarizer) + gcloud auth (CUIExtractor)
+Single re-runnable cell. Requires artifacts.init() to have been run once.
+Edit `query` / `doc_texts`, re-run this whole file as one cell.
 """
 
 import time
-
-from config import (
-    PROJECT_ID, LOCATION, MODEL_VERSION,
-    API_URL, TOP_K, TOP_P, CLUSTER_SET, COMBINED,
-)
-from intents import ContextualIntentPipeline
-from cui_core import CUIExtractor
-from cui_summarizer import CUISummarizer
-
-from topic_adaptor import TopicAdaptor
+import artifacts
 
 
 def split_path(path):
@@ -36,52 +14,42 @@ def split_path(path):
 
 
 def _flatten_cuis(raw):
-    """raw: {phrase: {"cuis": {cui: distance}}} -> ordered unique cui list."""
     out, seen = [], set()
-    for phrase_data in raw.values():
-        for cui in phrase_data.get("cuis", {}):
+    for d in raw.values():
+        for cui in d.get("cuis", {}):
             if cui and cui not in seen:
                 seen.add(cui)
                 out.append(cui)
     return out
 
 
-def text_to_topics(text, pipeline, extractor, summarizer, adaptor, label):
-    """One text blob -> set of topic IDs. Path + atomic CUIs both summarized
-    (matches pipeline.py _process_intent)."""
-    print(f"\n{'='*72}\n{label}: {text!r}\n{'='*72}")
+def text_to_topics(text, label="TEXT"):
+    pipeline   = artifacts.pipeline
+    extractor  = artifacts.extractor
+    summarizer = artifacts.summarizer
+    adaptor    = artifacts.adaptor
 
+    print(f"\n{'='*72}\n{label}: {text!r}\n{'='*72}")
     full = pipeline.run(query=text, output_format="full_pipeline")
     if not full.get("is_clinical", False):
         print(f"  non-clinical: {full.get('reason')}")
         return set(), []
 
     cuis, cseen = [], set()
-
     for intent in full.get("intents", []):
         for sn in intent.get("sub_natures", []):
-            path  = sn.get("category_path", "")
-            atoms = sn.get("atomic_concepts", []) or []
-
-            # path segments
-            for seg in split_path(path):
-                raw = extractor.extract([seg], [seg])
-                for cui in _flatten_cuis(raw):
+            for seg in split_path(sn.get("category_path", "")):
+                for cui in _flatten_cuis(extractor.extract([seg], [seg])):
                     if cui not in cseen:
-                        cseen.add(cui)
-                        cuis.append(cui)
+                        cseen.add(cui); cuis.append(cui)
                         print(f"    [path]   {seg!r:30s} -> {cui}")
-
-            # atomic concepts
-            for c in atoms:
+            for c in (sn.get("atomic_concepts", []) or []):
                 c = (c or "").strip()
                 if not c:
                     continue
-                raw = extractor.extract([c], [c])
-                for cui in _flatten_cuis(raw):
+                for cui in _flatten_cuis(extractor.extract([c], [c])):
                     if cui not in cseen:
-                        cseen.add(cui)
-                        cuis.append(cui)
+                        cseen.add(cui); cuis.append(cui)
                         print(f"    [atomic] {c!r:30s} -> {cui}")
 
     print(f"  extracted CUIs ({len(cuis)}): {cuis}")
@@ -89,61 +57,51 @@ def text_to_topics(text, pipeline, extractor, summarizer, adaptor, label):
         return set(), []
 
     t = time.time()
-    s = summarizer.summarize(cuis, sources=["SNOMEDCT_US"])
+    summ = summarizer.summarize(cuis, sources=["SNOMEDCT_US"])
     print(f"  summarize: {time.time()-t:.1f}s")
-    surviving = [r["cui"] for r in s["surviving_cuis"]]
-    print(f"  surviving after summarize ({len(surviving)}): {surviving}")
+    surviving = [r["cui"] for r in summ["surviving_cuis"]]
+    print(f"  surviving ({len(surviving)}): {surviving}")
 
     tp_ids = adaptor.cuis_to_topics(surviving)
     print(f"  topic IDs ({len(tp_ids)}):")
-    for tp in sorted(tp_ids, key=lambda t: adaptor.topic_size(t)):
+    for tp in sorted(tp_ids, key=lambda x: adaptor.topic_size(x)):
         print(f"      {tp}  size={adaptor.topic_size(tp):>4}  "
-              f"IC={adaptor.topic_anchor_ic(tp):.3f}  "
-              f"'{adaptor.topic_label(tp)}'")
+              f"IC={adaptor.topic_anchor_ic(tp):.3f}  '{adaptor.topic_label(tp)}'")
     return tp_ids, surviving
 
 
-if __name__ == "__main__":
-    pipeline   = ContextualIntentPipeline(
-        project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION)
-    extractor  = CUIExtractor(
-        API_URL, top_k=TOP_K, top_p=TOP_P,
-        cluster_set=CLUSTER_SET, combined=COMBINED)
-    summarizer = CUISummarizer()
-    adaptor    = TopicAdaptor("topics.pkl")
-
-    # ---------------- QUERY ----------------
-    query_text = "Do you have constipation or diarrhea?"
-    q_topics, q_cuis = text_to_topics(
-        query_text, pipeline, extractor, summarizer, adaptor, "QUERY")
-
-    # ---------------- DOCUMENTS (manual blobs) ----------------
-    doc_texts = {
-        "doc1": "Patient presents with chronic constipation and abdominal pain.",
-        "doc2": "History of pneumonia and respiratory infection.",
-        "doc3": "Screening for colon cancer and rectal cancer.",
-    }
-    doc_index = {}
-    for did, dtext in doc_texts.items():
-        tps, _ = text_to_topics(
-            dtext, pipeline, extractor, summarizer, adaptor, f"DOC {did}")
-        doc_index[did] = tps
-
-    # ---------------- MATCH (all scores reported) ----------------
+def report_matches(q_topics, doc_index, top_k=10, rank_by="sum_inv_size"):
+    adaptor = artifacts.adaptor
     print(f"\n{'#'*72}\nMATCH RESULTS (all metrics)\n{'#'*72}")
-    results = adaptor.search(q_topics, doc_index, top_k=10, rank_by="sum_inv_size")
+    results = adaptor.search(q_topics, doc_index, top_k=top_k, rank_by=rank_by)
     if not results:
         print("  no documents shared any topic with the query.")
+        return results
     for r in results:
         print(f"\n  {r['doc_id']}:")
         print(f"    count={r['count']}  min_inv_size={r['min_inv_size']}  "
               f"sum_inv_size={r['sum_inv_size']}  "
               f"max_anchor_ic={r['max_anchor_ic']}  "
               f"sum_anchor_ic={r['sum_anchor_ic']}")
-        print(f"    shared topics:")
         for sh in r["shared"]:
             print(f"      {sh['tp_id']}  size={sh['size']:>4}  "
                   f"IC={sh['anchor_ic']}  '{sh['label']}'")
+    return results
 
-    summarizer.close()
-    print("\nDone.")
+
+# ===========================================================================
+# EDIT THESE, RE-RUN THE WHOLE CELL
+# ===========================================================================
+
+query = "Do you have constipation or diarrhea?"
+
+doc_texts = {
+    "doc1": "Patient presents with chronic constipation and abdominal pain.",
+    "doc2": "History of pneumonia and respiratory infection.",
+    "doc3": "Screening for colon cancer and rectal cancer.",
+}
+
+# ---- run ----
+q_topics, _ = text_to_topics(query, "QUERY")
+doc_index = {did: text_to_topics(t, f"DOC {did}")[0] for did, t in doc_texts.items()}
+report_matches(q_topics, doc_index)
