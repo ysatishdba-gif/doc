@@ -1,5 +1,1 @@
-import config
-print(config.HIERARCHY_PATH)
-import os
-print(os.path.exists(config.HIERARCHY_PATH))
-print(type(config.hierarchy))
+import config, os; print(config.HIERARCHY_PATH); print(os.path.exists(config.HIERARCHY_PATH)); print(type(config.hierarchy))
