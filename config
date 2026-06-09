@@ -1,7 +1,92 @@
-if __name__ == "__main__":
-    import os
-    if os.path.exists(OUTPUT_PATH):
-        print(f"{OUTPUT_PATH} already exists — skipping build. "
-              f"Delete it to force a rebuild.")
-    else:
-        main()
+"""
+artifacts.py
+------------
+Loads all heavy pickles ONCE per process and caches them. Import anywhere;
+every importer in the same kernel shares the same loaded objects.
+
+Usage in notebook (run once at the top of your session):
+    import artifacts
+    artifacts.load_all()
+
+Then everything else (config, TopicAdaptor, CUISummarizer) reuses the
+cached objects for the rest of the kernel's life. No reloading.
+"""
+
+import os
+import pickle
+import time
+import networkx
+
+# ---- artifact paths (single source of truth) ----
+HIERARCHY_PATH   = "networkx_cui_context_v1_3_0.pkl"
+IC_PATH          = "ic_precomputed.pkl"
+MEDLINEPLUS_PATH = "medlineplus.pkl"
+TOPICS_PATH      = "topics.pkl"
+
+_CACHE = {}
+
+
+def _load_once(key, path, required=True, validate=None):
+    """Load a pickle once; subsequent calls return the cached object."""
+    if key in _CACHE:
+        return _CACHE[key]
+    if not os.path.exists(path):
+        if required:
+            raise FileNotFoundError(f"{path} not found")
+        print(f"[artifacts] {path} not found — skipping (optional)")
+        _CACHE[key] = None
+        return None
+    t0 = time.time()
+    with open(path, "rb") as f:
+        obj = pickle.load(f)
+    if validate:
+        validate(obj)
+    _CACHE[key] = obj
+    print(f"[artifacts] loaded {path} ({time.time()-t0:.1f}s)")
+    return obj
+
+
+# ---- accessors (load-on-first-access, then cached) ----
+
+def hierarchy():
+    return _load_once(
+        "hierarchy", HIERARCHY_PATH,
+        validate=lambda o: isinstance(o, networkx.DiGraph),
+    )
+
+def ic():
+    return _load_once(
+        "ic", IC_PATH,
+        validate=lambda o: isinstance(o, dict) and len(o) > 0,
+    )
+
+def medlineplus():
+    return _load_once("medlineplus", MEDLINEPLUS_PATH, required=False) or {}
+
+def topics():
+    return _load_once("topics", TOPICS_PATH, required=False)
+
+
+def load_all():
+    """Load every artifact once. Safe to call repeatedly — cached.
+    Call this at the start of your notebook session."""
+    h = hierarchy()
+    i = ic()
+    m = medlineplus()
+    t = topics()
+    print(f"[artifacts] ready: "
+          f"hierarchy={h.number_of_nodes():,} nodes | "
+          f"ic={len(i):,} | "
+          f"medlineplus={len(m)} | "
+          f"topics={len(t['topic_id_to_topic']) if t else 0}")
+    return _CACHE
+
+
+def is_loaded(key):
+    return key in _CACHE
+
+
+def clear():
+    """Drop the cache (forces reload on next access). Rarely needed."""
+    _CACHE.clear()
+    print("[artifacts] cache cleared")
