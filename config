@@ -1,1 +1,1 @@
-641139967
+>>> exec(open("test_manual.py").read())
