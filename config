@@ -1,11 +1,56 @@
-target_node = 'C0559470'
-root = 'SNOMEDCT_US.isa'
-all_ancestor_paths = []
-ancestors = []
-for node in netw.successors(target_node):
-    print(node)
-    if nx.has_path(netw, root, node): 
-        ancestors.extend(list(nx.ancestors(netw, node)))
-        path = list(nx.shortest_path(netw, source=root, target=node))
-        all_ancestor_paths.append(path)
-ancestors = list(set([ele.split('-')[0] for ele in ancestors if '-' in ele]))
+import networkx as nx
+import math
+
+# netw = your network DiGraph (already loaded)
+ROOT = 'SNOMEDCT_US.isa'
+
+def clean(nodes):
+    """strip the -suffix, keep base CUIs, drop the root itself."""
+    out = set()
+    for n in nodes:
+        if isinstance(n, str) and '-' in n:
+            out.add(n.split('-')[0])
+    return out
+
+def cui_isa_nodes(cui):
+    """the suffix-bridge nodes of `cui` that sit under the isa root."""
+    nodes = []
+    for s in netw.successors(cui):
+        if nx.has_path(netw, ROOT, s):
+            nodes.append(s)
+    return nodes
+
+def ancestors_of(cui):
+    """is-a ancestors (more general concepts above cui)."""
+    anc = set()
+    for node in cui_isa_nodes(cui):
+        anc |= set(nx.ancestors(netw, node))
+    return clean(anc)
+
+def descendants_of(cui):
+    """is-a descendants (more specific concepts below cui)."""
+    desc = set()
+    for node in cui_isa_nodes(cui):
+        desc |= set(nx.descendants(netw, node))
+    return clean(desc)
+
+
+# ---- TEST on a few known concepts ----
+TESTS = {
+    "C0032285": "Pneumonia",
+    "C0011849": "Diabetes mellitus",
+    "C0559470": "Allergy to peanut",
+    "C0006277": "Bronchitis",
+}
+
+for cui, name in TESTS.items():
+    if cui not in netw:
+        print(f"\n{cui} {name}: NOT in network"); continue
+    anc = ancestors_of(cui)
+    desc = descendants_of(cui)
+    print(f"\n{cui}  {name}")
+    print(f"  ancestors  : {len(anc)}")
+    print(f"  descendants: {len(desc)}")
+    # show a few ancestors (should be MORE GENERAL: pneumonia -> lung infection -> disease)
+    print(f"  sample ancestors  : {list(anc)[:8]}")
+    print(f"  sample descendants: {list(desc)[:8]}")
