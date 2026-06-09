@@ -1,3 +1,58 @@
-!gsutil cp gs://your-bucket/path/reconstructed_obj.pkl .
-!gsutil cp gs://your-bucket/path/sampling_1_stats.pkl .
-!gsutil cp gs://your-bucket/path/*.pdf .
+import os, pickle
+
+def banner(t): print("\n"+"="*70); print(t); print("="*70)
+
+def describe(obj, name, depth=0, max_items=5):
+    pad="  "*depth; t=type(obj).__name__
+    if isinstance(obj, dict):
+        print(f"{pad}{name}: dict ({len(obj)} keys)")
+        for i,(k,v) in enumerate(obj.items()):
+            if i>=max_items: print(f"{pad}  ... ({len(obj)-max_items} more)"); break
+            print(f"{pad}  key={k!r} ({type(k).__name__})")
+            describe(v,"value",depth+2,max_items=3)
+    elif isinstance(obj,(list,tuple)):
+        print(f"{pad}{name}: {t} (len {len(obj)})")
+        for i,v in enumerate(obj[:max_items]): describe(v,f"[{i}]",depth+1,max_items=3)
+        if len(obj)>max_items: print(f"{pad}  ... ({len(obj)-max_items} more)")
+    elif isinstance(obj,str):
+        print(f"{pad}{name}: str (len {len(obj)}) -> {obj[:150]!r}")
+    else:
+        print(f"{pad}{name}: {t} -> {repr(obj)[:150]}")
+
+# pickles
+for name in ["reconstructed_obj.pkl", "sampling_1_stats.pkl"]:
+    if not os.path.exists(name):
+        print(f"MISSING: {name}"); continue
+    banner(f"PICKLE: {name}  ({os.path.getsize(name):,} bytes)")
+    try:
+        with open(name,"rb") as f: obj = pickle.load(f)
+        print(f"top-level type: {type(obj).__name__}")
+        describe(obj,"root")
+    except Exception as e:
+        print(f"FAILED: {type(e).__name__}: {e}")
+
+# the one PDF
+PDF = "sample_101.pdf"
+banner(f"TEXT FROM {PDF}")
+if not os.path.exists(PDF):
+    print(f"MISSING: {PDF}")
+else:
+    text = None
+    try:
+        import pdfplumber
+        with pdfplumber.open(PDF) as pdf:
+            text = "\n".join((pg.extract_text() or "") for pg in pdf.pages)
+        print(f"[pdfplumber] {len(pdf.pages)} pages, {len(text)} chars")
+    except ImportError:
+        try:
+            from pypdf import PdfReader
+            r = PdfReader(PDF)
+            text = "\n".join((pg.extract_text() or "") for pg in r.pages)
+            print(f"[pypdf] {len(r.pages)} pages, {len(text)} chars")
+        except ImportError:
+            print("pip install pdfplumber")
+    except Exception as e:
+        print(f"extract failed: {e}")
+    if text:
+        print("\n--- FIRST 2000 CHARS ---")
+        print(text[:2000])
