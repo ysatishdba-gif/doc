@@ -1,1 +1,1 @@
-import os; print(os.path.getsize("networkx_cui_context_v1_3_0.pkl"))
+641139967
