@@ -1,35 +1,11 @@
-"""
-test_manual.py — run as often as you want. Talks to server.py (which must
-be running). Edit `query` / `docs`, then:  python test_manual.py
-"""
-from multiprocessing.connection import Client
+QUERY: 'Do you have olon cancer'
 
-# ====== EDIT THESE ======
-query = "Do you have constipation or diarrhea?"
-docs = {
-    "doc1": "Patient with chronic constipation and abdominal pain.",
-    "doc2": "History of pneumonia and respiratory infection.",
-    "doc3": "Screening for colon cancer and rectal cancer.",
-}
-# ========================
+DOC doc1:
 
-conn = Client(("localhost", 6000), authkey=b"cui")
-conn.send({"query": query, "docs": docs})
-res = conn.recv()
-conn.close()
+DOC doc2:
 
-print(f"\nQUERY: {query!r}")
-for t in res["query_result"].get("topics", []):
-    print(f"  {t['tp']}  size={t['size']}  IC={t['ic']}  '{t['label']}'")
+DOC doc3:
 
-for d, dr in res["doc_results"].items():
-    print(f"\nDOC {d}:")
-    for t in dr.get("topics", []):
-        print(f"  {t['tp']}  size={t['size']}  IC={t['ic']}  '{t['label']}'")
-
-print(f"\n{'#'*60}\nMATCH\n{'#'*60}")
-for r in res["matches"]:
-    print(f"\n  {r['doc_id']}: count={r['count']} sum_inv_size={r['sum_inv_size']} "
-          f"min_inv_size={r['min_inv_size']} max_anchor_ic={r['max_anchor_ic']}")
-    for sh in r["shared"]:
-        print(f"      {sh['tp_id']}  size={sh['size']}  '{sh['label']}'")
+############################################################
+MATCH
+############################################################
