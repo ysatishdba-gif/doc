@@ -1,24 +1,30 @@
 """
 test_manual.py
 --------------
-Run as often as you want. server.py must already be running in another terminal.
-Edit `query` / `docs`, then:  python test_manual.py
+Demo client. server.py must be running in another terminal.
+Edit `query` and `DOC_INDEX`, then:  python test_manual.py
 
-QUERY side : full PASS 1 (nature breakdown) + PASS 2 (extract) + summarize + topics
-DOC side   : raw text -> extract -> summarize -> topics (no LLM)
-MATCH      : query topics vs each doc, all scoring metrics
+QUERY side : LLM nature-breakdown -> per-concept extract -> summarize -> topics
+DOC side   : per-chunk (blob) extract -> union -> summarize -> topics  (no LLM)
+MATCH      : query topics vs doc topics, all scoring metrics
+
+Document text comes from document.py (reconstructed_obj.pk), one doc by index.
 """
 
 from multiprocessing.connection import Client
+from document import get_document, list_documents
 
 # ====== EDIT THESE ======
-query = "Do you have constipation or diarrhea?"
-docs = {
-    "doc1": "Patient with chronic constipation and abdominal pain.",
-    "doc2": "History of pneumonia and respiratory infection.",
-    "doc3": "Screening for colon cancer and rectal cancer.",
-}
+query     = "Do you have chest pain or shortness of breath?"
+DOC_INDEX = 0          # which reconstructed document to use (0..N-1)
 # ========================
+
+# To browse documents and pick a matching index, uncomment, run once:
+# list_documents(20); raise SystemExit(0)
+
+doc = get_document(DOC_INDEX)
+print(f"\nUsing document [{DOC_INDEX}]: {doc['label']}  ({len(doc['chunks'])} chunks)")
+print(f"  category: {doc['category']}")
 
 
 def hr(ch="=", n=70):
@@ -94,14 +100,18 @@ def show_doc(label, tr):
     hr("=")
     print(f"{label}: {tr['text']!r}")
     hr("=")
-    print(f"\n  [extract] raw text -> {len(tr.get('doc_cuis',[]))} CUIs: "
-          f"{cl(tr.get('doc_cuis',[]))}")
+    print(f"\n  PER-CHUNK CUI EXTRACTION ({len(tr.get('chunks',[]))} chunks):")
+    for ch in tr.get("chunks", []):
+        print(f"    [chunk {ch['i']:>2}] {ch['preview']!r}")
+        print(f"               -> {len(ch['cuis'])} CUIs: {cl(ch['cuis'])}")
+    print(f"\n  ALL extracted CUIs ({len(tr.get('extracted_cuis',[]))}): "
+          f"{cl(tr.get('extracted_cuis',[]))}")
     _show_summary_and_topics(tr)
 
 
 # ---- connect to server ----
 conn = Client(("localhost", 6000), authkey=b"cui")
-conn.send({"query": query, "docs": docs})
+conn.send({"query": query, "docs": [doc]})     # docs is a LIST of doc dicts
 res = conn.recv()
 conn.close()
 
@@ -117,7 +127,7 @@ show_query("QUERY", res["query_result"])
 
 # ---- DOCUMENT SIDE ----
 print("\n" + "#" * 70)
-print("#  DOCUMENT SIDE (no LLM — direct extraction)")
+print("#  DOCUMENT SIDE (no LLM — per-chunk extraction)")
 print("#" * 70)
 for d, dr in res["doc_results"].items():
     print()
