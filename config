@@ -1,17 +1,23 @@
-TOP KEYS: ['raw_document', 'reconstructed']
+def _trace_doc(doc):
+    """DOC side: NO LLM. Per-chunk CUI extract -> union -> summarize -> topics.
+    `doc` is the dict from document.get_document()."""
+    tr = {"text": f"{doc['label']}  ({doc['category']})",
+          "doc_id": doc["doc_id"],
+          "is_clinical": True,
+          "chunks": []}
 
-RECONSTRUCTED KEYS: ['text', 'pages', 'document', 'blobs', 'sections', 'topics', 'tables', 'figures']
+    cuis, seen = [], set()
+    for ci, chunk in enumerate(doc["chunks"]):
+        got = flat(extractor.extract([chunk], [chunk]))
+        tr["chunks"].append({
+            "i": ci,
+            "preview": chunk[:80].replace("\n", " "),
+            "cuis": got,
+        })
+        for c in got:
+            if c not in seen:
+                seen.add(c); cuis.append(c)
 
-  text: str (len 3253) -> 'DISCHARGE SUMMARY\nPatient Name: JANE DOE DOB: 01/15/1960 MRN: 12345678\nAdmission Date: 03/10/2023 Di'
-  pages: int -> 1
-  document: str (len 109) -> 'Medical Record > Hospital Document > Discharge Summary > Cardiac Event Discharge > Post-PCI Discharg'
-  blobs: list (len 21)
-      [0] = str: 'DISCHARGE SUMMARY Patient Name: JANE DOE DOB: 01/15/1960 MRN: 12345678 Admission Date: 03/10/2023 Discharge Date: 03/15/2023 Attending Physician: Dr.
-  sections: list (len 21)
-      [0] = dict: {'Section': 'DISCHARGE SUMMARY', 'SampleText': 'DISCHARGE SUMMARY Patient Name: JANE DOE DOB: 01/15/1960 MRN: 12345678'}
-  topics: list (len 23)
-      [0] = str: 'Patient Demographics'
-  tables: list (len 1)
-      [0] = dict: {'Detected': True, 'Topic': 'Medications at Discharge', 'SampleText': 'Medication Dosage Frequency Route Notes Aspirin 81 mg Daily PO Take with food M
-  figures: list (len 1)
-      [0] = dict: {'Contained': False, 'Topic': 'NA', 'Description': 'A standard medical discharge summary typically does not contain figures such as charts, graphs, or
+    tr["extracted_cuis"] = list(cuis)
+    _summarize_and_topics(tr, cuis)
+    return tr
