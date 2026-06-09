@@ -1,96 +1,32 @@
-"""
-test_manual.py — run as often as you want. Talks to server.py (must be running).
-Edit `query` / `docs`, then:  python test_manual.py
-"""
-from multiprocessing.connection import Client
+########################################################################
+#  QUERY SIDE
+########################################################################
 
-# ====== EDIT THESE ======
-query = "Do you have colon cancer?"
-docs = {
-    "doc1": "Patient with chronic constipation and abdominal pain.",
-    "doc2": "History of pneumonia and respiratory infection.",
-    "doc3": "Screening for colon cancer and rectal cancer.",
-}
-# ========================
+========================================================================
+QUERY: 'colon cancer?'
+========================================================================
+  NON-CLINICAL: LLM call failed
 
-HR = "=" * 72
-hr = "-" * 72
+########################################################################
+#  DOCUMENT SIDE
+########################################################################
 
+========================================================================
+DOC doc1: 'Patient with chronic constipation and abdominal pain.'
+========================================================================
+  NON-CLINICAL: LLM call failed
 
-def show_trace(label, tr):
-    print(f"\n{HR}\n{label}: {tr['text']!r}\n{HR}")
+========================================================================
+DOC doc2: 'History of pneumonia and respiratory infection.'
+========================================================================
+  NON-CLINICAL: LLM call failed
 
-    if tr.get("non_clinical"):
-        print(f"  NON-CLINICAL: {tr['non_clinical']}")
-        return
+========================================================================
+DOC doc3: 'Screening for colon cancer and rectal cancer.'
+========================================================================
+  NON-CLINICAL: LLM call failed
 
-    # Step 1: nature breakdown
-    print(f"\n  [1] NATURE BREAKDOWN")
-    print(f"      expanded: {tr.get('expanded','')!r}")
-    for iv in tr.get("intents", []):
-        print(f"      intent: {iv['intent']}   (nature: {iv['nature']})")
-        for sn in iv["sub_natures"]:
-            print(f"          sub_nature: {sn['path']}")
-            for a in sn["atomic"]:
-                print(f"              atomic: {a}")
-
-    # Step 2: final candidates -> API -> CUIs
-    print(f"\n  [2] FINAL CANDIDATES -> API -> CUIs")
-    for pc in tr.get("per_concept", []):
-        cl = ", ".join(pc["cuis"]) if pc["cuis"] else "(none)"
-        print(f"      [{pc['kind']:6s}] {pc['text']!r:30s} -> {cl}")
-    print(f"      all extracted CUIs ({len(tr.get('extracted_cuis',[]))}): "
-          f"{tr.get('extracted_cuis',[])}")
-
-    # Step 3: summarize
-    print(f"\n  [3] SUMMARIZE CUIs")
-    surv = tr.get("surviving", [])
-    print(f"      surviving ({len(surv)}):")
-    for s in surv:
-        print(f"          {s['cui']}  {s['term']}  IC={s['ic']}")
-    if tr.get("removed"):
-        print(f"      removed ({len(tr['removed'])}):")
-        for r in tr["removed"]:
-            print(f"          {r['cui']}  {r['term']}  <- {r['by']} ({r['reason']})")
-
-    # Step 4: topics
-    print(f"\n  [4] TOPIC FORMATION")
-    tops = tr.get("topics", [])
-    print(f"      topics ({len(tops)}):")
-    for t in tops:
-        print(f"          {t['tp']}  size={t['size']:>4}  IC={t['ic']}  '{t['label']}'")
-
-
-conn = Client(("localhost", 6000), authkey=b"cui")
-conn.send({"query": query, "docs": docs})
-res = conn.recv()
-conn.close()
-
-# ---- QUERY SIDE ----
-print("\n" + "#" * 72)
-print("#  QUERY SIDE")
-print("#" * 72)
-show_trace("QUERY", res["query_result"])
-
-# ---- DOCUMENT SIDE ----
-print("\n" + "#" * 72)
-print("#  DOCUMENT SIDE")
-print("#" * 72)
-for d, dr in res["doc_results"].items():
-    show_trace(f"DOC {d}", dr)
-
-# ---- MATCH ----
-print("\n" + "#" * 72)
-print("#  ADAPTOR MATCH / RETRIEVAL")
-print("#" * 72)
-matches = res["matches"]
-if not matches:
-    print("  no documents shared any topic with the query.")
-for r in matches:
-    print(f"\n  {r['doc_id']}:")
-    print(f"    count={r['count']}  sum_inv_size={r['sum_inv_size']}  "
-          f"min_inv_size={r['min_inv_size']}  max_anchor_ic={r['max_anchor_ic']}  "
-          f"sum_anchor_ic={r['sum_anchor_ic']}")
-    print(f"    shared topics:")
-    for sh in r["shared"]:
-        print(f"      {sh['tp_id']}  size={sh['size']:>4}  IC={sh['anchor_ic']}  '{sh['label']}'")
+########################################################################
+#  ADAPTOR MATCH / RETRIEVAL
+########################################################################
+  no documents shared any topic with the query.
