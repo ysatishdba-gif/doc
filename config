@@ -1,23 +1,26 @@
-C0032285  Pneumonia
-  ancestors  : 29
-  descendants: 183
-  sample ancestors  : ['C0575479', 'C1290884', 'C0039978', 'C1285340', 'C1320355', 'C0149725', 'C0425442', 'C0577910']
-  sample descendants: ['C0264522', 'C4039451', 'C0023241', 'C0276678', 'C0155860', 'C4041068', 'C1290337', 'C2585749']
+import networkx as nx
+import time
 
-C0011849  Diabetes mellitus
-  ancestors  : 8
-  descendants: 127
-  sample ancestors  : ['C0025517', 'C0012634', 'C1285159', 'C0037088', 'C0149670', 'C0014130', 'C1257958', 'C2720507']
-  sample descendants: ['C1859965', 'C2931296', 'C1263962', 'C2732401', 'C0342274', 'C0271663', 'C0342277', 'C3495814']
+ROOT = 'SNOMEDCT_US.isa'
 
-C0559470  Allergy to peanut
-  ancestors  : 11
-  descendants: 0
-  sample ancestors  : ['C2227759', 'C1630648', 'C3539909', 'C0016470', 'C0851444', 'C3662243', 'C0037088', 'C1096735']
-  sample descendants: []
+t0 = time.time()
 
-C0006277  Bronchitis
-  ancestors  : 26
-  descendants: 116
-  sample ancestors  : ['C0575479', 'C1290884', 'C0577913', 'C0039978', 'C1285340', 'C0425442', 'C0577910', 'C0035204']
-  sample descendants: ['C0340130', 'C4039451', 'C4041068', 'C1290337', 'C0040586', 'C5395603', 'C0555996', 'C0339929']
+# all nodes under the isa root (the hierarchy universe)
+isa_nodes = nx.descendants(netw, ROOT)
+print(f"nodes under isa root: {len(isa_nodes):,}  ({time.time()-t0:.0f}s)")
+
+# Build a clean CUI-level isa DiGraph: parent_cui -> child_cui
+# Edges in netw under the isa root go root -> ... -> general -> specific.
+# We collapse suffix-bridge nodes to base CUIs.
+t0 = time.time()
+G = nx.DiGraph()
+for u, v in netw.subgraph(isa_nodes | {ROOT}).edges():
+    cu = u.split('-')[0] if isinstance(u, str) and '-' in u else u
+    cv = v.split('-')[0] if isinstance(v, str) and '-' in v else v
+    if cu == ROOT or cv == ROOT:
+        continue
+    if cu != cv:
+        G.add_edge(cu, cv)        # cu (more general) -> cv (more specific)
+
+print(f"isa CUI graph: {G.number_of_nodes():,} nodes, "
+      f"{G.number_of_edges():,} edges  ({time.time()-t0:.0f}s)")
