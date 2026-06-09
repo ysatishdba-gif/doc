@@ -1,5 +1,21 @@
 import time, random
-sample = random.sample(list(TARGET), 200)
+import networkx as nx
+from collections import defaultdict
+
+# 1. map each base CUI -> its suffixed nodes in H
+t0 = time.time()
+cui_to_suffix = defaultdict(list)
+for n in H.nodes():
+    if isinstance(n, str) and '-' in n:
+        cui_to_suffix[n.split('-')[0]].append(n)
+print(f"mapped {len(cui_to_suffix):,} base CUIs ({time.time()-t0:.0f}s)")
+
+# 2. target CUIs = the SNOMED ones present in H
+TARGET = set(SNOMED_CUIS) & set(cui_to_suffix.keys())
+print(f"TARGET CUIs: {len(TARGET):,}")
+
+# 3. time a 200-CUI sample to estimate full runtime
+sample = random.sample(list(TARGET), min(200, len(TARGET)))
 t0 = time.time()
 for cui in sample:
     desc = set()
@@ -7,5 +23,5 @@ for cui in sample:
         desc |= nx.descendants(H, s)
     _ = len({d.split('-')[0] for d in desc if '-' in d})
 dt = time.time() - t0
-print(f"200 CUIs took {dt:.1f}s  ->  est. for {len(TARGET):,}: "
-      f"{dt/200*len(TARGET)/60:.1f} min")
+print(f"200 CUIs took {dt:.1f}s  ->  est. full {len(TARGET):,}: "
+      f"{dt/len(sample)*len(TARGET)/60:.1f} min")
