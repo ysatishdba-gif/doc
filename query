@@ -1,23 +1,141 @@
-Traceback (most recent call last):
-  File "c:\cuisummary\test_manual.py", line 15, in <module>
-    summarizer = CUISummarizer()
-                 ^^^^^^^^^^^^^^^
-  File "c:\cuisummary\cui_summarizer.py", line 24, in __init__
-    self._ic = ICComputer(self._graph, self._ic_pre)
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "c:\cuisummary\cui_core.py", line 297, in __init__
-    self._total = max(graph.number_of_nodes(), 1)
-                      ^^^^^^^^^^^^^^^^^^^^^
-AttributeError: 'NoneType' object has no attribute 'number_of_nodes'
-PS C:\cuisummary> python -i test_manual.py
-Traceback (most recent call last):
-  File "C:\cuisummary\test_manual.py", line 15, in <module>
-    summarizer = CUISummarizer()
-                 ^^^^^^^^^^^^^^^
-  File "C:cuisummary\cui_summarizer.py", line 24, in __init__
-    self._ic = ICComputer(self._graph, self._ic_pre)
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\cuisummary\cui_core.py", line 297, in __init__
-    self._total = max(graph.number_of_nodes(), 1)
-                      ^^^^^^^^^^^^^^^^^^^^^
-AttributeError: 'NoneType' object has no attribute 'number_of_nodes'
+"""
+test_manual.py
+--------------
+Run as often as you want. server.py must already be running in another terminal.
+Edit `query` / `docs`, then:  python test_manual.py
+
+QUERY side : full PASS 1 (nature breakdown) + PASS 2 (extract) + summarize + topics
+DOC side   : raw text -> extract -> summarize -> topics (no LLM)
+MATCH      : query topics vs each doc, all scoring metrics
+"""
+
+from multiprocessing.connection import Client
+
+# ====== EDIT THESE ======
+query = "Do you have constipation or diarrhea?"
+docs = {
+    "doc1": "Patient with chronic constipation and abdominal pain.",
+    "doc2": "History of pneumonia and respiratory infection.",
+    "doc3": "Screening for colon cancer and rectal cancer.",
+}
+# ========================
+
+
+def hr(ch="=", n=70):
+    print(ch * n)
+
+
+def cl(cuis):
+    return ", ".join(cuis) if cuis else "(none)"
+
+
+def _show_summary_and_topics(tr):
+    m = tr.get("metrics", {})
+    print(f"\n  --- SUMMARIZATION ---")
+    print(f"  {m.get('input_code_count','?')} in -> {m.get('output_code_count','?')} out")
+    print(f"  Surviving CUIs:")
+    for s in tr.get("surviving", []):
+        print(f"      {s['cui']}  {s['term']}  IC={s['ic']}")
+    if tr.get("removed"):
+        print(f"  Removed CUIs:")
+        for r in tr["removed"]:
+            print(f"      {r['cui']}  {r['term']}  <- {r['by']} ({r['reason']})")
+    print(f"\n  --- TOPICS ---")
+    tops = tr.get("topics", [])
+    print(f"  {len(tops)} topics:")
+    for t in tops:
+        print(f"    {t['tp']}  size={t['size']:>4}  IC={t['ic']}  '{t['label']}'")
+
+
+def show_query(label, tr):
+    hr("=")
+    print(f"{label}: {tr['text']!r}")
+    hr("=")
+
+    if not tr.get("is_clinical"):
+        print(f"  NON-CLINICAL: {tr.get('reason')}")
+        return
+
+    # PASS 1 — structure
+    print(f"\nExpanded: {tr.get('expanded','')!r}")
+    print(f"Total intents: {len(tr.get('intents',[]))}")
+    for i, iv in enumerate(tr.get("intents", []), 1):
+        print()
+        hr("-")
+        print(f"  INTENT {i}: {iv['intent']}")
+        print(f"    Nature:      {iv['nature']}")
+        print(f"    Description: {iv['description']}")
+        print(f"\n    Sub-natures ({len(iv['sub_natures'])}):")
+        for sn in iv["sub_natures"]:
+            print(f"      - {sn['path']}")
+            for a in sn["atomic"]:
+                print(f"          atomic: {a}")
+
+    # PASS 2 — extraction
+    print()
+    hr("-")
+    print("  PASS 2 — CUI EXTRACTION")
+    hr("-")
+    for iv in tr["intents"]:
+        print(f"\n  INTENT: {iv['intent']}")
+        for sn in iv["sub_natures"]:
+            print(f"    sub_nature: {sn['path']}")
+            for pc in sn["path_cuis"]:
+                print(f"      [path]   {pc['text']!r:30s} -> "
+                      f"{len(pc['cuis'])} CUIs: {cl(pc['cuis'])}")
+            for ac in sn["atomic_cuis"]:
+                print(f"      [atomic] {ac['text']!r:30s} -> "
+                      f"{len(ac['cuis'])} CUIs: {cl(ac['cuis'])}")
+
+    _show_summary_and_topics(tr)
+
+
+def show_doc(label, tr):
+    hr("=")
+    print(f"{label}: {tr['text']!r}")
+    hr("=")
+    print(f"\n  [extract] raw text -> {len(tr.get('doc_cuis',[]))} CUIs: "
+          f"{cl(tr.get('doc_cuis',[]))}")
+    _show_summary_and_topics(tr)
+
+
+# ---- connect to server ----
+conn = Client(("localhost", 6000), authkey=b"cui")
+conn.send({"query": query, "docs": docs})
+res = conn.recv()
+conn.close()
+
+if "error" in res:
+    print("SERVER ERROR:", res["error"])
+    raise SystemExit(1)
+
+# ---- QUERY SIDE ----
+print("\n" + "#" * 70)
+print("#  QUERY SIDE (LLM nature-breakdown)")
+print("#" * 70)
+show_query("QUERY", res["query_result"])
+
+# ---- DOCUMENT SIDE ----
+print("\n" + "#" * 70)
+print("#  DOCUMENT SIDE (no LLM — direct extraction)")
+print("#" * 70)
+for d, dr in res["doc_results"].items():
+    print()
+    show_doc(f"DOC {d}", dr)
+
+# ---- MATCH ----
+print("\n" + "#" * 70)
+print("#  ADAPTOR MATCH / RETRIEVAL")
+print("#" * 70)
+matches = res["matches"]
+if not matches:
+    print("  no documents shared any topic with the query.")
+for r in matches:
+    print(f"\n  {r['doc_id']}:")
+    print(f"    count={r['count']}  sum_inv_size={r['sum_inv_size']}  "
+          f"min_inv_size={r['min_inv_size']}  max_anchor_ic={r['max_anchor_ic']}  "
+          f"sum_anchor_ic={r['sum_anchor_ic']}")
+    print(f"    shared topics:")
+    for sh in r["shared"]:
+        print(f"      {sh['tp_id']}  size={sh['size']:>4}  "
+              f"IC={sh['anchor_ic']}  '{sh['label']}'")
