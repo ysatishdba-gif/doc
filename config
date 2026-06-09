@@ -1,18 +1,7 @@
-class TopicAdaptor:
-    def __init__(self, topics_pkl=None):
-        if topics_pkl is None:
-            # use the pickle config already loaded
-            from config import topics, TOPICS_AVAILABLE, TOPICS_PATH
-            if not TOPICS_AVAILABLE or topics is None:
-                raise FileNotFoundError(
-                    f"{TOPICS_PATH} not found — run build_topics.py first")
-            p = topics
-        else:
-            with open(topics_pkl, "rb") as f:
-                p = pickle.load(f)
-
-        self.cui_to_topic_ids  = p["cui_to_topic_ids"]
-        self.topic_id_to_topic = p["topic_id_to_topic"]
-        self.labels            = p.get("labels", {})
-        print(f"TopicAdaptor: {len(self.topic_id_to_topic):,} topics, "
-              f"{len(self.cui_to_topic_ids):,} CUIs with topics")
+if __name__ == "__main__":
+    import os
+    if os.path.exists(OUTPUT_PATH):
+        print(f"{OUTPUT_PATH} already exists — skipping build. "
+              f"Delete it to force a rebuild.")
+    else:
+        main()
