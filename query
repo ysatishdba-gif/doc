@@ -1,30 +1,21 @@
 """
 test_manual.py
 --------------
-Demo client. server.py must be running in another terminal.
-Edit `query` and `DOC_INDEX`, then:  python test_manual.py
+Demo client. server.py must be running (it caches the document once).
+Edit `query`, re-run. The document side does NOT reprocess.
 
-QUERY side : LLM nature-breakdown -> per-concept extract -> summarize -> topics
-DOC side   : per-chunk (blob) extract -> union -> summarize -> topics  (no LLM)
-MATCH      : query topics vs doc topics, all scoring metrics
+    python test_manual.py
 
-Document text comes from document.py (reconstructed_obj.pk), one doc by index.
+Output order: DOCUMENT side (cached) -> QUERY side -> RETRIEVAL.
+Retrieval shows each shared topic + the document CUIs under it + the chunk
+text those CUIs came from.
 """
 
 from multiprocessing.connection import Client
-from document import get_document, list_documents
 
-# ====== EDIT THESE ======
-query     = "Do you have chest pain or shortness of breath?"
-DOC_INDEX = 0          # which reconstructed document to use (0..N-1)
-# ========================
-
-# To browse documents and pick a matching index, uncomment, run once:
-# list_documents(20); raise SystemExit(0)
-
-doc = get_document(DOC_INDEX)
-print(f"\nUsing document [{DOC_INDEX}]: {doc['label']}  ({len(doc['chunks'])} chunks)")
-print(f"  category: {doc['category']}")
+# ====== EDIT THIS (document is fixed/cached on the server) ======
+query = "Do you have chest pain or shortness of breath?"
+# ================================================================
 
 
 def hr(ch="=", n=70):
@@ -37,81 +28,19 @@ def cl(cuis):
 
 def _show_summary_and_topics(tr):
     m = tr.get("metrics", {})
-    print(f"\n  --- SUMMARIZATION ---")
-    print(f"  {m.get('input_code_count','?')} in -> {m.get('output_code_count','?')} out")
+    print(f"\n  SUMMARIZATION: {m.get('input_code_count','?')} in -> "
+          f"{m.get('output_code_count','?')} out")
     print(f"  Surviving CUIs:")
     for s in tr.get("surviving", []):
         print(f"      {s['cui']}  {s['term']}  IC={s['ic']}")
-    if tr.get("removed"):
-        print(f"  Removed CUIs:")
-        for r in tr["removed"]:
-            print(f"      {r['cui']}  {r['term']}  <- {r['by']} ({r['reason']})")
-    print(f"\n  --- TOPICS ---")
-    tops = tr.get("topics", [])
-    print(f"  {len(tops)} topics:")
-    for t in tops:
+    print(f"  TOPICS ({len(tr.get('topics',[]))}):")
+    for t in tr.get("topics", []):
         print(f"    {t['tp']}  size={t['size']:>4}  IC={t['ic']}  '{t['label']}'")
 
 
-def show_query(label, tr):
-    hr("=")
-    print(f"{label}: {tr['text']!r}")
-    hr("=")
-
-    if not tr.get("is_clinical"):
-        print(f"  NON-CLINICAL: {tr.get('reason')}")
-        return
-
-    # PASS 1 — structure
-    print(f"\nExpanded: {tr.get('expanded','')!r}")
-    print(f"Total intents: {len(tr.get('intents',[]))}")
-    for i, iv in enumerate(tr.get("intents", []), 1):
-        print()
-        hr("-")
-        print(f"  INTENT {i}: {iv['intent']}")
-        print(f"    Nature:      {iv['nature']}")
-        print(f"    Description: {iv['description']}")
-        print(f"\n    Sub-natures ({len(iv['sub_natures'])}):")
-        for sn in iv["sub_natures"]:
-            print(f"      - {sn['path']}")
-            for a in sn["atomic"]:
-                print(f"          atomic: {a}")
-
-    # PASS 2 — extraction
-    print()
-    hr("-")
-    print("  PASS 2 — CUI EXTRACTION")
-    hr("-")
-    for iv in tr["intents"]:
-        print(f"\n  INTENT: {iv['intent']}")
-        for sn in iv["sub_natures"]:
-            print(f"    sub_nature: {sn['path']}")
-            for pc in sn["path_cuis"]:
-                print(f"      [path]   {pc['text']!r:30s} -> "
-                      f"{len(pc['cuis'])} CUIs: {cl(pc['cuis'])}")
-            for ac in sn["atomic_cuis"]:
-                print(f"      [atomic] {ac['text']!r:30s} -> "
-                      f"{len(ac['cuis'])} CUIs: {cl(ac['cuis'])}")
-
-    _show_summary_and_topics(tr)
-
-
-def show_doc(label, tr):
-    hr("=")
-    print(f"{label}: {tr['text']!r}")
-    hr("=")
-    print(f"\n  PER-CHUNK CUI EXTRACTION ({len(tr.get('chunks',[]))} chunks):")
-    for ch in tr.get("chunks", []):
-        print(f"    [chunk {ch['i']:>2}] {ch['preview']!r}")
-        print(f"               -> {len(ch['cuis'])} CUIs: {cl(ch['cuis'])}")
-    print(f"\n  ALL extracted CUIs ({len(tr.get('extracted_cuis',[]))}): "
-          f"{cl(tr.get('extracted_cuis',[]))}")
-    _show_summary_and_topics(tr)
-
-
-# ---- connect to server ----
+# ---- connect ----
 conn = Client(("localhost", 6000), authkey=b"cui")
-conn.send({"query": query, "docs": [doc]})     # docs is a LIST of doc dicts
+conn.send({"query": query})
 res = conn.recv()
 conn.close()
 
@@ -119,33 +48,75 @@ if "error" in res:
     print("SERVER ERROR:", res["error"])
     raise SystemExit(1)
 
-# ---- QUERY SIDE ----
+# ---------- DOCUMENT SIDE FIRST (cached) ----------
+print("\n" + "#" * 70)
+print("#  DOCUMENT SIDE (cached — processed once at startup)")
+print("#" * 70)
+doc = res["doc_result"]
+hr("=")
+print(f"DOC {doc['doc_id']}: {doc['text']!r}")
+hr("=")
+print(f"  {len(doc.get('chunks',[]))} chunks -> "
+      f"{len(doc.get('extracted_cuis',[]))} CUIs extracted")
+_show_summary_and_topics(doc)
+
+# ---------- QUERY SIDE ----------
 print("\n" + "#" * 70)
 print("#  QUERY SIDE (LLM nature-breakdown)")
 print("#" * 70)
-show_query("QUERY", res["query_result"])
-
-# ---- DOCUMENT SIDE ----
-print("\n" + "#" * 70)
-print("#  DOCUMENT SIDE (no LLM — per-chunk extraction)")
-print("#" * 70)
-for d, dr in res["doc_results"].items():
+q = res["query_result"]
+hr("=")
+print(f"QUERY: {q['text']!r}")
+hr("=")
+if not q.get("is_clinical"):
+    print(f"  NON-CLINICAL: {q.get('reason')}")
+else:
+    print(f"\nExpanded: {q.get('expanded','')!r}")
+    print(f"Total intents: {len(q.get('intents',[]))}")
+    for i, iv in enumerate(q.get("intents", []), 1):
+        print()
+        hr("-")
+        print(f"  INTENT {i}: {iv['intent']}")
+        print(f"    Nature:      {iv['nature']}")
+        print(f"    Description: {iv['description']}")
+        print(f"    Sub-natures ({len(iv['sub_natures'])}):")
+        for sn in iv["sub_natures"]:
+            print(f"      - {sn['path']}")
+            for a in sn["atomic"]:
+                print(f"          atomic: {a}")
     print()
-    show_doc(f"DOC {d}", dr)
+    hr("-")
+    print("  CUI EXTRACTION")
+    hr("-")
+    for iv in q["intents"]:
+        print(f"\n  INTENT: {iv['intent']}")
+        for sn in iv["sub_natures"]:
+            print(f"    sub_nature: {sn['path']}")
+            for pc in sn["path_cuis"]:
+                print(f"      [path]   {pc['text']!r:28s} -> "
+                      f"{len(pc['cuis'])} CUIs: {cl(pc['cuis'])}")
+            for ac in sn["atomic_cuis"]:
+                print(f"      [atomic] {ac['text']!r:28s} -> "
+                      f"{len(ac['cuis'])} CUIs: {cl(ac['cuis'])}")
+    _show_summary_and_topics(q)
 
-# ---- MATCH ----
+# ---------- RETRIEVAL ----------
 print("\n" + "#" * 70)
-print("#  ADAPTOR MATCH / RETRIEVAL")
+print("#  RETRIEVAL (shared topics -> doc CUIs -> chunk text)")
 print("#" * 70)
-matches = res["matches"]
-if not matches:
-    print("  no documents shared any topic with the query.")
-for r in matches:
-    print(f"\n  {r['doc_id']}:")
-    print(f"    count={r['count']}  sum_inv_size={r['sum_inv_size']}  "
-          f"min_inv_size={r['min_inv_size']}  max_anchor_ic={r['max_anchor_ic']}  "
-          f"sum_anchor_ic={r['sum_anchor_ic']}")
-    print(f"    shared topics:")
-    for sh in r["shared"]:
-        print(f"      {sh['tp_id']}  size={sh['size']:>4}  "
-              f"IC={sh['anchor_ic']}  '{sh['label']}'")
+m = res["metrics"]
+print(f"\n  shared topics: {res['shared_count']}  |  "
+      f"count={m['count']}  sum_inv_size={m['sum_inv_size']}  "
+      f"min_inv_size={m['min_inv_size']}  max_anchor_ic={m['max_anchor_ic']}")
+
+if not res["retrieval"]:
+    print("\n  no shared topics — query and document do not overlap.")
+for r in res["retrieval"]:
+    print(f"\n  >>> SHARED TOPIC {r['tp_id']}  size={r['size']}  "
+          f"IC={r['anchor_ic']}  '{r['label']}'")
+    print(f"      doc CUIs under this topic:")
+    for cui, label in r["doc_cuis"]:
+        print(f"        {cui}  '{label}'")
+    print(f"      matching chunk(s) from the document:")
+    for ch in r["chunks"]:
+        print(f"        [chunk {ch['i']}] {ch['full'][:300]!r}")
