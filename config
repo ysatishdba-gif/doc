@@ -1,18 +1,75 @@
-import pickle
+SAMPLE 1 — Clean case: one group splits into two topics
+The group (from network graph)
+Focal CUI: Peanut allergy
+GROUP = { Peanut allergy, Tree nut allergy, Food allergy, Anaphylaxis, Allergy }
+Each member's full family tree (MRREL) with IC at every level
+Peanut allergy (0.92)  → Food allergy (0.62) → Allergy (0.40) → Hypersensitivity (0.22) → Disease (0.05)
+Tree nut allergy (0.90)→ Food allergy (0.62) → Allergy (0.40) → ...
+Food allergy (0.62)    → Allergy (0.40) → Hypersensitivity (0.22) → Disease (0.05)
+Anaphylaxis (0.70)     → Allergy (0.40) → Hypersensitivity (0.22) → Disease (0.05)
+Allergy (0.40)         → Hypersensitivity (0.22) → Disease (0.05)
+Climb each member — keep ONLY in-group parents, apply IC floor (0.30), pick highest IC
+Peanut allergy:
+Food allergy (0.62)      → in group ✅, IC≥0.30 ✅
+Allergy (0.40)           → in group ✅, IC≥0.30 ✅ but lower
+Hypersensitivity (0.22)  → not in group ❌ (and below floor anyway)
+Disease (0.05)           → not in group ❌
+WINNER = Food allergy (0.62)   ← highest IC among in-group
+Tree nut allergy:
+Food allergy (0.62) ✅ in group, highest → WINNER
+Allergy (0.40) in group, lower → skipped
+WINNER = Food allergy (0.62)
+Anaphylaxis:
+Allergy (0.40) ✅ in group, IC≥0.30 → WINNER  (Food allergy is NOT its ancestor)
+Hypersensitivity (0.22) not in group ❌
+WINNER = Allergy (0.40)
+Food allergy:
+Allergy (0.40) ✅ in group → WINNER
+WINNER = Allergy (0.40)
+Result — two topics from one group
+TOPIC "Food allergy" (anchor IC 0.62)
+   { Peanut allergy, Tree nut allergy, Food allergy }
 
-DOC_INDEX = 0      # <-- change to the document you want
+TOPIC "Allergy" (anchor IC 0.40)
+   { Anaphylaxis, Food allergy }
+Why two: the nut allergies climbed to Food allergy (specific), while Anaphylaxis had no Food-allergy ancestor so it stopped at Allergy. Different in-group parents → different topics. Clean and correct.
 
-RECON = pickle.load(open("reconstructed_obj.pk", "rb"))
-d = RECON[DOC_INDEX]
-r = d["reconstructed"]
-blobs = [b for b in (r.get("blobs") or []) if b and b.strip()]
+SAMPLE 2 — Edge case: a member with NO good in-group parent
+The group (from network graph)
+Focal CUI: Rectal cancer
+GROUP = { Rectal cancer, Colon cancer, Colorectal cancer, Malignant neoplasm, Constipation }
+Note: Constipation got pulled in by the network (it co-occurs in colorectal notes) but it's clinically a different axis.
+Family trees with IC
+Rectal cancer (0.88)      → Colorectal cancer (0.66) → Malignant neoplasm (0.45) → Neoplasm (0.20) → Disease (0.05)
+Colon cancer (0.87)       → Colorectal cancer (0.66) → Malignant neoplasm (0.45) → ...
+Colorectal cancer (0.66)  → Malignant neoplasm (0.45) → Neoplasm (0.20) → Disease (0.05)
+Constipation (0.78)       → Symptom (0.30) → Clinical finding (0.08) → ...   (a DIFFERENT branch)
+Climb each member
+Rectal cancer:
+Colorectal cancer (0.66) ✅ in group, IC≥0.30, highest → WINNER
+Malignant neoplasm (0.45) in group ✅ but lower → skipped
+Neoplasm (0.20) not in group ❌ (also below floor)
+WINNER = Colorectal cancer (0.66)
+Colon cancer:
+Colorectal cancer (0.66) ✅ → WINNER
+WINNER = Colorectal cancer (0.66)
+Colorectal cancer:
+Malignant neoplasm (0.45) ✅ in group → WINNER
+WINNER = Malignant neoplasm (0.45)
+Constipation — THE EDGE CASE:
+Constipation's ancestors: Symptom (0.30), Clinical finding (0.08), ...
+Is Symptom in the group?          NO ❌
+Is Clinical finding in the group? NO ❌
+→ NO in-group ancestor at all
+→ Constipation gets NO anchor from this group → it is UNGROUPED here
+Constipation was a network-neighbor (co-occurs with colorectal cancer) but its family tree shares no parent with the cancer concepts. So it doesn't join any cancer topic. Correct — constipation isn't a cancer.
+Result
+TOPIC "Colorectal cancer" (anchor IC 0.66)
+   { Rectal cancer, Colon cancer, Colorectal cancer }
 
-print(f"Document [{DOC_INDEX}]: {d['raw_document']}")
-print(f"Category: {r.get('document','')}")
-print(f"Total chunks: {len(blobs)}\n")
-print("="*70)
-for i, chunk in enumerate(blobs):
-    print(f"\n[CHUNK {i}]")
-    print("-"*70)
-    print(chunk)
-    print("="*70)
+TOPIC "Malignant neoplasm" (anchor IC 0.45)
+   { Colorectal cancer }
+
+Constipation → UNGROUPED in this group
+   (it will get its own topic later when IT is the focal point,
+    anchoring to "Symptom" or its own neighborhood)
