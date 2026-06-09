@@ -1,21 +1,26 @@
-import time, math
+import networkx as nx
+import time
 
+ROOT = 'SNOMEDCT_US.isa'
+
+# 1. extract the suffixed isa subgraph ONCE (small, should be a clean DAG)
 t0 = time.time()
+isa_sub_nodes = nx.descendants(netw, ROOT) | {ROOT}
+H = netw.subgraph(isa_sub_nodes).copy()
+print(f"isa subgraph H: {H.number_of_nodes():,} nodes, "
+      f"{H.number_of_edges():,} edges  ({time.time()-t0:.0f}s)")
 
-# robust descendant counts on G (handles cycles), computed on the SMALL isa graph
-desc_count = {}
-for i, n in enumerate(G.nodes()):
-    desc_count[n] = len(nx.descendants(G, n))
-    if i % 50000 == 0:
-        print(f"  {i:,}/{G.number_of_nodes():,} ({time.time()-t0:.0f}s)")
+# 2. is it a clean DAG now? (should be True on the SUFFIXED graph)
+print("is DAG:", nx.is_directed_acyclic_graph(H))
 
-print(f"descendants done ({time.time()-t0:.0f}s)")
-
-TOTAL = G.number_of_nodes()
-log_total = math.log(TOTAL + 1)
-ic = {n: 1.0 - math.log(desc_count.get(n, 0) + 1) / log_total for n in G.nodes()}
-
-for cui, name in [("C0032285","Pneumonia"), ("C0011849","Diabetes"),
-                  ("C0559470","Peanut allergy"), ("C0006277","Bronchitis")]:
-    if cui in G:
-        print(f"  {name:16s} desc={desc_count.get(cui,0):>5}  IC={ic[cui]:.3f}")
+# 3. test descendant counts — collapse suffixes only at the END
+for cui, name in [("C0032285", "Pneumonia"),
+                  ("C0011849", "Diabetes"),
+                  ("C0559470", "Peanut allergy"),
+                  ("C0006277", "Bronchitis")]:
+    desc = set()
+    for s in netw.successors(cui):
+        if s in H:
+            desc |= nx.descendants(H, s)
+    base = {d.split('-')[0] for d in desc if '-' in d} - {cui}
+    print(f"  {name:16s} desc={len(base):>5}")
