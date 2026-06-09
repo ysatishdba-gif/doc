@@ -1,27 +1,5 @@
-import os, pickle, networkx
-
-HIERARCHY_PATH   = "networkx_cui_context_v1_3_0.pkl"
-IC_PATH          = "ic_precomputed.pkl"
-MEDLINEPLUS_PATH = "medlineplus.pkl"
-TOPICS_PATH      = "topics.pkl"
-
-with open(HIERARCHY_PATH, "rb") as f:
-    hierarchy = pickle.load(f)
-assert isinstance(hierarchy, networkx.DiGraph)
-
-with open(IC_PATH, "rb") as f:
-    ic_precomputed = pickle.load(f)
-
-medlineplus = {}
-if os.path.exists(MEDLINEPLUS_PATH):
-    with open(MEDLINEPLUS_PATH, "rb") as f:
-        medlineplus = pickle.load(f)
-
-topics = None
-if os.path.exists(TOPICS_PATH):
-    with open(TOPICS_PATH, "rb") as f:
-        topics = pickle.load(f)
-TOPICS_AVAILABLE = topics is not None
-
-print(f"config: hierarchy={hierarchy.number_of_nodes():,} nodes, "
-      f"ic={len(ic_precomputed):,}, topics={len(topics['topic_id_to_topic']) if topics else 0}")
+import config
+print(config.HIERARCHY_PATH)
+import os
+print(os.path.exists(config.HIERARCHY_PATH))
+print(type(config.hierarchy))
