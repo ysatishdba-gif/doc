@@ -1,4 +1,5 @@
-import pickle
+1. Give a CUI → get its topics
+pythonimport pickle
 P = pickle.load(open("topics.pkl", "rb"))
 
 CUI = "C0032285"      # <-- change
@@ -9,3 +10,46 @@ for tp in sorted(tids, key=lambda t: P["topic_id_to_topic"][t]["size"]):
     t = P["topic_id_to_topic"][t] if False else P["topic_id_to_topic"][tp]
     print(f"  {tp}  size={t['size']:>4}  IC={t['anchor_ic']:.3f}  "
           f"anchor '{P['labels'].get(t['canonical'], t['canonical'])}'")
+2. Give a topic ID → get the CUIs in it
+pythonimport pickle
+P = pickle.load(open("topics.pkl", "rb"))
+
+TOPIC_ID = "tp_4385b55dfcd9"     # <-- change
+
+t = P["topic_id_to_topic"].get(TOPIC_ID)
+if not t:
+    print("no such topic:", TOPIC_ID)
+else:
+    anchor = t["canonical"]
+    print(f"{TOPIC_ID}  anchor {anchor} '{P['labels'].get(anchor, anchor)}'  "
+          f"size {t['size']}  IC {t['anchor_ic']:.3f}\n")
+    for cui in sorted(t["members"]):
+        mark = "  <-- anchor" if cui == anchor else ""
+        print(f"  {cui}  '{P['labels'].get(cui, cui)}'{mark}")
+3. Total count of topics
+pythonimport pickle
+P = pickle.load(open("topics.pkl", "rb"))
+print(f"total topics : {len(P['topic_id_to_topic']):,}")
+print(f"CUIs in >=1 topic : {len(P['cui_to_topic_ids']):,}")
+4. How many CUIs were left out (no topic)
+"Left out" = CUIs that exist in the isa hierarchy but ended up in no topic. Compare the full CUI universe against the ones that got topics:
+pythonimport pickle
+P = pickle.load(open("topics.pkl", "rb"))
+
+# all CUIs we tried to place = those in the isa hierarchy
+d = pickle.load(open("isa_precomputed.pkl", "rb"))
+all_cuis = set(d["isa_ancestors"].keys()) | set(d["ic"].keys())
+
+in_topics = set(P["cui_to_topic_ids"].keys())
+left_out  = all_cuis - in_topics
+
+print(f"total CUIs (isa universe) : {len(all_cuis):,}")
+print(f"CUIs in >=1 topic         : {len(in_topics):,}  "
+      f"({len(in_topics)/len(all_cuis)*100:.1f}%)")
+print(f"CUIs left out (no topic)  : {len(left_out):,}  "
+      f"({len(left_out)/len(all_cuis)*100:.1f}%)")
+
+# sample some left-out CUIs to see what they are
+print("\nsample left-out CUIs:")
+for c in list(left_out)[:20]:
+    print(f"  {c}  '{P['labels'].get(c, c)}'  ic={d['ic'].get(c, '?')}")
