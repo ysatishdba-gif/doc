@@ -1,3 +1,39 @@
-base CUIs in H: 373,077 (11s)
-TARGET: 373,077
-200 CUIs: 0.4s  ->  est. full 373,077: 13.0 min
+import time, math
+import networkx as nx
+
+# ---- 1. descendant count for every CUI (collapse suffixes at the end) ----
+t0 = time.time()
+desc_count = {}
+for i, cui in enumerate(TARGET):
+    desc = set()
+    for s in cui_to_suffix[cui]:
+        desc |= nx.descendants(H, s)
+    desc_count[cui] = len({d.split('-')[0] for d in desc if '-' in d} - {cui})
+    if i % 25000 == 0:
+        print(f"  desc {i:,}/{len(TARGET):,} ({time.time()-t0:.0f}s)")
+print(f"descendants done ({time.time()-t0:.0f}s)")
+
+# ---- 2. IC from descendant counts ----
+TOTAL = len(TARGET)
+log_total = math.log(TOTAL + 1)
+ic = {cui: 1.0 - math.log(desc_count[cui] + 1) / log_total for cui in TARGET}
+print("IC done")
+
+# ---- 3. ancestors (parents up the isa tree) for every CUI ----
+t0 = time.time()
+isa_ancestors = {}
+for i, cui in enumerate(TARGET):
+    anc = set()
+    for s in cui_to_suffix[cui]:
+        anc |= nx.ancestors(H, s)
+    isa_ancestors[cui] = {a.split('-')[0] for a in anc if isinstance(a, str) and '-' in a} - {cui}
+    if i % 25000 == 0:
+        print(f"  anc {i:,}/{len(TARGET):,} ({time.time()-t0:.0f}s)")
+print(f"ancestors done ({time.time()-t0:.0f}s)")
+
+# ---- sanity check ----
+for cui, name in [("C0032285","Pneumonia"), ("C0011849","Diabetes"),
+                  ("C0559470","Peanut allergy"), ("C0006277","Bronchitis")]:
+    if cui in desc_count:
+        print(f"  {name:16s} desc={desc_count[cui]:>5}  IC={ic[cui]:.3f}  "
+              f"ancestors={len(isa_ancestors[cui])}")
