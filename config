@@ -1,5 +1,160 @@
-import pickle
-with open("isa_precomputed.pkl", "wb") as f:
-    pickle.dump({"desc_count": desc_count, "ic": ic,
-                 "isa_ancestors": isa_ancestors}, f, protocol=pickle.HIGHEST_PROTOCOL)
-print("saved isa_precomputed.pkl")
+"""
+build_topics.py  (network-only version — no MRREL)
+---------------------------------------------------
+Builds clinical topics from the network graph alone.
+
+PIPELINE:
+  STAGE A : Flatten network graph -> neighbors (who is related)
+  STAGE B : Hierarchy from network isa (precomputed): isa_ancestors + IC
+  STAGE C : Anchor per member = highest-IC in-group isa ancestor, IC >= floor
+  STAGE D : Dedup by anchor -> one topic per anchor
+  STAGE E : (no SY merge here — network space already collapses synonyms)
+
+Inputs (notebook globals):
+  netw                : network DiGraph
+  isa_ancestors       : {cui: set(ancestor cuis)}   from isa_precomputed.pkl
+  ic                  : {cui: ic_score}              from isa_precomputed.pkl
+  LABELS              : {cui: label}                 (or build from elsewhere)
+
+If you have isa_precomputed.pkl on disk:
+  import pickle
+  d = pickle.load(open("isa_precomputed.pkl","rb"))
+  isa_ancestors, ic = d["isa_ancestors"], d["ic"]
+
+Output: topics.pkl
+"""
+
+import pickle, datetime, hashlib, os, time
+from collections import defaultdict
+
+OUTPUT_PATH   = "topics.pkl"
+MIN_ANCHOR_IC = 0.30          # network IC matches MRREL scale; 0.30 floor
+
+ROOT = 'SNOMEDCT_US.isa'
+
+
+# ============================================================
+# STAGE A: Flatten network graph -> neighbors
+# ============================================================
+def flatten_graph(graph, target_cuis):
+    print("  [A] Flattening network graph...")
+    t0 = time.time()
+    neighbors = defaultdict(set)
+    n = 0
+    for cui in target_cuis:
+        n += 1
+        if n % 50000 == 0:
+            print(f"      {n:,}/{len(target_cuis):,} ({time.time()-t0:.0f}s)")
+        if cui not in graph:
+            continue
+        for suffix_child in graph.successors(cui):
+            if "-" not in suffix_child:
+                continue
+            base = suffix_child.rsplit("-", 1)[0]
+            if base != cui:
+                continue
+            for pred in graph.predecessors(suffix_child):
+                if pred == cui or "-" not in pred:
+                    continue
+                other = pred.rsplit("-", 1)[0]
+                if other == cui or other not in target_cuis:
+                    continue
+                neighbors[cui].add(other)
+                neighbors[other].add(cui)
+    edges = sum(len(v) for v in neighbors.values()) // 2
+    print(f"      CUIs with neighbors: {len(neighbors):,}, edges: {edges:,} "
+          f"({time.time()-t0:.0f}s)")
+    return neighbors
+
+
+# ============================================================
+# STAGE C+D: build + dedup topics
+# ============================================================
+def topic_id_for(canonical):
+    return "tp_" + hashlib.sha1(canonical.encode()).hexdigest()[:12]
+
+
+def build_topics(target_cuis, neighbors, isa_ancestors, ic):
+    print(f"  [C] Anchoring (highest-IC in-group ancestor, IC>={MIN_ANCHOR_IC})...")
+    t0 = time.time()
+    canonical_to_members = defaultdict(set)
+    n_filtered = 0
+    n = 0
+    for focal in target_cuis:
+        n += 1
+        if n % 50000 == 0:
+            print(f"      {n:,}/{len(target_cuis):,} ({time.time()-t0:.0f}s)")
+        members = {focal} | neighbors.get(focal, set())
+        if len(members) < 2:
+            continue
+        for m in members:
+            anc = isa_ancestors.get(m, set())
+            in_topic = (anc & members) - {m}        # ancestors that are IN the group
+            if not in_topic:
+                continue
+            qualified = {a for a in in_topic if ic.get(a, 0.0) >= MIN_ANCHOR_IC}
+            if not qualified:
+                n_filtered += 1
+                continue
+            anchor = max(qualified, key=lambda a: ic.get(a, 0.0))
+            canonical_to_members[anchor].add(anchor)
+            canonical_to_members[anchor].add(m)
+    print(f"      done ({time.time()-t0:.0f}s) | filtered_by_IC={n_filtered:,} | "
+          f"anchors={len(canonical_to_members):,}")
+    return dict(canonical_to_members)
+
+
+# ============================================================
+# Main
+# ============================================================
+def main():
+    print(f"BUILD START {datetime.datetime.now().isoformat()}")
+    t_total = time.time()
+
+    target_cuis = set(isa_ancestors.keys()) | set(ic.keys())
+    print(f"  target CUIs: {len(target_cuis):,}")
+
+    neighbors = flatten_graph(netw, target_cuis)
+    canon_to_members = build_topics(target_cuis, neighbors, isa_ancestors, ic)
+
+    print("  [E] Packaging topics...")
+    topic_id_to_topic, canonical_to_topic_id = {}, {}
+    cui_to_topic_ids = defaultdict(set)
+    for canonical, mems in canon_to_members.items():
+        tp = topic_id_for(canonical)
+        fs = frozenset(mems)
+        topic_id_to_topic[tp] = {
+            "canonical": canonical, "members": fs, "size": len(fs),
+            "anchor_ic": ic.get(canonical, 0.0),
+        }
+        canonical_to_topic_id[canonical] = tp
+        for m in fs:
+            cui_to_topic_ids[m].add(tp)
+
+    sizes = sorted(t["size"] for t in topic_id_to_topic.values())
+    if sizes:
+        print(f"      topics={len(topic_id_to_topic):,} | CUIs={len(cui_to_topic_ids):,} | "
+              f"size min/med/p90/p99/max="
+              f"{sizes[0]}/{sizes[len(sizes)//2]}/{sizes[int(.9*len(sizes))]}/"
+              f"{sizes[int(.99*len(sizes))]}/{sizes[-1]}")
+
+    payload = {
+        "topic_id_to_topic":     topic_id_to_topic,
+        "canonical_to_topic_id": canonical_to_topic_id,
+        "cui_to_topic_ids":      {c: sorted(s) for c, s in cui_to_topic_ids.items()},
+        "labels":                globals().get("LABELS", {}),
+        "config": {
+            "anchor_rule": f"highest-IC in-group isa ancestor, IC>={MIN_ANCHOR_IC}",
+            "min_anchor_ic": MIN_ANCHOR_IC,
+            "hierarchy_source": "network isa (SNOMEDCT_US.isa)",
+            "uses_mrrel": False,
+        },
+        "built_at": datetime.datetime.now().isoformat(),
+    }
+    with open(OUTPUT_PATH, "wb") as f:
+        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    print(f"  saved {OUTPUT_PATH} ({os.path.getsize(OUTPUT_PATH)/1024/1024:.1f} MB)")
+    print(f"TOTAL {time.time()-t_total:.0f}s")
+
+
+main()
