@@ -1,37 +1,5 @@
-  desc 0/373,077 (0s)
-  desc 25,000/373,077 (271s)
-  desc 50,000/373,077 (336s)
-  desc 75,000/373,077 (521s)
-  desc 100,000/373,077 (523s)
-  desc 125,000/373,077 (524s)
-  desc 150,000/373,077 (525s)
-  desc 175,000/373,077 (536s)
-  desc 200,000/373,077 (606s)
-  desc 225,000/373,077 (699s)
-  desc 250,000/373,077 (744s)
-  desc 275,000/373,077 (762s)
-  desc 300,000/373,077 (770s)
-  desc 325,000/373,077 (812s)
-  desc 350,000/373,077 (893s)
-descendants done (1012s)
-IC done
-  anc 0/373,077 (0s)
-  anc 25,000/373,077 (19s)
-  anc 50,000/373,077 (21s)
-  anc 75,000/373,077 (34s)
-  anc 100,000/373,077 (37s)
-  anc 125,000/373,077 (38s)
-  anc 150,000/373,077 (40s)
-  anc 175,000/373,077 (60s)
-  anc 200,000/373,077 (120s)
-  anc 225,000/373,077 (187s)
-  anc 250,000/373,077 (191s)
-  anc 275,000/373,077 (210s)
-  anc 300,000/373,077 (221s)
-  anc 325,000/373,077 (226s)
-  anc 350,000/373,077 (276s)
-ancestors done (331s)
-  Pneumonia        desc=  183  IC=0.594  ancestors=29
-  Diabetes         desc=  127  IC=0.622  ancestors=8
-  Peanut allergy   desc=    0  IC=1.000  ancestors=11
-  Bronchitis       desc=  116  IC=0.629  ancestors=26
+import pickle
+with open("isa_precomputed.pkl", "wb") as f:
+    pickle.dump({"desc_count": desc_count, "ic": ic,
+                 "isa_ancestors": isa_ancestors}, f, protocol=pickle.HIGHEST_PROTOCOL)
+print("saved isa_precomputed.pkl")
