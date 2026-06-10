@@ -1,18 +1,15 @@
-cui = "C0032285"   # Pneumonia
+base node attrs: {}
 
-# 1. is the base CUI a node, and does it have attributes?
-if cui in netw:
-    print("base node attrs:", netw.nodes[cui])
-else:
-    print("base CUI is not a direct node")
+suffixed nodes:
+  C0032285-0: {}
+  C0032285-1: {}
+  C0032285-2: {}
+  C0032285-3: {}
+  C0032285-4: {}
 
-# 2. check its suffixed nodes' attributes
-print("\nsuffixed nodes:")
-for s in list(netw.successors(cui))[:5]:
-    print(f"  {s}: {netw.nodes.get(s, {})}")
-
-# 3. also peek at a few random nodes to see the general attribute shape
-print("\nrandom nodes:")
-import itertools
-for n in itertools.islice(netw.nodes(data=True), 5):
-    print(" ", n)
+random nodes:
+  ('Context', {})
+  ('CCSR_ICD10PCS.Empty', {})
+  ('CDCREC.Empty', {})
+  ('CPT.Empty', {})
+  ('GO.Empty', {})
