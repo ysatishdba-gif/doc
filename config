@@ -1,135 +1,1734 @@
-"""
-test_manual.py
---------------
-Demo client. server.py must be running (it caches the document once).
-Edit `query`, re-run. Document side does NOT reprocess.
 
-Output order: DOCUMENT side (cached) -> QUERY side -> RETRIEVAL.
-Retrieval: each shared topic lists its doc CUIs + the chunk NUMBERS it hit,
-then the unique matching chunks are printed once at the end (no repeats).
-"""
+######################################################################
+#  DOCUMENT SIDE (cached — processed once at startup)
+######################################################################
+======================================================================
+DOC doc_0_Discharge_Summary: 'Discharge Summary  (Medical Record > Hospital Document > Discharge Summary > Cardiac Event Discharge > Post-PCI Discharge Summary)'
+======================================================================
+  21 chunks -> 1491 CUIs extracted
 
-from multiprocessing.connection import Client
+  SUMMARIZATION: 1491 in -> 313 out
+  Surviving CUIs:
+      C0743221  Discharge summary  IC=13.1913
+      C4302949  Physician discharge concise summary  IC=14.8007
+      C1998401  History of allergy to latex  IC=14.8007
+      C0260486  Personal history of allergy to sulfonamides  IC=14.8007
+      C0455609  H/O: multiple allergies  IC=14.8007
+      C0455590  allergic reaction to penicillins  IC=12.8548
+      C0455602  H/O: co-trimoxazole allergy  IC=14.8007
+      C0481617  [V]Personal history of non-drug allergy  IC=14.8007
+      C0475698  allergic reaction to sulfa drugs  IC=12.8548
+      C0455608  H/O: plant allergy  IC=14.8007
+      C0455595  allergy to cephalosporins  IC=14.8007
+      C5397161  Allergy to ampicillin and/or floxacillin  IC=13.7021
+      C0730015  [V]Personal history of aspirin allergy  IC=14.8007
+      C0455596  History of tetracycline allergy  IC=14.8007
+      C4749632  Allergic reaction caused by sulfonamide  IC=14.1075
+      C0260484  Personal history of allergy to penicillin  IC=14.8007
+      C0030824  Allergy to penicillin  IC=10.7403
+      C4749629  Allergic reaction caused by penicillin  IC=14.1075
+      C0481615  [V]Personal history of unspecified drug allergy  IC=14.8007
+      C1998306  Allergy to sulfonamide antibiotic  IC=12.2357
+      C0571490  Allergy to mafenide  IC=14.8007
+      C0571636  Allergy to sulfonylurea  IC=12.3158
+      C0571486  Allergy to sulfamethazine  IC=14.8007
+      C0571133  Allergy to probenecid  IC=14.8007
+      C0571483  Allergy to sulfalene  IC=14.8007
+      C0571489  Allergy to sulfanilylurea  IC=14.8007
+      C0038757  Allergy to sulfonamide  IC=10.8304
+      C0571894  Thiazide diuretic allergy  IC=12.7213
+      C0570834  Allergy to sulpiride  IC=14.8007
+      C0571644  Allergy to glymidine  IC=14.8007
+      C0571903  Allergy to furosemide  IC=14.8007
+      C0571929  Allergy to metolazone  IC=14.8007
+      C4305385  Allergy to rosuvastatin  IC=14.8007
+      C1640727  Allergy to sulfonamide diuretic  IC=12.7213
+      C0571904  Allergy to bumetanide  IC=14.8007
+      C0570556  Allergy to sulindac  IC=14.8007
+      C0571932  Allergy to dichlorphenamide  IC=14.8007
+      C0571639  Allergy to glyburide  IC=14.8007
+      C0571933  Allergy to acetazolamide  IC=14.8007
+      C0571642  Allergy to glipizide  IC=14.8007
+      C0571926  Allergy to chlorthalidone  IC=14.8007
+      C0585891  H/O: Myocardial infarction in last year  IC=14.1075
+      C4274366  History of acute ST segment elevation myocardial infarction  IC=14.8007
+      C0455528  H/O: myocardial infarct at less than 60  IC=14.8007
+      C0455529  H/O: myocardial infarct at greater than 60  IC=14.8007
+      C3662187  History of myocardial infarction in last eight weeks  IC=14.8007
+      C3698570  History of non-ST segment elevation myocardial infarction  IC=14.8007
+      C0559158  H/O: myocardial problem  IC=12.3158
+      C1997578  History of cardiac arrest  IC=14.8007
+      C4512001  History of chest pain  IC=14.8007
+      C1320647  History of percutaneous coronary intervention  IC=14.8007
+      C0585892  H/O: Angina in last year  IC=14.8007
+      C4075953  Coronary arteriosclerosis in patient with history of previous myocardial infarction  IC=14.8007
+      C1997319  History of placement of stent in anterior descending branch of left coronary artery  IC=14.8007
+      C0455530  H/O: angina pectoris  IC=14.1075
+      C0585894  H/O: Treatment for ischemic heart disease  IC=14.8007
+      C1275835  History of myocardial infarction  IC=12.6035
+      C1997490  History of placement of stent in circumflex branch of left coronary artery  IC=14.8007
+      C5438408  History of myocardial infarction due to atherothrombotic coronary artery disease  IC=14.8007
+      C1542544  H/O: cardiovascular disease (& [heart disorder] or [myocardial problem])  IC=16.9959
+      C0476718  Observation for suspected myocardial infarction  IC=14.8007
+      C0232326  EKG ST segment changes  IC=10.4569
+      C3531778  Acute ST segment elevation myocardial infarction involving left anterior descending coronary artery  IC=12.8548
+      C5438311  History of myocardial infarction due to demand ischemia  IC=14.8007
+      C4706737  Acute ST segment elevation myocardial infarction of inferolateral wall  IC=14.8007
+      C4039964  Acute ST segment elevation myocardial infarction due to left coronary artery occlusion  IC=12.0281
+      C0264711  Past myocardial infarction diagnosed on ECG AND/OR other special investigation, but currently presenting no symptoms  IC=14.8007
+      C0429101  Reverse tick ST segment  IC=14.8007
+      C5395627  Acute ST segment elevation myocardial infarction due to occlusion of septal branch of anterior descending branch of left coronary artery  IC=14.8007
+      C5396558  Acute ST segment elevation myocardial infarction due to occlusion of mid portion of right coronary artery  IC=14.8007
+      C5395459  Acute ST segment elevation myocardial infarction due to occlusion of anterior descending branch of left coronary artery  IC=13.4144
+      C5817880  Acute ST segment elevation myocardial infarction due to mid left circumflex coronary artery occlusion  IC=14.8007
+      C5396553  Acute ST segment elevation myocardial infarction due to occlusion of proximal portion of right coronary artery  IC=14.8007
+      C5395649  Acute ST segment elevation myocardial infarction due to occlusion of intermediate artery  IC=14.8007
+      C0429029  ST segment  IC=10.4569
+      C4551366  Acute ST segment elevation myocardial infarction due to occlusion of circumflex branch of left coronary artery  IC=13.4144
+      C0264704  Acute myocardial infarction of high lateral wall  IC=14.8007
+      C5395250  Acute ST segment elevation myocardial infarction due to proximal left anterior descending coronary artery occlusion  IC=14.8007
+      C0455335  No significant social history  IC=14.8007
+      C1287236  Social history baseline finding  IC=14.8007
+      C0740860  Denies alcohol abuse  IC=14.8007
+      C3875333  Denies alcohol use  IC=14.8007
+      C4047911  Family history: maternal grandmother alive and well  IC=14.8007
+      C0557468  Patient themselves providing care  IC=11.5426
+      C4047909  Family history: paternal grandmother alive and well  IC=14.8007
+      C1266850  Social context finding  IC=6.9711
+      C2586137  Mother does not smoke  IC=14.1075
+      C1318616  H/O: recreational drug use  IC=14.8007
+      C0556388  Has never misused drugs  IC=14.1075
+      C0455500  H/O: alcoholism  IC=14.8007
+      C0260460  Personal history of alcoholism  IC=14.8007
+      C4076447  Alcohol misuser in household  IC=14.8007
+      C0221628  history of alcohol abuse  IC=14.8007
+      C0478622  Family history of other substance abuse  IC=14.8007
+      C0559555  Family history of alcoholism  IC=12.8548
+      C2186257  reported family history of alcoholism in both parents (history)  IC=14.8007
+      C2316287  Family history of diabetes mellitus type 2  IC=14.1075
+      C0455405  Family history: Hypertension  IC=14.8007
+      C1277321  FH myocardial infarction female first degree age known  IC=14.8007
+      C0424905  Family history with explicit context pertaining to sister  IC=13.7021
+      C1277322  FH myocardial infarction female first degree age unknown  IC=14.8007
+      C0455348  No FH: Hypertension  IC=14.8007
+      C2585258  Family history of cardiovascular disease in first degree male relative less than 55 years of age  IC=14.8007
+      C0455406  Family history: Myocardial infarction  IC=12.6035
+      C0260535  Family history of other condition  IC=10.7063
+      C0573986  Family history observations  IC=9.6245
+      C1276023  FH: Myocardial infarct in 1st degree male relative <55 years  IC=14.8007
+      C1261139  Diabetic relative  IC=14.1075
+      C0455678  No family history of diabetes mellitus  IC=14.8007
+      C1536768  [V] Family history of: [ischemic heart disease] or [myocardial infarction]  IC=16.9959
+      C1276032  FH: Angina in 1st degree male relative <55 years  IC=14.8007
+      C1562166  Family history of diabetes mellitus in first degree relative  IC=14.8007
+      C1579475  FH: Myocardial infarction > 60  IC=16.9959
+      C1534281  No FH: Ischemic heart disease (& [angina])  IC=16.9959
+      C1277320  FH myocardial infarction male first degree age unknown  IC=14.8007
+      C4510820  Family history of hyperlipidemia  IC=12.7213
+      C2317524  Family history of coronary arteriosclerosis  IC=14.1075
+      C4047908  Family history: Paternal grandfather alive and well  IC=14.8007
+      C0424885  Family history with explicit context pertaining to paternal grandfather  IC=14.1075
+      C4047910  Family history: maternal grandfather alive and well  IC=14.8007
+      C0424907  FH: Sister alive with problem  IC=14.8007
+      C2919333  High troponin I level  IC=14.8007
+      C0586984  Cardiac enzymes abnormal - first set  IC=14.8007
+      C1278065  Serum troponin I measurement  IC=14.8007
+      C0920210  Troponin I measurement  IC=12.8548
+      C1278063  Plasma troponin I measurement  IC=14.8007
+      C0523952  Troponin measurement  IC=12.2357
+      C0523953  Troponin T cardiac measurement  IC=14.8007
+      C0020538  Hypertensive disease  IC=7.7342
+      C0264703  Acute myocardial infarction, basal-lateral  IC=14.8007
+      C1696708  Prehypertension  IC=14.8007
+      C5817881  Acute ST segment elevation myocardial infarction due to distal left circumflex coronary artery occlusion  IC=14.8007
+      C2349195  Acute Anterior Wall Myocardial Infarction  IC=11.3042
+      C0348591  Acute transmural myocardial infarction of unspecified site  IC=14.8007
+      C5817879  Acute ST segment elevation myocardial infarction due to proximal left circumflex coronary artery occlusion  IC=14.8007
+      C3698282  Acute myocardial infarction due to left coronary artery occlusion  IC=12.0926
+      C0392462  Benign hypertensive heart disease without congestive heart failure  IC=14.8007
+      C1541655  Hypertensive heart disease NOS without congestive cardic failure  IC=16.9959
+      C3697762  Hypertensive heart AND chronic kidney disease stage 1  IC=14.8007
+      C4048003  Benign hypertensive heart disease and chronic renal disease stage 3  IC=14.8007
+      C3532953  Hypertensive heart AND chronic kidney disease stage 3  IC=14.8007
+      C3532954  Hypertensive heart AND chronic kidney disease stage 2  IC=14.8007
+      C4048002  Benign hypertensive heart disease and chronic renal disease stage 2  IC=14.8007
+      C4048001  Benign hypertensive heart disease and chronic renal disease stage 1  IC=14.8007
+      C5396575  Percutaneous coronary intervention of anterior descending branch of left coronary artery  IC=14.8007
+      C0583691  Seen by cardiology service  IC=14.8007
+      C0199297  MEDICAL CONSULTATIONS - OFFICE - OUTPATIENT - EMERGENCY DEPARTMENT  IC=12.8548
+      C0583557  Seen by cardiologist  IC=14.8007
+      C0586084  Referral to cardiologist  IC=14.1075
+      C0580136  Private referral to cardiologist  IC=14.8007
+      C0583598  Seen by cardiothoracic surgeon  IC=13.7021
+      C1273964  Discussed with consultant  IC=14.8007
+      C0422277  Seen by consultant  IC=14.8007
+      C0199305  Medical consultation on inpatient  IC=12.3158
+      C0199306  Medical consultation on hospital inpatient  IC=14.8007
+      C0583764  Seen by cardiothoracic surgery service  IC=13.7021
+      C5788979  Group consultation  IC=14.1075
+      C0583781  Seen by urology service  IC=14.8007
+      C0451624  Seen in cardiac clinic  IC=14.1075
+      C0583559  Seen by thoracic physician  IC=14.8007
+      C0422268  Seen by social worker  IC=13.7021
+      C0583600  Seen by cardiac surgeon  IC=14.8007
+      C4316478  Discussed with specialist  IC=14.8007
+      C0583599  Seen by thoracic surgeon  IC=14.8007
+      C0584235  Seen by cardiac surgery service  IC=14.8007
+      C0583574  Seen by care of the elderly physician  IC=14.8007
+      C0583769  Seen by general surgery service  IC=14.8007
+      C0583712  Seen by nuclear medicine service  IC=14.8007
+      C0583425  Under care of cardiac surgeon  IC=14.8007
+      C4284587  Physician consulting initial evaluation note  IC=14.8007
+      C1269802  Clinical consultation report  IC=9.2752
+      C0558857  Abdominal rigidity absent  IC=14.8007
+      C1827038  On examination - lungs normal  IC=16.9959
+      C0422822  Nil abnormal on examination  IC=14.8007
+      C0577151  Shifting abdominal dullness absent  IC=14.8007
+      C0437437  O/E - abdominal reflex normal  IC=14.8007
+      C0577820  Heart murmur absent  IC=14.8007
+      C0436945  O/E - no rebound tenderness  IC=14.8007
+      C0577259  Prostate non-tender  IC=14.8007
+      C0426624  No excessive upper gastrointestinal gas  IC=14.8007
+      C0438122  Abdomen examined - NAD  IC=14.8007
+      C0436956  O/E - no abdominal rigidity  IC=14.8007
+      C0436770  O/E - pulse character normal  IC=14.8007
+      C0427043  No stiff neck  IC=14.8007
+      C0437002  O/E - ascites not demonstrated  IC=14.8007
+      C0436934  O/E - no guarding on palpation  IC=14.8007
+      C0577291  Spleen non-tender  IC=14.8007
+      C0437025  O/E - bowel sounds normal  IC=14.8007
+      C0577145  No abdominal guarding on palpation  IC=14.8007
+      C0424826  Abdomen not distended  IC=14.8007
+      C0438107  General examination - nil abnormal  IC=14.8007
+      C0588114  O/E - no gallop rhythm  IC=14.8007
+      C0578586  No eye discharge  IC=14.8007
+      C0436568  O/E patient well  IC=14.1075
+      C0436911  On examination - abdominal wall moves normally  IC=14.8007
+      C0437767  O/E - vesicles not present  IC=14.8007
+      C0425555  No hiccough  IC=14.8007
+      C0426663  Abdomen soft  IC=14.8007
+      C0436915  On examination - abdominal wall contour normal  IC=14.8007
+      C0437021  O/E-percussion of abdomen NAD  IC=14.8007
+      C5395763  No pain in abdominal region on palpation  IC=14.8007
+      C0436822  O/E - heart sounds normal  IC=14.8007
+      C0437665  O/E - no discharge from ear  IC=14.8007
+      C1299454  Patient discharged alive  IC=14.8007
+      C0730368  O/E - BP reading: no postural drop  IC=14.8007
+      C0436795  O/E - BP stable  IC=14.8007
+      C1290982  Vital signs finding  IC=8.1517
+      C0436786  O/E - BP reading normal  IC=14.8007
+      C0581844  Patient's condition satisfactory  IC=14.8007
+      C0438953  Discharged from hospital  IC=13.1913
+      C0577837  Pulse rate stable  IC=14.8007
+      C0436759  O/E - pulse rate normal  IC=14.8007
+      C2314972  Ready for discharge  IC=14.8007
+      C1628333  Verbalizes discharge instructions regarding activity plan  IC=14.8007
+      C1640390  Tolerates activity for discharge setting  IC=14.8007
+      C3871203  At discharge  IC=14.8007
+      C0420296  Discharged from inpatient care  IC=14.8007
+      C3872865  Inpatient management not required  IC=14.8007
+      C0586514  Discharge status  IC=11.9103
+      C1563138  Discharged from accident and emergency (finding)  IC=14.8007
+      C1997685  Medically fit for discharge  IC=14.8007
+      C0420300  Discharged from hospital care NOS  IC=14.8007
+      C0584269  Discharge by physician  IC=10.2468
+      C0584271  Discharge by cardiologist  IC=14.8007
+      C0584343  Discharge by vascular surgeon  IC=14.8007
+      C0584422  Discharge from cardiology service  IC=14.8007
+      C0184714  Patient discharge, to home, ambulatory  IC=14.8007
+      C1320654  Already on aspirin  IC=14.8007
+      C4081517  Medication prescription not provided at discharge  IC=14.8007
+      C2315089  Aspirin given  IC=13.7021
+      C5569148  Aspirin- and atorvastatin- and clopidogrel-containing product in oral dose form  IC=14.8007
+      C5569145  Aspirin 75 mg and atorvastatin (as atorvastatin calcium) 20 mg and clopidogrel (as clopidogrel bisulfate) 75 mg oral capsule  IC=14.8007
+      C1329076  {30 (aspirin 81 MG Oral Tablet) / 30 (pravastatin sodium 40 MG Oral Tablet) } Pack  IC=14.1075
+      C1319917  Clopidogrel declined  IC=14.8007
+      C1276380  Taking aspirin education  IC=14.8007
+      C1277232  Aspirin indicated  IC=14.8007
+      C4756601  Hydrochlorothiazide and metoprolol only product in oral dose form  IC=14.8007
+      C3216463  hydrochlorothiazide / metoprolol Oral Product  IC=13.1913
+      C4753497  Hydrochlorothiazide and metoprolol only product  IC=14.8007
+      C0717827  hydrochlorothiazide / metoprolol  IC=13.1913
+      C4053458  Dietary Approaches To Stop Hypertension  IC=14.8007
+      C0420183  Low salt diet - prophylaxis  IC=14.8007
+      C0566604  Recommendation to change sodium intake  IC=14.1075
+      C5566623  Dietary sodium intake normal  IC=14.8007
+      C0012169  Low sodium diet  IC=13.0089
+      C0418846  Low salt diet education  IC=14.8007
+      C1633736  Recommendation to change diet  IC=11.6652
+      C0562663  Recommendation to change dietary intake  IC=10.9295
+      C3494667  Recommendation to continue current diet  IC=14.8007
+      C2243019  Low cholesterol-low saturated fat diet  IC=14.8007
+      C0418844  Low fat diet education  IC=14.8007
+      C3661825  General healthful diet  IC=14.8007
+      C0521974  Diet, High-Fat  IC=14.8007
+      C4082209  Increased sodium diet  IC=14.8007
+      C1276372  Recommendation to avoid nut intake  IC=14.8007
+      C0184625  Normal diet  IC=13.4144
+      C0418856  Patient advised about diet NOS  IC=14.8007
+      C0452298  Low saturated fat diet  IC=14.1075
+      C0452373  Low monosodium glutamate diet  IC=14.8007
+      C0418850  Low protein diet education  IC=14.8007
+      C0311137  Sodium restricted diet, 90 milliequivalents  IC=14.8007
+      C0452340  High sodium diet  IC=14.8007
+      C0425434  Dietary sodium - low  IC=14.8007
+      C2316118  Excessive dietary intake of potassium  IC=16.9959
+      C0425436  Dietary sodium - high  IC=14.8007
+      C2316117  Inadequate dietary intake of potassium  IC=16.9959
+      C0425437  Dietary potassium - low  IC=14.8007
+      C0425431  Dietary salt intake NOS  IC=14.8007
+      C0425440  dietary fat intake  IC=8.4799
+      C2315043  Inadequate dietary mineral intake  IC=16.9959
+      C1287880  Dietary fat intake - finding  IC=16.9959
+      C0425433  Dietary sodium intake  IC=13.1913
+      C5437796  Excessive intake of potassium  IC=14.8007
+      C2315515  Inadequate dietary intake of calcium  IC=16.9959
+      C0425439  Dietary potassium - high  IC=14.8007
+      C3714388  Inadequate sodium intake  IC=14.8007
+      C0418829  Postoperative procedure education  IC=14.1075
+      C2585426  Postoperative follow-up visit  IC=14.1075
+      C2584756  Postoperative physical examination  IC=14.1075
+      C4302491  Postoperative blood pressure measurement  IC=14.8007
+      C0205903  Postoperative Procedures  IC=11.9103
+      C4545324  Education about internal cardiac defibrillator  IC=14.8007
+      C4040266  History of removal of cardiac device  IC=14.8007
+      C2733619  Automatic implantable cardiac defibrillator in situ (finding)  IC=14.1075
+      C2711273  Cardiac defibrillator in situ  IC=13.4144
+      C1319386  Patient advised about cardiovascular disorder  IC=16.9959
+      C2584973  Visit with doctor at next appointment requested  IC=14.8007
+      C0420318  Medical follow-up  IC=14.1075
+      C1278504  Attending cardiology clinic  IC=16.9959
+      C3650862  Scheduling of follow up appointment  IC=14.8007
+      C0420331  Follow-up 1 week  IC=14.8007
+      C0419818  Follow-up cardiac assessment  IC=14.8007
+      C0184760  Patient follow-up planned and scheduled  IC=14.8007
+      C0421172  Next hospital appointment  IC=14.8007
+      C3494669  Patient informed - arrange follow-up care  IC=14.8007
+      C1446243  Patient asked to make an appointment  IC=16.9959
+      C0420329  Follow-up 2-3 days  IC=14.8007
+      C0422322  Follow-up consultation  IC=13.7021
+      C1276006  Chiropody follow-up  IC=14.8007
+      C0420328  Follow-up 1 day  IC=14.8007
+      C0589121  Follow-up visit  IC=11.1631
+      C0420298  Discharged from private hospital  IC=14.8007
+      C1542036  No follow-up: [none arranged] or [discharged]  IC=16.9959
+      C0567449  Declined consent for surgical procedure  IC=14.8007
+      C1446381  Patient non-compliant - declined intervention / support  IC=14.8007
+      C1320725  Physician consent obtained  IC=14.8007
+      C4544792  Declined consent for treatment  IC=14.1075
+      C4040366  Patient notified of treatment plan  IC=14.8007
+      C2585055  Referral declined by patient  IC=11.5426
+      C3875415  Consent declined for examination of respiratory system  IC=14.8007
+      C3875291  Consent declined for examination of cardiovascular system  IC=14.8007
+      C1320724  Self consent  IC=14.8007
+      C4706267  Follow-up encounter declined  IC=13.7021
+  TOPICS (213):
+    tp_7143686fddfa  size=   2  IC=0.946  'C0577125'
+    tp_e8334614446f  size=   2  IC=0.875  'C5438250'
+    tp_4fb4005ece9c  size=   2  IC=0.946  'C0424884'
+    tp_358c07ef0757  size=   2  IC=0.946  'C5788979'
+    tp_17931bf2d005  size=   2  IC=0.946  'C4749632'
+    tp_4f95fcd82ead  size=   2  IC=0.946  'C2586137'
+    tp_1f18dab8bd57  size=   2  IC=0.946  'C5967376'
+    tp_861c9a10069a  size=   2  IC=0.914  'C0455405'
+    tp_e3229345a5c7  size=   2  IC=0.946  'C0585891'
+    tp_3c28740c6344  size=   2  IC=0.946  'C5569149'
+    tp_31a26e032c11  size=   2  IC=0.829  'C3216463'
+    tp_f1a836303a94  size=   2  IC=0.946  'C4544792'
+    tp_7bbad52381e7  size=   2  IC=0.946  'C2584756'
+    tp_4d388634c958  size=   2  IC=0.946  'C0424886'
+    tp_a3ac2ea0fde0  size=   2  IC=0.946  'C0424887'
+    tp_3e5f7a151609  size=   2  IC=0.946  'C0556388'
+    tp_b115be43c3b3  size=   2  IC=0.914  'C4512001'
+    tp_208f691f30c7  size=   2  IC=0.946  'C2316287'
+    tp_dbd02ff3910a  size=   2  IC=0.946  'C0418829'
+    tp_98e6d71be3b6  size=   2  IC=0.946  'C4749629'
+    tp_b24ad623ed97  size=   2  IC=0.946  'C0586084'
+    tp_dade5f491a71  size=   2  IC=0.946  'C1273998'
+    tp_802d0021e66f  size=   2  IC=0.914  'C5569148'
+    tp_65d3eda7ca57  size=   2  IC=0.946  'C6009209'
+    tp_c3ff85d18be8  size=   2  IC=0.946  'C0451624'
+    tp_5dc86c003652  size=   2  IC=0.914  'C0455407'
+    tp_7aaab9a6cb9f  size=   2  IC=0.946  'C0452298'
+    tp_04fc1d237535  size=   2  IC=0.946  'C2317524'
+    tp_ad204cb13329  size=   2  IC=0.946  'C2733619'
+    tp_f7d6b70a13ca  size=   2  IC=0.946  'C1287882'
+    tp_be1a4ee2259a  size=   2  IC=0.946  'C3661730'
+    tp_374d34bd4c8e  size=   2  IC=0.914  'C1997578'
+    tp_a27e502f548f  size=   2  IC=0.946  'C0455530'
+    tp_81f3aaf30bd3  size=   2  IC=0.946  'C0424885'
+    tp_bd4e88eb53e2  size=   3  IC=0.914  'C0920210'
+    tp_aaa9ecccdfcf  size=   3  IC=0.914  'C0422268'
+    tp_59e5ef8276a7  size=   3  IC=0.914  'C5397161'
+    tp_b469eaaa6118  size=   3  IC=0.813  'C0717827'
+    tp_af79457e9ea8  size=   3  IC=0.838  'C0523952'
+    tp_7b8e4b5d36df  size=   3  IC=0.892  'C2711273'
+    tp_035ba8fb5b91  size=   3  IC=0.914  'C4040040'
+    tp_6ed150441aae  size=   3  IC=0.914  'C0155591'
+    tp_32364c1b4dba  size=   3  IC=0.914  'C4706267'
+    tp_3528ece93b7f  size=   3  IC=0.914  'C0583558'
+    tp_4bcccfe3fb12  size=   3  IC=0.821  'C0455369'
+    tp_64a1c7c4d438  size=   3  IC=0.914  'C3661707'
+    tp_6dd3cedd214e  size=   3  IC=0.914  'C0583598'
+    tp_b17e1f0e50eb  size=   3  IC=0.848  'C0589121'
+    tp_03940e001c04  size=   3  IC=0.914  'C5768706'
+    tp_2272e56e5d88  size=   3  IC=0.892  'C4749622'
+    tp_b1f6ee60cc78  size=   3  IC=0.914  'C0583764'
+    tp_0e4dc766bd13  size=   3  IC=0.892  'C0556387'
+    tp_01d87e548634  size=   3  IC=0.914  'C0423651'
+    tp_3daf3e23dd1a  size=   3  IC=0.875  'C5569146'
+    tp_08974477692f  size=   3  IC=0.914  'C2315089'
+    tp_a8b4ccc216c5  size=   3  IC=0.86  'C5686780'
+    tp_ce7b4bffaa8e  size=   3  IC=0.914  'C0583423'
+    tp_0f87b3175e92  size=   3  IC=0.914  'C0199305'
+    tp_47288a2b062b  size=   3  IC=0.86  'C6009568'
+    tp_bcf2725b8cc3  size=   3  IC=0.914  'C0422322'
+    tp_4412dae30ca3  size=   4  IC=0.892  'C4551366'
+    tp_1d0b13e078a4  size=   4  IC=0.892  'C1997535'
+    tp_aac40d260f48  size=   4  IC=0.813  'C1446911'
+    tp_52cb251ec7a5  size=   4  IC=0.892  'C1320648'
+    tp_5413485a8688  size=   4  IC=0.875  'C2585426'
+    tp_50ed10e46497  size=   4  IC=0.784  'C3698282'
+    tp_626e20695491  size=   4  IC=0.892  'C0452371'
+    tp_279494640aef  size=   4  IC=0.892  'C1269802'
+    tp_14919b059820  size=   4  IC=0.821  'C1827887'
+    tp_f2accc6049fa  size=   4  IC=0.892  'C5395459'
+    tp_bd4e6dd9b759  size=   4  IC=0.892  'C1141947'
+    tp_ee06858fae5d  size=   4  IC=0.669  'C1287081'
+    tp_27474e9194c5  size=   4  IC=0.794  'C0559158'
+    tp_9fd36bb14263  size=   4  IC=0.892  'C0424905'
+    tp_f5f6258a04b4  size=   4  IC=0.848  'C3531778'
+    tp_7d625f516054  size=   4  IC=0.838  'C4510820'
+    tp_6826c04e547e  size=   4  IC=0.892  'C0184625'
+    tp_80c1992f764b  size=   5  IC=0.848  'C0743221'
+    tp_ac46bb6378a2  size=   5  IC=0.875  'C0438953'
+    tp_2d5a9501cfd4  size=   5  IC=0.875  'C3494551'
+    tp_e3f2d7bad6b0  size=   5  IC=0.875  'C0340308'
+    tp_cd49076acadf  size=   5  IC=0.749  'C1633736'
+    tp_e600f6f2028d  size=   5  IC=0.848  'C5768707'
+    tp_2a4d4e7965f8  size=   5  IC=0.813  'C3494593'
+    tp_173962c92a24  size=   5  IC=0.759  'C1313980'
+    tp_c7cd396365d7  size=   5  IC=0.875  'C0429029'
+    tp_780db893bbe0  size=   5  IC=0.875  'C3494591'
+    tp_c8603b53ca8c  size=   5  IC=0.875  'C0184713'
+    tp_e4bc06b2f737  size=   5  IC=0.794  'C3216026'
+    tp_d09afa17ee73  size=   6  IC=0.789  'C3838738'
+    tp_60aa4014dc77  size=   6  IC=0.813  'C1631603'
+    tp_d4e82afa30d3  size=   6  IC=0.86  'C1629031'
+    tp_69a0215c1088  size=   6  IC=0.763  'C0562663'
+    tp_69bd15658572  size=   6  IC=0.784  'C1299498'
+    tp_49a63ddc9dbd  size=   6  IC=0.779  'C1290004'
+    tp_9ac5b0c7d4f4  size=   6  IC=0.829  'C1313937'
+    tp_c3415d271c57  size=   6  IC=0.732  'C1273104'
+    tp_0ff369862eb3  size=   6  IC=0.73  'C0585031'
+    tp_35a48c650812  size=   6  IC=0.86  'C3494590'
+    tp_cbb23639921b  size=   7  IC=0.838  'C0012169'
+    tp_c6b227c00db3  size=   7  IC=0.829  'C0577836'
+    tp_9cb15a848f15  size=   7  IC=0.794  'C0340311'
+    tp_488e5909e7fc  size=   7  IC=0.838  'C0455346'
+    tp_11d10bb6894d  size=   7  IC=0.775  'C2349195'
+    tp_bed354481094  size=   7  IC=0.848  'C4040918'
+    tp_bc7680bb6333  size=   7  IC=0.848  'C4755509'
+    tp_10a188c0f99f  size=   7  IC=0.8  'C4039964'
+    tp_71f493d0e72f  size=   8  IC=0.806  'C0155668'
+    tp_418931c09d75  size=   8  IC=0.838  'C0562669'
+    tp_65bb7407e237  size=   8  IC=0.705  'C0025859'
+    tp_401482433de9  size=   8  IC=0.813  'C0242970'
+    tp_13691b4be575  size=   8  IC=0.838  'C4756601'
+    tp_c62d3aa34a0e  size=   8  IC=0.838  'C1640727'
+    tp_3dc54385560c  size=   9  IC=0.829  'C0455406'
+    tp_7eb370d98571  size=   9  IC=0.813  'C0005824'
+    tp_70b0c574d6e0  size=   9  IC=0.829  'C4753497'
+    tp_d176dc54b60c  size=   9  IC=0.525  'C1290982'
+    tp_b08c4f6340bb  size=   9  IC=0.829  'C0571873'
+    tp_a5ce802e5dff  size=   9  IC=0.775  'C0849584'
+    tp_84138f8c525d  size=  10  IC=0.766  'C0332123'
+    tp_0fc70ccc6bc1  size=  10  IC=0.813  'C1275835'
+    tp_cdb42ef1ce5b  size=  10  IC=0.821  'C0559129'
+    tp_6d313b37d2a1  size=  10  IC=0.705  'C0261773'
+    tp_3dce03951c92  size=  10  IC=0.6  'C0584236'
+    tp_3ded8119379c  size=  10  IC=0.714  'C0038757'
+    tp_93d050f16d24  size=  10  IC=0.723  'C0413443'
+    tp_b5149f5c1afb  size=  10  IC=0.821  'C0155587'
+    tp_8c5b6864a37b  size=  10  IC=0.716  'C0205903'
+    tp_eb37c4bee57e  size=  10  IC=0.779  'C0452347'
+    tp_d351b84da777  size=  11  IC=0.673  'C1282984'
+    tp_dfa3cf725153  size=  11  IC=0.672  'C0232326'
+    tp_316ea4dec772  size=  11  IC=0.743  'C5396574'
+    tp_fe5c8fea64fd  size=  11  IC=0.813  'C0571636'
+    tp_be08e50477fd  size=  12  IC=0.759  'C1282424'
+    tp_a37919f62806  size=  12  IC=0.8  'C0573980'
+    tp_db2e8a1bffa6  size=  12  IC=0.784  'C0586514'
+    tp_ce9564335002  size=  12  IC=0.716  'C0428732'
+    tp_afc54d36a54d  size=  13  IC=0.8  'C1998306'
+    tp_1015c763f86b  size=  13  IC=0.784  'C5881104'
+    tp_7a84dbd09118  size=  13  IC=0.784  'C1626923'
+    tp_a8c0b3902b3b  size=  13  IC=0.714  'C1303258'
+    tp_79973b0ee3f7  size=  14  IC=0.688  'C1271104'
+    tp_df51f8a9d2d6  size=  14  IC=0.789  'C1277226'
+    tp_ca8ebdf59240  size=  14  IC=0.712  'C0559157'
+    tp_5cc188206f1c  size=  14  IC=0.711  'C0586002'
+    tp_70a5669c7adc  size=  15  IC=0.732  'C1690487'
+    tp_d9fc14392bef  size=  15  IC=0.544  'C0438195'
+    tp_eec142039aad  size=  15  IC=0.756  'C0557468'
+    tp_07c707790dd0  size=  15  IC=0.697  'C0559128'
+    tp_b82e61af5a19  size=  16  IC=0.784  'C1719469'
+    tp_3688e2542e30  size=  17  IC=0.779  'C3714287'
+    tp_91efe4b68a25  size=  17  IC=0.779  'C0420327'
+    tp_92e9a808a8b8  size=  17  IC=0.775  'C0420372'
+    tp_96575dc97790  size=  17  IC=0.779  'C3714288'
+    tp_ce2afe093258  size=  18  IC=0.581  'C0558689'
+    tp_152c940ec47a  size=  18  IC=0.746  'C2585055'
+    tp_d0208c613a82  size=  18  IC=0.707  'C0589120'
+    tp_f09c451db259  size=  19  IC=0.663  'C0455404'
+    tp_85467b2006a3  size=  20  IC=0.746  'C0030824'
+    tp_6268de7fd885  size=  20  IC=0.732  'C0583762'
+    tp_f71a8a4492f9  size=  20  IC=0.65  'C0155626'
+    tp_e481dad786d2  size=  20  IC=0.735  'C0584315'
+    tp_c63cdf31c53a  size=  21  IC=0.628  'C0455586'
+    tp_e5a71c299ad1  size=  21  IC=0.735  'C0583596'
+    tp_fb1fcbe33a64  size=  22  IC=0.749  'C0584419'
+    tp_bcfb4216089f  size=  22  IC=0.749  'C0583689'
+    tp_47e21aa730a7  size=  25  IC=0.68  'C0424914'
+    tp_8a67c273506a  size=  25  IC=0.711  'C0455367'
+    tp_1acaccd461c3  size=  26  IC=0.707  'C0455332'
+    tp_a63abd9cce69  size=  27  IC=0.725  'C0420210'
+    tp_52333476628b  size=  28  IC=0.658  'C0586888'
+    tp_425a04f460a1  size=  28  IC=0.622  'C0565662'
+    tp_83b75c302cfe  size=  29  IC=0.569  'C1290908'
+    tp_e61091275ecc  size=  30  IC=0.621  'C0020538'
+    tp_f3a3d2ec179c  size=  31  IC=0.732  'C0570537'
+    tp_7a4fb3ef2c8c  size=  32  IC=0.546  'C0012155'
+    tp_63edd015ec8a  size=  32  IC=0.595  'C3217108'
+    tp_aba03160996e  size=  32  IC=0.562  'C0419178'
+    tp_9b993165b4b8  size=  33  IC=0.568  'C0020261'
+    tp_ede7d53dbf0a  size=  34  IC=0.684  'C0542304'
+    tp_91c906f9a876  size=  34  IC=0.68  'C0204932'
+    tp_af049294b576  size=  35  IC=0.659  'C4531205'
+    tp_3425ee070446  size=  38  IC=0.525  'C1266850'
+    tp_8b8245d1abfd  size=  39  IC=0.645  'C0584269'
+    tp_f579c04c73f2  size=  39  IC=0.409  'C1287110'
+    tp_c3ac8124ba4a  size=  39  IC=0.695  'C1319048'
+    tp_23570703151c  size=  41  IC=0.615  'C0150600'
+    tp_1fd1d5b10bd7  size=  42  IC=0.673  'C0455618'
+    tp_ae3402840f15  size=  49  IC=0.634  'C3874402'
+    tp_be4ff3abb4a9  size=  49  IC=0.603  'C0420382'
+    tp_abbb3c570443  size=  55  IC=0.654  'C0586146'
+    tp_f3765a74421e  size=  59  IC=0.41  'C0585724'
+    tp_de9eb961050e  size=  61  IC=0.374  'C0031809'
+    tp_48574c7fc8e7  size=  62  IC=0.599  'C0344905'
+    tp_18affb04d3ad  size=  64  IC=0.639  'C0009818'
+    tp_4208fba9d141  size=  67  IC=0.66  'C1276746'
+    tp_82d1b2878416  size=  69  IC=0.481  'C1562177'
+    tp_c8bb84f861db  size=  73  IC=0.507  'C0559550'
+    tp_84feca9ab430  size=  78  IC=0.577  'C1271408'
+    tp_26d75783048e  size=  78  IC=0.415  'C0087111'
+    tp_a51cd0963737  size=  85  IC=0.589  'C0522055'
+    tp_ac5cb962a3bb  size=  89  IC=0.482  'C0241889'
+    tp_b9fe61df1909  size=  89  IC=0.64  'C0585862'
+    tp_e2b5eecd3b8d  size=  98  IC=0.451  'C2317559'
+    tp_459015b9ca14  size= 105  IC=0.552  'C0420590'
+    tp_ac524d20e417  size= 123  IC=0.439  'C3539909'
+    tp_067671ddf49a  size= 126  IC=0.383  'C1293083'
+    tp_92189052f32e  size= 128  IC=0.458  'C0428486'
+    tp_ad421af205b3  size= 138  IC=0.435  'C0039401'
+    tp_554934252df6  size= 169  IC=0.538  'C0161816'
+    tp_0b7771d230be  size= 190  IC=0.527  'C1276745'
+    tp_a1d7a3403e78  size= 291  IC=0.385  'C0202202'
+    tp_040e78072525  size= 553  IC=0.457  'C0013182'
 
-# ====== EDIT THIS (document is fixed/cached on the server) ======
-query = "Do you have chest pain or shortness of breath?"
-# ================================================================
+######################################################################
+#  QUERY SIDE (LLM nature-breakdown)
+######################################################################
+======================================================================
+QUERY: 'Do you have chest pain or shortness of breath?'
+======================================================================
 
+Expanded: 'Presence, characteristics, and associated symptoms of chest pain, including its location, radiation, quality (e.g., sharp, dull, crushing, pressure, burning), severity, duration, aggravating factors, and alleviating factors. Additionally, presence, characteristics, and associated symptoms of shortness of breath (dyspnea), including its onset, duration, severity, aggravating factors (e.g., exertion, lying flat), and alleviating factors, as well as any associated symptoms such as wheezing, cough, orthopnea, or paroxysmal nocturnal dyspnea.'
+Total intents: 2
 
-def hr(ch="=", n=70):
-    print(ch * n)
+----------------------------------------------------------------------
+  INTENT 1: Chest Pain Characteristics
+    Nature:      Symptom / Assessment
+    Description: This intent captures the detailed characteristics and associated factors of chest pain, crucial for differential diagnosis and management.
+    Sub-natures (8):
+      - Symptom >> Presence
+          atomic: chest pain
+      - Symptom >> Location
+          atomic: location
+      - Symptom >> Radiation
+          atomic: radiation
+      - Symptom >> Quality
+          atomic: sharp
+          atomic: dull
+          atomic: crushing
+          atomic: pressure
+          atomic: burning
+      - Symptom >> Severity
+          atomic: severity
+      - Symptom >> Duration
+          atomic: duration
+      - Symptom >> Modifying Factors >> Aggravating
+          atomic: aggravating factors
+      - Symptom >> Modifying Factors >> Alleviating
+          atomic: alleviating factors
 
+----------------------------------------------------------------------
+  INTENT 2: Dyspnea Characteristics and Associated Symptoms
+    Nature:      Symptom / Assessment
+    Description: This intent captures the detailed characteristics of shortness of breath (dyspnea) and any associated respiratory symptoms, vital for diagnosing respiratory or cardiac conditions.
+    Sub-natures (7):
+      - Symptom >> Presence
+          atomic: shortness of breath
+          atomic: dyspnea
+      - Symptom >> Onset
+          atomic: onset
+      - Symptom >> Duration
+          atomic: duration
+      - Symptom >> Severity
+          atomic: severity
+      - Symptom >> Modifying Factors >> Aggravating
+          atomic: exertion
+          atomic: lying flat
+      - Symptom >> Modifying Factors >> Alleviating
+          atomic: alleviating factors
+      - Symptom >> Associated Symptoms
+          atomic: wheezing
+          atomic: cough
+          atomic: orthopnea
+          atomic: paroxysmal nocturnal dyspnea
 
-def cl(cuis):
-    return ", ".join(cuis) if cuis else "(none)"
+----------------------------------------------------------------------
+  CUI EXTRACTION
+----------------------------------------------------------------------
 
+  INTENT: Chest Pain Characteristics
+    sub_nature: Symptom >> Presence
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Presence'                   -> 75 CUIs: C3854307, C0442721, C0150312, C1444703, C1298907, C1385355, C1385328, C0392148, C2827364, C1385325, C0332443, C1547035, C1385330, C0680061, C1385335, C1278507, C2724205, C1385358, C1264691, C4036112, C1385340, C3841436, C1545438, C0515453, C1399223, C4061065, C1301671, C1553521, C1385352, C1301736, C3842851, C3843614, C5933777, C1444639, C1402166, C1385350, C5963502, C0517220, C1385338, C1385378, C0576688, C5890400, C2724207, C0680145, C1444714, C1385354, C4266677, C5204265, C1456498, C5924584, C1555313, C5220288, C0470168, C3243801, C1548417, C2986424, C3166194, C3243309, C4710740, C5963579, C3662246, C1551357, C0521090, C1709643, C0470196, C3243303, C3174772, C3839526, C4698078, C3242211, C3243800, C5963067, C4082130, C4086634, C0586311
+      [atomic] 'chest pain'                 -> 39 CUIs: C3842521, C3695051, C0742314, C3695050, C0742321, C3475903, C3695052, C2073318, C0742295, C2924503, C0742298, C3842024, C0742320, C0856134, C0742294, C4697749, C0742281, C0742317, C0848187, C0438716, C3695057, C0742318, C2073319, C0742293, C2073252, C3695053, C0858529, C3263431, C0235715, C0742306, C5939523, C0235711, C0742310, C1299600, C0232284, C0742313, C0742315, C2318662, C0742286
+    sub_nature: Symptom >> Location
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Location'                   -> 50 CUIs: C0450429, C1553438, C4739896, C0240795, C5548394, C4545686, C0517220, C1553436, C0449683, C1552552, C3494299, C0806106, C4068798, C4075017, C2360829, C0682130, C1881644, C5452968, C0392752, C3843862, C0562215, C0205145, C0441986, C3843861, C4759955, C3166646, C2735070, C1262869, C4019420, C1553435, C1522666, C1998352, C3842987, C0449689, C2985792, C5187431, C2371432, C3243474, C2826940, C2360835, C3842942, C0557152, C1547669, C4318800, C3177155, C0424015, C0557660, C2234358, C1285538, C4534363
+      [atomic] 'location'                   -> 44 CUIs: C0450429, C4739896, C1553438, C5548394, C0449683, C0240795, C0517220, C4545686, C0205145, C3166646, C3843862, C2360829, C4075017, C0682130, C4068798, C1552552, C4759955, C4019420, C3843861, C5452968, C1262869, C0449689, C0441986, C1553436, C1547669, C0424015, C3842987, C0557660, C1881644, C0392752, C1998352, C2985792, C2826940, C2735070, C0562215, C3842942, C0557152, C2360835, C3837714, C2234358, C5187431, C2184261, C3840630, C4534363
+    sub_nature: Symptom >> Radiation
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Radiation'                  -> 74 CUIs: C4524722, C5205043, C3825766, C1514458, C1398569, C0260191, C0851346, C0034533, C0809849, C0743659, C1396159, C1282930, C4290392, C1395257, C1396199, C3828416, C3846207, C0458344, C5205042, C1396157, C5667399, C0015333, C3842050, C2010745, C0807677, C0850767, C0748228, C0743660, C2135527, C2707507, C0743658, C5667394, C0418177, C1408589, C1657980, C3846127, C2187313, C4324392, C2135532, C2135533, C0520903, C1882537, C2135534, C1524020, C0418178, C0564754, C3846209, C3846444, C1628466, C0445177, C2135549, C2135529, C0034525, C2533060, C2135539, C3846179, C2533041, C2541878, C2169048, C2135535, C2533040, C2533067, C0807676, C2533042, C0807734, C2533063, C2457713, C2531287, C4042794, C1627326, C5411497, C2064931, C0807675, C2541877
+      [atomic] 'radiation'                  -> 78 CUIs: C4524722, C5205043, C3825766, C1398569, C0260191, C0851346, C1514458, C1282930, C0743659, C0458344, C0034533, C1396199, C2010745, C1395257, C3828416, C1396159, C0809849, C5205042, C3846207, C0337029, C3850065, C4290392, C5667399, C1396157, C0743658, C0418177, C0743660, C2707507, C0015333, C1408589, C0850767, C3846127, C2135532, C2135527, C2135534, C3842050, C0748228, C0520903, C5667394, C1657980, C2135533, C1406013, C1396160, C1882537, C4324392, C0445177, C1410241, C2187313, C0807677, C1524020, C1628466, C3846179, C2135549, C2541878, C3846444, C3846209, C0541895, C2135529, C0034525, C0479537, C2135539, C2533060, C2457713, C2533063, C2169048, C2533042, C2533041, C1627326, C2541877, C2533067, C2533040, C2531287, C0203497, C2531333, C0807734, C2541653, C1304446, C5411497
+    sub_nature: Symptom >> Quality
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Quality'                    -> 86 CUIs: C0332306, C2936612, C0557391, C1881755, C0034378, C0422976, C1507041, C0681522, C2698249, C3476594, C0680621, C0423043, C0449577, C5912322, C0808134, C4715425, C2698924, C1522427, C0939976, C4288337, C0814848, C2090601, C4087099, C5889809, C2349975, C4759659, C0871201, C3267104, C0814847, C4517914, C4034836, C0441800, C4728217, C4050404, C5447947, C0559857, C4288329, C0678739, C4288330, C4288331, C2609246, C1549844, C4288334, C0920475, C4287910, C2984831, C0033269, C4288332, C4288333, C1610034, C1548743, C4288338, C4699239, C2698923, C0814849, C1547867, C5243651, C4552241, C0596587, C5548507, C1961136, C4288336, C0525060, C2609386, C3641222, C4517500, C4087106, C5907043, C5548545, C4552176, C1882425, C1709790, C0748997, C0309195, C4054800, C3845606, C0585055, C1828058, C4054804, C1828241, C4054802, C4054803, C5548560, C1827816, C0441806, C4054801
+      [atomic] 'sharp'                      -> 84 CUIs: C1444775, C0455270, C4718426, C0423606, C1444774, C3639305, C3266044, C5233305, C0423557, C0423603, C4524690, C4270688, C4321411, C1301568, C0235290, C0457726, C3639790, C0740619, C0439821, C3469137, C0480664, C4049932, C0337278, C4313937, C3281003, C1834191, C0337244, C4270699, C0333177, C5566673, C4273428, C5566674, C4270694, C0480674, C0949159, C2170578, C2186457, C4270701, C5141080, C0480673, C4027793, C2905962, C3648547, C0418566, C1960082, C2186671, C2905958, C2058322, C0418119, C4270702, C2906187, C0481024, C2134546, C1299578, C0422977, C0580104, C5697418, C3279880, C0744661, C0744662, C4699177, C0750276, C0750278, C1821690, C5883354, C1821689, C3166184, C4749184, C0552300, C3854540, C5435805, C3553696, C1821413, C5775209, C4313110, C0750277, C0241690, C5552644, C5775217, C4073010, C5883668, C2202566, C2675096, C0750279
+      [atomic] 'dull'                       -> 73 CUIs: C0443208, C0541911, C0239540, C3670761, C4020876, C1455762, C4230064, C1621860, C0558105, C3475714, C0234233, C0278144, C5237203, C0239885, C4718427, C0201033, C4227652, C3842601, C3258463, C4479204, C1880427, C3843099, C0541993, C0857239, C5238525, C5394682, C2185926, C3475715, C3842454, C3843345, C2199213, C0240441, C0557738, C5142856, C2237163, C0424598, C3260164, C4289293, C3845159, C3842079, C0443347, C4062205, C5142881, C1997138, C0558082, C4289278, C0474383, C3843956, C4288600, C3899149, C0474382, C4264377, C2237162, C3843992, C4538610, C3699070, C3845882, C4329754, C4321351, C5779559, C3845685, C3830508, C5706986, C5238358, C5142882, C0748996, C3840792, C2673810, C3484052, C3161661, C5555235, C3899718, C5142854
+      [atomic] 'crushing'                   -> 74 CUIs: C0563598, C0458259, C0185060, C1456399, C0341661, C0565825, C1394242, C0278265, C2136691, C1394234, C0180191, C0495991, C0435221, C0402831, C0451981, C0586106, C1394233, C1268568, C3686588, C0458102, C0417962, C1394226, C0232290, C0545116, C0274276, C1406829, C3163841, C2138550, C1394235, C2138528, C0273232, C1304058, C2832714, C0332679, C0027745, C0564384, C1742644, C0192794, C0273441, C0273440, C1408274, C0180192, C0273439, C1272550, C0741858, C0562531, C2138554, C1572287, C1740682, C3504304, C0278266, C5908438, C0195019, C0196889, C2839877, C0023878, C0193229, C1292832, C0012827, C0193582, C0189073, C5430574, C0449354, C5825967, C0191207, C5931179, C2400931, C0185062, C0441578, C0196893, C5825968, C2485968, C0194530, C5820441
+      [atomic] 'pressure'                   -> 116 CUIs: C1881736, C0677038, C0460139, C0445174, C0449252, C1442094, C0033095, C4284008, C0520818, C0677039, C5243860, C0563547, C4528238, C0596891, C0520820, C4270730, C0429215, C1882095, C1387512, C4687747, C0520819, C1395830, C2370961, C0429487, C1881187, C0311421, C0429216, C1306345, C0032676, C1442096, C0311422, C0428718, C4062637, C0311423, C1395826, C0429758, C4050428, C0428708, C2499321, C1305710, C1707711, C5187366, C4053771, C1709648, C0802867, C0428642, C1393935, C0232781, C1395827, C5148622, C0429218, C4687744, C0439467, C5148624, C4718428, C0232712, C4061141, C1395831, C0578862, C5178100, C4533774, C1405150, C4297051, C1563105, C4062760, C5697034, C0450458, C1963871, C0233145, C0428876, C5435902, C1536290, C4524007, C0877644, C0852957, C0599323, C0856094, C0429701, C1868852, C0456180, C0234708, C2735098, C0456189, C4054157, C0429207, C0456190, C0848159, C1168064, C5147776, C5216364, C0489565, C2008528, C4531219, C0520999, C0021888, C2008467, C1710531, C4081567, C4081568, C4510570, C5921764, C1562592, C1262026, C5852640, C5852639, C0944573, C5852592, C1262025, C5852637, C5852638, C1532437, C5921734, C4050445, C5185361, C5169518, C0578863
+      [atomic] 'burning'                    -> 143 CUIs: C0234230, C0085624, C0562705, C0541818, C3639307, C0241057, C2219680, C2220028, C2004836, C0234655, C0857337, C0239332, C2128522, C0858789, C2136647, C2136614, C0858938, C0277602, C3841931, C0877605, C0857062, C0418326, C5237168, C0810083, C0857336, C2219741, C0867827, C5570581, C2957432, C4290388, C3842034, C0417567, C2231624, C0701836, C4069267, C2005128, C3842131, C0565934, C0867826, C0474076, C4698929, C0418433, C0867822, C0417579, C5222879, C0417157, C0417540, C4324292, C0261991, C2004839, C0867828, C0417510, C0417513, C5574728, C0877714, C5881069, C2134736, C4759317, C0418329, C2005127, C5222857, C2005104, C0414269, C2134767, C2005136, C2005019, C5222856, C5222854, C2118169, C0414255, C5222878, C2083596, C0414270, C2005155, C2153556, C0480423, C2005115, C5222850, C0480424, C2005113, C5222851, C2005008, C0480414, C5683565, C5222836, C4060910, C0414273, C0480419, C2103908, C5881068, C2103871, C2005114, C5222861, C5881070, C5222835, C0562090, C2005109, C0414274, C3648542, C2905743, C0414272, C0480420, C0480418, C0260990, C0480643, C0418327, C0479656, C3511115, C0480416, C0480421, C0414271, C2905919, C0260995, C0480415, C0260994, C0480642, C0418330, C2905744, C0480994, C0414248, C2905745, C2905741, C0480417, C0260992, C0260996, C0260993, C0480426, C0414275, C0414249, C0260991, C0414251, C0414252, C0414266, C0414253, C0414262, C0414267, C0414263, C0414250, C0414254, C2117951, C0414264, C2117952, C2117950
+    sub_nature: Symptom >> Severity
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Severity'                   -> 82 CUIs: C4687963, C0439793, C4288241, C4288234, C1553527, C0457451, C4288233, C4288239, C5784865, C4288235, C3843523, C4687958, C0392364, C4687964, C4687968, C4687965, C4687966, C4687960, C4288238, C5446401, C4288236, C0442720, C5446400, C4740692, C1547227, C4288237, C4687967, C5784069, C4288242, C4480027, C3846035, C4288240, C4688607, C1547891, C3842380, C3842510, C0441982, C3897634, C1698254, C2985871, C3243791, C1547231, C2826947, C3244056, C5236415, C5446398, C0449286, C5855641, C5784887, C2985921, C4526094, C4084779, C5963110, C1547226, C2986103, C5784886, C5236757, C5708931, C5784908, C3242054, C2987079, C5784885, C5908339, C5784884, C5784888, C5446403, C5446417, C5447128, C5446376, C5554985, C5446536, C5446377, C5446451, C5446386, C5447131, C5446390, C5447134, C5446414, C5446434, C5446382, C5446407, C5446381
+      [atomic] 'severity'                   -> 83 CUIs: C4687963, C0439793, C4288241, C1553527, C4288234, C0457451, C4288233, C4288239, C3843523, C5784865, C4288235, C0392364, C4687964, C4687958, C4687968, C4687965, C4288238, C4687966, C5446401, C0442720, C4687960, C4288236, C4740692, C4288237, C5446400, C1547227, C5784069, C4288240, C4687967, C4288242, C3842380, C3842510, C1547891, C3846035, C4480027, C1292730, C0441982, C1698254, C2985871, C3897634, C3243791, C2826947, C3244056, C1547231, C5236415, C5446398, C0449286, C5855641, C5784887, C2985921, C4084779, C4526094, C5963110, C1547226, C2986103, C5236757, C4085548, C5784886, C5708931, C5908339, C3242054, C2987079, C5784908, C5784885, C5784888, C5784884, C5446417, C5446403, C5447128, C5446376, C5554985, C5446536, C5446377, C5446451, C5446386, C5447131, C5447134, C5446390, C5446414, C5446456, C5446434, C5446382, C5446407
+    sub_nature: Symptom >> Duration
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Duration'                   -> 66 CUIs: C2985752, C0449238, C2985849, C3840694, C0237585, C2170438, C3897844, C3843386, C2985708, C3177062, C2826775, C3843398, C3843397, C2346509, C0429930, C5890732, C2347450, C3843483, C2348354, C2985954, C0807155, C1442475, C2983599, C1442476, C2985771, C0439591, C5781620, C2347173, C2986093, C2183269, C0449240, C2985827, C0237586, C2986198, C5890513, C5141807, C0436359, C0436363, C3260925, C0586402, C2735076, C1822342, C3174770, C0436364, C3175526, C0436362, C0436361, C2073279, C0436365, C0436366, C2735075, C3260924, C0586409, C0436367, C0436360, C5551613, C0436370, C0438986, C0436372, C0436347, C0586400, C0436369, C0436350, C1320528, C0586401, C0586403
+      [atomic] 'duration'                   -> 66 CUIs: C2985752, C0449238, C2985849, C3840694, C3897844, C2170438, C3843386, C0237585, C2985708, C3177062, C2826775, C3843397, C3843398, C2346509, C0429930, C0807155, C5890732, C2985954, C3843483, C2348354, C2347450, C2183269, C5781620, C2986093, C1442475, C2985771, C1442476, C2983599, C0439591, C0449240, C2986198, C2347173, C2985827, C0237586, C5890513, C0436359, C0920470, C0436363, C0586402, C3260925, C2735076, C1822342, C0436364, C3174770, C3175526, C0436362, C2073279, C0436361, C0436365, C0436366, C2735075, C0586409, C3260924, C0436360, C0436367, C5551613, C0436370, C0438986, C0436372, C0586400, C0436347, C0436350, C0586401, C0436369, C1320528, C0586403
+    sub_nature: Symptom >> Modifying Factors >> Aggravating
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Modifying Factors'          -> 51 CUIs: C2092244, C2066646, C2736765, C5684098, C3840684, C3699341, C2598144, C5669997, C2066654, C4540703, C0205432, C0682774, C5689237, C0040225, C0813999, C0878755, C0814292, C2066649, C2066665, C0001783, C2223920, C0332161, C5444177, C3843091, C2223919, C4718158, C2066653, C4060986, C5890518, C4264315, C0337460, C2735940, C2092241, C1516451, C2066661, C1394855, C3178895, C1264628, C5444427, C0559248, C0332246, C0679858, C2066648, C5453028, C5669999, C0520270, C0205459, C3845594, C0579005, C1554963, C0205538
+      [path]   'Aggravating'                -> 94 CUIs: C1706753, C0679239, C0564606, C0151885, C0235889, C0237201, C0557883, C0235893, C0852920, C1737257, C4476688, C0542181, C0436331, C4060942, C4086268, C0549254, C5830872, C4540501, C0235769, C1444749, C0236022, C1387048, C0235874, C0853948, C0854126, C2735064, C4061375, C0858673, C0541766, C2963903, C0541889, C0562572, C4061374, C0557906, C0856075, C0856134, C0852922, C3468597, C0424331, C0436335, C0348027, C0436338, C5880398, C0876988, C0856088, C5188425, C0549277, C0743630, C0856087, C0549260, C5238691, C0235890, C0549273, C2219689, C0436332, C0856060, C3640008, C0856135, C1735633, C0436333, C0856095, C0858803, C0856136, C0863128, C0877360, C0549335, C0856112, C0856125, C0858248, C0876980, C5197672, C5141269, C4476699, C2110478, C2029723, C2128506, C2073280, C5690014, C1507007, C3842524, C0239889, C1960719, C2116334, C2203306, C2128954, C2127531, C1508024, C2029710, C2233598, C2108818, C2203300, C2219655, C2029718, C2073283
+      [atomic] 'aggravating factors'        -> 92 CUIs: C0679239, C0436331, C2735064, C2219689, C5238691, C0436332, C0151885, C4476688, C0235889, C0235874, C4086268, C5238827, C0436335, C0235890, C0856136, C0856134, C0436338, C0876980, C1444749, C0853312, C2029723, C0235769, C0856133, C0856060, C0856092, C2735063, C0856135, C1735633, C0856112, C2073280, C0856088, C0856067, C0853941, C0856095, C5690014, C2128506, C0863128, C0549335, C0436333, C0856097, C1507007, C0858248, C5197672, C0858280, C0436334, C0853926, C5141269, C4476699, C2127531, C2219655, C0436339, C2128954, C2183754, C2110478, C2116334, C2108818, C2029691, C5400342, C1508024, C5765408, C1960719, C2073319, C2233598, C2108924, C2108961, C2029748, C2108805, C2108993, C2073283, C2029719, C2029710, C3842524, C2070849, C2126081, C2127534, C2088478, C2128841, C2127533, C2127505, C2129370, C2127506, C2127504, C2128159, C2215888, C2140837, C2128167, C2197709, C2129371, C2201446, C2215886, C2128191, C2197701
+    sub_nature: Symptom >> Modifying Factors >> Alleviating
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Modifying Factors'          -> 51 CUIs: C2092244, C2066646, C2736765, C5684098, C3840684, C3699341, C2598144, C5669997, C2066654, C4540703, C0205432, C0682774, C5689237, C0040225, C0813999, C0878755, C0814292, C2066649, C2066665, C0001783, C2223920, C0332161, C5444177, C3843091, C2223919, C4718158, C2066653, C4060986, C5890518, C4264315, C0337460, C2735940, C2092241, C1516451, C2066661, C1394855, C3178895, C1264628, C5444427, C0559248, C0332246, C0679858, C2066648, C5453028, C5669999, C0520270, C0205459, C3845594, C0579005, C1554963, C0205538
+      [path]   'Alleviating'                -> 94 CUIs: C1301676, C5238633, C1507004, C2707674, C3858691, C0679251, C0150135, C2015880, C3858861, C1652544, C2012266, C0516500, C5690015, C5933151, C1821203, C0564405, C1301771, C4718169, C0814340, C4717268, C1285530, C4716840, C0332303, C0436323, C0740936, C0451615, C0548235, C0814342, C3687576, C1961000, C2146147, C2165516, C0512918, C4714021, C0240889, C5453123, C0518065, C0515300, C0515305, C0436326, C0436329, C5238805, C5420376, C5703347, C5765424, C0436330, C0436325, C2128153, C2095120, C2095121, C5912062, C4717257, C4716943, C0948482, C0420259, C5915243, C4545333, C2129468, C2128509, C4709633, C4717253, C4717168, C2219697, C2129469, C2735698, C4046277, C4715406, C2032298, C0557023, C3693969, C5934480, C5765422, C5934467, C2029770, C3872550, C2233606, C2073359, C2128950, C2130046, C2108797, C2129428, C2129440, C2128532, C2129471, C2128154, C2129472, C2129427, C2130132, C2129430, C2129425, C2129429, C2128495, C2129431, C2128493
+      [atomic] 'alleviating factors'        -> 84 CUIs: C5689237, C5238633, C3699341, C4716568, C2707674, C0332161, C1507004, C5690015, C2165516, C5447397, C2707673, C0436323, C1821203, C5547101, C0679240, C5570808, C1301676, C2128509, C0436332, C2128153, C1961000, C3699340, C4061495, C1820855, C0436326, C2735064, C2029770, C5933151, C2073359, C0436327, C0679251, C5238805, C0815176, C2129468, C2219697, C2129469, C0436330, C4718169, C2015880, C0240889, C1508025, C2233606, C0436324, C2036534, C4717242, C5914576, C0564405, C2032298, C0240887, C2130046, C2219655, C2129440, C2129428, C5426026, C2036539, C2129427, C2130132, C2129430, C2128154, C0436316, C2128493, C2126981, C2129425, C2129429, C2129431, C2036540, C2036536, C2036537, C2036538, C2036503, C2128495, C2036535, C5571068, C2039374, C4264392, C2039373, C2036541, C2130103, C2130050, C2127115, C2219658, C2130130, C0522032, C2036545
 
-def _show_summary_and_topics(tr):
-    m = tr.get("metrics", {})
-    print(f"\n  SUMMARIZATION: {m.get('input_code_count','?')} in -> "
-          f"{m.get('output_code_count','?')} out")
-    print(f"  Surviving CUIs:")
-    for s in tr.get("surviving", []):
-        print(f"      {s['cui']}  {s['term']}  IC={s['ic']}")
-    print(f"  TOPICS ({len(tr.get('topics',[]))}):")
-    for t in tr.get("topics", []):
-        print(f"    {t['tp']}  size={t['size']:>4}  IC={t['ic']}  '{t['label']}'")
+  INTENT: Dyspnea Characteristics and Associated Symptoms
+    sub_nature: Symptom >> Presence
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Presence'                   -> 75 CUIs: C3854307, C0442721, C0150312, C1444703, C1298907, C1385355, C1385328, C0392148, C2827364, C1385325, C0332443, C1547035, C1385330, C0680061, C1385335, C1278507, C2724205, C1385358, C1264691, C4036112, C1385340, C3841436, C1545438, C0515453, C1399223, C4061065, C1301671, C1553521, C1385352, C1301736, C3842851, C3843614, C5933777, C1444639, C1402166, C1385350, C5963502, C0517220, C1385338, C1385378, C0576688, C5890400, C2724207, C0680145, C1444714, C1385354, C4266677, C5204265, C1456498, C5924584, C1555313, C5220288, C0470168, C3243801, C1548417, C2986424, C3166194, C3243309, C4710740, C5963579, C3662246, C1551357, C0521090, C1709643, C0470196, C3243303, C3174772, C3839526, C4698078, C3242211, C3243800, C5963067, C4082130, C4086634, C0586311
+      [atomic] 'shortness of breath'        -> 64 CUIs: C3173987, C5446538, C1830531, C0748648, C4255032, C0946383, C3263439, C0748644, C3258344, C4290027, C0748643, C3241964, C2707923, C4287837, C3475938, C0748642, C0748646, C4288021, C5570643, C0748647, C3174009, C1272200, C2707921, C4054523, C5552213, C4054032, C3845443, C2129627, C4288324, C5552387, C4483933, C4329481, C3642233, C4683920, C4084763, C4084764, C5446845, C5141846, C4683925, C4696826, C4683924, C4683926, C4683919, C5142332, C5446835, C5239565, C4683927, C4696828, C5238945, C4683923, C4683921, C4288951, C3274920, C4288225, C5238946, C4084762, C4054234, C4053830, C4288097, C3641913, C5142276, C4084858, C3830442, C5420012
+      [atomic] 'dyspnea'                    -> 83 CUIs: C0013404, C0239202, C0277854, C3176996, C2236533, C0743331, C2169545, C3263439, C1301597, C1391960, C0475116, C5420012, C1388881, C2169544, C0743327, C1963100, C2024881, C1388880, C5784571, C0231805, C5396924, C5959417, C0231806, C2183407, C0743330, C2910383, C0743325, C5784572, C2074678, C2024878, C2368563, C3808299, C1830531, C2074676, C2036391, C0231810, C2129627, C2921550, C2183401, C4483933, C0231803, C2080706, C3241964, C1272201, C3475812, C5959498, C0848683, C5446538, C5552213, C3845441, C2236531, C4055107, C2921548, C3258344, C1740753, C2921540, C5141846, C3475510, C4084764, C3475525, C4288021, C4050245, C4288324, C4054032, C4287851, C4287837, C4696828, C3642233, C4290027, C4329481, C4288097, C3830442, C4696826, C5142332, C4683927, C4683920, C3641913, C4084858, C4084763, C4683925, C5446845, C4054523, C5238945
+    sub_nature: Symptom >> Onset
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Onset'                      -> 92 CUIs: C2986534, C0332162, C3274945, C0574845, C0747001, C0746890, C0871920, C2986543, C1304680, C1299997, C4484130, C1838994, C5205878, C1507009, C5205879, C0277793, C0332164, C5541453, C4086878, C0458004, C0518681, C1276802, C5552395, C0518063, C0449244, C4300458, C0871908, C3842292, C0436347, C0747970, C2075260, C5552403, C3869791, C4553712, C3263264, C0439557, C0518182, C0025274, C1627769, C5543628, C2233552, C0848255, C0566679, C4022392, C0151902, C0233916, C0474483, C5781458, C4280713, C0156719, C3897844, C1148379, C3843321, C2735137, C0474463, C0423594, C1405680, C2346509, C0597444, C0567299, C5963104, C3836975, C2371941, C2114287, C0567310, C1843996, C5962415, C0871191, C4476667, C5962416, C5566150, C0746523, C0271616, C3277703, C1299418, C2735136, C5566159, C0474462, C1507006, C5781620, C2053626, C0474456, C5784416, C3494204, C4540902, C0460089, C5685973, C2736116, C5203489, C1301668, C3540000, C5214382
+      [atomic] 'onset'                      -> 92 CUIs: C2986534, C0332162, C0747001, C0574845, C0746890, C0871920, C2986543, C4484130, C1299997, C3274945, C5205878, C1507009, C0277793, C1304680, C1838994, C5541453, C0458004, C0518681, C0332164, C5205879, C4086878, C0449244, C5552395, C1276802, C0518063, C0871908, C4300458, C3842292, C0814124, C5552403, C0436347, C2075260, C3869791, C3263264, C4553712, C1320528, C0518182, C0025274, C2233552, C4022392, C0566679, C5543628, C5781458, C0848255, C3897844, C0474483, C1571749, C0233916, C0151902, C4280713, C0156719, C3843321, C5962415, C0567299, C5963104, C2346509, C1843996, C3836975, C0271616, C0474463, C2371941, C0567310, C2735137, C0597444, C5566150, C1148379, C0423594, C0871191, C2114287, C3174464, C0746523, C1299418, C4476667, C2609149, C0585281, C2053626, C2735136, C5566159, C5781620, C1507006, C0474462, C0474456, C5784416, C0460089, C4540902, C2736116, C3494204, C5685973, C5203489, C1301668, C3540000, C5214382
+    sub_nature: Symptom >> Duration
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Duration'                   -> 66 CUIs: C2985752, C0449238, C2985849, C3840694, C0237585, C2170438, C3897844, C3843386, C2985708, C3177062, C2826775, C3843398, C3843397, C2346509, C0429930, C5890732, C2347450, C3843483, C2348354, C2985954, C0807155, C1442475, C2983599, C1442476, C2985771, C0439591, C5781620, C2347173, C2986093, C2183269, C0449240, C2985827, C0237586, C2986198, C5890513, C5141807, C0436359, C0436363, C3260925, C0586402, C2735076, C1822342, C3174770, C0436364, C3175526, C0436362, C0436361, C2073279, C0436365, C0436366, C2735075, C3260924, C0586409, C0436367, C0436360, C5551613, C0436370, C0438986, C0436372, C0436347, C0586400, C0436369, C0436350, C1320528, C0586401, C0586403
+      [atomic] 'duration'                   -> 66 CUIs: C2985752, C0449238, C2985849, C3840694, C3897844, C2170438, C3843386, C0237585, C2985708, C3177062, C2826775, C3843397, C3843398, C2346509, C0429930, C0807155, C5890732, C2985954, C3843483, C2348354, C2347450, C2183269, C5781620, C2986093, C1442475, C2985771, C1442476, C2983599, C0439591, C0449240, C2986198, C2347173, C2985827, C0237586, C5890513, C0436359, C0920470, C0436363, C0586402, C3260925, C2735076, C1822342, C0436364, C3174770, C3175526, C0436362, C2073279, C0436361, C0436365, C0436366, C2735075, C0586409, C3260924, C0436360, C0436367, C5551613, C0436370, C0438986, C0436372, C0586400, C0436347, C0436350, C0586401, C0436369, C1320528, C0586403
+    sub_nature: Symptom >> Severity
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Severity'                   -> 82 CUIs: C4687963, C0439793, C4288241, C4288234, C1553527, C0457451, C4288233, C4288239, C5784865, C4288235, C3843523, C4687958, C0392364, C4687964, C4687968, C4687965, C4687966, C4687960, C4288238, C5446401, C4288236, C0442720, C5446400, C4740692, C1547227, C4288237, C4687967, C5784069, C4288242, C4480027, C3846035, C4288240, C4688607, C1547891, C3842380, C3842510, C0441982, C3897634, C1698254, C2985871, C3243791, C1547231, C2826947, C3244056, C5236415, C5446398, C0449286, C5855641, C5784887, C2985921, C4526094, C4084779, C5963110, C1547226, C2986103, C5784886, C5236757, C5708931, C5784908, C3242054, C2987079, C5784885, C5908339, C5784884, C5784888, C5446403, C5446417, C5447128, C5446376, C5554985, C5446536, C5446377, C5446451, C5446386, C5447131, C5446390, C5447134, C5446414, C5446434, C5446382, C5446407, C5446381
+      [atomic] 'severity'                   -> 83 CUIs: C4687963, C0439793, C4288241, C1553527, C4288234, C0457451, C4288233, C4288239, C3843523, C5784865, C4288235, C0392364, C4687964, C4687958, C4687968, C4687965, C4288238, C4687966, C5446401, C0442720, C4687960, C4288236, C4740692, C4288237, C5446400, C1547227, C5784069, C4288240, C4687967, C4288242, C3842380, C3842510, C1547891, C3846035, C4480027, C1292730, C0441982, C1698254, C2985871, C3897634, C3243791, C2826947, C3244056, C1547231, C5236415, C5446398, C0449286, C5855641, C5784887, C2985921, C4084779, C4526094, C5963110, C1547226, C2986103, C5236757, C4085548, C5784886, C5708931, C5908339, C3242054, C2987079, C5784908, C5784885, C5784888, C5784884, C5446417, C5446403, C5447128, C5446376, C5554985, C5446536, C5446377, C5446451, C5446386, C5447131, C5447134, C5446390, C5446414, C5446456, C5446434, C5446382, C5446407
+    sub_nature: Symptom >> Modifying Factors >> Aggravating
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Modifying Factors'          -> 51 CUIs: C2092244, C2066646, C2736765, C5684098, C3840684, C3699341, C2598144, C5669997, C2066654, C4540703, C0205432, C0682774, C5689237, C0040225, C0813999, C0878755, C0814292, C2066649, C2066665, C0001783, C2223920, C0332161, C5444177, C3843091, C2223919, C4718158, C2066653, C4060986, C5890518, C4264315, C0337460, C2735940, C2092241, C1516451, C2066661, C1394855, C3178895, C1264628, C5444427, C0559248, C0332246, C0679858, C2066648, C5453028, C5669999, C0520270, C0205459, C3845594, C0579005, C1554963, C0205538
+      [path]   'Aggravating'                -> 94 CUIs: C1706753, C0679239, C0564606, C0151885, C0235889, C0237201, C0557883, C0235893, C0852920, C1737257, C4476688, C0542181, C0436331, C4060942, C4086268, C0549254, C5830872, C4540501, C0235769, C1444749, C0236022, C1387048, C0235874, C0853948, C0854126, C2735064, C4061375, C0858673, C0541766, C2963903, C0541889, C0562572, C4061374, C0557906, C0856075, C0856134, C0852922, C3468597, C0424331, C0436335, C0348027, C0436338, C5880398, C0876988, C0856088, C5188425, C0549277, C0743630, C0856087, C0549260, C5238691, C0235890, C0549273, C2219689, C0436332, C0856060, C3640008, C0856135, C1735633, C0436333, C0856095, C0858803, C0856136, C0863128, C0877360, C0549335, C0856112, C0856125, C0858248, C0876980, C5197672, C5141269, C4476699, C2110478, C2029723, C2128506, C2073280, C5690014, C1507007, C3842524, C0239889, C1960719, C2116334, C2203306, C2128954, C2127531, C1508024, C2029710, C2233598, C2108818, C2203300, C2219655, C2029718, C2073283
+      [atomic] 'exertion'                   -> 61 CUIs: C0015264, C1401026, C5570919, C5570920, C4476742, C0031807, C1401025, C0301616, C1290920, C4270704, C0424588, C0749195, C5765408, C2016104, C5563357, C2126118, C5570917, C1960725, C4062505, C4270707, C1828228, C0161750, C0743838, C0015259, C2349815, C1822185, C1998035, C1272201, C2349809, C2349805, C2368005, C5212745, C2349753, C4062480, C0232288, C4270724, C2363911, C2349803, C0261751, C4716724, C0946383, C2349813, C0231236, C0418141, C2136402, C2886507, C0442694, C2368003, C5775714, C4270708, C1290925, C0856118, C5685592, C0336917, C0480137, C2138217, C4270706, C0480134, C0429693, C0746780, C1830690
+      [atomic] 'lying flat'                 -> 63 CUIs: C4699589, C4075028, C3261457, C4075030, C3261730, C3843056, C1821784, C0560840, C4075031, C4075027, C3263389, C3263670, C0444334, C2371384, C0560051, C3279340, C5924213, C0277816, C5570643, C0555089, C2945636, C1286597, C4075029, C4075026, C3263410, C2237433, C1821793, C4075036, C5543314, C2584317, C1820837, C3263669, C0560349, C4331744, C3261456, C4296954, C0444401, C4482506, C0437984, C3687378, C0560048, C5380905, C4718531, C0560351, C0744212, C3843053, C0560347, C0560049, C0560350, C2371391, C0427121, C0560791, C0560052, C0560050, C1411978, C1286507, C0575123, C0424599, C0560053, C5878080, C2749093, C1540933, C1288245
+    sub_nature: Symptom >> Modifying Factors >> Alleviating
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Modifying Factors'          -> 51 CUIs: C2092244, C2066646, C2736765, C5684098, C3840684, C3699341, C2598144, C5669997, C2066654, C4540703, C0205432, C0682774, C5689237, C0040225, C0813999, C0878755, C0814292, C2066649, C2066665, C0001783, C2223920, C0332161, C5444177, C3843091, C2223919, C4718158, C2066653, C4060986, C5890518, C4264315, C0337460, C2735940, C2092241, C1516451, C2066661, C1394855, C3178895, C1264628, C5444427, C0559248, C0332246, C0679858, C2066648, C5453028, C5669999, C0520270, C0205459, C3845594, C0579005, C1554963, C0205538
+      [path]   'Alleviating'                -> 94 CUIs: C1301676, C5238633, C1507004, C2707674, C3858691, C0679251, C0150135, C2015880, C3858861, C1652544, C2012266, C0516500, C5690015, C5933151, C1821203, C0564405, C1301771, C4718169, C0814340, C4717268, C1285530, C4716840, C0332303, C0436323, C0740936, C0451615, C0548235, C0814342, C3687576, C1961000, C2146147, C2165516, C0512918, C4714021, C0240889, C5453123, C0518065, C0515300, C0515305, C0436326, C0436329, C5238805, C5420376, C5703347, C5765424, C0436330, C0436325, C2128153, C2095120, C2095121, C5912062, C4717257, C4716943, C0948482, C0420259, C5915243, C4545333, C2129468, C2128509, C4709633, C4717253, C4717168, C2219697, C2129469, C2735698, C4046277, C4715406, C2032298, C0557023, C3693969, C5934480, C5765422, C5934467, C2029770, C3872550, C2233606, C2073359, C2128950, C2130046, C2108797, C2129428, C2129440, C2128532, C2129471, C2128154, C2129472, C2129427, C2130132, C2129430, C2129425, C2129429, C2128495, C2129431, C2128493
+      [atomic] 'alleviating factors'        -> 84 CUIs: C5689237, C5238633, C3699341, C4716568, C2707674, C0332161, C1507004, C5690015, C2165516, C5447397, C2707673, C0436323, C1821203, C5547101, C0679240, C5570808, C1301676, C2128509, C0436332, C2128153, C1961000, C3699340, C4061495, C1820855, C0436326, C2735064, C2029770, C5933151, C2073359, C0436327, C0679251, C5238805, C0815176, C2129468, C2219697, C2129469, C0436330, C4718169, C2015880, C0240889, C1508025, C2233606, C0436324, C2036534, C4717242, C5914576, C0564405, C2032298, C0240887, C2130046, C2219655, C2129440, C2129428, C5426026, C2036539, C2129427, C2130132, C2129430, C2128154, C0436316, C2128493, C2126981, C2129425, C2129429, C2129431, C2036540, C2036536, C2036537, C2036538, C2036503, C2128495, C2036535, C5571068, C2039374, C4264392, C2039373, C2036541, C2130103, C2130050, C2127115, C2219658, C2130130, C0522032, C2036545
+    sub_nature: Symptom >> Associated Symptoms
+      [path]   'Symptom'                    -> 31 CUIs: C0586403, C0424450, C2039334, C0436363, C0436353, C0422826, C3257980, C5420215, C1822352, C0037088, C0436364, C0159028, C1457887, C0679309, C0521989, C0558467, C0871466, C0436354, C0518681, C0749196, C0748709, C3258060, C3839223, C0586401, C0436317, C0518691, C0436357, C5446398, C0436356, C3533163, C3494437
+      [path]   'Associated Symptoms'        -> 42 CUIs: C5890193, C5890191, C0521989, C0521990, C0518692, C0518695, C0243082, C2029690, C0518694, C4483233, C0476291, C3829779, C0518069, C0478141, C0518693, C3257980, C2735082, C0243083, C5935323, C0029625, C2039359, C0495702, C0029855, C0231217, C0878643, C0749196, C0558467, C2126027, C0159064, C5447511, C0476256, C0424450, C0037088, C1317600, C0858996, C3476546, C1822352, C0436319, C0427220, C4738117, C0029854, C0436331
+      [atomic] 'wheezing'                   -> 69 CUIs: C2964059, C3173989, C4539802, C2128974, C2074986, C1735643, C2128973, C0043144, C2074987, C2367673, C2089439, C2128975, C0741782, C2203209, C0421202, C2074985, C2071405, C2203196, C4271955, C2071402, C5763516, C2237502, C2071407, C0231875, C5766911, C2203172, C0877638, C0746058, C2071404, C2203182, C2203199, C0741785, C2203181, C2203189, C4271916, C2203188, C2203190, C5763515, C5766913, C4271962, C2203187, C2203186, C4271948, C4271960, C4271965, C4271927, C5766912, C4271964, C4271925, C5763498, C4271959, C4271952, C4271912, C2203195, C5764205, C5764204, C4271951, C0741784, C5764892, C4271909, C2203185, C4271947, C5766910, C4271945, C3840884, C4271950, C4271906, C4271944, C5764895
+      [atomic] 'cough'                      -> 81 CUIs: C3475808, C0687152, C2138221, C4539801, C3830996, C5420054, C0239132, C3173983, C1821420, C5447133, C3274924, C5784887, C2220033, C3174005, C3476009, C0584637, C0436338, C0277872, C2366919, C3553459, C0239135, C0742860, C0562483, C4318599, C0584636, C2074639, C5238943, C2138218, C0574067, C4061158, C0232051, C0852123, C4708767, C0239134, C4526750, C3173638, C4084727, C5908337, C4708768, C3173628, C4086402, C4086656, C0577929, C0566517, C3173632, C0586750, C3173630, C5668948, C3641816, C4084726, C2169800, C0455777, C5239063, C1287655, C5908350, C3642244, C4084725, C5238944, C0277870, C4086655, C1578935, C0577927, C1536391, C5775326, C5934292, C3828179, C0566523, C0742859, C3173634, C0566528, C4086657, C0476274, C0425505, C1287657, C3173742, C2138226, C3899833, C4526773, C0566525, C0558168, C3649530
+      [atomic] 'orthopnea'                  -> 85 CUIs: C0475117, C3661810, C4534449, C0085619, C2188830, C2128966, C1716783, C1717946, C4700384, C4483934, C4298327, C4319382, C4296954, C0392194, C2183402, C1391960, C1168185, C2183404, C2183403, C5690723, C2129023, C0344357, C2127200, C0013405, C0520825, C1388881, C0013404, C2128967, C0743330, C0743324, C2707923, C2128965, C0743327, C1956415, C3176996, C0743331, C1956414, C4087267, C0239202, C0748644, C0023212, C0231806, C0748648, C0277854, C0748645, C1301597, C2882269, C0748642, C3263439, C0475116, C3166428, C3845441, C0574066, C3174009, C1303239, C4483933, C2236533, C1403149, C1830531, C3173987, C3475516, C1303248, C0231805, C5784572, C5141846, C2169544, C5420012, C5446538, C5396924, C0742815, C5784571, C3173666, C4055107, C2910383, C5142262, C0231803, C3475510, C5551771, C5552213, C3173663, C4288097, C3475503, C3475504, C5142274, C2368563
+      [atomic] 'paroxysmal nocturnal dyspnea' -> 83 CUIs: C0013405, C1956415, C0344357, C1956414, C2127200, C1391960, C1717946, C3173743, C0743324, C4534449, C2128966, C1388881, C0475117, C4296954, C1534472, C3173744, C2882269, C1168185, C1716783, C2188830, C3661810, C5849390, C0519058, C1399341, C2183404, C0013404, C0865679, C0519059, C0748645, C0742815, C4698925, C0856142, C5690723, C0743327, C0034063, C1403149, C0748123, C1168329, C0546960, C0743326, C0748644, C0743330, C2368563, C2138230, C0742743, C5784572, C4483934, C1536131, C0023212, C4483933, C0155919, C0748641, C4087508, C2910383, C3475516, C5142262, C1737267, C3845441, C0340106, C0231803, C5439136, C3697063, C5784571, C0748122, C5141846, C3166428, C2882268, C4534434, C3475510, C5551771, C4288097, C5420012, C0277854, C3475525, C3475528, C3173666, C5446538, C5142259, C3475518, C2236533, C3173997, C4055107, C3169465
 
+  SUMMARIZATION: 1912 in -> 533 out
+  Surviving CUIs:
+      C0586403  Symptom findings in relation to frequency  IC=12.6035
+      C0424450  General symptom description  IC=9.9487
+      C0436363  Symptom lasts days  IC=14.8007
+      C0436353  Has symptom every few hours  IC=14.8007
+      C0422826  Symptom distribution  IC=10.1002
+      C0037088  Signs and Symptoms  IC=2.5876
+      C0436364  Symptom lasts weeks  IC=14.8007
+      C0159028  General symptom  IC=8.1086
+      C1457887  Symptoms  IC=4.6041
+      C0521989  Signs and Symptoms Associated with Chief Complaint  IC=14.8007
+      C0558467  Multiple symptomatology  IC=14.8007
+      C0436354  Has the symptom daily  IC=14.8007
+      C3839223  Frequency of pain symptom  IC=14.1075
+      C0586401  Symptom findings in relation to start time  IC=12.7213
+      C0436317  Symptom has changed  IC=14.8007
+      C0436357  Has the symptom monthly  IC=14.8007
+      C0436356  Has the symptom weekly  IC=14.8007
+      C3854307  Presence (property)  IC=14.8007
+      C0442721  Presence findings  IC=10.8887
+      C0150312  Present  IC=12.4028
+      C1444703  Definitely present  IC=14.1075
+      C1298907  Yes (qualifier value)  IC=14.8007
+      C0392148  Providing presence (regime/therapy)  IC=10.8689
+      C0332443  Normal presence  IC=14.8007
+      C1278507  Chaperone present  IC=14.8007
+      C2724205  Present +++ out of ++++  IC=14.8007
+      C1264691  Presence OR identity  IC=14.8007
+      C1301671  Present during procedure  IC=14.8007
+      C1301736  Practitioner presence  IC=14.8007
+      C1444639  Known present  IC=13.7021
+      C0576688  Body position sense present  IC=14.8007
+      C2724207  Present + out of ++++  IC=14.8007
+      C1444714  Confirmed present  IC=14.8007
+      C1456498  Attended (qualifier value)  IC=14.8007
+      C5924584  Reduced sensitivity  IC=14.8007
+      C3662246  Suspected or known present  IC=16.9959
+      C0521090  No indication of  IC=14.8007
+      C3839526  Detecting without classifying  IC=13.4144
+      C4082130  Prepared (qualifier value)  IC=14.8007
+      C0586311  Patient asked to attend  IC=13.1913
+      C0438716  Chest pressure  IC=14.8007
+      C1299600  Squeezing chest pain  IC=14.8007
+      C0450429  Location  IC=10.47
+      C5548394  Location property  IC=11.2453
+      C4545686  Geographical location  IC=14.8007
+      C0449683  Site of involvement  IC=14.8007
+      C4075017  Does transfer location  IC=12.0926
+      C0392752  Localized  IC=11.3995
+      C0562215  Location within home premises  IC=11.1371
+      C0205145  Site  IC=8.9258
+      C0441986  Relative sites  IC=8.5373
+      C1262869  Body position  IC=9.2713
+      C1998352  Finding of physical location of patient  IC=12.6035
+      C0449689  Site of origin  IC=14.1075
+      C0557152  Details of local facilities and amenities  IC=13.1913
+      C0424015  Getting lost  IC=13.4144
+      C0557660  Location inside building  IC=11.6226
+      C1285538  Finding site  IC=14.8007
+      C0851346  Radiation  IC=8.2597
+      C1282930  Irradiation (physical force)  IC=16.9959
+      C0458344  Site of radiation  IC=14.8007
+      C0015333  Exposure to radiation  IC=9.8035
+      C0418177  Exposure to electric current and radiation  IC=9.4301
+      C0520903  Skin sensitivity to radiation  IC=14.8007
+      C0418178  Overexposure to radiation  IC=11.8563
+      C0564754  Radiation respiratory disease  IC=12.8548
+      C0445177  Post-radiation  IC=14.8007
+      C0034525  Effects of radiation  IC=14.8007
+      C0479537  [X]Exposure to unspecified type of radiation, occurrence at sports and athletics area  IC=14.8007
+      C0203497  Oral radiation  IC=14.8007
+      C1304446  Disorder of skin due to radiotherapy  IC=12.7213
+      C0332306  Quality  IC=11.9103
+      C0557391  Quality of work  IC=14.8007
+      C0422976  Quality of visual image  IC=13.1913
+      C0423043  Quality of focus  IC=14.1075
+      C0449577  Quality of fixation  IC=14.8007
+      C4759659  With quality (attribute)  IC=14.8007
+      C4517914  99.9  IC=16.9959
+      C0441800  Grade  IC=9.6532
+      C0559857  Dandy grade 1  IC=14.8007
+      C5548507  Numeric grade on a scale of 1 to 7  IC=12.7213
+      C1961136  Excellent (qualifier value)  IC=14.8007
+      C3641222  Very good (qualifier value)  IC=14.8007
+      C4517500  1.33  IC=16.9959
+      C5548545  Numeric grade on a scale of 1 to 5  IC=13.0089
+      C0309195  Grade A  IC=14.8007
+      C0585055  General grades  IC=13.0089
+      C1828058  Grade 1 on a scale of 1 to 3  IC=14.8007
+      C1828241  Numeric grade on a scale of 1 to 3  IC=13.4144
+      C5548560  Grade 9 on a scale of 0 to 10  IC=14.8007
+      C1827816  Grade 3 on a scale of 1 to 3  IC=14.8007
+      C0441806  Grade B  IC=14.8007
+      C1444775  Sharp sensation quality  IC=14.8007
+      C0455270  Sharp pain  IC=13.7021
+      C0423606  Cutting pain  IC=14.8007
+      C1444774  Shooting sensation quality  IC=14.8007
+      C3266044  Wound edge sharp  IC=14.8007
+      C0423557  Discrimination between sharp and blunt  IC=14.8007
+      C0423603  Pricking pain  IC=14.8007
+      C1301568  Ability to sense sharp point  IC=14.8007
+      C0457726  Denture surface sharp  IC=14.8007
+      C0439821  Pricking sensation quality  IC=14.8007
+      C0480664  Assault by sharp object  IC=11.3667
+      C0337278  Contact with sharp leaves  IC=14.8007
+      C0337244  Struck by sharp object  IC=14.8007
+      C5566673  Sharp impact  IC=14.8007
+      C5566674  Sharp force injury  IC=13.7021
+      C0480674  [X]Assault by sharp object, occurrence at unspecified place  IC=14.8007
+      C0480673  [X]Assault by sharp object, occurrence at other specified place  IC=14.8007
+      C0418566  Injury of unknown intent by sharp instrument  IC=13.4144
+      C1960082  Penetrating injury by sharp object  IC=16.9959
+      C0418119  Accident caused by sharp-edged object  IC=12.7213
+      C0481024  [X]Contact with sharp object, undetermined intent, occurrence on farm  IC=14.8007
+      C1299578  Finding of auditory acuity  IC=14.8007
+      C0422977  Clarity of visual image  IC=14.8007
+      C0580104  Poor visual acuity  IC=14.8007
+      C0443208  Dull  IC=14.8007
+      C1455762  Dull sensation quality  IC=14.8007
+      C1621860  Mentally dull  IC=14.1075
+      C0558105  Wears dull clothes  IC=14.8007
+      C0234233  Sore to touch  IC=11.0871
+      C0278144  Dull pain  IC=14.1075
+      C0201033  Bacterial colony surface, dull  IC=14.8007
+      C5394682  Lack of luster of hair  IC=14.8007
+      C0557738  Unchallenging environment  IC=14.8007
+      C0424598  Switched off  IC=14.8007
+      C0443347  Very slow  IC=14.8007
+      C1997138  Blunted  IC=14.8007
+      C0558082  Unenthusiastic  IC=14.8007
+      C0474383  Perception that things appear gray  IC=14.8007
+      C0474382  Perception that things appear colorless  IC=14.1075
+      C5779559  [D]Malaise and fatigue  IC=14.8007
+      C0563598  Mechanical crushing  IC=14.8007
+      C0458259  Pain, Crushing  IC=14.8007
+      C0185060  Crushing (procedure)  IC=13.0089
+      C1456399  Crushing sensation quality  IC=14.8007
+      C0341661  Crusher  IC=14.8007
+      C0565825  Bruises with crushing - superficial injury  IC=14.8007
+      C0435221  Crushing injury of ligament  IC=14.8007
+      C0402831  Crusher/miller/mixer NOS  IC=14.8007
+      C0451981  Crushing Skull Injury  IC=13.4144
+      C0586106  Crush - wound  IC=11.9103
+      C1268568  Juice  IC=11.4685
+      C0458102  Central crushing chest pain  IC=14.8007
+      C0417962  Accidentally crushed by machinery  IC=14.8007
+      C0232290  Crushing chest pain  IC=14.1075
+      C0274276  Late effect of crushing injury  IC=13.0089
+      C3163841  Artifact due to crushing  IC=14.8007
+      C2138550  Crushing injury of right hip  IC=13.1913
+      C2138528  Crushing injury of left hip  IC=13.1913
+      C1304058  Crush injury to skin  IC=14.8007
+      C0332679  Crushing injury  IC=8.6804
+      C0027745  Nerve Crush  IC=12.8548
+      C0564384  Crush injury of musculoskeletal structure  IC=13.7021
+      C0192794  Crushing of contents of intestine  IC=14.1075
+      C0273441  Crushing injury of testis  IC=13.7021
+      C0273440  Crushing injury of scrotum  IC=14.8007
+      C0273439  Crushing injury of penis  IC=13.4144
+      C1272550  Crushing of contents of bladder (procedure)  IC=16.9959
+      C0562531  Crush injury of respiratory structure  IC=13.7021
+      C0195019  Crushing of vas deferens  IC=14.8007
+      C0196889  Crushing of peripheral nerve  IC=13.4144
+      C0023878  Lithotripsy  IC=10.6263
+      C0193229  Crushing of contents of rectum  IC=14.8007
+      C1292832  Grinding - action  IC=16.9959
+      C0193582  crushing of bile calculus  IC=14.8007
+      C0189073  Crushing of nasal septum  IC=14.1075
+      C0449354  Method of fragmentation  IC=14.8007
+      C0191207  Venotripsy  IC=14.8007
+      C0185062  Emulsification procedure  IC=14.8007
+      C0441578  Mechanical fragmentation  IC=10.8495
+      C0196893  Crushing of phrenic nerve  IC=14.8007
+      C0194530  Crushing of calculus of urinary bladder, NOS (procedure)  IC=13.1913
+      C0677038  Increase in pressure (physical force)  IC=14.1075
+      C0460139  Pressure (finding)  IC=14.8007
+      C0445174  Peak pressure  IC=14.8007
+      C0449252  Pressure phase  IC=14.8007
+      C0033095  Pressure - physical agent  IC=11.4334
+      C4284008  Pressure (property)  IC=14.1075
+      C0520818  Increased pressure  IC=14.8007
+      C0677039  Decrease in pressure (physical force)  IC=14.8007
+      C0563547  Pressure change  IC=13.4144
+      C0596891  Mechanical pressure  IC=14.8007
+      C0520820  Absence of pressure  IC=14.8007
+      C0429215  Gastrointestinal pressure  IC=14.8007
+      C0520819  Decreased pressure  IC=14.8007
+      C0429487  Uterine pressure  IC=14.8007
+      C0311421  fluid pressure  IC=14.8007
+      C0429216  Gastric pressure  IC=14.8007
+      C1306345  Pressure - action  IC=13.1913
+      C1442096  Difference in pressure  IC=14.8007
+      C0311422  Increased fluid pressure  IC=14.8007
+      C0428718  Pressure in the breathing system  IC=14.8007
+      C0311423  Decreased fluid pressure  IC=14.8007
+      C0429758  Urethral pressure  IC=13.7021
+      C0428708  Central nervous system pressure  IC=14.1075
+      C1305710  Liquid pressure  IC=14.8007
+      C0428642  Pulmonary artery pressure  IC=13.4144
+      C0232781  Equalization of pressure of gallbladder  IC=14.8007
+      C0429218  Abdominal pressure  IC=14.1075
+      C0439467  Unit of pressure  IC=10.9505
+      C0232712  Colorectal pressure  IC=14.8007
+      C0578862  Intraocular pressure finding  IC=11.063
+      C1563105  Intraocular pressure right eye  IC=13.4144
+      C0450458  Ventricular pressure result  IC=12.7213
+      C0233145  Intramyometrial pressure  IC=14.8007
+      C0428876  Intracardiac pressure  IC=11.6652
+      C1536290  (Ocular hypertension) or (raised intra-ocular pressure - finding or diagnosis)  IC=16.9959
+      C0429701  Respiratory pressure  IC=13.4144
+      C0456180  Aortic Pressure  IC=14.8007
+      C0234708  Raised intraocular pressure (finding)  IC=13.1913
+      C0456189  Left ventricular systolic pressure  IC=14.8007
+      C0429207  Transnasal pressure  IC=14.8007
+      C0456190  Left ventricular end-diastolic pressure  IC=14.8007
+      C0520999  Abnormal intraocular pressure  IC=11.6226
+      C0021888  Physiologic Intraocular Pressure  IC=11.7097
+      C4081567  Elevated left intraocular pressure  IC=14.1075
+      C4081568  Elevated right intraocular pressure  IC=14.1075
+      C4510570  Bilateral raised intraocular pressure  IC=14.8007
+      C5921764  Intraocular pressure of bilateral eyes below reference range  IC=14.8007
+      C1562592  Intraocular pressure left eye  IC=13.4144
+      C5852640  Maximum untreated intraocular pressure of right eye  IC=14.8007
+      C5852639  Maximum untreated intraocular pressure of left eye  IC=14.8007
+      C5852592  Target intraocular pressure of left eye  IC=14.8007
+      C5852637  Maximum intraocular pressure of left eye  IC=14.8007
+      C5852638  Maximum intraocular pressure of right eye  IC=14.8007
+      C1532437  O/E - intraocular pressure reading  IC=16.9959
+      C5921734  Intraocular pressure of left eye below reference range  IC=13.7021
+      C0578863  Normal intraocular pressure  IC=13.7021
+      C0234230  Pain, Burning  IC=10.994
+      C0085624  Burning sensation  IC=10.7403
+      C0562705  Burning self  IC=14.8007
+      C0241057  Burning sensation of skin  IC=10.7576
+      C0234655  Burning sensation in eye  IC=14.8007
+      C0277602  Death by immolation  IC=14.8007
+      C0418326  Suicide or self injury by burning or fire  IC=13.0089
+      C0810083  Burn caused by fire  IC=14.1075
+      C0417567  Accidental burning caused by other caustic or corrosive substance  IC=14.8007
+      C0701836  Thermal burn  IC=9.3118
+      C0565934  Flame burn of skin  IC=14.1075
+      C0474076  Burning caused by conflagration in theater  IC=14.8007
+      C0418433  Assault by fire and burning  IC=13.0089
+      C0417579  Burning caused by creosote  IC=14.8007
+      C0417157  Burning caused by conflagration in store  IC=14.8007
+      C0417540  Burning due to contact with molten bitumen or tar  IC=14.8007
+      C0417510  Accidental burning caused by other hot substance or object  IC=14.8007
+      C0417513  Burning due to contact with hot substance  IC=11.0871
+      C5574728  Burn of skin  IC=7.9506
+      C5881069  Burn of left lower limb  IC=9.7834
+      C4759317  Suicide attempt by burning self  IC=14.8007
+      C0418329  Suicide or self injury by scalding  IC=14.8007
+      C2005127  Burn of left shoulder  IC=11.0165
+      C2005104  Burn of left breast  IC=13.1913
+      C0414269  Train accident involving burning  IC=12.8548
+      C2005136  Burn of left thigh  IC=11.1631
+      C5222854  Burn of left hip  IC=13.1913
+      C0414255  Train accident involving explosion  IC=12.8548
+      C5222878  Burn of right hip  IC=13.1913
+      C0414270  Train accident involving burning, unspecified person injured  IC=14.8007
+      C2005155  Burn of right lower leg  IC=11.1631
+      C0480423  [X]Intentional self harm by smoke, fire and flames, occurrence at other specified place  IC=14.8007
+      C2005115  Burn of left knee region  IC=11.5818
+      C0480424  [X]Intentional self harm by smoke, fire and flames, occurrence at unspecified place  IC=14.8007
+      C2005113  Burn of left forearm  IC=10.7403
+      C0480414  Intentional self-harm by smoke, fire and flames  IC=12.1616
+      C0414273  Train accident involving burning, pedestrian injured  IC=14.8007
+      C0480419  [X]Intentional self harm by smoke, fire and flames, occurrence on street and highway  IC=14.8007
+      C5881068  Burn of right lower limb  IC=9.824
+      C2005114  Burn of left hand  IC=10.7063
+      C5881070  Burn of right upper limb  IC=10.1279
+      C0562090  Burn of hip  IC=13.1913
+      C2005109  Burn of left ear  IC=14.1075
+      C0414274  Train accident involving burning, passenger injured  IC=14.8007
+      C0414272  Train accident involving burning, pedal cyclist injured  IC=14.8007
+      C0480420  [X]Intentional self harm by smoke, fire and flames, occurrence at trade and service area  IC=14.8007
+      C0480418  [X]Intentional self harm by smoke, fire and flames, occurrence at sports and athletics area  IC=14.8007
+      C0480643  [X]Assault by smoke, fire and flames, occurrence at home  IC=14.8007
+      C0418327  Suicide or self injury by igniting gasoline soaked clothing  IC=14.8007
+      C0479656  [X]Exposure to unspecified smoke, fire and flames, occurrence at home  IC=14.8007
+      C0480416  [X]Intentional self harm by smoke, fire and flames, occurrence in residential institution  IC=14.8007
+      C0480421  [X]Intentional self harm by smoke, fire and flames, occurrence at industrial and construction area  IC=14.8007
+      C0414271  Train accident involving burning, other specified person injured  IC=14.8007
+      C0480415  [X]Intentional self harm by smoke, fire and flames, occurrence at home  IC=14.8007
+      C0480642  Assault by smoke, fire and flames  IC=12.1616
+      C0418330  Self injury by cigarette burn  IC=14.8007
+      C0480994  Exposure to smoke, fire and flames, undetermined intent causing accidental injury  IC=12.1616
+      C0414248  Train accident involving explosion, fire or burning  IC=11.4685
+      C0480417  [X]Intentional self harm by smoke, fire and flames, occurrence at school, other institution and public administrative area  IC=14.8007
+      C0480426  [X]Intentional self harm by steam, hot vapours and hot objects, occurrence at home  IC=14.8007
+      C0414275  Train accident involving burning, railway employee injured  IC=14.8007
+      C0414249  Train accident involving explosion, fire or burning NOS, unspecified person injured  IC=14.8007
+      C0414251  Train accident involving explosion, fire or burning NOS, pedal cyclist injured  IC=14.8007
+      C0414252  Train accident involving explosion, fire or burning NOS, pedestrian injured  IC=14.8007
+      C0414266  Train accident involving fire, pedestrian injured  IC=14.8007
+      C0414253  Train accident involving explosion, fire or burning NOS, passenger injured  IC=14.8007
+      C0414262  Train accident involving fire  IC=12.8548
+      C0414267  Train accident involving fire, passenger injured  IC=14.8007
+      C0414263  Train accident involving fire, unspecified person injured  IC=14.8007
+      C0414250  Train accident involving explosion, fire or burning NOS, other specified person injured  IC=14.8007
+      C0414254  Train accident involving explosion, fire or burning NOS, railway employee injured  IC=14.8007
+      C0414264  Train accident involving fire, other specified person injured  IC=14.8007
+      C0439793  Severities  IC=11.5818
+      C0457451  Severity score  IC=14.8007
+      C0442720  Severity findings  IC=14.1075
+      C0441982  Degrees of severity  IC=13.4144
+      C0449286  Degree or extent  IC=12.8548
+      C1292730  Condition severity  IC=14.8007
+      C0449238  Duration (temporal)  IC=9.5024
+      C0429930  Test duration  IC=14.8007
+      C0439591  Long duration  IC=14.8007
+      C0449240  Duration of freeze  IC=14.8007
+      C0436359  Time symptom lasts  IC=14.8007
+      C0586402  Symptom findings in relation to time lasts  IC=12.6035
+      C0436362  Symptom lasts hours  IC=14.8007
+      C0436361  Symptom lasts minutes  IC=14.8007
+      C0436365  Symptom lasts months  IC=14.8007
+      C0436366  Symptom is continuous  IC=14.8007
+      C0586409  Temporal measure of symptom  IC=13.1913
+      C0436367  Time since symptom started  IC=14.8007
+      C0436360  Symptom lasts seconds  IC=14.8007
+      C0436370  Symptom started days ago  IC=14.8007
+      C0438986  Symptom started years ago  IC=14.8007
+      C0436372  Symptom started months ago  IC=14.8007
+      C0436347  Onset of symptom speed  IC=13.7021
+      C0586400  Symptom findings in relation to time  IC=11.3995
+      C0436369  Symptom started hours ago  IC=14.8007
+      C0436350  Symptom frequency  IC=14.8007
+      C1320528  Time of symptom onset  IC=14.1075
+      C0205432  Compensated  IC=14.8007
+      C0001783  Age Factors  IC=11.9675
+      C0332161  Attenuated by (contextual qualifier)  IC=11.2172
+      C0337460  Social Factors  IC=12.7213
+      C1264628  Narrative value  IC=14.8007
+      C0559248  Modified radical  IC=14.8007
+      C0332246  Sliding  IC=14.8007
+      C0205459  Modifier related to basic sciences  IC=10.8887
+      C0579005  Modification - action  IC=7.2313
+      C0205538  Modifier mainly for procedure  IC=6.7036
+      C0564606  Aggressive character  IC=14.8007
+      C0557883  Feeling aggressive  IC=14.8007
+      C0436331  Symptom aggravating factors  IC=11.2172
+      C1444749  Exacerbated  IC=14.8007
+      C0562572  Displays of aggression  IC=14.8007
+      C0557906  Becomes angry very easily  IC=14.8007
+      C0424331  Temper problem  IC=14.1075
+      C0436335  Movement aggravates symptom  IC=14.8007
+      C0348027  Irritant behavior  IC=14.8007
+      C0436338  Cough aggravates symptom  IC=14.8007
+      C5880398  Verbal agitation  IC=14.8007
+      C0436332  No symptom aggravating factor  IC=14.8007
+      C0436333  Food aggravates symptom  IC=14.8007
+      C5141269  Increased pain  IC=12.8548
+      C1960719  Pain characterized by provoking factor  IC=11.335
+      C0436334  Exercise aggravates symptom  IC=14.8007
+      C0436339  Breathing aggravates symptom  IC=14.8007
+      C1301676  Relieving  IC=14.8007
+      C0150135  Alleviating anxiety  IC=11.4685
+      C0564405  Feeling relief  IC=14.8007
+      C1301771  Relieved (qualifier value)  IC=14.8007
+      C1285530  Palliative  IC=14.8007
+      C0332303  Relieved by  IC=14.8007
+      C0436323  Symptom relieving factors  IC=12.7213
+      C0451615  Pain relief  IC=14.1075
+      C1961000  Pain characterized by relieving factor  IC=12.6035
+      C0436326  Exercise relieves symptom  IC=14.8007
+      C0436329  Heat relieves symptom  IC=14.8007
+      C0436330  Cold relieves symptom  IC=14.8007
+      C0436325  Food relieves symptom  IC=14.8007
+      C0420259  Analgesics requested  IC=14.8007
+      C4545333  Pain relief by lowering leg  IC=14.8007
+      C0557023  Recommendation to take things gently  IC=14.8007
+      C3872550  Pain relieved by analgesic  IC=14.8007
+      C5547101  Managing to control symptoms  IC=14.1075
+      C0436327  Movement relieves symptom  IC=14.8007
+      C0436324  No symptom relieving factor  IC=14.8007
+      C0436316  Symptom not changed  IC=13.7021
+      C0522032  Neck pain aggravated by recumbency  IC=14.8007
+      C3241964  Winded  IC=14.8007
+      C1272200  Dyspnea on dressing and undressing  IC=14.8007
+      C0013404  Dyspnea  IC=9.3497
+      C1301597  Borg Breathlessness Score finding  IC=12.2357
+      C0475116  O/E - dyspnea  IC=14.8007
+      C0231805  Dyspnea, class III  IC=14.8007
+      C5396924  Chronic dyspnea  IC=14.8007
+      C0231806  Dyspnea, class IV  IC=14.8007
+      C0743330  Rest Dyspnea  IC=14.8007
+      C0231810  Dyspnea raising arms  IC=14.8007
+      C0231803  Dyspnea, class I  IC=14.8007
+      C1272201  Dyspnea on strenuous exertion  IC=14.8007
+      C0332162  Onset of (contextual qualifier)  IC=12.0926
+      C0574845  Date of onset  IC=11.805
+      C1304680  Attack (finding)  IC=16.9959
+      C1299997  Onsets (qualifier value)  IC=14.8007
+      C5205878  Delayed onset  IC=14.8007
+      C0277793  Onset of illness  IC=13.1913
+      C0332164  Gradual onset  IC=14.8007
+      C0458004  Period of onset  IC=14.8007
+      C1276802  Sudden onset (attribute)  IC=14.8007
+      C0449244  Time of onset  IC=13.1913
+      C4553712  Onset of menstrual cycle  IC=14.8007
+      C0439557  Acute phase  IC=14.8007
+      C0025274  Menarche  IC=12.8548
+      C1627769  Pubertal  IC=14.8007
+      C0566679  Duration of labor  IC=12.8548
+      C0233916  Prepubertal orgasm  IC=14.8007
+      C0474483  Total duration of labor  IC=14.8007
+      C0474463  Late onset of labor  IC=14.8007
+      C0423594  Sensation as if period due  IC=14.8007
+      C0567299  periods have not started  IC=14.8007
+      C2114287  Prepubertal bleeding from vagina  IC=14.8007
+      C0567310  Finding of sensation of periods  IC=14.1075
+      C5566150  Maternal antenatal period  IC=14.8007
+      C0271616  Precocious female puberty  IC=14.1075
+      C1299418  Length of procedure  IC=14.8007
+      C5566159  Maternal first stage of labor period  IC=14.8007
+      C0474462  Relation of onset of labor to due date  IC=14.8007
+      C0474456  Labor details  IC=14.8007
+      C0460089  Duration of gestation  IC=10.0385
+      C5685973  Fetal intrapartum and/or early neonatal period  IC=13.4144
+      C1301668  Time of delivery  IC=14.8007
+      C1571749  Precocious puberty (& sexual precocity NEC)  IC=16.9959
+      C0585281  During menstruation  IC=14.8007
+      C0015264  Exertion  IC=14.8007
+      C0301616  Overexertion  IC=12.0926
+      C1290920  Finding related to exertion  IC=8.6651
+      C0424588  Exhausted on least exertion  IC=14.8007
+      C1960725  Pain provoked by exertion  IC=13.1913
+      C1828228  Exercise above recommended level  IC=14.8007
+      C0161750  Exhaustion due to excessive exertion  IC=13.4144
+      C0015259  Exercise  IC=8.9456
+      C1998035  Pain onset during exertion  IC=16.9959
+      C0232288  Chest pain on exertion  IC=13.1913
+      C2363911  Headache due to exertion  IC=14.1075
+      C0261751  Overexertion and strenuous movements (event)  IC=14.8007
+      C0231236  Underexertion  IC=14.8007
+      C0418141  Overexertion from pushing  IC=14.8007
+      C0442694  Straining (finding)  IC=14.8007
+      C1290925  Post-exercise state  IC=13.1913
+      C0336917  Active physical exercise  IC=14.8007
+      C0480137  [X]Overexertion and strenuous or repetitive movements, occurrence at other specified place  IC=14.8007
+      C0480134  [X]Overexertion and strenuous or repetitive movements, occurrence at trade and service area  IC=14.8007
+      C0429693  Maximum oxygen uptake  IC=14.8007
+      C4075028  Does maintain a lying position  IC=14.8007
+      C4075030  Able to maintain a lying position  IC=14.8007
+      C0560840  Ability to lie down  IC=13.1913
+      C4075031  Finding related to ability to maintain lying position  IC=13.0089
+      C4075027  Does not maintain a lying position  IC=14.8007
+      C0444334  Recumbent body position  IC=11.063
+      C0560051  Does walk on the flat  IC=13.7021
+      C5924213  Able to lie down without assistance  IC=14.1075
+      C0277816  Lying in bed  IC=14.8007
+      C0555089  Difficulty lying down  IC=14.1075
+      C1286597  Finding related to ability to lie down  IC=13.0089
+      C4075029  Unable to maintain a lying position  IC=14.8007
+      C4075026  Difficulty maintaining a lying position  IC=14.8007
+      C4075036  Ability to maintain lying position  IC=14.8007
+      C0560349  Unable to run on flat  IC=14.8007
+      C0444401  Lying in water  IC=12.8548
+      C0437984  O/E - sign flattened  IC=14.8007
+      C0560048  Ability to walk on the flat  IC=13.7021
+      C0560351  Does not run on flat  IC=14.8007
+      C0560347  Ability to run on flat  IC=13.0089
+      C0560049  Able to walk on the flat  IC=13.7021
+      C0560350  Does run on flat  IC=14.8007
+      C0427121  Crumples to floor  IC=14.8007
+      C0560791  Does not stand up  IC=13.4144
+      C0560052  Does not walk on the flat  IC=13.7021
+      C0560050  Unable to walk on the flat  IC=13.7021
+      C1286507  Finding related to ability to run on flat  IC=13.0089
+      C0575123  Does not fall  IC=14.8007
+      C0424599  Found on floor  IC=14.8007
+      C0560053  Difficulty walking on the flat  IC=13.7021
+      C1540933  (Arches fallen) or (flat foot NOS)  IC=16.9959
+      C1288245  Finding related to ability to walk on the flat  IC=14.8007
+      C0521990  Associated sign  IC=14.8007
+      C0476291  Other digestive symptoms  IC=13.7021
+      C0478141  Other symptoms and signs involving appearance and behavior  IC=10.9721
+      C0029625  Other general symptoms  IC=11.3042
+      C0231217  Multiple symptoms  IC=14.1075
+      C0476256  [D]Other symptoms affecting head and neck  IC=10.2574
+      C0436319  No symptom pattern  IC=14.8007
+      C0427220  Other symptoms - knee  IC=14.8007
+      C0043144  Wheezing  IC=10.0733
+      C0421202  Increasing exercise wheeze  IC=14.8007
+      C0231875  Expiratory wheezing  IC=11.1371
+      C0687152  Does cough  IC=14.8007
+      C0584637  Able to cough voluntarily  IC=14.8007
+      C0277872  Brassy cough  IC=14.8007
+      C0562483  Persistent cough  IC=14.1075
+      C0584636  Ability to cough voluntarily  IC=13.4144
+      C0574067  Increasing frequency of cough  IC=14.8007
+      C0232051  Cough reflex  IC=13.4144
+      C4708767  Cough strength  IC=14.8007
+      C0239134  Productive Cough  IC=10.7934
+      C4708768  No cough strength  IC=14.8007
+      C0577929  Does cough up sputum  IC=14.8007
+      C0566517  Ability to cough  IC=11.9675
+      C0586750  Cough on exercise  IC=14.8007
+      C0455777  Coughing ineffective  IC=14.8007
+      C1287655  Finding related to ability to cough  IC=11.9675
+      C0277870  Spasmodic cough  IC=14.8007
+      C1578935  (Coughing up phlegm) or (productive cough NOS)  IC=16.9959
+      C0577927  Ability to cough up sputum  IC=12.8548
+      C1536391  Coughing up phlegm  IC=16.9959
+      C0566523  Able to cough  IC=14.8007
+      C0566528  Does expectorate  IC=14.8007
+      C0476274  cough with hemorrhage  IC=14.8007
+      C0425505  Productive cough -clear sputum  IC=14.8007
+      C1287657  Finding related to ability to cough up sputum  IC=12.8548
+      C0566525  Difficulty coughing  IC=14.8007
+      C0558168  Able to cough up sputum  IC=14.8007
+      C0475117  O/E - orthopnea  IC=14.8007
+      C3661810  Sleeps in sitting position due to orthopnea  IC=14.8007
+      C0085619  Orthopnea  IC=14.8007
+      C0392194  Trepopnea  IC=13.7021
+      C0344357  Nocturnal dyspnea  IC=14.1075
+      C0013405  Dyspnea, Paroxysmal  IC=14.1075
+      C0520825  Platypnea  IC=14.8007
+      C1956415  Paroxysmal nocturnal dyspnea  IC=14.8007
+      C1956414  Cardiac asthma  IC=14.8007
+      C4087267  Bendopnea  IC=14.8007
+      C0023212  Left-Sided Heart Failure  IC=11.2453
+      C0574066  Increasing breathlessness  IC=14.8007
+      C1303239  Borg Breathlessness Score: 3 moderate  IC=14.8007
+      C1303248  Borg Breathlessness Score: 7 very severe  IC=14.8007
+      C1534472  (Left ventricular: [failure] or [impaired function]) or (cardiac asthma) or (acute pulmonary oedema)  IC=16.9959
+      C0034063  Pulmonary Edema  IC=11.0871
+      C0546960  Paroxysmal nodal tachycardia  IC=14.8007
+      C0155919  Acute pulmonary edema  IC=11.9675
+      C4087508  Acute exacerbation of chronic heart failure  IC=14.8007
+      C0340106  Fluid overload pulmonary edema  IC=14.8007
+      C5439136  Paroxysmal atrial fibrillation with rapid ventricular response  IC=14.8007
+      C3697063  Acute exacerbation of chronic congestive heart failure  IC=13.7021
+  TOPICS (491):
+    tp_e8c3073689f4  size=   2  IC=0.946  'C0192794'
+    tp_33c5b607e23e  size=   2  IC=0.946  'C4284008'
+    tp_6d918129a328  size=   2  IC=0.946  'C0232290'
+    tp_8813a8303656  size=   2  IC=0.875  'C1285837'
+    tp_2e6885faa24c  size=   2  IC=0.946  'C0555089'
+    tp_0bc33367a788  size=   2  IC=0.946  'C0474382'
+    tp_0cffcb21c770  size=   2  IC=0.946  'C4081567'
+    tp_73800021372c  size=   2  IC=0.946  'C0189073'
+    tp_256e1c68f926  size=   2  IC=0.946  'C4081568'
+    tp_479071f4bcbb  size=   2  IC=0.946  'C2138550'
+    tp_362719d9c402  size=   2  IC=0.946  'C0451981'
+    tp_dbbaa3bef3fd  size=   2  IC=0.946  'C0232288'
+    tp_cfa9e9b90035  size=   2  IC=0.946  'C3839223'
+    tp_30e1f54833f7  size=   2  IC=0.946  'C0278144'
+    tp_c70c903c6174  size=   2  IC=0.946  'C0563291'
+    tp_4309e4699c96  size=   2  IC=0.946  'C0392148'
+    tp_68cee709abe9  size=   2  IC=0.946  'C0231875'
+    tp_6e56bb4331e7  size=   2  IC=0.946  'C0560840'
+    tp_398878ff4630  size=   2  IC=0.914  'C0458259'
+    tp_f6326dd788fc  size=   2  IC=0.946  'C0271616'
+    tp_11d2a3f805fe  size=   2  IC=0.946  'C0677038'
+    tp_3072b0fdc76b  size=   2  IC=0.946  'C0449689'
+    tp_a23ebf40bad5  size=   2  IC=0.8  'C1285697'
+    tp_fb958350352a  size=   2  IC=0.946  'C0429218'
+    tp_4e49acdfbb28  size=   2  IC=0.946  'C0439834'
+    tp_a35d34763941  size=   2  IC=0.946  'C0451615'
+    tp_83ed68042f16  size=   2  IC=0.892  'C3839526'
+    tp_0a3889d16109  size=   2  IC=0.914  'C0436350'
+    tp_2860475a6414  size=   2  IC=0.914  'C5566674'
+    tp_ac8c9eca02e6  size=   2  IC=0.914  'C1444639'
+    tp_f32854a26549  size=   2  IC=0.946  'C0436315'
+    tp_b017f759a0aa  size=   2  IC=0.946  'C0013405'
+    tp_22ebb0eaa4e3  size=   2  IC=0.914  'C0424015'
+    tp_3fc1cb0ded31  size=   2  IC=0.946  'C0455270'
+    tp_36f693d3c151  size=   2  IC=0.946  'C5924213'
+    tp_05db225e1d48  size=   2  IC=0.946  'C0450429'
+    tp_264a577681eb  size=   2  IC=0.946  'C0277600'
+    tp_74a6f00c2f1e  size=   2  IC=0.946  'C0566669'
+    tp_a09f8383b0a6  size=   2  IC=0.946  'C1444703'
+    tp_05715d5ec555  size=   2  IC=0.946  'C0429627'
+    tp_fd70b0d48497  size=   2  IC=0.946  'C0423634'
+    tp_d2b5a087592f  size=   2  IC=0.946  'C1621860'
+    tp_bbdbd3b0b0ad  size=   2  IC=0.946  'C0439590'
+    tp_b4ef907b3c9d  size=   2  IC=0.946  'C0332306'
+    tp_6c50b35ca4e6  size=   2  IC=0.946  'C1142306'
+    tp_5809cddec575  size=   2  IC=0.946  'C0344357'
+    tp_79f26b2aba93  size=   2  IC=0.946  'C0429206'
+    tp_faa59114ffd0  size=   2  IC=0.946  'C0563715'
+    tp_b1fe28330175  size=   2  IC=0.946  'C2138528'
+    tp_179ac0cbca91  size=   2  IC=0.946  'C2363911'
+    tp_dc24b7ffb77e  size=   2  IC=0.946  'C1286046'
+    tp_49450d069626  size=   2  IC=0.946  'C0562483'
+    tp_70b6287a2d27  size=   2  IC=0.946  'C5547101'
+    tp_afc0890697b8  size=   2  IC=0.946  'C0810083'
+    tp_87cadaefe865  size=   2  IC=0.946  'C0586106'
+    tp_05d3315fe12c  size=   2  IC=0.946  'C0231217'
+    tp_bd2f3ab93164  size=   2  IC=0.946  'C1305710'
+    tp_cc45d138993f  size=   3  IC=0.86  'C5685973'
+    tp_4850923dabb9  size=   3  IC=0.914  'C5921734'
+    tp_c524e7480af8  size=   3  IC=0.821  'C0450458'
+    tp_09b197efa574  size=   3  IC=0.914  'C0567310'
+    tp_7d881b6f9447  size=   3  IC=0.914  'C0414255'
+    tp_a273fe076d9a  size=   3  IC=0.914  'C0560049'
+    tp_01a744766173  size=   3  IC=0.914  'C5548394'
+    tp_aae3663272ed  size=   3  IC=0.914  'C0413299'
+    tp_f4eb3aa738ea  size=   3  IC=0.86  'C1286165'
+    tp_1123b78c92f6  size=   3  IC=0.914  'C0560048'
+    tp_0a9f90b7034c  size=   3  IC=0.914  'C0414269'
+    tp_ffecce564b88  size=   3  IC=0.914  'C0436347'
+    tp_0679456f0864  size=   3  IC=0.892  'C0424331'
+    tp_bd8cec5ddff9  size=   3  IC=0.875  'C5566150'
+    tp_c21a654b2fee  size=   3  IC=0.914  'C0560052'
+    tp_25afab351554  size=   3  IC=0.914  'C0417578'
+    tp_c35f45b2f36e  size=   3  IC=0.829  'C1285924'
+    tp_65594187b261  size=   3  IC=0.914  'C0560051'
+    tp_62db33cf252f  size=   3  IC=0.806  'C1268568'
+    tp_73f67072115f  size=   3  IC=0.914  'C0439807'
+    tp_d5bae5409a74  size=   3  IC=0.914  'C0563557'
+    tp_afddc19934c0  size=   3  IC=0.892  'C0234708'
+    tp_4e969e0a7348  size=   3  IC=0.892  'C0271615'
+    tp_f59562af598d  size=   3  IC=0.914  'C0235480'
+    tp_3153e72a8af5  size=   3  IC=0.738  'C0337460'
+    tp_f95df4b5484e  size=   3  IC=0.914  'C0433073'
+    tp_bd06c6cfcbef  size=   3  IC=0.892  'C0562531'
+    tp_dc9880feaf88  size=   3  IC=0.892  'C0563547'
+    tp_21d5d5fefbb9  size=   3  IC=0.86  'C0560886'
+    tp_e4eb22a0b571  size=   3  IC=0.914  'C1306345'
+    tp_98f4062b0f57  size=   3  IC=0.657  'C5438571'
+    tp_45ec7c3d60a5  size=   3  IC=0.848  'C0333240'
+    tp_d41c5dc70c8d  size=   3  IC=0.914  'C0418566'
+    tp_fd991c6d5649  size=   3  IC=0.914  'C0566517'
+    tp_092927748f5a  size=   3  IC=0.914  'C5921733'
+    tp_4ba1a08f900d  size=   3  IC=0.821  'C5566148'
+    tp_ebd99054c311  size=   3  IC=0.914  'C3697063'
+    tp_bf9bdaface75  size=   3  IC=0.821  'C1285881'
+    tp_7ae5320a2200  size=   3  IC=0.914  'C0205170'
+    tp_43663ea2be72  size=   3  IC=0.838  'C5685970'
+    tp_27317cd17819  size=   3  IC=0.914  'C2005109'
+    tp_9f897914e879  size=   3  IC=0.914  'C0274276'
+    tp_3e7ea4e6f21e  size=   3  IC=0.914  'C0429758'
+    tp_3e7a47b0e0ba  size=   3  IC=0.914  'C0560050'
+    tp_dbb2bba58087  size=   3  IC=0.914  'C0457711'
+    tp_08ca07705f0d  size=   3  IC=0.914  'C5852770'
+    tp_2db6522607dd  size=   3  IC=0.914  'C0578863'
+    tp_aa208174bcf0  size=   3  IC=0.892  'C0563207'
+    tp_6a210781ee26  size=   3  IC=0.914  'C0414262'
+    tp_522e2f1a22e7  size=   3  IC=0.914  'C0560053'
+    tp_de12525a1e60  size=   3  IC=0.914  'C0273438'
+    tp_ac7d035c7508  size=   3  IC=0.914  'C5852771'
+    tp_f6c5049753e3  size=   3  IC=0.914  'C5852593'
+    tp_d77fb78eb52a  size=   3  IC=0.794  'C0439467'
+    tp_4c633d10a1e7  size=   3  IC=0.914  'C1998289'
+    tp_bc05ca69c9a5  size=   3  IC=0.892  'C0560841'
+    tp_bef06d048ea5  size=   4  IC=0.838  'C0428717'
+    tp_ec2acc7127ef  size=   4  IC=0.732  'C0332685'
+    tp_56a3f0ac6015  size=   4  IC=0.691  'C0557660'
+    tp_e43f36cb8bc8  size=   4  IC=0.875  'C0418881'
+    tp_8b42ba98f0b2  size=   4  IC=0.86  'C0264719'
+    tp_30db84418dc3  size=   4  IC=0.892  'C2005115'
+    tp_1150848ae21f  size=   4  IC=0.892  'C1997553'
+    tp_3009ab246b15  size=   4  IC=0.892  'C0428642'
+    tp_5ccc52e1107a  size=   4  IC=0.875  'C0564384'
+    tp_b62ebb426f0e  size=   4  IC=0.821  'C0414248'
+    tp_dc1a4ed8037a  size=   4  IC=0.86  'C0233409'
+    tp_389180b8c706  size=   4  IC=0.892  'C1828241'
+    tp_5510e2eca867  size=   4  IC=0.892  'C0196889'
+    tp_ad960c180caf  size=   4  IC=0.848  'C0027745'
+    tp_ef92094734f2  size=   4  IC=0.591  'C1286502'
+    tp_a11bea3adcae  size=   4  IC=0.892  'C0574764'
+    tp_6048a32582f3  size=   4  IC=0.752  'C1268968'
+    tp_1ad6f37268b3  size=   4  IC=0.892  'C0025274'
+    tp_846ec0efe620  size=   4  IC=0.892  'C1563105'
+    tp_07b944004585  size=   4  IC=0.892  'C0441982'
+    tp_2d522268cda6  size=   4  IC=0.685  'C0417513'
+    tp_4ab84d5a8c54  size=   4  IC=0.892  'C0422976'
+    tp_f744d963552a  size=   4  IC=0.892  'C0456179'
+    tp_7701e1c94fa0  size=   4  IC=0.892  'C0428982'
+    tp_8fc0b35abe05  size=   4  IC=0.892  'C1562592'
+    tp_e227617c1a8c  size=   4  IC=0.892  'C0564605'
+    tp_50e4f7792a86  size=   4  IC=0.892  'C0301616'
+    tp_27d389f40fe6  size=   4  IC=0.86  'C1285803'
+    tp_e0ec11780fb6  size=   4  IC=0.892  'C1641250'
+    tp_c1149bb8886d  size=   4  IC=0.821  'C2828394'
+    tp_ce7e5a3a970b  size=   4  IC=0.848  'C4087508'
+    tp_5f4fcfa56e16  size=   4  IC=0.892  'C1272695'
+    tp_b9f53ff79801  size=   4  IC=0.892  'C1278505'
+    tp_b3e5002bf0c6  size=   4  IC=0.667  'C0851346'
+    tp_80e98e900217  size=   4  IC=0.892  'C0578503'
+    tp_854e4de741ac  size=   4  IC=0.838  'C1293668'
+    tp_18f9aca23631  size=   4  IC=0.848  'C0085631'
+    tp_39df8f32ef54  size=   4  IC=0.892  'C5566160'
+    tp_5bd83504b523  size=   4  IC=0.892  'C0417539'
+    tp_080765cf8b89  size=   4  IC=0.892  'C0205276'
+    tp_59285d1a6d38  size=   4  IC=0.892  'C0560791'
+    tp_eac4bf6dce37  size=   4  IC=0.892  'C1287656'
+    tp_68552a21c919  size=   4  IC=0.892  'C0239134'
+    tp_2dfc218f0fee  size=   5  IC=0.875  'C0422826'
+    tp_15d3aaabbea7  size=   5  IC=0.457  'C0587374'
+    tp_0f72ffb5d0b9  size=   5  IC=0.74  'C0586400'
+    tp_7c6460fda02c  size=   5  IC=0.875  'C0576687'
+    tp_0a112c99039b  size=   5  IC=0.756  'C1961000'
+    tp_5982b1b3f6b7  size=   5  IC=0.875  'C0566679'
+    tp_82ac279eb5d9  size=   5  IC=0.875  'C0560767'
+    tp_5baa86c27c3d  size=   5  IC=0.875  'C0418433'
+    tp_519385206d38  size=   5  IC=0.779  'C0578862'
+    tp_60eb67dcb75b  size=   5  IC=0.806  'C0205309'
+    tp_4f13fbf2bb74  size=   5  IC=0.875  'C2005136'
+    tp_0abaa3339f33  size=   5  IC=0.86  'C0560764'
+    tp_802e71c66547  size=   5  IC=0.875  'C0085089'
+    tp_de67a8ed407c  size=   5  IC=0.649  'C0566635'
+    tp_165f40559fab  size=   5  IC=0.848  'C0455778'
+    tp_4b771182342b  size=   5  IC=0.746  'C0428876'
+    tp_96667f4242ed  size=   5  IC=0.875  'C2005155'
+    tp_3146756c2961  size=   5  IC=0.875  'C1290925'
+    tp_9b690b95484c  size=   5  IC=0.821  'C0457570'
+    tp_47b8cfbe643f  size=   5  IC=0.673  'C1287669'
+    tp_fea21125e0ac  size=   5  IC=0.86  'C0560768'
+    tp_c248642d3dd4  size=   5  IC=0.613  'C0234233'
+    tp_598cb2c90fdc  size=   5  IC=0.813  'C0520999'
+    tp_1c6c0a588a32  size=   5  IC=0.875  'C5551254'
+    tp_d3c0adddb855  size=   5  IC=0.875  'C0155919'
+    tp_6d3572377809  size=   5  IC=0.813  'C0444400'
+    tp_27f823074302  size=   5  IC=0.848  'C0002957'
+    tp_2061107199db  size=   5  IC=0.86  'C0560765'
+    tp_b3ed1f8ed0b8  size=   5  IC=0.829  'C1998352'
+    tp_c14b5c83c878  size=   5  IC=0.875  'C0585044'
+    tp_e3f11d8f3853  size=   5  IC=0.86  'C2005113'
+    tp_569a7b7c35ad  size=   5  IC=0.838  'C0264722'
+    tp_e57a607cb5c8  size=   5  IC=0.875  'C0559853'
+    tp_8499a03ba559  size=   5  IC=0.656  'C0562215'
+    tp_1d14e6896ddf  size=   5  IC=0.875  'C0560766'
+    tp_2b270d1a117d  size=   6  IC=0.86  'C1286507'
+    tp_c4bc0e2612be  size=   6  IC=0.821  'C0273993'
+    tp_edd5a1e0a7fe  size=   6  IC=0.86  'C0456622'
+    tp_4f0ed2eefadd  size=   6  IC=0.766  'C0274071'
+    tp_30a693fd5091  size=   6  IC=0.794  'C1285600'
+    tp_26435ecaf98c  size=   6  IC=0.86  'C1286478'
+    tp_182d7db15ad7  size=   6  IC=0.86  'C4082134'
+    tp_7bf97c34a91c  size=   6  IC=0.784  'C1288245'
+    tp_cf4b6b086f33  size=   6  IC=0.848  'C0555084'
+    tp_05eb9ca2b97a  size=   6  IC=0.779  'C1285981'
+    tp_c845f0117eec  size=   6  IC=0.821  'C0586017'
+    tp_89358247c948  size=   6  IC=0.602  'C0459135'
+    tp_e07df1f8425d  size=   6  IC=0.86  'C2005127'
+    tp_e9e1e8ba9e9a  size=   6  IC=0.86  'C0449820'
+    tp_363931918ade  size=   6  IC=0.789  'C0274149'
+    tp_0f53560b4536  size=   6  IC=0.86  'C0429701'
+    tp_58a1e3366024  size=   6  IC=0.86  'C0205390'
+    tp_2e930ec1ede9  size=   6  IC=0.587  'C1562300'
+    tp_748fb435f256  size=   6  IC=0.86  'C5548545'
+    tp_e3bafab957df  size=   6  IC=0.848  'C0234230'
+    tp_243dd5c9f760  size=   6  IC=0.789  'C4075017'
+    tp_63c43ad487a3  size=   6  IC=0.86  'C0557152'
+    tp_488c90a5586f  size=   6  IC=0.77  'C0274155'
+    tp_62e8fd1369b9  size=   6  IC=0.681  'C0015333'
+    tp_e559da160c72  size=   6  IC=0.806  'C0205145'
+    tp_98872797fcd8  size=   6  IC=0.806  'C0021888'
+    tp_73d524b0035c  size=   6  IC=0.86  'C0585055'
+    tp_dc696c1a644c  size=   6  IC=0.784  'C0028841'
+    tp_c4ccd20b81e8  size=   6  IC=0.86  'C0449244'
+    tp_cd15eb841cff  size=   6  IC=0.789  'C1285906'
+    tp_e0f3ed28ab42  size=   6  IC=0.77  'C0577273'
+    tp_2315529eab1f  size=   6  IC=0.779  'C0274143'
+    tp_d6cc734e60e9  size=   6  IC=0.86  'C4075031'
+    tp_901c517bb069  size=   6  IC=0.86  'C1286699'
+    tp_3133f5343997  size=   6  IC=0.838  'C0418119'
+    tp_18a877788b9d  size=   7  IC=0.829  'C0586409'
+    tp_75e28f00f6f8  size=   7  IC=0.794  'C0002766'
+    tp_f9f688cd4e17  size=   7  IC=0.703  'C5881070'
+    tp_359138f6fd64  size=   7  IC=0.848  'C0429928'
+    tp_3567a617a94c  size=   7  IC=0.806  'C0043144'
+    tp_f14d35b9db8b  size=   7  IC=0.794  'C5396064'
+    tp_4822e6d4ede5  size=   7  IC=0.738  'C0584842'
+    tp_6ca5a6ffd120  size=   7  IC=0.848  'C1287657'
+    tp_bdd113bdf20c  size=   7  IC=0.848  'C3266041'
+    tp_cf9dcb0acf23  size=   7  IC=0.848  'C0444401'
+    tp_efa8cac9faab  size=   7  IC=0.848  'C0231807'
+    tp_b4de02267c60  size=   7  IC=0.703  'C5881071'
+    tp_77566aa14e7a  size=   7  IC=0.848  'C0586401'
+    tp_1c67ae5bfa61  size=   7  IC=0.821  'C0455919'
+    tp_556242768b8b  size=   7  IC=0.838  'C0194530'
+    tp_b72ea64c2ea6  size=   7  IC=0.848  'C0201029'
+    tp_18fa5c5ac8f6  size=   7  IC=0.848  'C0441805'
+    tp_933f6d29c492  size=   7  IC=0.738  'C3489624'
+    tp_16668e2fac9d  size=   7  IC=0.794  'C0033095'
+    tp_72ab4ce7cb38  size=   7  IC=0.794  'C0273946'
+    tp_d95cc78a75d6  size=   7  IC=0.784  'C0562549'
+    tp_3bca68f8ae66  size=   7  IC=0.848  'C0449286'
+    tp_471e0b30ee38  size=   7  IC=0.829  'C1285608'
+    tp_20b70c15a316  size=   8  IC=0.794  'C0580203'
+    tp_bf8b5090ab18  size=   8  IC=0.721  'C5881069'
+    tp_c0af0a56883b  size=   8  IC=0.763  'C1960725'
+    tp_455e9b1d91c3  size=   8  IC=0.684  'C0460089'
+    tp_bbafedb3445e  size=   8  IC=0.645  'C1289914'
+    tp_13a9383c901e  size=   8  IC=0.779  'C1287655'
+    tp_6ead0937eeff  size=   8  IC=0.779  'C1285529'
+    tp_704573863d0c  size=   8  IC=0.813  'C1286385'
+    tp_0c1a33daab0b  size=   8  IC=0.838  'C0436331'
+    tp_8bc93bd5f2a8  size=   8  IC=0.721  'C5881068'
+    tp_4af21d8c7100  size=   8  IC=0.8  'C1290921'
+    tp_e9197834db30  size=   8  IC=0.838  'C0436323'
+    tp_28187890eb50  size=   8  IC=0.829  'C0562090'
+    tp_05183929f902  size=   8  IC=0.743  'C0449238'
+    tp_b67167f62c38  size=   8  IC=0.838  'C5548507'
+    tp_33af8f45c489  size=   8  IC=0.806  'C1286597'
+    tp_06f12ce5f405  size=   8  IC=0.838  'C0586402'
+    tp_28cf905ab59a  size=   8  IC=0.806  'C0392674'
+    tp_9f29c18caede  size=   9  IC=0.694  'C1320390'
+    tp_e8438162eb5d  size=   9  IC=0.703  'C1287476'
+    tp_7ea27e19f0c8  size=   9  IC=0.73  'C1287066'
+    tp_42d013f6ad7e  size=   9  IC=0.723  'C0274041'
+    tp_57c6b9339d40  size=   9  IC=0.829  'C1304446'
+    tp_4031e947fe4e  size=   9  IC=0.813  'C0457338'
+    tp_284a9212fc24  size=   9  IC=0.829  'C0586403'
+    tp_52f7ee2310e9  size=   9  IC=0.829  'C0578061'
+    tp_79de6cc32969  size=   9  IC=0.77  'C1948053'
+    tp_9b72779edaaf  size=   9  IC=0.821  'C0439793'
+    tp_6fb133308ebe  size=  10  IC=0.784  'C0205459'
+    tp_49a9927b0568  size=  10  IC=0.727  'C0580859'
+    tp_52f4a4b75ddb  size=  10  IC=0.721  'C0580861'
+    tp_0bd522100d55  size=  10  IC=0.784  'C0557150'
+    tp_416f5049500e  size=  10  IC=0.716  'C0560786'
+    tp_80018704895a  size=  10  IC=0.746  'C1286586'
+    tp_983157d96196  size=  10  IC=0.759  'C0264714'
+    tp_7cc29b32b4f7  size=  10  IC=0.763  'C0264716'
+    tp_ff947a2abfef  size=  10  IC=0.77  'C4721224'
+    tp_3edbfc3c59bb  size=  10  IC=0.8  'C1287123'
+    tp_bddb9979e304  size=  10  IC=0.73  'C0580860'
+    tp_7386d312bbcc  size=  10  IC=0.794  'C0015259'
+    tp_fd722d100599  size=  10  IC=0.806  'C0085633'
+    tp_23601c47784e  size=  10  IC=0.692  'C0554788'
+    tp_13c7e4deb5dc  size=  10  IC=0.794  'C1286048'
+    tp_4f2134c33956  size=  10  IC=0.813  'C1285739'
+    tp_7fc9da788cd0  size=  10  IC=0.8  'C0564754'
+    tp_2b43d49e2907  size=  10  IC=0.821  'C0702221'
+    tp_e55e6906ded8  size=  11  IC=0.794  'C0023212'
+    tp_04ad43c1f829  size=  11  IC=0.723  'C1286581'
+    tp_2c0b089570fb  size=  11  IC=0.691  'C5886856'
+    tp_914eeb006f23  size=  11  IC=0.749  'C0436321'
+    tp_a7732cbc369f  size=  11  IC=0.501  'C0580197'
+    tp_f424b51b6d74  size=  11  IC=0.8  'C0232767'
+    tp_7537e587bb88  size=  11  IC=0.77  'C0085624'
+    tp_30ae66e4cb16  size=  11  IC=0.759  'C0185060'
+    tp_913687817990  size=  11  IC=0.813  'C0150312'
+    tp_f02d4fbc9651  size=  11  IC=0.533  'C5574728'
+    tp_2dc4ae51c8b3  size=  11  IC=0.749  'C0429855'
+    tp_9257b0203bac  size=  11  IC=0.545  'C1266831'
+    tp_d351b84da777  size=  11  IC=0.673  'C1282984'
+    tp_e68f867a50be  size=  11  IC=0.766  'C0449255'
+    tp_bdc13eb05c37  size=  12  IC=0.789  'C0575121'
+    tp_7dc484fdf4d4  size=  12  IC=0.779  'C0417381'
+    tp_c35c33e9bf7d  size=  12  IC=0.806  'C0600140'
+    tp_fb25c6a898df  size=  12  IC=0.746  'C0007859'
+    tp_8e407cc8cf02  size=  12  IC=0.806  'C5548546'
+    tp_87248620de33  size=  12  IC=0.806  'C0480203'
+    tp_13b8bc9fe91f  size=  12  IC=0.763  'C2005114'
+    tp_49b07ebb67d0  size=  12  IC=0.64  'C0026606'
+    tp_0fc177d75bad  size=  12  IC=0.806  'C0560343'
+    tp_927373b6359e  size=  12  IC=0.645  'C4075020'
+    tp_082813cbd3e1  size=  12  IC=0.806  'C0560331'
+    tp_063a5d0cf622  size=  13  IC=0.641  'C0274089'
+    tp_8796bbeee5be  size=  13  IC=0.725  'C0750729'
+    tp_80fcb04e48d6  size=  13  IC=0.716  'C1290920'
+    tp_9ab3909148d1  size=  13  IC=0.658  'C0023878'
+    tp_d4032fc07da2  size=  13  IC=0.65  'C0567305'
+    tp_11204e70e5d1  size=  13  IC=0.8  'C1301597'
+    tp_7f047e6938c6  size=  13  IC=0.779  'C0337242'
+    tp_a77918581ffa  size=  13  IC=0.759  'C0418178'
+    tp_2c0fad00b469  size=  13  IC=0.716  'C0396141'
+    tp_c884a64f5a74  size=  13  IC=0.58  'C0441800'
+    tp_ba51438ed9b6  size=  13  IC=0.8  'C0560344'
+    tp_9a2e95dc2c7d  size=  13  IC=0.725  'C1293326'
+    tp_038b293ae5cd  size=  13  IC=0.8  'C1287542'
+    tp_d523153a66d8  size=  13  IC=0.711  'C0444334'
+    tp_abe26438e951  size=  14  IC=0.784  'C0600108'
+    tp_c5dd98602991  size=  14  IC=0.784  'C0559964'
+    tp_1ad921ec9ab4  size=  14  IC=0.585  'C0577267'
+    tp_eee4121de349  size=  14  IC=0.756  'C0449235'
+    tp_5c292a0df6b9  size=  14  IC=0.784  'C0560046'
+    tp_149f04cfd336  size=  14  IC=0.784  'C0560047'
+    tp_3481acce0dcd  size=  14  IC=0.756  'C0034013'
+    tp_395f25272d6a  size=  15  IC=0.779  'C2712089'
+    tp_46eaff9f9f08  size=  15  IC=0.752  'C0347653'
+    tp_be887826862e  size=  15  IC=0.455  'C0441727'
+    tp_65b4a8b0ae5a  size=  15  IC=0.638  'C0414085'
+    tp_a7a0938f2df6  size=  15  IC=0.775  'C0311394'
+    tp_b46de415dfd3  size=  15  IC=0.621  'C0452428'
+    tp_43d40a51d4d0  size=  15  IC=0.673  'C1960719'
+    tp_2a9fb62b7f56  size=  15  IC=0.578  'C0274035'
+    tp_f1a9e523c1b0  size=  15  IC=0.643  'C0185061'
+    tp_164d49979540  size=  15  IC=0.583  'C1286585'
+    tp_9fa1eec2eda7  size=  15  IC=0.723  'C0560647'
+    tp_8aca6e39283e  size=  15  IC=0.602  'C0442746'
+    tp_55063a55c945  size=  15  IC=0.743  'C0578587'
+    tp_e7ac26ffe310  size=  15  IC=0.681  'C2236633'
+    tp_a1b2ad7a82ab  size=  16  IC=0.594  'C1290912'
+    tp_c49955507eb9  size=  16  IC=0.602  'C0274137'
+    tp_ec61bf47453b  size=  16  IC=0.676  'C0578541'
+    tp_68637c9d8fd7  size=  16  IC=0.719  'C0005603'
+    tp_a58556307498  size=  16  IC=0.64  'C4281100'
+    tp_26256a62b462  size=  16  IC=0.759  'C0232680'
+    tp_2e709d326136  size=  16  IC=0.784  'C0699794'
+    tp_b0519830b845  size=  17  IC=0.752  'C1268614'
+    tp_8516ced2b174  size=  17  IC=0.74  'C0701836'
+    tp_dd80954add03  size=  17  IC=0.644  'C0424450'
+    tp_cc3b1bbf2c36  size=  17  IC=0.759  'C0474396'
+    tp_ef4950ed00b6  size=  17  IC=0.668  'C1286506'
+    tp_f77d074f2d0e  size=  17  IC=0.488  'C0441986'
+    tp_b3861af5b8fe  size=  17  IC=0.714  'C0178363'
+    tp_ce87c64c49f6  size=  18  IC=0.775  'C0233121'
+    tp_b06aa1ce0e4a  size=  18  IC=0.73  'C0034063'
+    tp_85298b968482  size=  18  IC=0.749  'C0332150'
+    tp_f858556fe2ad  size=  18  IC=0.759  'C1268917'
+    tp_44bcfd1b1de9  size=  18  IC=0.502  'C0435001'
+    tp_613654c1342d  size=  19  IC=0.675  'C0441801'
+    tp_a565caf8c04f  size=  19  IC=0.618  'C0191206'
+    tp_7e1f245fe1a1  size=  19  IC=0.555  'C0560313'
+    tp_89306b2b972a  size=  20  IC=0.61  'C0442519'
+    tp_d143592cbd0d  size=  20  IC=0.725  'C0038663'
+    tp_90d048adbc7c  size=  21  IC=0.606  'C0196848'
+    tp_c6f510276335  size=  21  IC=0.631  'C5547563'
+    tp_add3ad033705  size=  21  IC=0.698  'C0347656'
+    tp_e2915901916a  size=  21  IC=0.599  'C0336996'
+    tp_a836ace77afa  size=  22  IC=0.523  'C0027741'
+    tp_ce4f6a1c36ec  size=  22  IC=0.641  'C1288244'
+    tp_8047442e670d  size=  22  IC=0.698  'C1444779'
+    tp_0cec082ab99d  size=  23  IC=0.6  'C0332679'
+    tp_bf2f0745522a  size=  24  IC=0.656  'C0001807'
+    tp_d8096b4e914c  size=  24  IC=0.637  'C1532866'
+    tp_a2c62d91e3d6  size=  26  IC=0.746  'C1291010'
+    tp_18ed68ad7b21  size=  26  IC=0.421  'C4758295'
+    tp_37c69110e4ca  size=  26  IC=0.551  'C0194361'
+    tp_3ae8ccc79e5e  size=  26  IC=0.449  'C0192573'
+    tp_d5e0c61520c0  size=  26  IC=0.589  'C1290838'
+    tp_1c0c4220cfc9  size=  27  IC=0.539  'C0402785'
+    tp_bf547c05cc09  size=  27  IC=0.635  'C4281103'
+    tp_5689126a0e64  size=  27  IC=0.589  'C0261712'
+    tp_b9f1dcc2fc17  size=  27  IC=0.604  'C1293485'
+    tp_d5502b055a92  size=  27  IC=0.635  'C4281102'
+    tp_66e2a0ccc37c  size=  27  IC=0.598  'C0574744'
+    tp_dad554c98af9  size=  27  IC=0.626  'C0005823'
+    tp_f1cb6de096d4  size=  27  IC=0.482  'C1293196'
+    tp_60ec569ab4ff  size=  28  IC=0.695  'C0449576'
+    tp_a8cbfc977a3b  size=  29  IC=0.702  'C0442721'
+    tp_5daabd62fe11  size=  29  IC=0.613  'C0161099'
+    tp_7932be6374d4  size=  29  IC=0.519  'C0577969'
+    tp_ba9fec05856c  size=  29  IC=0.707  'C0421199'
+    tp_e90fa8ad16ed  size=  30  IC=0.619  'C4750279'
+    tp_d760069b9bc1  size=  30  IC=0.619  'C0008031'
+    tp_5afdd9aa295f  size=  31  IC=0.654  'C0344211'
+    tp_10a3390dd1df  size=  31  IC=0.517  'C0281865'
+    tp_a81e241ecacb  size=  31  IC=0.58  'C0542538'
+    tp_5ad7ed0a4ae9  size=  31  IC=0.52  'C4281095'
+    tp_a5aa15643cd9  size=  31  IC=0.68  'C0013404'
+    tp_02218c845eb0  size=  32  IC=0.608  'C0577215'
+    tp_aaf85b69bdf5  size=  32  IC=0.426  'C0442719'
+    tp_83744bd7646b  size=  32  IC=0.601  'C1262869'
+    tp_2c31755323c6  size=  32  IC=0.645  'C0196850'
+    tp_f2e11e78dd65  size=  32  IC=0.707  'C1260919'
+    tp_feff1f356c57  size=  33  IC=0.658  'C1287665'
+    tp_6f3ab07a592c  size=  33  IC=0.697  'C0393386'
+    tp_7bd86cf47302  size=  34  IC=0.721  'C1455667'
+    tp_9d4f53512594  size=  34  IC=0.466  'C0006434'
+    tp_e44d5ef9188f  size=  35  IC=0.498  'C0439545'
+    tp_d02a9ce5ca28  size=  35  IC=0.714  'C0439062'
+    tp_8b887b92ed14  size=  35  IC=0.67  'C0085271'
+    tp_e370f8160031  size=  35  IC=0.46  'C0567036'
+    tp_acf6b81aba92  size=  36  IC=0.631  'C4721093'
+    tp_a62cbdebc9e3  size=  37  IC=0.477  'C2077204'
+    tp_9eb9b8bbeecf  size=  37  IC=0.604  'C0004063'
+    tp_da576691d5c3  size=  37  IC=0.477  'C2077191'
+    tp_a615c853b78d  size=  37  IC=0.61  'C3648600'
+    tp_6b5a52ba2e9f  size=  37  IC=0.621  'C0018801'
+    tp_3425ee070446  size=  38  IC=0.525  'C1266850'
+    tp_ae6793b0a515  size=  38  IC=0.609  'C4280927'
+    tp_811495490937  size=  40  IC=0.675  'C0010200'
+    tp_334384870b6c  size=  40  IC=0.367  'C0441471'
+    tp_fe7913eaca35  size=  41  IC=0.476  'C0565496'
+    tp_34660b6111b6  size=  41  IC=0.515  'C0949766'
+    tp_a158341bedeb  size=  43  IC=0.408  'C1261381'
+    tp_69b78d4a7c55  size=  44  IC=0.568  'C0264219'
+    tp_a7d5569466db  size=  45  IC=0.354  'C0332798'
+    tp_4eb2677b364f  size=  45  IC=0.644  'C0205538'
+    tp_35ac83d9bc7f  size=  46  IC=0.623  'C1689949'
+    tp_9240ddde6485  size=  46  IC=0.591  'C0429673'
+    tp_79498084d9ff  size=  47  IC=0.593  'C0149751'
+    tp_37d933445338  size=  47  IC=0.666  'C1532493'
+    tp_6c2dd73765a0  size=  48  IC=0.478  'C1290854'
+    tp_5f0096dd3cea  size=  49  IC=0.595  'C0018681'
+    tp_d572abf135ef  size=  50  IC=0.61  'C5887115'
+    tp_052bcb0d494a  size=  52  IC=0.447  'C1519795'
+    tp_d4d0b9d88289  size=  58  IC=0.594  'C5924215'
+    tp_6d748e12af98  size=  59  IC=0.607  'C0393387'
+    tp_aa3807f83597  size=  60  IC=0.676  'C0332118'
+    tp_712047f17fcc  size=  60  IC=0.624  'C1286390'
+    tp_f64c0fd5d820  size=  64  IC=0.363  'C0561852'
+    tp_3f43a0fdb5fa  size=  65  IC=0.653  'C2945843'
+    tp_8c892d68668d  size=  66  IC=0.52  'C0198577'
+    tp_012cef1fb858  size=  67  IC=0.564  'C1302887'
+    tp_82c707e7eb40  size=  69  IC=0.562  'C0178356'
+    tp_b8a939f29a24  size=  70  IC=0.536  'C0441472'
+    tp_9f30f79416f0  size=  72  IC=0.603  'C1264636'
+    tp_cc481494ee01  size=  72  IC=0.339  'C0425442'
+    tp_d1979751b16f  size=  73  IC=0.543  'C5924649'
+    tp_107c312a984b  size=  73  IC=0.465  'C0684322'
+    tp_cb55fcbf98f7  size=  74  IC=0.574  'C0311392'
+    tp_5df0c267588e  size=  74  IC=0.353  'C0035204'
+    tp_db6ed521dc6f  size=  75  IC=0.477  'C2748388'
+    tp_281bd80a5396  size=  76  IC=0.399  'C0282354'
+    tp_0db3e280def1  size=  76  IC=0.441  'C0024115'
+    tp_963d7192e488  size=  77  IC=0.581  'C0586814'
+    tp_a635cc977494  size=  78  IC=0.536  'C1313863'
+    tp_52ed6f3d50fb  size=  79  IC=0.602  'C0700364'
+    tp_22e07b7f4460  size=  80  IC=0.602  'C0677612'
+    tp_e4fd540d7902  size=  82  IC=0.383  'C0018674'
+    tp_715d07dc875d  size=  87  IC=0.323  'C0423216'
+    tp_d0f48748393c  size=  93  IC=0.623  'C0442795'
+    tp_8d2425d33fa2  size= 105  IC=0.505  'C0010957'
+    tp_b0cef0cda5f1  size= 105  IC=0.623  'C4546005'
+    tp_7471499c84a6  size= 107  IC=0.321  'C0272448'
+    tp_d10ece5d9f2c  size= 119  IC=0.436  'C0030193'
+    tp_c203f9088daa  size= 124  IC=0.382  'C0542341'
+    tp_0946a02e366b  size= 134  IC=0.418  'C1285241'
+    tp_930a22face05  size= 147  IC=0.385  'C4024586'
+    tp_9c70db5e74a5  size= 148  IC=0.385  'C0004927'
+    tp_bf40b6103c51  size= 206  IC=0.459  'C1443286'
+    tp_cd3ce966ce7e  size= 206  IC=0.402  'C4280889'
+    tp_b91482d86053  size= 225  IC=0.51  'C2733037'
+    tp_80571fa0f730  size= 335  IC=0.479  'C0449851'
+    tp_243102dc2573  size= 350  IC=0.535  'C0205159'
+    tp_5b76faab59c1  size= 612  IC=0.5  'C1285556'
 
-# ---- connect ----
-conn = Client(("localhost", 6000), authkey=b"cui")
-conn.send({"query": query})
-res = conn.recv()
-conn.close()
+######################################################################
+#  RETRIEVAL (shared topics -> doc CUIs -> chunk numbers)
+######################################################################
 
-if "error" in res:
-    print("SERVER ERROR:", res["error"])
-    raise SystemExit(1)
+  shared topics: 2  |  count=2  sum_inv_size=0.1172  min_inv_size=0.0909  max_anchor_ic=0.6734  sum_anchor_ic=1.1986
 
-# ---------- DOCUMENT SIDE FIRST (cached) ----------
-print("\n" + "#" * 70)
-print("#  DOCUMENT SIDE (cached — processed once at startup)")
-print("#" * 70)
-doc = res["doc_result"]
-hr("=")
-print(f"DOC {doc['doc_id']}: {doc['text']!r}")
-hr("=")
-print(f"  {len(doc.get('chunks',[]))} chunks -> "
-      f"{len(doc.get('extracted_cuis',[]))} CUIs extracted")
-_show_summary_and_topics(doc)
+  >>> SHARED TOPIC tp_d351b84da777  size=11  IC=0.673  'C1282984'
+      doc CUIs under this topic:
+        C1640390  'C1640390'
+      from chunk(s): [11]
 
-# ---------- QUERY SIDE ----------
-print("\n" + "#" * 70)
-print("#  QUERY SIDE (LLM nature-breakdown)")
-print("#" * 70)
-q = res["query_result"]
-hr("=")
-print(f"QUERY: {q['text']!r}")
-hr("=")
-if not q.get("is_clinical"):
-    print(f"  NON-CLINICAL: {q.get('reason')}")
-else:
-    print(f"\nExpanded: {q.get('expanded','')!r}")
-    print(f"Total intents: {len(q.get('intents',[]))}")
-    for i, iv in enumerate(q.get("intents", []), 1):
-        print()
-        hr("-")
-        print(f"  INTENT {i}: {iv['intent']}")
-        print(f"    Nature:      {iv['nature']}")
-        print(f"    Description: {iv['description']}")
-        print(f"    Sub-natures ({len(iv['sub_natures'])}):")
-        for sn in iv["sub_natures"]:
-            print(f"      - {sn['path']}")
-            for a in sn["atomic"]:
-                print(f"          atomic: {a}")
-    print()
-    hr("-")
-    print("  CUI EXTRACTION")
-    hr("-")
-    for iv in q["intents"]:
-        print(f"\n  INTENT: {iv['intent']}")
-        for sn in iv["sub_natures"]:
-            print(f"    sub_nature: {sn['path']}")
-            for pc in sn["path_cuis"]:
-                print(f"      [path]   {pc['text']!r:28s} -> "
-                      f"{len(pc['cuis'])} CUIs: {cl(pc['cuis'])}")
-            for ac in sn["atomic_cuis"]:
-                print(f"      [atomic] {ac['text']!r:28s} -> "
-                      f"{len(ac['cuis'])} CUIs: {cl(ac['cuis'])}")
-    _show_summary_and_topics(q)
+  >>> SHARED TOPIC tp_3425ee070446  size=38  IC=0.525  'C1266850'
+      doc CUIs under this topic:
+        C1266850  'C1266850'
+      from chunk(s): [3]
 
-# ---------- RETRIEVAL ----------
-print("\n" + "#" * 70)
-print("#  RETRIEVAL (shared topics -> doc CUIs -> chunk numbers)")
-print("#" * 70)
-m = res["metrics"]
-print(f"\n  shared topics: {res['shared_count']}  |  "
-      f"count={m['count']}  sum_inv_size={m['sum_inv_size']}  "
-      f"min_inv_size={m['min_inv_size']}  max_anchor_ic={m['max_anchor_ic']}  "
-      f"sum_anchor_ic={m['sum_anchor_ic']}")
+----------------------------------------------------------------------
+  MATCHING CHUNKS (unique — 2 chunk(s))
+----------------------------------------------------------------------
 
-if not res["retrieval"]:
-    print("\n  no shared topics — query and document do not overlap.")
-else:
-    # topics: list doc CUIs + chunk NUMBERS only
-    all_chunk_idxs = set()
-    chunk_text = {}          # idx -> full chunk text (collected once)
-    for r in res["retrieval"]:
-        print(f"\n  >>> SHARED TOPIC {r['tp_id']}  size={r['size']}  "
-              f"IC={r['anchor_ic']}  '{r['label']}'")
-        print(f"      doc CUIs under this topic:")
-        for cui, label in r["doc_cuis"]:
-            print(f"        {cui}  '{label}'")
-        idxs = sorted(ch["i"] for ch in r["chunks"])
-        all_chunk_idxs.update(idxs)
-        for ch in r["chunks"]:
-            chunk_text.setdefault(ch["i"], ch["full"])
-        print(f"      from chunk(s): {idxs}")
+  [chunk 3]
+  SOCIAL HISTORY: Lives alone, retired. Denies tobacco use. Occasional alcohol consumption. No illicit drug use. Has good social support from adult children.
 
-    # unique matching chunks, printed ONCE
-    print("\n" + "-" * 70)
-    print(f"  MATCHING CHUNKS (unique — {len(all_chunk_idxs)} chunk(s))")
-    print("-" * 70)
-    for i in sorted(all_chunk_idxs):
-        print(f"\n  [chunk {i}]")
-        print(f"  {chunk_text[i][:400]}")
+  [chunk 11]
+  VITAL SIGNS ON DISCHARGE: BP: 128/78 mmHg HR: 72 bpm Temp: 98.6 F SpO2: 96% on RA
