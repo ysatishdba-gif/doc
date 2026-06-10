@@ -1,39 +1,37 @@
-import time, math
-import networkx as nx
-
-# ---- 1. descendant count for every CUI (collapse suffixes at the end) ----
-t0 = time.time()
-desc_count = {}
-for i, cui in enumerate(TARGET):
-    desc = set()
-    for s in cui_to_suffix[cui]:
-        desc |= nx.descendants(H, s)
-    desc_count[cui] = len({d.split('-')[0] for d in desc if '-' in d} - {cui})
-    if i % 25000 == 0:
-        print(f"  desc {i:,}/{len(TARGET):,} ({time.time()-t0:.0f}s)")
-print(f"descendants done ({time.time()-t0:.0f}s)")
-
-# ---- 2. IC from descendant counts ----
-TOTAL = len(TARGET)
-log_total = math.log(TOTAL + 1)
-ic = {cui: 1.0 - math.log(desc_count[cui] + 1) / log_total for cui in TARGET}
-print("IC done")
-
-# ---- 3. ancestors (parents up the isa tree) for every CUI ----
-t0 = time.time()
-isa_ancestors = {}
-for i, cui in enumerate(TARGET):
-    anc = set()
-    for s in cui_to_suffix[cui]:
-        anc |= nx.ancestors(H, s)
-    isa_ancestors[cui] = {a.split('-')[0] for a in anc if isinstance(a, str) and '-' in a} - {cui}
-    if i % 25000 == 0:
-        print(f"  anc {i:,}/{len(TARGET):,} ({time.time()-t0:.0f}s)")
-print(f"ancestors done ({time.time()-t0:.0f}s)")
-
-# ---- sanity check ----
-for cui, name in [("C0032285","Pneumonia"), ("C0011849","Diabetes"),
-                  ("C0559470","Peanut allergy"), ("C0006277","Bronchitis")]:
-    if cui in desc_count:
-        print(f"  {name:16s} desc={desc_count[cui]:>5}  IC={ic[cui]:.3f}  "
-              f"ancestors={len(isa_ancestors[cui])}")
+  desc 0/373,077 (0s)
+  desc 25,000/373,077 (271s)
+  desc 50,000/373,077 (336s)
+  desc 75,000/373,077 (521s)
+  desc 100,000/373,077 (523s)
+  desc 125,000/373,077 (524s)
+  desc 150,000/373,077 (525s)
+  desc 175,000/373,077 (536s)
+  desc 200,000/373,077 (606s)
+  desc 225,000/373,077 (699s)
+  desc 250,000/373,077 (744s)
+  desc 275,000/373,077 (762s)
+  desc 300,000/373,077 (770s)
+  desc 325,000/373,077 (812s)
+  desc 350,000/373,077 (893s)
+descendants done (1012s)
+IC done
+  anc 0/373,077 (0s)
+  anc 25,000/373,077 (19s)
+  anc 50,000/373,077 (21s)
+  anc 75,000/373,077 (34s)
+  anc 100,000/373,077 (37s)
+  anc 125,000/373,077 (38s)
+  anc 150,000/373,077 (40s)
+  anc 175,000/373,077 (60s)
+  anc 200,000/373,077 (120s)
+  anc 225,000/373,077 (187s)
+  anc 250,000/373,077 (191s)
+  anc 275,000/373,077 (210s)
+  anc 300,000/373,077 (221s)
+  anc 325,000/373,077 (226s)
+  anc 350,000/373,077 (276s)
+ancestors done (331s)
+  Pneumonia        desc=  183  IC=0.594  ancestors=29
+  Diabetes         desc=  127  IC=0.622  ancestors=8
+  Peanut allergy   desc=    0  IC=1.000  ancestors=11
+  Bronchitis       desc=  116  IC=0.629  ancestors=26
