@@ -1,19 +1,9 @@
-# 1. dump ALL ancestors of the left-knee CUIs and look for laterality concepts
-LAT_CANDIDATES = {
-    "C0205091": "Left",
-    "C0205090": "Right",
-    "C0238767": "Bilateral",
-    "C0205089": "Unilateral",
-    "C0443246": "Lateral",
-    "C1180147": "Right and left",
-}
+============================================================
+C5442019  (#ancestors=16)
+  known laterality CUIs in ancestors: NONE
+  all ancestors: ['C0023222', 'C0030193', 'C0030196', 'C0037088', 'C0231749', 'C0234185', 'C0422837', 'C0458087', 'C0564822', 'C0575986', 'C0576084', 'C0579141', 'C1291731', 'C2720507', 'C3698353', 'C4076247']
 
-for cui in ["C5442019", "C2142181"]:
-    anc = isa_ancestors.get(cui, set())
-    print(f"\n{'='*60}\n{cui}  (#ancestors={len(anc)})")
-    # known laterality CUIs present?
-    hits = anc & set(LAT_CANDIDATES)
-    print(f"  known laterality CUIs in ancestors: "
-          f"{[(h, LAT_CANDIDATES[h]) for h in hits] or 'NONE'}")
-    # print the FULL ancestor list so we can eyeball any laterality concept
-    print(f"  all ancestors: {sorted(anc)}")
+============================================================
+C2142181  (#ancestors=23)
+  known laterality CUIs in ancestors: NONE
+  all ancestors: ['C0003862', 'C0023222', 'C0026858', 'C0030193', 'C0030196', 'C0037088', 'C0231749', 'C0234185', 'C0422837', 'C0426779', 'C0427210', 'C0458087', 'C0564822', 'C0575027', 'C0575986', 'C0576084', 'C0576085', 'C0579141', 'C1291731', 'C2720507', 'C3698353', 'C4076247', 'C5442019']
