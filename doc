@@ -1,9 +1,50 @@
-import pickle
-P = pickle.load(open("topics.pkl", "rb"))
+tp_08aa6fc4fbde  anchor C4543632  size 2191  IC 0.292
+    C0000246 
+    C0000291 
+    C0000359 
+    C0000360 
+    C0000530 
+    C0000977 
+    C0000999 
+    C0001019 
+    C0001022 
+    C0001024 
+    C0001026 
+    C0001028 
+    C0001057 
+    C0001064 
+    C0001109 
 
-# look at a mid-size topic — are its members genuinely related?
-for tp, t in sorted(P["topic_id_to_topic"].items(),
-                    key=lambda r: -r[1]["size"])[:3]:
-    print(f"\n{tp}  anchor {t['canonical']}  size {t['size']}  IC {t['anchor_ic']:.3f}")
-    for m in sorted(t["members"])[:15]:
-        print("   ", m, P["labels"].get(m, ""))
+tp_da07652a7305  anchor C0265388  size 1485  IC 0.404
+    C0000744 
+    C0001627 
+    C0002066 
+    C0002735 
+    C0004135 
+    C0004775 
+    C0010324 
+    C0010674 
+    C0014522 
+    C0015523 
+    C0016719 
+    C0016751 
+    C0016756 
+    C0016788 
+    C0017920 
+
+tp_1ce8f187adf8  anchor C1285243  size 1431  IC 0.403
+    C0001080 
+    C0001193 
+    C0001627 
+    C0001916 
+    C0002452 
+    C0004135 
+    C0004903 
+    C0008928 
+    C0009207 
+    C0010273 
+    C0011430 
+    C0011436 
+    C0011989 
+    C0013720 
+    C0013902 
