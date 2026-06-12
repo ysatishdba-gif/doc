@@ -1,9 +1,9 @@
-============================================================
-C5442019  (#ancestors=16)
-  known laterality CUIs in ancestors: NONE
-  all ancestors: ['C0023222', 'C0030193', 'C0030196', 'C0037088', 'C0231749', 'C0234185', 'C0422837', 'C0458087', 'C0564822', 'C0575986', 'C0576084', 'C0579141', 'C1291731', 'C2720507', 'C3698353', 'C4076247']
+import pickle
+P = pickle.load(open("topics.pkl", "rb"))
 
-============================================================
-C2142181  (#ancestors=23)
-  known laterality CUIs in ancestors: NONE
-  all ancestors: ['C0003862', 'C0023222', 'C0026858', 'C0030193', 'C0030196', 'C0037088', 'C0231749', 'C0234185', 'C0422837', 'C0426779', 'C0427210', 'C0458087', 'C0564822', 'C0575027', 'C0575986', 'C0576084', 'C0576085', 'C0579141', 'C1291731', 'C2720507', 'C3698353', 'C4076247', 'C5442019']
+# look at a mid-size topic — are its members genuinely related?
+for tp, t in sorted(P["topic_id_to_topic"].items(),
+                    key=lambda r: -r[1]["size"])[:3]:
+    print(f"\n{tp}  anchor {t['canonical']}  size {t['size']}  IC {t['anchor_ic']:.3f}")
+    for m in sorted(t["members"])[:15]:
+        print("   ", m, P["labels"].get(m, ""))
