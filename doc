@@ -1,18 +1,19 @@
-relation roots: ['SNOMEDCT_US.Empty', 'SNOMEDCT_US.isa']
+# 1. dump ALL ancestors of the left-knee CUIs and look for laterality concepts
+LAT_CANDIDATES = {
+    "C0205091": "Left",
+    "C0205090": "Right",
+    "C0238767": "Bilateral",
+    "C0205089": "Unilateral",
+    "C0443246": "Lateral",
+    "C1180147": "Right and left",
+}
 
-successors of C5442019:
-  -> C5442019-0
-  -> C5442019-1
-  -> C5442019-2
-  -> C5442019-3
-  -> C5442019-4
-  -> C5442019-5
-  -> C5442019-6
-  -> C5442019-7
-  -> C5442019-8
-  -> C5442019-9
-  -> C5442019-10
-  -> C5442019-11
-
-predecessors of C5442019:
-  <- CUI
+for cui in ["C5442019", "C2142181"]:
+    anc = isa_ancestors.get(cui, set())
+    print(f"\n{'='*60}\n{cui}  (#ancestors={len(anc)})")
+    # known laterality CUIs present?
+    hits = anc & set(LAT_CANDIDATES)
+    print(f"  known laterality CUIs in ancestors: "
+          f"{[(h, LAT_CANDIDATES[h]) for h in hits] or 'NONE'}")
+    # print the FULL ancestor list so we can eyeball any laterality concept
+    print(f"  all ancestors: {sorted(anc)}")
