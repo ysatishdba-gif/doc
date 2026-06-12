@@ -1,126 +1,315 @@
 """
-diagnose_topics.py
-------------------
-Three accuracy checks on a built topics.pkl:
-  1. Anchor specificity  — are broad anchors (Disease/Finding) surviving as topics?
-  2. Topic purity        — do members actually descend from the anchor?
-  3. Overlap explosion    — are large topics near-duplicates of each other?
+build_topics.py  (network-only, LOCAL convergence topics)
+---------------------------------------------------------
+Builds clinical topics from the network graph alone (no MRREL).
 
-Needs:
-  topics.pkl
-  isa_precomputed.pkl   (for isa_ancestors, to check purity)
+ACCURACY FIX (vs previous version):
+  Previously, an anchor was validated LOCALLY (coverage in one neighborhood)
+  but accumulated members GLOBALLY (union across every neighborhood it ever
+  qualified in) -> moderately-general anchors blobbed into giant topics that
+  no single neighborhood supported.
 
-Run:  exec(open("diagnose_topics.py").read())
+  Now: each topic is the member set from the SINGLE neighborhood that
+  supported it. Topics never accumulate across unrelated neighborhoods.
+  Identical / near-duplicate member sets are merged afterward.
+
+PIPELINE:
+  STAGE A : Flatten network graph -> neighbors
+  STAGE B : (hierarchy + IC precomputed from isa_precomputed.pkl)
+  STAGE C : Per focal group, form LOCAL topics at convergence anchors
+  STAGE D : Merge identical + near-duplicate (Jaccard) topics
+
+Inputs (notebook globals):
+  netw            : network DiGraph
+  isa_ancestors   : {cui: set(ancestor cuis)}   from isa_precomputed.pkl
+  ic              : {cui: ic_score}              from isa_precomputed.pkl
+  LABELS          : {cui: label}   (optional)
+
+Output: topics.pkl
 """
 
-import pickle
-from collections import defaultdict
+import pickle, datetime, hashlib, os, time
+from collections import defaultdict, Counter
 
-P = pickle.load(open("topics.pkl", "rb"))
-D = pickle.load(open("isa_precomputed.pkl", "rb"))
-isa_ancestors = D["isa_ancestors"]
 
-t2t   = P["topic_id_to_topic"]
-labels = P.get("labels", {})
+OUTPUT_PATH   = "topics.pkl"
+MIN_ANCHOR_IC = 0.30      # an anchor must be at least this specific
+MIN_COVERAGE  = 2         # anchor must group >= this many members in a neighborhood
+                          # (drops single-member anchors)
+JACCARD_MERGE = 0.90      # merge two topics if member-set Jaccard >= this
+                          # (1.0 = only exact duplicates)
 
-def lbl(c): return labels.get(c, c)
-
-# ============================================================
-# CHECK 1 — anchor specificity (largest topics + their IC)
-# ============================================================
-print("="*70)
-print("CHECK 1 — largest topics: anchor, IC, size")
-print("  (broad anchors like Disease/Finding here = IC floor too low)")
-print("="*70)
-big = sorted(t2t.items(), key=lambda r: -r[1]["size"])[:30]
-for tp, t in big:
-    print(f"  size={t['size']:>5}  IC={t['anchor_ic']:.3f}  "
-          f"{t['canonical']}  '{lbl(t['canonical'])[:55]}'")
-
-# IC distribution of anchors
-ics = sorted(t["anchor_ic"] for t in t2t.values())
-n = len(ics)
-def pct(p): return ics[min(n-1, int(p*(n-1)))] if n else 0
-print(f"\n  anchor IC  min/p10/med/p90/max = "
-      f"{ics[0]:.3f}/{pct(.1):.3f}/{pct(.5):.3f}/{pct(.9):.3f}/{ics[-1]:.3f}")
-low = sum(1 for x in ics if x < 0.40)
-print(f"  anchors with IC < 0.40 (broad): {low:,} ({low/n*100:.1f}%)")
 
 # ============================================================
-# CHECK 2 — topic purity (members descend from anchor?)
+# STAGE A: Flatten network graph -> neighbors
 # ============================================================
-print("\n" + "="*70)
-print("CHECK 2 — topic purity: % of members that descend from the anchor")
-print("  (low purity = members grouped that aren't really under the anchor)")
-print("="*70)
-
-# a member m descends from anchor a  iff  a in isa_ancestors[m]
-impure_topics = 0
-total_members = 0
-impure_members = 0
-worst = []
-for tp, t in t2t.items():
-    anchor = t["canonical"]
-    members = t["members"]
-    bad = 0
-    for m in members:
-        if m == anchor:
+def flatten_graph(graph, target_cuis):
+    print("  [A] Flattening network graph...")
+    t0 = time.time()
+    neighbors = defaultdict(set)
+    total = len(target_cuis)
+    n = 0
+    for cui in target_cuis:
+        n += 1
+        if n % 50000 == 0:
+            print(f"      {n:,}/{total:,} ({time.time()-t0:.0f}s)")
+        if cui not in graph:
             continue
-        if anchor not in isa_ancestors.get(m, ()):
-            bad += 1
-    total_members += len(members)
-    impure_members += bad
-    if bad:
-        impure_topics += 1
-        worst.append((bad, len(members), tp, anchor))
+        for suffix_child in graph.successors(cui):
+            if "-" not in suffix_child:
+                continue
+            base = suffix_child.rsplit("-", 1)[0]
+            if base != cui:
+                continue
+            for pred in graph.predecessors(suffix_child):
+                if pred == cui or "-" not in pred:
+                    continue
+                other = pred.rsplit("-", 1)[0]
+                if other == cui or other not in target_cuis:
+                    continue
+                neighbors[cui].add(other)
+                neighbors[other].add(cui)
+    edges = sum(len(v) for v in neighbors.values()) // 2
+    print(f"      CUIs with neighbors: {len(neighbors):,}, edges: {edges:,} "
+          f"({time.time()-t0:.0f}s)")
+    return neighbors
 
-print(f"  topics with >=1 non-descendant member: {impure_topics:,} of {len(t2t):,}")
-print(f"  impure members: {impure_members:,} of {total_members:,} "
-      f"({impure_members/max(total_members,1)*100:.2f}%)")
-worst.sort(reverse=True)
-print("  worst offenders (non-descendant count / size):")
-for bad, sz, tp, anchor in worst[:10]:
-    print(f"    {bad}/{sz}  anchor {anchor} '{lbl(anchor)[:45]}'")
 
 # ============================================================
-# CHECK 3 — overlap explosion (Jaccard among large topics)
+# STAGE C: LOCAL convergence topics (no global accumulation)
 # ============================================================
-print("\n" + "="*70)
-print("CHECK 3 — overlap among the 200 largest topics (Jaccard > 0.8)")
-print("  (many high-overlap pairs = redundant topics)")
-print("="*70)
-large = sorted(t2t.items(), key=lambda r: -r[1]["size"])[:200]
-sets = [(tp, set(t["members"])) for tp, t in large]
-high = 0
-samples = []
-for i in range(len(sets)):
-    for j in range(i+1, len(sets)):
-        a, sa = sets[i]; b, sb = sets[j]
-        inter = len(sa & sb)
-        if inter == 0:
+def topic_id_for(members_fs):
+    """ID from the MEMBER SET (stable regardless of which anchor names it)."""
+    key = ",".join(sorted(members_fs))
+    return "tp_" + hashlib.sha1(key.encode()).hexdigest()[:12]
+
+
+def build_local_topics(target_cuis, neighbors, isa_ancestors, ic):
+    print(f"  [C] Local convergence topics "
+          f"(IC>={MIN_ANCHOR_IC}, coverage>={MIN_COVERAGE})...")
+    t0 = time.time()
+
+    # cache IC-floor-filtered ancestor set per CUI
+    filt_anc = {}
+    def filtered_ancestors(cui):
+        s = filt_anc.get(cui)
+        if s is None:
+            s = {a for a in isa_ancestors.get(cui, ()) if ic.get(a, 0.0) >= MIN_ANCHOR_IC}
+            filt_anc[cui] = s
+        return s
+
+    # each LOCAL topic: (anchor, coverage, frozenset(members))
+    # keyed by (anchor, members) so the same local topic found from different
+    # focals isn't double-counted; we keep the max coverage seen.
+    local = {}    # (anchor, members_fs) -> coverage
+    total = len(target_cuis)
+    n = 0
+    n_groups_with_topic = 0
+
+    for focal in target_cuis:
+        n += 1
+        if n % 50000 == 0:
+            print(f"      {n:,}/{total:,} ({time.time()-t0:.0f}s, "
+                  f"local_topics={len(local):,})")
+
+        members = {focal} | neighbors.get(focal, set())
+        if len(members) < 2:
             continue
-        jac = inter / len(sa | sb)
-        if jac > 0.8:
-            high += 1
-            if len(samples) < 10:
-                samples.append((jac, t2t[a]["canonical"], t2t[b]["canonical"]))
-print(f"  pairs (of {len(sets)} topics) with Jaccard > 0.8: {high}")
-for jac, ca, cb in samples:
-    print(f"    {jac:.2f}  '{lbl(ca)[:30]}'  ~  '{lbl(cb)[:30]}'")
+
+        # in-group ancestors + coverage (local to THIS neighborhood)
+        coverage = Counter()
+        member_in_group = {}
+        for m in members:
+            anc = filtered_ancestors(m) & members
+            anc = anc - {m}
+            member_in_group[m] = anc
+            for a in anc:
+                coverage[a] += 1
+
+        # for each convergence anchor, the LOCAL topic = the members it covers
+        # here (anchor + its covered members), NOT a global union.
+        anchor_members = defaultdict(set)
+        for m, anc in member_in_group.items():
+            for a in anc:
+                if coverage[a] >= MIN_COVERAGE:
+                    anchor_members[a].add(m)
+        had = False
+        for a, mems in anchor_members.items():
+            mems = set(mems)
+            mems.add(a)                       # anchor is part of its topic
+            fs = frozenset(mems)
+            key = (a, fs)
+            cov = coverage[a]
+            if cov > local.get(key, -1):
+                local[key] = cov
+            had = True
+        if had:
+            n_groups_with_topic += 1
+
+    print(f"      done ({time.time()-t0:.0f}s) | "
+          f"groups_with_topic={n_groups_with_topic:,} | "
+          f"local_topics={len(local):,} | ancestor_cache={len(filt_anc):,}")
+    return local   # {(anchor, members_fs): coverage}
+
 
 # ============================================================
-# CHECK 4 — coverage support (if stored) + overall stats
+# STAGE D: merge identical + near-duplicate topics
 # ============================================================
-print("\n" + "="*70)
-print("CHECK 4 — overall")
-print("="*70)
-sizes = sorted(t["size"] for t in t2t.values())
-print(f"  topics: {len(t2t):,}")
-print(f"  size min/med/p90/p99/max = "
-      f"{sizes[0]}/{sizes[len(sizes)//2]}/{sizes[int(.9*len(sizes))]}/"
-      f"{sizes[int(.99*len(sizes))]}/{sizes[-1]}")
-cui_to_t = P["cui_to_topic_ids"]
-tpc = sorted(len(v) for v in cui_to_t.values())
-print(f"  topics-per-CUI min/med/p90/max = "
-      f"{tpc[0]}/{tpc[len(tpc)//2]}/{tpc[int(.9*len(tpc))]}/{tpc[-1]}")
-print("\nDONE")
+def merge_topics(local, ic):
+    print(f"  [D] Merging duplicates (exact + Jaccard>={JACCARD_MERGE})...")
+    t0 = time.time()
+
+    # first collapse EXACT member-set duplicates; keep best anchor by
+    # (coverage, IC, cui) — coverage-first gives the most representative label
+    by_members = defaultdict(list)   # members_fs -> list of (anchor, coverage)
+    for (anchor, fs), cov in local.items():
+        by_members[fs].append((anchor, cov))
+
+    topics = []   # list of dicts: {canonical, members, size, anchor_ic, coverage}
+    for fs, anchors in by_members.items():
+        anchor, cov = max(anchors, key=lambda ac: (ac[1], ic.get(ac[0], 0.0), ac[0]))
+        topics.append({
+            "canonical": anchor, "members": fs, "size": len(fs),
+            "anchor_ic": ic.get(anchor, 0.0), "coverage": cov,
+        })
+    print(f"      after exact dedup: {len(topics):,} topics ({time.time()-t0:.0f}s)")
+
+    if JACCARD_MERGE >= 1.0:
+        return topics
+
+    # near-duplicate merge via Jaccard, blocked by shared members for speed.
+    # Process largest-first; absorb smaller topics that are >= JACCARD_MERGE
+    # similar into the larger one.
+    topics.sort(key=lambda t: -t["size"])
+    member_to_topics = defaultdict(set)   # cui -> set of topic idx (kept ones)
+    kept = []
+    absorbed = 0
+    for t in topics:
+        fs = t["members"]
+        # candidate overlaps: topics already kept that share any member
+        cand = set()
+        for m in fs:
+            cand |= member_to_topics.get(m, set())
+        merged_into = None
+        for idx in cand:
+            k = kept[idx]
+            inter = len(fs & k["members"])
+            if inter == 0:
+                continue
+            jac = inter / len(fs | k["members"])
+            if jac >= JACCARD_MERGE:
+                merged_into = idx
+                break
+        if merged_into is None:
+            ki = len(kept)
+            kept.append({"canonical": t["canonical"],
+                         "members": set(fs), "size": len(fs),
+                         "anchor_ic": t["anchor_ic"], "coverage": t["coverage"]})
+            for m in fs:
+                member_to_topics[m].add(ki)
+        else:
+            k = kept[merged_into]
+            new_members = k["members"] | fs
+            # keep the better-supported / more specific anchor as the label
+            if (t["coverage"], t["anchor_ic"], t["canonical"]) > \
+               (k["coverage"], k["anchor_ic"], k["canonical"]):
+                k["canonical"] = t["canonical"]
+                k["anchor_ic"] = t["anchor_ic"]
+                k["coverage"]  = t["coverage"]
+            # update membership index for any newly added members
+            for m in fs - k["members"]:
+                member_to_topics[m].add(merged_into)
+            k["members"] = new_members
+            k["size"] = len(new_members)
+            absorbed += 1
+
+    print(f"      after Jaccard merge: {len(kept):,} topics "
+          f"(absorbed {absorbed:,}) ({time.time()-t0:.0f}s)")
+    # finalize member sets to frozenset
+    for k in kept:
+        k["members"] = frozenset(k["members"])
+        k["size"] = len(k["members"])
+    return kept
+
+
+# ============================================================
+# Main
+# ============================================================
+def main():
+    required = ["netw", "isa_ancestors", "ic"]
+    missing = [r for r in required if r not in globals()]
+    if missing:
+        raise RuntimeError(
+            f"Missing required global(s): {missing}. "
+            f"Load isa_precomputed.pkl (isa_ancestors, ic) and netw first.")
+
+    print(f"BUILD START {datetime.datetime.now().isoformat()}")
+    t_total = time.time()
+
+    target_cuis = set(isa_ancestors.keys()) | set(ic.keys())
+    print(f"  target CUIs: {len(target_cuis):,}")
+    print(f"  MIN_ANCHOR_IC={MIN_ANCHOR_IC}  MIN_COVERAGE={MIN_COVERAGE}  "
+          f"JACCARD_MERGE={JACCARD_MERGE}")
+
+    neighbors = flatten_graph(netw, target_cuis)
+    local = build_local_topics(target_cuis, neighbors, isa_ancestors, ic)
+    topics = merge_topics(local, ic)
+
+    print("  [pkg] Packaging topics...")
+    topic_id_to_topic, canonical_to_topic_id = {}, {}
+    cui_to_topic_ids = defaultdict(set)
+    for t in topics:
+        fs = t["members"]
+        tp = topic_id_for(fs)            # ID from member set (stable)
+        topic_id_to_topic[tp] = {
+            "canonical": t["canonical"], "members": fs, "size": t["size"],
+            "anchor_ic": t["anchor_ic"], "coverage": t["coverage"],
+        }
+        canonical_to_topic_id[t["canonical"]] = tp
+        for m in fs:
+            cui_to_topic_ids[m].add(tp)
+
+    # ---- size report ----
+    sizes = sorted(t["size"] for t in topic_id_to_topic.values())
+    n_topics = len(topic_id_to_topic)
+    def pct(p):
+        if not sizes:
+            return 0
+        return sizes[min(len(sizes) - 1, int(p * (len(sizes) - 1)))]
+    if sizes:
+        print(f"\n  RESULT")
+        print(f"    topics                : {n_topics:,}")
+        print(f"    CUIs in >=1 topic     : {len(cui_to_topic_ids):,}")
+        print(f"    topics per CUI (avg)  : "
+              f"{sum(len(v) for v in cui_to_topic_ids.values())/max(len(cui_to_topic_ids),1):.2f}")
+        print(f"    size min/med/p90/p99/max: "
+              f"{sizes[0]}/{pct(.5)}/{pct(.9)}/{pct(.99)}/{sizes[-1]}")
+        size2 = sum(1 for s in sizes if s == 2)
+        print(f"    size-2 topics         : {size2:,} ({size2/n_topics*100:.1f}%)")
+
+    payload = {
+        "topic_id_to_topic":     topic_id_to_topic,
+        "canonical_to_topic_id": canonical_to_topic_id,
+        "cui_to_topic_ids":      {c: sorted(s) for c, s in cui_to_topic_ids.items()},
+        "labels":                globals().get("LABELS", {}),
+        "config": {
+            "anchor_rule": "LOCAL convergence topics (members from supporting "
+                           "neighborhood only); exact + Jaccard merge; "
+                           "label by (coverage, IC)",
+            "min_anchor_ic": MIN_ANCHOR_IC,
+            "min_coverage":  MIN_COVERAGE,
+            "jaccard_merge": JACCARD_MERGE,
+            "hierarchy_source": "network isa (SNOMEDCT_US.isa)",
+            "uses_mrrel": False,
+            "topic_id_from": "member_set",
+            "global_accumulation": False,
+        },
+        "built_at": datetime.datetime.now().isoformat(),
+    }
+    with open(OUTPUT_PATH, "wb") as f:
+        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+    print(f"\n  saved {OUTPUT_PATH} ({os.path.getsize(OUTPUT_PATH)/1024/1024:.1f} MB)")
+    print(f"TOTAL {time.time()-t_total:.0f}s")
+
+
+main()
