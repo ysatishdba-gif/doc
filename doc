@@ -1,14 +1,18 @@
-# 1. all relation roots
-roots = sorted(n for n in netw.nodes
-               if isinstance(n, str) and n.startswith("SNOMEDCT_US."))
-print("relation roots:", roots)
+relation roots: ['SNOMEDCT_US.Empty', 'SNOMEDCT_US.isa']
 
-# 2. for a known left-knee CUI, what does it connect to?
-#    (use the left-knee CUI you searched with)
-LEFT_KNEE = "C5442019"   # 'Pain of left knee' — change to your actual CUI
-print(f"\nsuccessors of {LEFT_KNEE}:")
-for s in list(netw.successors(LEFT_KNEE))[:30]:
-    print("  ->", s)
-print(f"\npredecessors of {LEFT_KNEE}:")
-for p in list(netw.predecessors(LEFT_KNEE))[:30]:
-    print("  <-", p)
+successors of C5442019:
+  -> C5442019-0
+  -> C5442019-1
+  -> C5442019-2
+  -> C5442019-3
+  -> C5442019-4
+  -> C5442019-5
+  -> C5442019-6
+  -> C5442019-7
+  -> C5442019-8
+  -> C5442019-9
+  -> C5442019-10
+  -> C5442019-11
+
+predecessors of C5442019:
+  <- CUI
