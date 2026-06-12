@@ -1,0 +1,148 @@
+# Clinical Topic Retrieval — README
+
+Turns a clinical **query** and a **document** into topics, then matches them
+to retrieve the relevant document content.
+
+---
+
+## How topics are built (one-time)
+
+`build_topics.py` builds topics from the **network graph** + the **SNOMED
+IS-A hierarchy** (precomputed in `isa_precomputed.pkl`). No MRREL.
+
+- **Group**  = a concept + its network neighbors (who is related).
+- **Anchor** = the most-specific shared IS-A parent that groups >= 2 members
+  (a "convergence point"). IC is used only to *rank* anchors (pick the most
+  specific), NOT to filter — filtering happens later at the adaptor.
+- Each concept joins the topic(s) anchored at its convergence point(s).
+- Identical topics are merged.
+
+Result: clean topic buckets saved to `topics.pkl` (CUI -> topics,
+topic -> members). 100% pure (every member descends from its anchor).
+
+---
+
+## How matching works (per query)
+
+1. **Query**  -> LLM breakdown -> concepts -> CUIs (via API) -> summarized -> topics.
+2. **Document** -> chunks -> CUIs (via API) -> summarized -> topics.
+3. **Adaptor** matches query-topics vs document-topics.
+   - Among shared topics, only the **top 3 by IC** (most specific) are scored.
+   - This keeps broad/low-IC "blob" topics out of the score automatically.
+
+---
+
+## Code files
+
+| File | What it does |
+|---|---|
+| **load.py** | Loads everything once, holds it in memory, runs the pipeline + matching when a query comes in. Start once, leave open. |
+| **test_manual.py** | Sends your query to load.py and prints results. Re-run per query. |
+| **config.py** | Settings (project ID, API URL, model) + pickle paths. |
+| **artifacts.py** | Loads the heavy pickles (network graph, IC, topics) once. |
+| **document.py** | Reads the synthetic document chunks from `reconstructed_obj.pk`. |
+| **intents.py** | LLM query breakdown -> intents, sub-natures, atomic concepts. |
+| **cui_core.py** | Calls the extraction API to turn text into CUIs. |
+| **cui_summarizer.py** | Reduces a big CUI list to the important surviving CUIs. |
+| **topic_adaptor.py** | Looks up topics for CUIs; matches query vs doc (top-3-by-IC scoring). |
+| **build_topics.py** | Builds `topics.pkl`. Run once; NOT used during the demo. |
+| **diagnose_topics.py** | Checks topic quality (anchor specificity, purity, overlap). |
+
+---
+
+## Data files (required)
+
+| File | What it holds |
+|---|---|
+| **topics.pkl** | Prebuilt topic buckets. |
+| **isa_precomputed.pkl** | Precomputed IS-A ancestors + IC from the network graph. |
+| **networkx_cui_context_v1_3_0.pkl** | The network graph (~1.6 GB). |
+| **ic_precomputed.pkl** | IC scores used by the summarizer. |
+| **reconstructed_obj.pk** | The synthetic documents and their text chunks. |
+
+---
+
+## Steps to run
+
+### 1. Setup (once)
+- Put all data files in the folder.
+- Fill `config.py`: `PROJECT_ID`, `DATASET_ID`, `API_URL`, `MODEL_VERSION`.
+
+### 2. Start the server (Terminal 1) — leave it open
+```
+python load.py
+```
+Wait for `Server ready on ('localhost', 6000).`
+(This loads the heavy pickles once and stays running.)
+
+### 3. Run a query (Terminal 2)
+```
+python test_manual.py
+```
+Prints: document side, query side, and the retrieval match.
+
+### 4. Change the query
+- Edit the `query = "..."` line in `test_manual.py`.
+- Re-run `python test_manual.py`. No server restart — fast each time.
+
+### 5. Change the document
+- Edit `DEMO_DOC_INDEX = 0` in `load.py`.
+- Restart the server (`Ctrl+C`, then `python load.py`) — doc is cached at startup.
+
+---
+
+## Quick reference
+
+| To change | Edit | Restart server? |
+|---|---|---|
+| Query | `query` in `test_manual.py` | No |
+| Document | `DEMO_DOC_INDEX` in `load.py` | Yes |
+| How many topics scored per match | `top_k` in `TopicAdaptor(...)` | Yes |
+
+---
+
+## Rebuilding topics (only if needed)
+
+In the notebook (needs `netw` + `isa_precomputed.pkl` loaded):
+```python
+import pickle
+d = pickle.load(open("isa_precomputed.pkl", "rb"))
+isa_ancestors, ic = d["isa_ancestors"], d["ic"]
+exec(open("build_topics.py").read())
+```
+Then check quality:
+```python
+exec(open("diagnose_topics.py").read())
+```
+
+---
+
+## Handy lookups
+
+**What CUIs are in a topic:**
+```python
+import pickle
+P = pickle.load(open("topics.pkl", "rb"))
+TOPIC_ID = "tp_xxxxxxxxxxxx"
+t = P["topic_id_to_topic"].get(TOPIC_ID)
+print(f"anchor {t['canonical']} | size {t['size']} | IC {t['anchor_ic']:.3f}")
+for cui in sorted(t["members"]):
+    print(" ", cui, P["labels"].get(cui, cui))
+```
+
+**Total number of topics:**
+```python
+print(len(P["topic_id_to_topic"]), "topics")
+```
+
+---
+
+## Known limitations
+
+- **Laterality** (left vs right knee) is NOT separated. The SNOMED IS-A
+  hierarchy treats left/right knee as identical (laterality is a separate
+  axis not in the graph), so they group into the same topic. The top-3-by-IC
+  scoring reduces this leak, but full separation would need laterality data
+  from MRREL (not currently loaded).
+- A few **broad topics** (low IC, large size) exist. They are harmless — the
+  top-3-by-IC scoring keeps them out of matches.
