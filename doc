@@ -1,50 +1,48 @@
-tp_08aa6fc4fbde  anchor C4543632  size 2191  IC 0.292
-    C0000246 
-    C0000291 
-    C0000359 
-    C0000360 
-    C0000530 
-    C0000977 
-    C0000999 
-    C0001019 
-    C0001022 
-    C0001024 
-    C0001026 
-    C0001028 
-    C0001057 
-    C0001064 
-    C0001109 
+Peanut allergy -> Tree nut allergy, Food allergy, Anaphylaxis, Allergy
 
-tp_da07652a7305  anchor C0265388  size 1485  IC 0.404
-    C0000744 
-    C0001627 
-    C0002066 
-    C0002735 
-    C0004135 
-    C0004775 
-    C0010324 
-    C0010674 
-    C0014522 
-    C0015523 
-    C0016719 
-    C0016751 
-    C0016756 
-    C0016788 
-    C0017920 
+Focal CUI: Peanut allergy
+GROUP = { Peanut allergy, Tree nut allergy, Food allergy, Anaphylaxis, Allergy }
 
-tp_1ce8f187adf8  anchor C1285243  size 1431  IC 0.403
-    C0001080 
-    C0001193 
-    C0001627 
-    C0001916 
-    C0002452 
-    C0004135 
-    C0004903 
-    C0008928 
-    C0009207 
-    C0010273 
-    C0011430 
-    C0011436 
-    C0011989 
-    C0013720 
-    C0013902 
+Each member's full family tree (MRREL) with IC at every level
+
+Peanut allergy (0.92)  → Food allergy (0.62) → Allergy (0.40) → Hypersensitivity (0.22) → Disease (0.05)
+
+Tree nut allergy (0.90)→ Food allergy (0.62) → Allergy (0.40) → ...
+Food allergy (0.62)    → Allergy (0.40) → Hypersensitivity (0.22) → Disease (0.05)
+Anaphylaxis (0.70)     → Allergy (0.40) → Hypersensitivity (0.22) → Disease (0.05)
+Allergy (0.40)         → Hypersensitivity (0.22) → Disease (0.05)
+
+Climb each member — keep ONLY in-group parents, apply IC floor (0.30), pick highest IC
+
+Peanut allergy:
+Food allergy (0.62)      → in group ✅, IC≥0.30 ✅
+
+Allergy (0.40)           → in group ✅, IC≥0.30 ✅ but lower
+
+Hypersensitivity (0.22)  → not in group ❌ 
+
+Disease (0.05)           → not in group ❌
+
+WINNER = Food allergy (0.62)   ← highest IC among in-group
+
+Tree nut allergy:
+Food allergy (0.62) ✅ in group, highest → WINNER
+Allergy (0.40) in group, lower → skipped
+WINNER = Food allergy (0.62)
+
+Anaphylaxis:
+Allergy (0.40) ✅ in group, IC≥0.30 → WINNER  (Food allergy is NOT its ancestor)
+Hypersensitivity (0.22) not in group ❌
+WINNER = Allergy (0.40)
+
+Food allergy:
+Allergy (0.40) ✅ in group → WINNER
+WINNER = Allergy (0.40)
+
+Result — two topics from one group
+TOPIC "Food allergy" (anchor IC 0.62)
+   { Peanut allergy, Tree nut allergy, Food allergy }
+
+TOPIC "Allergy" (anchor IC 0.40)
+   { Anaphylaxis, Food allergy }
+Why two: the nut allergies climbed to Food allergy (specific), while Anaphylaxis had no Food-allergy ancestor so it stopped at Allergy. Different in-group parents → different topics. Clean and correct.
