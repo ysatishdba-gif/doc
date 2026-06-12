@@ -1,63 +1,126 @@
 """
-document.py
------------
-Loads the reconstructed synthetic documents once and serves one document's
-chunks (blobs) for the demo.
+diagnose_topics.py
+------------------
+Three accuracy checks on a built topics.pkl:
+  1. Anchor specificity  — are broad anchors (Disease/Finding) surviving as topics?
+  2. Topic purity        — do members actually descend from the anchor?
+  3. Overlap explosion    — are large topics near-duplicates of each other?
 
-    reconstructed_obj.pk : dict {index -> {raw_document, reconstructed{...}}}
-    each doc's chunks are reconstructed["blobs"] (list of text strings)
+Needs:
+  topics.pkl
+  isa_precomputed.pkl   (for isa_ancestors, to check purity)
 
-Usage:
-    from document import get_document
-    doc = get_document(0)
-    doc["doc_id"], doc["label"], doc["chunks"], doc["full_text"]
+Run:  exec(open("diagnose_topics.py").read())
 """
 
 import pickle
+from collections import defaultdict
 
-PK_PATH = "reconstructed_obj.pk"
+P = pickle.load(open("topics.pkl", "rb"))
+D = pickle.load(open("isa_precomputed.pkl", "rb"))
+isa_ancestors = D["isa_ancestors"]
 
-_RECON = None
+t2t   = P["topic_id_to_topic"]
+labels = P.get("labels", {})
 
+def lbl(c): return labels.get(c, c)
 
-def _load():
-    global _RECON
-    if _RECON is None:
-        with open(PK_PATH, "rb") as f:
-            _RECON = pickle.load(f)
-        print(f"[document] loaded {PK_PATH}: {len(_RECON)} documents")
-    return _RECON
+# ============================================================
+# CHECK 1 — anchor specificity (largest topics + their IC)
+# ============================================================
+print("="*70)
+print("CHECK 1 — largest topics: anchor, IC, size")
+print("  (broad anchors like Disease/Finding here = IC floor too low)")
+print("="*70)
+big = sorted(t2t.items(), key=lambda r: -r[1]["size"])[:30]
+for tp, t in big:
+    print(f"  size={t['size']:>5}  IC={t['anchor_ic']:.3f}  "
+          f"{t['canonical']}  '{lbl(t['canonical'])[:55]}'")
 
+# IC distribution of anchors
+ics = sorted(t["anchor_ic"] for t in t2t.values())
+n = len(ics)
+def pct(p): return ics[min(n-1, int(p*(n-1)))] if n else 0
+print(f"\n  anchor IC  min/p10/med/p90/max = "
+      f"{ics[0]:.3f}/{pct(.1):.3f}/{pct(.5):.3f}/{pct(.9):.3f}/{ics[-1]:.3f}")
+low = sum(1 for x in ics if x < 0.40)
+print(f"  anchors with IC < 0.40 (broad): {low:,} ({low/n*100:.1f}%)")
 
-def get_document(index):
-    """Return one document's metadata + chunks (blobs)."""
-    recon = _load()
-    if index not in recon:
-        raise KeyError(f"document index {index} not in {PK_PATH} "
-                       f"(valid: 0..{len(recon)-1})")
-    d = recon[index]
-    r = d["reconstructed"]
-    label = d.get("raw_document", f"doc_{index}")
-    blobs = [b for b in (r.get("blobs") or []) if b and b.strip()]
-    if not blobs:                       # fallback: whole text as one chunk
-        blobs = [r.get("text", "")]
-    return {
-        "doc_id":    f"doc_{index}_{label.replace(' ', '_')}",
-        "index":     index,
-        "label":     label,
-        "category":  r.get("document", ""),
-        "chunks":    blobs,
-        "full_text": r.get("text", ""),
-        "section_topics": r.get("topics", []),
-    }
+# ============================================================
+# CHECK 2 — topic purity (members descend from anchor?)
+# ============================================================
+print("\n" + "="*70)
+print("CHECK 2 — topic purity: % of members that descend from the anchor")
+print("  (low purity = members grouped that aren't really under the anchor)")
+print("="*70)
 
+# a member m descends from anchor a  iff  a in isa_ancestors[m]
+impure_topics = 0
+total_members = 0
+impure_members = 0
+worst = []
+for tp, t in t2t.items():
+    anchor = t["canonical"]
+    members = t["members"]
+    bad = 0
+    for m in members:
+        if m == anchor:
+            continue
+        if anchor not in isa_ancestors.get(m, ()):
+            bad += 1
+    total_members += len(members)
+    impure_members += bad
+    if bad:
+        impure_topics += 1
+        worst.append((bad, len(members), tp, anchor))
 
-def list_documents(n=20):
-    """Print the first n documents so you can pick an index for the demo."""
-    recon = _load()
-    for i in range(min(n, len(recon))):
-        d = recon[i]
-        r = d["reconstructed"]
-        nblobs = len(r.get("blobs") or [])
-        print(f"  [{i:>3}] {d.get('raw_document',''):28s} "
-              f"chunks={nblobs:>3}  {r.get('document','')[:60]}")
+print(f"  topics with >=1 non-descendant member: {impure_topics:,} of {len(t2t):,}")
+print(f"  impure members: {impure_members:,} of {total_members:,} "
+      f"({impure_members/max(total_members,1)*100:.2f}%)")
+worst.sort(reverse=True)
+print("  worst offenders (non-descendant count / size):")
+for bad, sz, tp, anchor in worst[:10]:
+    print(f"    {bad}/{sz}  anchor {anchor} '{lbl(anchor)[:45]}'")
+
+# ============================================================
+# CHECK 3 — overlap explosion (Jaccard among large topics)
+# ============================================================
+print("\n" + "="*70)
+print("CHECK 3 — overlap among the 200 largest topics (Jaccard > 0.8)")
+print("  (many high-overlap pairs = redundant topics)")
+print("="*70)
+large = sorted(t2t.items(), key=lambda r: -r[1]["size"])[:200]
+sets = [(tp, set(t["members"])) for tp, t in large]
+high = 0
+samples = []
+for i in range(len(sets)):
+    for j in range(i+1, len(sets)):
+        a, sa = sets[i]; b, sb = sets[j]
+        inter = len(sa & sb)
+        if inter == 0:
+            continue
+        jac = inter / len(sa | sb)
+        if jac > 0.8:
+            high += 1
+            if len(samples) < 10:
+                samples.append((jac, t2t[a]["canonical"], t2t[b]["canonical"]))
+print(f"  pairs (of {len(sets)} topics) with Jaccard > 0.8: {high}")
+for jac, ca, cb in samples:
+    print(f"    {jac:.2f}  '{lbl(ca)[:30]}'  ~  '{lbl(cb)[:30]}'")
+
+# ============================================================
+# CHECK 4 — coverage support (if stored) + overall stats
+# ============================================================
+print("\n" + "="*70)
+print("CHECK 4 — overall")
+print("="*70)
+sizes = sorted(t["size"] for t in t2t.values())
+print(f"  topics: {len(t2t):,}")
+print(f"  size min/med/p90/p99/max = "
+      f"{sizes[0]}/{sizes[len(sizes)//2]}/{sizes[int(.9*len(sizes))]}/"
+      f"{sizes[int(.99*len(sizes))]}/{sizes[-1]}")
+cui_to_t = P["cui_to_topic_ids"]
+tpc = sorted(len(v) for v in cui_to_t.values())
+print(f"  topics-per-CUI min/med/p90/max = "
+      f"{tpc[0]}/{tpc[len(tpc)//2]}/{tpc[int(.9*len(tpc))]}/{tpc[-1]}")
+print("\nDONE")
