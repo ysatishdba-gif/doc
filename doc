@@ -1,4 +1,14 @@
-# find all SNOMED relation roots in the network
+# 1. all relation roots
 roots = sorted(n for n in netw.nodes
                if isinstance(n, str) and n.startswith("SNOMEDCT_US."))
-print(roots)
+print("relation roots:", roots)
+
+# 2. for a known left-knee CUI, what does it connect to?
+#    (use the left-knee CUI you searched with)
+LEFT_KNEE = "C5442019"   # 'Pain of left knee' — change to your actual CUI
+print(f"\nsuccessors of {LEFT_KNEE}:")
+for s in list(netw.successors(LEFT_KNEE))[:30]:
+    print("  ->", s)
+print(f"\npredecessors of {LEFT_KNEE}:")
+for p in list(netw.predecessors(LEFT_KNEE))[:30]:
+    print("  <-", p)
