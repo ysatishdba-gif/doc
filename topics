@@ -1,23 +1,29 @@
 """
-build_topics.py  (network-only, LOCAL convergence topics)
----------------------------------------------------------
+build_topics.py  (network-only, highest-IC convergence anchoring)
+-----------------------------------------------------------------
 Builds clinical topics from the network graph alone (no MRREL).
 
-ACCURACY FIX (vs previous version):
-  Previously, an anchor was validated LOCALLY (coverage in one neighborhood)
-  but accumulated members GLOBALLY (union across every neighborhood it ever
-  qualified in) -> moderately-general anchors blobbed into giant topics that
-  no single neighborhood supported.
+ANCHOR RULE (no IC FILTERING at formation — IC is used only as a RANKING):
+  - Group  = a focal CUI + its network neighbors.
+  - Convergence point = an in-group IS-A ancestor that groups >= MIN_COVERAGE
+    members of the group (this kills size-2 fragments).
+  - Each member anchors to its HIGHEST-IC convergence point — the most
+    specific *meaningful* shared parent. IC is a ranking, NOT a floor:
+      * Most-specific convergence anchor wins (e.g. Pneumonia over Disease).
+      * Broad navigation nodes (huge descendant count = low IC) naturally
+        lose the ranking, so they don't become anchors — without any floor.
+  - A member may anchor under MULTIPLE convergence points only when it has
+    multiple DISTINCT highest-IC parents via different paths (multi-parent),
+    so we keep, per member, every convergence ancestor that is not itself
+    dominated by a more-specific in-group convergence ancestor.
 
-  Now: each topic is the member set from the SINGLE neighborhood that
-  supported it. Topics never accumulate across unrelated neighborhoods.
-  Identical / near-duplicate member sets are merged afterward.
+  NO MIN_ANCHOR_IC floor here. IC filtering is done later, at the adaptor.
 
 PIPELINE:
   STAGE A : Flatten network graph -> neighbors
   STAGE B : (hierarchy + IC precomputed from isa_precomputed.pkl)
-  STAGE C : Per focal group, form LOCAL topics at convergence anchors
-  STAGE D : Merge identical + near-duplicate (Jaccard) topics
+  STAGE C : Per group, anchor each member to its highest-IC convergence point(s)
+  STAGE D : Dedup identical member sets (keep highest-IC anchor as name)
 
 Inputs (notebook globals):
   netw            : network DiGraph
@@ -32,12 +38,9 @@ import pickle, datetime, hashlib, os, time
 from collections import defaultdict, Counter
 
 
-OUTPUT_PATH   = "topics.pkl"
-MIN_ANCHOR_IC = 0.30      # an anchor must be at least this specific
-MIN_COVERAGE  = 2         # anchor must group >= this many members in a neighborhood
-                          # (drops single-member anchors)
-JACCARD_MERGE = 0.90      # merge two topics if member-set Jaccard >= this
-                          # (1.0 = only exact duplicates)
+OUTPUT_PATH  = "topics.pkl"
+MIN_COVERAGE = 2          # convergence: anchor must group >= this many members
+                          # (drops single-member anchors). NO IC floor here.
 
 
 # ============================================================
@@ -76,7 +79,7 @@ def flatten_graph(graph, target_cuis):
 
 
 # ============================================================
-# STAGE C: LOCAL convergence topics (no global accumulation)
+# STAGE C: highest-IC convergence anchoring
 # ============================================================
 def topic_id_for(members_fs):
     """ID from the MEMBER SET (stable regardless of which anchor names it)."""
@@ -84,152 +87,88 @@ def topic_id_for(members_fs):
     return "tp_" + hashlib.sha1(key.encode()).hexdigest()[:12]
 
 
-def build_local_topics(target_cuis, neighbors, isa_ancestors, ic):
-    print(f"  [C] Local convergence topics "
-          f"(IC>={MIN_ANCHOR_IC}, coverage>={MIN_COVERAGE})...")
+def build_topics(target_cuis, neighbors, isa_ancestors, ic):
+    print(f"  [C] Highest-IC convergence anchoring "
+          f"(coverage>={MIN_COVERAGE}, IC=ranking only, no floor)...")
     t0 = time.time()
-
-    # cache IC-floor-filtered ancestor set per CUI
-    filt_anc = {}
-    def filtered_ancestors(cui):
-        s = filt_anc.get(cui)
-        if s is None:
-            s = {a for a in isa_ancestors.get(cui, ()) if ic.get(a, 0.0) >= MIN_ANCHOR_IC}
-            filt_anc[cui] = s
-        return s
-
-    # each LOCAL topic: (anchor, coverage, frozenset(members))
-    # keyed by (anchor, members) so the same local topic found from different
-    # focals isn't double-counted; we keep the max coverage seen.
-    local = {}    # (anchor, members_fs) -> coverage
+    canonical_to_members = defaultdict(set)
     total = len(target_cuis)
     n = 0
-    n_groups_with_topic = 0
+    n_no_anchor = 0
+
+    # cache in-group ancestors per CUI? ancestors are global, but the
+    # intersection with each group differs, so we just cache the raw set.
+    anc_cache = {}
+    def ancestors(cui):
+        s = anc_cache.get(cui)
+        if s is None:
+            s = isa_ancestors.get(cui, set())
+            anc_cache[cui] = s
+        return s
 
     for focal in target_cuis:
         n += 1
         if n % 50000 == 0:
-            print(f"      {n:,}/{total:,} ({time.time()-t0:.0f}s, "
-                  f"local_topics={len(local):,})")
+            print(f"      {n:,}/{total:,} ({time.time()-t0:.0f}s)")
 
         members = {focal} | neighbors.get(focal, set())
         if len(members) < 2:
             continue
 
-        # in-group ancestors + coverage (local to THIS neighborhood)
+        # in-group ancestors per member + coverage (how many members each groups)
         coverage = Counter()
         member_in_group = {}
         for m in members:
-            anc = filtered_ancestors(m) & members
-            anc = anc - {m}
+            anc = (ancestors(m) & members) - {m}
             member_in_group[m] = anc
             for a in anc:
                 coverage[a] += 1
 
-        # for each convergence anchor, the LOCAL topic = the members it covers
-        # here (anchor + its covered members), NOT a global union.
-        anchor_members = defaultdict(set)
+        # convergence points = in-group ancestors with coverage >= MIN_COVERAGE
+        # each member anchors to its HIGHEST-IC convergence ancestor.
+        any_assigned = False
         for m, anc in member_in_group.items():
-            for a in anc:
-                if coverage[a] >= MIN_COVERAGE:
-                    anchor_members[a].add(m)
-        had = False
-        for a, mems in anchor_members.items():
-            mems = set(mems)
-            mems.add(a)                       # anchor is part of its topic
-            fs = frozenset(mems)
-            key = (a, fs)
-            cov = coverage[a]
-            if cov > local.get(key, -1):
-                local[key] = cov
-            had = True
-        if had:
-            n_groups_with_topic += 1
+            conv = [a for a in anc if coverage[a] >= MIN_COVERAGE]
+            if not conv:
+                continue
+            # highest IC = most specific meaningful shared parent
+            best_ic = max(ic.get(a, 0.0) for a in conv)
+            # keep all convergence ancestors at the top IC (handles multi-parent
+            # via different paths that are equally specific); usually just one.
+            anchors = [a for a in conv if ic.get(a, 0.0) == best_ic]
+            for a in anchors:
+                canonical_to_members[a].add(a)
+                canonical_to_members[a].add(m)
+                any_assigned = True
+        if not any_assigned:
+            n_no_anchor += 1
 
     print(f"      done ({time.time()-t0:.0f}s) | "
-          f"groups_with_topic={n_groups_with_topic:,} | "
-          f"local_topics={len(local):,} | ancestor_cache={len(filt_anc):,}")
-    return local   # {(anchor, members_fs): coverage}
+          f"groups_no_convergence_anchor={n_no_anchor:,} | "
+          f"raw_anchors={len(canonical_to_members):,}")
+    return dict(canonical_to_members)
 
 
 # ============================================================
-# STAGE D: merge identical + near-duplicate topics
+# STAGE D: dedup identical member sets
 # ============================================================
-def merge_topics(local, ic):
-    print(f"  [D] Merging duplicates (exact + Jaccard>={JACCARD_MERGE})...")
+def dedup_member_sets(canonical_to_members, ic):
+    print("  [D] Deduping identical member sets...")
     t0 = time.time()
-
-    # first collapse EXACT member-set duplicates; keep best anchor by
-    # (coverage, IC, cui) — coverage-first gives the most representative label
-    by_members = defaultdict(list)   # members_fs -> list of (anchor, coverage)
-    for (anchor, fs), cov in local.items():
-        by_members[fs].append((anchor, cov))
-
-    topics = []   # list of dicts: {canonical, members, size, anchor_ic, coverage}
-    for fs, anchors in by_members.items():
-        anchor, cov = max(anchors, key=lambda ac: (ac[1], ic.get(ac[0], 0.0), ac[0]))
-        topics.append({
-            "canonical": anchor, "members": fs, "size": len(fs),
-            "anchor_ic": ic.get(anchor, 0.0), "coverage": cov,
-        })
-    print(f"      after exact dedup: {len(topics):,} topics ({time.time()-t0:.0f}s)")
-
-    if JACCARD_MERGE >= 1.0:
-        return topics
-
-    # near-duplicate merge via Jaccard, blocked by shared members for speed.
-    # Process largest-first; absorb smaller topics that are >= JACCARD_MERGE
-    # similar into the larger one.
-    topics.sort(key=lambda t: -t["size"])
-    member_to_topics = defaultdict(set)   # cui -> set of topic idx (kept ones)
-    kept = []
-    absorbed = 0
-    for t in topics:
-        fs = t["members"]
-        # candidate overlaps: topics already kept that share any member
-        cand = set()
-        for m in fs:
-            cand |= member_to_topics.get(m, set())
-        merged_into = None
-        for idx in cand:
-            k = kept[idx]
-            inter = len(fs & k["members"])
-            if inter == 0:
-                continue
-            jac = inter / len(fs | k["members"])
-            if jac >= JACCARD_MERGE:
-                merged_into = idx
-                break
-        if merged_into is None:
-            ki = len(kept)
-            kept.append({"canonical": t["canonical"],
-                         "members": set(fs), "size": len(fs),
-                         "anchor_ic": t["anchor_ic"], "coverage": t["coverage"]})
-            for m in fs:
-                member_to_topics[m].add(ki)
-        else:
-            k = kept[merged_into]
-            new_members = k["members"] | fs
-            # keep the better-supported / more specific anchor as the label
-            if (t["coverage"], t["anchor_ic"], t["canonical"]) > \
-               (k["coverage"], k["anchor_ic"], k["canonical"]):
-                k["canonical"] = t["canonical"]
-                k["anchor_ic"] = t["anchor_ic"]
-                k["coverage"]  = t["coverage"]
-            # update membership index for any newly added members
-            for m in fs - k["members"]:
-                member_to_topics[m].add(merged_into)
-            k["members"] = new_members
-            k["size"] = len(new_members)
-            absorbed += 1
-
-    print(f"      after Jaccard merge: {len(kept):,} topics "
-          f"(absorbed {absorbed:,}) ({time.time()-t0:.0f}s)")
-    # finalize member sets to frozenset
-    for k in kept:
-        k["members"] = frozenset(k["members"])
-        k["size"] = len(k["members"])
-    return kept
+    by_members = defaultdict(list)
+    for anchor, mems in canonical_to_members.items():
+        by_members[frozenset(mems)].append(anchor)
+    deduped = {}
+    n_merged = 0
+    for mems_fs, anchors in by_members.items():
+        # deterministic: highest IC, then CUI string
+        keep = max(anchors, key=lambda a: (ic.get(a, 0.0), a))
+        deduped[keep] = set(mems_fs)
+        n_merged += len(anchors) - 1
+    print(f"      merged {n_merged:,} duplicate-membership topics "
+          f"({len(canonical_to_members):,} -> {len(deduped):,}) "
+          f"({time.time()-t0:.0f}s)")
+    return deduped
 
 
 # ============================================================
@@ -248,28 +187,26 @@ def main():
 
     target_cuis = set(isa_ancestors.keys()) | set(ic.keys())
     print(f"  target CUIs: {len(target_cuis):,}")
-    print(f"  MIN_ANCHOR_IC={MIN_ANCHOR_IC}  MIN_COVERAGE={MIN_COVERAGE}  "
-          f"JACCARD_MERGE={JACCARD_MERGE}")
+    print(f"  MIN_COVERAGE={MIN_COVERAGE}  (IC used as ranking only, NO floor)")
 
     neighbors = flatten_graph(netw, target_cuis)
-    local = build_local_topics(target_cuis, neighbors, isa_ancestors, ic)
-    topics = merge_topics(local, ic)
+    raw = build_topics(target_cuis, neighbors, isa_ancestors, ic)
+    canon_to_members = dedup_member_sets(raw, ic)
 
     print("  [pkg] Packaging topics...")
     topic_id_to_topic, canonical_to_topic_id = {}, {}
     cui_to_topic_ids = defaultdict(set)
-    for t in topics:
-        fs = t["members"]
-        tp = topic_id_for(fs)            # ID from member set (stable)
+    for canonical, mems in canon_to_members.items():
+        fs = frozenset(mems)
+        tp = topic_id_for(fs)
         topic_id_to_topic[tp] = {
-            "canonical": t["canonical"], "members": fs, "size": t["size"],
-            "anchor_ic": t["anchor_ic"], "coverage": t["coverage"],
+            "canonical": canonical, "members": fs, "size": len(fs),
+            "anchor_ic": ic.get(canonical, 0.0),
         }
-        canonical_to_topic_id[t["canonical"]] = tp
+        canonical_to_topic_id[canonical] = tp
         for m in fs:
             cui_to_topic_ids[m].add(tp)
 
-    # ---- size report ----
     sizes = sorted(t["size"] for t in topic_id_to_topic.values())
     n_topics = len(topic_id_to_topic)
     def pct(p):
@@ -293,16 +230,15 @@ def main():
         "cui_to_topic_ids":      {c: sorted(s) for c, s in cui_to_topic_ids.items()},
         "labels":                globals().get("LABELS", {}),
         "config": {
-            "anchor_rule": "LOCAL convergence topics (members from supporting "
-                           "neighborhood only); exact + Jaccard merge; "
-                           "label by (coverage, IC)",
-            "min_anchor_ic": MIN_ANCHOR_IC,
+            "anchor_rule": "highest-IC convergence anchor (coverage>=MIN_COVERAGE); "
+                           "IC used as RANKING only, NO floor; identical member "
+                           "sets merged",
             "min_coverage":  MIN_COVERAGE,
-            "jaccard_merge": JACCARD_MERGE,
+            "ic_floor": None,
+            "ic_role": "ranking_only",
             "hierarchy_source": "network isa (SNOMEDCT_US.isa)",
             "uses_mrrel": False,
             "topic_id_from": "member_set",
-            "global_accumulation": False,
         },
         "built_at": datetime.datetime.now().isoformat(),
     }
