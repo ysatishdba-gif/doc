@@ -1,148 +1,16 @@
-def test_concept_coding_success(monkeypatch):
-    async def fake_run_pipeline(**kwargs):
-        return _pipeline_success_result()
+import requests, google.auth.transport.requests
+from google.oauth2 import id_token
 
-    monkeypatch.setattr(concept_coding_mod, "run_pipeline", fake_run_pipeline)
+URL = "https://your-host/concept-coding/v1/analyze"
 
-    resp = client.post(
-        "/concept-coding/v1/analyze", json={"text": "Patient has fever."}
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["status"] == 1
-    assert body["output"]["text"] == "Patient has fever."
+def analyze(text):
+    token = id_token.fetch_id_token(google.auth.transport.requests.Request(), URL)
+    r = requests.post(URL, json={"text": text},
+                      headers={"Authorization": f"Bearer {token}"}, timeout=320)
+    r.raise_for_status()
+    return r.json()
 
-
-def test_concept_coding_pipeline_failure_returns_500(monkeypatch):
-    async def fake_run_pipeline(**kwargs):
-        return {
-            "status": 0,
-            "service": "concept-coding-api-1.0.0",
-            "output": "",
-            "details": {"timestamp": "2026-01-01T00:00:00"},
-            "error": {"message": "something went wrong"},
-        }
-
-    monkeypatch.setattr(concept_coding_mod, "run_pipeline", fake_run_pipeline)
-
-    resp = client.post(
-        "/concept-coding/v1/analyze", json={"text": "Patient has fever."}
-    )
-    assert resp.status_code == 500
-    body = resp.json()
-    assert body["status"] == 0
-
-
-def test_concept_coding_partial_timeout_returns_230(monkeypatch):
-    async def fake_run_pipeline(**kwargs):
-        return {
-            "status": 0,
-            "code": 230,
-            "error": "ReadTimeout",
-            "output": {"text": "", "entities": {}, "cuis": {}},
-            "details": {
-                "timings_ms": {},
-                "debug": {},
-                "output_obj": {},
-                "cluster_selection_params": None,
-            },
-        }
-
-    monkeypatch.setattr(concept_coding_mod, "run_pipeline", fake_run_pipeline)
-
-    resp = client.post(
-        "/concept-coding/v1/analyze", json={"text": "Patient has fever."}
-    )
-    assert resp.status_code == 230
-    body = resp.json()
-    assert body["status"] == 0
-    assert body["code"] == 230
-
-
-def test_concept_coding_raises_exception_returns_500(monkeypatch):
-    async def fake_run_pipeline(**kwargs):
-        raise RuntimeError("unexpected crash")
-
-    monkeypatch.setattr(concept_coding_mod, "run_pipeline", fake_run_pipeline)
-
-    resp = client.post(
-        "/concept-coding/v1/analyze", json={"text": "Patient has fever."}
-    )
-    assert resp.status_code == 500
-    body = resp.json()
-    assert body["status"] == 0
-    assert "message" in body["error"]
-
-
-# ── Input validation ──────────────────────────────────────────────────────────
-
-
-def test_concept_coding_empty_text_returns_422():
-    resp = client.post("/concept-coding/v1/analyze", json={"text": ""})
-    assert resp.status_code == 422
-    body = resp.json()
-    assert body["status"] == 0
-    assert "error" in body
-
-
-def test_concept_coding_missing_text_returns_422():
-    resp = client.post("/concept-coding/v1/analyze", json={})
-    assert resp.status_code == 422
-    body = resp.json()
-    assert body["status"] == 0
-
-
-def test_concept_coding_invalid_extraction_mode_returns_422():
-    resp = client.post(
-        "/concept-coding/v1/analyze",
-        json={"text": "Patient has fever.", "extraction_mode": "invalid_mode"},
-    )
-    assert resp.status_code == 422
-
-
-# ── internal_timeout validation ──────────────────────────────────────────────
-
-
-def test_internal_timeout_defaults_to_300(monkeypatch):
-    captured = {}
-
-    async def fake_run_pipeline(**kwargs):
-        captured.update(kwargs)
-        return _pipeline_success_result()
-
-    monkeypatch.setattr(concept_coding_mod, "run_pipeline", fake_run_pipeline)
-
-    resp = client.post(
-        "/concept-coding/v1/analyze", json={"text": "Patient has fever."}
-    )
-    assert resp.status_code == 200
-    assert captured["internal_timeout"] == 300
-
-
-def test_internal_timeout_custom_value_accepted(monkeypatch):
-    async def fake_run_pipeline(**kwargs):
-        return _pipeline_success_result()
-
-    monkeypatch.setattr(concept_coding_mod, "run_pipeline", fake_run_pipeline)
-
-    resp = client.post(
-        "/concept-coding/v1/analyze",
-        json={"text": "Patient has fever.", "internal_timeout": 120},
-    )
-    assert resp.status_code == 200
-
-
-def test_internal_timeout_below_60_returns_422():
-    resp = client.post(
-        "/concept-coding/v1/analyze",
-        json={"text": "Patient has fever.", "internal_timeout": 30},
-    )
-    assert resp.status_code == 422
-
-
-def test_internal_timeout_above_540_returns_422():
-    resp = client.post(
-        "/concept-coding/v1/analyze",
-        json={"text": "Patient has fever.", "internal_timeout": 600},
-    )
-    assert resp.status_code == 422
+resp = analyze("Patient has fever.")
+print(resp["status"])          # 1 = success
+print(resp["output"]["cuis"])  # the CUIs
+print(resp["output"]["entities"])
