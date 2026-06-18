@@ -1,16 +1,22 @@
-import requests, google.auth.transport.requests
-from google.oauth2 import id_token
+import requests
 
 URL = "https://your-host/concept-coding/v1/analyze"
 
-def analyze(text):
-    token = id_token.fetch_id_token(google.auth.transport.requests.Request(), URL)
-    r = requests.post(URL, json={"text": text},
-                      headers={"Authorization": f"Bearer {token}"}, timeout=320)
+def analyze(text, internal_timeout=300):
+    r = requests.post(
+        URL,
+        json={"text": text, "internal_timeout": internal_timeout},
+        timeout=internal_timeout + 20,   # keep HTTP timeout above the server's
+    )
     r.raise_for_status()
     return r.json()
 
-resp = analyze("Patient has fever.")
-print(resp["status"])          # 1 = success
-print(resp["output"]["cuis"])  # the CUIs
-print(resp["output"]["entities"])
+resp = analyze("Patient has fever, headache and diabetes.")
+
+if resp["status"] == 1:
+    out = resp["output"]
+    print("text:", out["text"])
+    for entity, cui in out["cuis"].items():
+        print(f"  {entity} -> {cui}")
+else:
+    print("failed:", resp.get("code"), resp.get("error"))   # 500 = crash, 230 = partial/timeout
