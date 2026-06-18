@@ -1,22 +1,33 @@
-import requests
-
-URL = "https://your-host/concept-coding/v1/analyze"
-
-def analyze(text, internal_timeout=300):
-    r = requests.post(
-        URL,
-        json={"text": text, "internal_timeout": internal_timeout},
-        timeout=internal_timeout + 20,   # keep HTTP timeout above the server's
-    )
-    r.raise_for_status()
-    return r.json()
-
-resp = analyze("Patient has fever, headache and diabetes.")
-
-if resp["status"] == 1:
-    out = resp["output"]
-    print("text:", out["text"])
-    for entity, cui in out["cuis"].items():
-        print(f"  {entity} -> {cui}")
-else:
-    print("failed:", resp.get("code"), resp.get("error"))   # 500 = crash, 230 = partial/timeout
+{'text': '....', 
+ 'extraction_mode':'general_only', 
+ 'intents': {
+    1: {'metadata': 'Entities', 
+        'definition': '.....'}, 
+    2: {'metadata': '....', 
+        'definition': '....'}}, 
+ 'cluster_selection_params': {
+    'cluster_set': 'appointment2_v002', 
+    'top_k': 150, 
+    'top_p': 10, 
+    'top_q': 20, 
+    'combined': True, 
+    'source_system': ['CCSR_ICD10PCS', 'CDCREC', 'CPT', 'GO', 'HL7V2.5', 'HL7V3.0', 'HPO', 
+                      'ICD10CM', 'ICD10PCS', 'ICD9CM', 'LNC', 'MED-RT', 'MEDLINEPLUS', 'MSH', 
+                      'NCBI', 'NCI', 'ORPHANET', 'RXNORM', 'SNOMEDCT_US', 'SOP', 'MCBT']}, 
+ 'general_extraction_options': {
+    'use_marker': True, 
+    'marker_sep': '.', 
+    'genai_model': 'gemini-2.5-flash-lite'}, 
+ 'semantic_linking_options': {
+    'sem_v1': {'genai_model': 'gemini-2.5-flash-lite'}, 
+    'sem_v2': {'genai_model': 'gemini-2.5-flash-lite', 
+               'semantic_linking_model': 'SemanticLinkerV0002'}, 
+    'intent_filter': {'genai_model': 'gemini-2.5-flash-lite'}}, 
+ 'pipeline_steps': {
+    'run_general_extraction': True, 
+    'run_ner_extraction': False, 
+    'run_semantic_linking_v1': True, 
+    'run_semantic_linking_v2': True, 
+    'run_intent_filter': True, 
+    'run_deep_search': False}, 
+ 'reasoning': ['both']}
