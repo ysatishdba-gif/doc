@@ -1,31 +1,1435 @@
-{'text': '....', 
- 'extraction_mode':'general_only', 
- 'intents': {
-    1: {'metadata': 'Entities', 
-        'definition': '.....'}, 
-    2: {'metadata': '....', 
-        'definition': '....'}}, 
- 'cluster_selection_params': {
-    'cluster_set': 'umls', 
-    'top_k': 150, 
-    'top_p': 10, 
-    'top_q': 20, 
-    'combined': True, 
-    'source_system': [ 'SNOMEDCT_US']}, 
- 'general_extraction_options': {
-    'use_marker': True, 
-    'marker_sep': '.', 
-    'genai_model': 'gemini-2.5-flash-lite'}, 
- 'semantic_linking_options': {
-    'sem_v1': {'genai_model': 'gemini-2.5-flash-lite'}, 
-    'sem_v2': {'genai_model': 'gemini-2.5-flash-lite', 
-               'semantic_linking_model': 'SemanticLinkerV0002'}, 
-    'intent_filter': {'genai_model': 'gemini-2.5-flash-lite'}}, 
- 'pipeline_steps': {
-    'run_general_extraction': True, 
-    'run_ner_extraction': False, 
-    'run_semantic_linking_v1': False, 
-    'run_semantic_linking_v2': False, 
-    'run_intent_filter': False, 
-    'run_deep_search': False}, 
- 'reasoning': ['both']}
+{
+  "elapsed_seconds": 64.6937,
+  "result": {
+    "final_cuis": [],
+    "timings_ms": {
+      "step_1_extraction_ms": 8629.06,
+      "step_2_matching_ms": 3626.622,
+      "step_3_semantic_linking_ms": 52421.201,
+      "step_3_v1_span_ms": 13469.5,
+      "step_3_v2_span_ms": 7276.78,
+      "step_6_intent_span_ms": 34304.94,
+      "step_3_v1_sum_ms": 22646.82,
+      "step_3_v2_sum_ms": 9424.49,
+      "step_6_intent_sum_ms": 55853.9
+    },
+    "counts": {
+      "payloads_step3": 2
+    },
+    "debug": {
+      "pre_sem_link_payloads_count": 2,
+      "stream_meta": {
+        "payloads_total": 2,
+        "v1_done": 2,
+        "v1_errors": 0,
+        "v2_done": 2,
+        "v2_errors": 0,
+        "intent_done": 2,
+        "intent_errors": 0,
+        "intent_meta_by_payload": {
+          "1": {
+            "initial_candidates": 3,
+            "total_rows": 3,
+            "num_batches": 1,
+            "batch_size": 150,
+            "concurrency": 8
+          },
+          "0": {
+            "initial_candidates": 6,
+            "total_rows": 6,
+            "num_batches": 1,
+            "batch_size": 150,
+            "concurrency": 8
+          }
+        },
+        "timings_streaming_ms": {
+          "v1_span_ms": 13469.5,
+          "v1_sum_ms": 22646.82,
+          "v1_calls": 2,
+          "v2_span_ms": 7276.78,
+          "v2_sum_ms": 9424.49,
+          "v2_calls": 2,
+          "intent_span_ms": 34304.94,
+          "intent_sum_ms": 55853.9,
+          "intent_calls": 2
+        }
+      },
+      "cluster_selection_params": {
+        "cluster_set": "umls",
+        "top_k": 3,
+        "top_p": 5
+      }
+    },
+    "output_obj": {
+      "output": {
+        "0": {
+          "text": [
+            0,
+            109,
+            "Patient has fever, headache and is in Newname hospital with Dr. John Doe. He is also suffering from diabetes."
+          ],
+          "utterances": {
+            "0": {
+              "text": [
+                0,
+                73,
+                "Patient has fever, headache and is in Newname hospital with Dr. John Doe."
+              ],
+              "phrases": {
+                "0": {
+                  "text": [
+                    12,
+                    5,
+                    "fever"
+                  ],
+                  "intent": 1,
+                  "mappings": {
+                    "0": {
+                      "score": null,
+                      "candidates": {
+                        "0": {
+                          "cui": "C3842045",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              12,
+                              5,
+                              "fever"
+                            ]
+                          ],
+                          "name": "General-fever",
+                          "description": "No description available",
+                          "semantic": [
+                            "Finding"
+                          ],
+                          "linker_v1": {
+                            "answer": "1",
+                            "reasoning": "The Entity_text 'fever' is directly described by the Definition 'General-fever [(Finding)]'. The definition accurately categorizes 'fever' as a general finding, which aligns perfectly with the entity itself. The sentence and full text confirm the presence of fever, reinforcing this direct description."
+                          },
+                          "linker_v2": {
+                            "answer": "1",
+                            "reasoning": "The sentence explicitly states 'Patient has fever'. The definition 'General-fever [(Finding)]' directly corresponds to this symptom. The semantic type 'Finding' is appropriate for a symptom like fever."
+                          },
+                          "intent_filter": {
+                            "intent1": {
+                              "answer": "Yes",
+                              "reasoning": "The clinical concept 'fever' (corresponding to ID '1' from the context) is a symptom the patient is experiencing and can be a primary health concern."
+                            }
+                          }
+                        },
+                        "1": {
+                          "cui": "C2051610",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              12,
+                              5,
+                              "fever"
+                            ]
+                          ],
+                          "name": "patient to call if fever develops",
+                          "description": "No description available",
+                          "semantic": [
+                            "Health Care Activity"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Definition 'patient to call if fever develops [(Health Care Activity)]' describes a health care activity related to fever, not fever itself. The Entity_text is simply 'fever'. While the sentence mentions fever, it does not describe a scenario where a patient is instructed to call if fever develops. Therefore, the definition does not directly describe the entity, nor is it fully indicated by the sentence or full text."
+                          }
+                        },
+                        "2": {
+                          "cui": "C3641890",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              12,
+                              5,
+                              "fever"
+                            ]
+                          ],
+                          "name": "Have Fever",
+                          "description": "A question about whether an individual has or had a fever.",
+                          "semantic": [
+                            "Intellectual Product"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Definition 'Have Fever [(Intellectual Product)]' implies an action or a state of inquiry about having a fever, categorized as an intellectual product. The Entity_text is simply 'fever'. While the sentence states 'Patient has fever', it does not align with the definition's focus on 'having fever' as an intellectual product or a question about it. The definition is not a direct descriptor of the entity 'fever'."
+                          }
+                        },
+                        "3": {
+                          "cui": "C0565798",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              12,
+                              5,
+                              "fever"
+                            ]
+                          ],
+                          "name": "[D]Fever NEC",
+                          "description": "No description available",
+                          "semantic": [
+                            "Sign or Symptom"
+                          ],
+                          "linker_v1": {
+                            "answer": "1",
+                            "reasoning": "The Entity_text 'fever' is directly described by the Definition '[D]Fever NEC [(Sign or Symptom)]'. The definition categorizes fever as a sign or symptom, which is an accurate and direct classification of the entity 'fever'. The sentence and full text confirm the presence of fever, supporting this direct description."
+                          },
+                          "linker_v2": {
+                            "answer": "1",
+                            "reasoning": "The sentence states 'Patient has fever'. The definition '[D]Fever NEC [(Sign or Symptom)]' accurately captures this. 'NEC' (Not Elsewhere Classified) is a common qualifier in medical coding, and 'Sign or Symptom' is an appropriate semantic type for fever."
+                          },
+                          "intent_filter": {
+                            "intent1": {
+                              "answer": "Yes",
+                              "reasoning": "The clinical concept 'headache' (corresponding to ID '2' from the context) is a symptom the patient is experiencing and can be a primary health concern."
+                            }
+                          }
+                        },
+                        "4": {
+                          "cui": "C1399571",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              12,
+                              5,
+                              "fever"
+                            ]
+                          ],
+                          "name": "fever; brain",
+                          "description": "No description available",
+                          "semantic": [
+                            "Disease or Syndrome"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Definition 'fever; brain [(Disease or Syndrome)]' suggests a condition involving both fever and the brain, classified as a disease or syndrome. The Entity_text is simply 'fever'. While the sentence mentions fever, it does not provide any information about the brain or suggest a combined disease or syndrome. Therefore, the definition is too specific and not directly applicable to the entity or the context provided."
+                          }
+                        },
+                        "5": {
+                          "cui": "C0437721",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              12,
+                              5,
+                              "fever"
+                            ]
+                          ],
+                          "name": "O/E - fever - general",
+                          "description": "No description available",
+                          "semantic": [
+                            "Finding"
+                          ],
+                          "linker_v1": {
+                            "answer": "1",
+                            "reasoning": "The Entity_text 'fever' is directly described by the Definition 'O/E - fever - general [(Finding)]'. 'O/E' typically stands for 'On Examination', and 'general' indicates a broad observation. This definition accurately classifies 'fever' as a general finding upon examination, which is a direct descriptor of the entity. The sentence and full text confirm the presence of fever, supporting this classification."
+                          },
+                          "linker_v2": {
+                            "answer": "1",
+                            "reasoning": "The sentence mentions 'Patient has fever'. The definition 'O/E - fever - general [(Finding)]' is applicable. 'O/E' typically means 'On Examination', and 'fever - general' describes the symptom of fever, which is a 'Finding'."
+                          },
+                          "intent_filter": {
+                            "intent1": {
+                              "answer": "No",
+                              "reasoning": "The clinical concept 'Newname hospital' (corresponding to ID '3' from the context) is a location, not a patient's health concern."
+                            }
+                          }
+                        },
+                        "6": {
+                          "cui": "C1715824",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              12,
+                              5,
+                              "fever"
+                            ]
+                          ],
+                          "name": "Fever:Find:Pt:^Patient:Ord:MDS",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Definition 'Fever:Find:Pt:^Patient:Ord:MDS [(Clinical Attribute)]' is a highly specific clinical code or attribute related to fever findings for a patient. The Entity_text is simply 'fever'. While the sentence mentions fever, it does not provide the detailed clinical context or attributes implied by this definition. The definition is not a direct descriptor of the entity 'fever' itself, nor is it clearly indicated by the sentence or full text."
+                          }
+                        },
+                        "7": {
+                          "cui": "C0437720",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              12,
+                              5,
+                              "fever"
+                            ]
+                          ],
+                          "name": "O/E - fever NOS",
+                          "description": "No description available",
+                          "semantic": [
+                            "Finding"
+                          ],
+                          "linker_v1": {
+                            "answer": "1",
+                            "reasoning": "The Entity_text 'fever' is directly described by the Definition 'O/E - fever NOS [(Finding)]'. 'O/E' typically stands for 'On Examination', and 'NOS' stands for 'Not Otherwise Specified'. This definition accurately classifies 'fever' as a finding that is not otherwise specified, which is a direct and appropriate descriptor for the entity 'fever'. The sentence and full text confirm the presence of fever, supporting this classification."
+                          },
+                          "linker_v2": {
+                            "answer": "1",
+                            "reasoning": "The sentence states 'Patient has fever'. The definition 'O/E - fever NOS [(Finding)]' is applicable. 'NOS' (Not Otherwise Specified) is a common qualifier in medical coding, and 'fever' is a 'Finding' observed on examination."
+                          },
+                          "intent_filter": {
+                            "intent1": {
+                              "answer": "No",
+                              "reasoning": "The clinical concept 'Dr. John Doe' (corresponding to ID '4' from the context) is a healthcare provider, not a patient's health concern."
+                            }
+                          }
+                        }
+                      },
+                      "source": "cluster-selection-api"
+                    }
+                  }
+                },
+                "1": {
+                  "text": [
+                    19,
+                    8,
+                    "headache"
+                  ],
+                  "intent": 1,
+                  "mappings": {
+                    "0": {
+                      "score": null,
+                      "candidates": {
+                        "0": {
+                          "cui": "C0513867",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              19,
+                              8,
+                              "headache"
+                            ]
+                          ],
+                          "name": "Note complaint of headache",
+                          "description": "No description available",
+                          "semantic": [
+                            "Health Care Activity"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'headache'. The Definition is 'Note complaint of headache [(Health Care Activity)]'. While 'headache' is mentioned, the definition focuses on 'Note complaint of headache' which implies an action of recording or noting a complaint. The Sentence and Full_text state the patient *has* a headache, not that a complaint of headache is being noted. Therefore, the definition does not directly describe the entity, nor is it fully indicated by the sentence or full text. Category 0 is appropriate due to a mismatch in the core meaning."
+                          }
+                        },
+                        "1": {
+                          "cui": "C0439024",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              19,
+                              8,
+                              "headache"
+                            ]
+                          ],
+                          "name": "Headache (& [C/O])",
+                          "description": "No description available",
+                          "semantic": [
+                            "Finding"
+                          ],
+                          "linker_v1": {
+                            "answer": "1",
+                            "reasoning": "The Entity_text is 'headache'. The Definition is 'Headache (& [C/O]) [(Finding)]'. The definition directly describes the entity 'headache' as a 'Finding'. The sentence states 'Patient has fever, headache...', directly indicating that headache is a finding. The '& [C/O]' part is a medical abbreviation for 'complains of', which is implied by the patient having a headache. Thus, the definition unequivocally characterizes the entity. Category 1 is appropriate."
+                          },
+                          "linker_v2": {
+                            "answer": "1",
+                            "reasoning": "The sentence explicitly states 'headache'. The definition 'Headache (& [C/O]) [(Finding)]' is applicable. '& [C/O]' likely refers to 'complaint of', which is consistent with a patient reporting a symptom. 'Finding' is an appropriate semantic type for a reported symptom."
+                          },
+                          "intent_filter": {
+                            "intent1": {
+                              "answer": "Yes",
+                              "reasoning": "The clinical concept 'diabetes' (corresponding to ID '5' from the context) is a chronic medical condition that can be a primary health concern for a patient."
+                            }
+                          }
+                        },
+                        "2": {
+                          "cui": "C1716792",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              19,
+                              8,
+                              "headache"
+                            ]
+                          ],
+                          "name": "Headache:Find:Pt:^Patient:Ord:MDS",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'headache'. The Definition is 'Headache:Find:Pt:^Patient:Ord:MDS [(Clinical Attribute)]'. This definition is highly specific with abbreviations like 'Find', 'Pt', '^Patient', 'Ord', and 'MDS'. While 'headache' is present, the definition's specific clinical attribute structure and abbreviations are not directly or unequivocally supported by the simple statement 'Patient has fever, headache...' in the Sentence or Full_text. Category 0 is appropriate due to unwarranted specificity and lack of direct support."
+                          }
+                        },
+                        "3": {
+                          "cui": "C0857361",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              19,
+                              8,
+                              "headache"
+                            ]
+                          ],
+                          "name": "Headache occurring",
+                          "description": "No description available",
+                          "semantic": [
+                            "Sign or Symptom"
+                          ],
+                          "linker_v1": {
+                            "answer": "1",
+                            "reasoning": "The Entity_text is 'headache'. The Definition is 'Headache occurring [(Sign or Symptom)]'. The definition classifies headache as a 'Sign or Symptom'. The Sentence states 'Patient has fever, headache...', directly presenting headache as a symptom the patient is experiencing. Therefore, the definition directly characterizes the entity. Category 1 is appropriate."
+                          },
+                          "linker_v2": {
+                            "answer": "1",
+                            "reasoning": "The sentence mentions 'headache'. The definition 'Headache occurring [(Sign or Symptom)]' is applicable. 'Headache occurring' describes the symptom, and 'Sign or Symptom' is an appropriate semantic type for headache."
+                          },
+                          "intent_filter": {
+                            "intent1": {
+                              "answer": "No",
+                              "reasoning": "No specific clinical concept corresponding to ID '6' could be identified in the provided context, therefore its relevance to a primary health concern cannot be determined."
+                            }
+                          }
+                        },
+                        "4": {
+                          "cui": "C0543871",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              19,
+                              8,
+                              "headache"
+                            ]
+                          ],
+                          "name": "Headache, cranial neuritis",
+                          "description": "No description available",
+                          "semantic": [
+                            "Disease or Syndrome"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'headache'. The Definition is 'Headache, cranial neuritis [(Disease or Syndrome)]'. The definition specifies 'cranial neuritis' in addition to headache. The Sentence and Full_text only mention 'headache' and 'fever', with no mention of 'cranial neuritis' or any specific type of headache that would unequivocally imply cranial neuritis. Therefore, the definition introduces unwarranted specificity not supported by the context. Category 0 is appropriate."
+                          }
+                        },
+                        "5": {
+                          "cui": "C0543872",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              19,
+                              8,
+                              "headache"
+                            ]
+                          ],
+                          "name": "Headache, cranial neuralgia",
+                          "description": "No description available",
+                          "semantic": [
+                            "Disease or Syndrome"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'headache'. The Definition is 'Headache, cranial neuralgia [(Disease or Syndrome)]'. Similar to the previous case, the definition includes 'cranial neuralgia' which is not mentioned or implied in the Sentence or Full_text. The context only states 'headache'. Therefore, the definition contains unwarranted specificity. Category 0 is appropriate."
+                          }
+                        },
+                        "6": {
+                          "cui": "C0543870",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              19,
+                              8,
+                              "headache"
+                            ]
+                          ],
+                          "name": "Headache, intracranial inflammation",
+                          "description": "No description available",
+                          "semantic": [
+                            "Disease or Syndrome"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'headache'. The Definition is 'Headache, intracranial inflammation [(Disease or Syndrome)]'. The definition specifies 'intracranial inflammation', which is not mentioned or unequivocally implied by the Sentence or Full_text. The context only states 'headache'. Therefore, the definition introduces unwarranted specificity. Category 0 is appropriate."
+                          }
+                        },
+                        "7": {
+                          "cui": "C0744645",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              19,
+                              8,
+                              "headache"
+                            ]
+                          ],
+                          "name": "HEADACHE NEUROLOGICAL",
+                          "description": "No description available",
+                          "semantic": [
+                            "Disease or Syndrome"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'headache'. The Definition is 'HEADACHE NEUROLOGICAL [(Disease or Syndrome)]'. The definition specifies 'NEUROLOGICAL' headache. The Sentence and Full_text only mention 'headache' without any qualification about it being neurological. Therefore, the definition introduces unwarranted specificity not supported by the context. Category 0 is appropriate."
+                          }
+                        },
+                        "8": {
+                          "cui": "C0744638",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              19,
+                              8,
+                              "headache"
+                            ]
+                          ],
+                          "name": "headache migraine chronic",
+                          "description": "No description available",
+                          "semantic": [
+                            "Disease or Syndrome"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'headache'. The Definition is 'headache migraine chronic [(Disease or Syndrome)]'. The definition specifies 'migraine' and 'chronic', neither of which are mentioned or unequivocally implied in the Sentence or Full_text. The context only states 'headache'. Therefore, the definition contains unwarranted specificity. Category 0 is appropriate."
+                          }
+                        },
+                        "9": {
+                          "cui": "C0810269",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              19,
+                              8,
+                              "headache"
+                            ]
+                          ],
+                          "name": "other headache",
+                          "description": "No description available",
+                          "semantic": [
+                            "Disease or Syndrome"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'headache'. The Definition is 'other headache [(Disease or Syndrome)]'. The definition 'other headache' implies a classification that distinguishes it from specific types of headaches. However, the Sentence and Full_text simply state 'headache' without providing any context to classify it as 'other' or to differentiate it from specific types. Therefore, the definition introduces a classification that is not directly supported or unequivocally implied by the provided text. Category 0 is appropriate."
+                          }
+                        }
+                      },
+                      "source": "cluster-selection-api"
+                    }
+                  }
+                },
+                "2": {
+                  "text": [
+                    38,
+                    16,
+                    "Newname hospital"
+                  ],
+                  "intent": 1,
+                  "mappings": {
+                    "0": {
+                      "score": null,
+                      "candidates": {
+                        "0": {
+                          "cui": "C1548210",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "Admitted as an inpatient to this hospital",
+                          "description": "No description available",
+                          "semantic": [
+                            "Idea or Concept"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'Admitted as an inpatient to this hospital [(Idea or Concept)]'. While the Entity_text refers to a hospital, the Definition describes the act of being admitted as an inpatient, which is not directly stated or unequivocally implied by the Entity_text itself. The Sentence and Full_text mention the patient is 'in Newname hospital', but not that they are admitted as an inpatient. Therefore, the Definition is not directly applicable to the Entity_text (Category 1), nor is it fully indicated by the Sentence (Category 2) or the Full_text (Category 3). It introduces a specific action ('Admitted as an inpatient') not supported by the provided text."
+                          }
+                        },
+                        "1": {
+                          "cui": "C4297614",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "Admission evaluation note:Find:Pt:Hospital:Doc:Nurse",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'Admission evaluation note:Find:Pt:Hospital:Doc:Nurse [(Clinical Attribute)]'. The Sentence and Full_text mention the patient is in 'Newname hospital' with 'Dr. John Doe'. However, there is no mention of an 'Admission evaluation note', 'Find', 'Pt' (patient, though implied), 'Doc' (doctor, though Dr. John Doe is mentioned), or 'Nurse'. The definition is too specific and contains elements not present or unequivocally inferable from the provided text."
+                          }
+                        },
+                        "2": {
+                          "cui": "C3173524",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "Admission evaluation note:Find:Pt:Hospital:Doc:General medicine.medical student",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'Admission evaluation note:Find:Pt:Hospital:Doc:General medicine.medical student [(Clinical Attribute)]'. Similar to row 1, the Sentence and Full_text mention the hospital and doctor, but there is no mention of an 'Admission evaluation note', 'Find', 'Pt', 'Doc', 'General medicine', or 'medical student'. The definition contains specific elements not supported by the text."
+                          }
+                        },
+                        "3": {
+                          "cui": "C3173536",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "Admission evaluation note:Find:Pt:Hospital:Doc:Surgery.medical student",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'Admission evaluation note:Find:Pt:Hospital:Doc:Surgery.medical student [(Clinical Attribute)]'. The Sentence and Full_text mention the hospital and doctor, but there is no mention of an 'Admission evaluation note', 'Find', 'Pt', 'Doc', 'Surgery', or 'medical student'. The definition contains specific elements not supported by the text."
+                          }
+                        },
+                        "4": {
+                          "cui": "C2215413",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "admission to hospital, the patient was accompanied by a friend",
+                          "description": "No description available",
+                          "semantic": [
+                            "Health Care Activity"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'admission to hospital, the patient was accompanied by a friend [(Health Care Activity)]'. The Sentence and Full_text state the patient is 'in Newname hospital', implying admission. However, there is no mention of the patient being accompanied by a 'friend'. This specific detail makes the definition not unequivocally supported by the text."
+                          }
+                        },
+                        "5": {
+                          "cui": "C5766738",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "transfer from another medical facility, doctor information",
+                          "description": "No description available",
+                          "semantic": [
+                            "Health Care Activity"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'transfer from another medical facility, doctor information [(Health Care Activity)]'. The Sentence and Full_text state the patient is 'in Newname hospital', but there is no mention of a 'transfer from another medical facility' or specific 'doctor information' beyond the name 'Dr. John Doe'. The core concept of transfer is not supported."
+                          }
+                        },
+                        "6": {
+                          "cui": "C5766781",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "transfer to another medical facility, doctor on staff",
+                          "description": "No description available",
+                          "semantic": [
+                            "Health Care Activity"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'transfer to another medical facility, doctor on staff [(Health Care Activity)]'. The Sentence and Full_text state the patient is 'in Newname hospital', but there is no mention of a 'transfer to another medical facility' or whether the doctor is 'on staff'. The core concept of transfer is not supported."
+                          }
+                        },
+                        "7": {
+                          "cui": "C5766739",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "transfer from another medical facility, doctor on staff",
+                          "description": "No description available",
+                          "semantic": [
+                            "Health Care Activity"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'transfer from another medical facility, doctor on staff [(Health Care Activity)]'. The Sentence and Full_text state the patient is 'in Newname hospital', but there is no mention of a 'transfer from another medical facility' or whether the doctor is 'on staff'. The core concept of transfer is not supported."
+                          }
+                        },
+                        "8": {
+                          "cui": "C5766780",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "transfer to another medical facility, doctor information",
+                          "description": "No description available",
+                          "semantic": [
+                            "Health Care Activity"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'transfer to another medical facility, doctor information [(Health Care Activity)]'. The Sentence and Full_text state the patient is 'in Newname hospital', but there is no mention of a 'transfer to another medical facility' or specific 'doctor information' beyond the name 'Dr. John Doe'. The core concept of transfer is not supported."
+                          }
+                        },
+                        "9": {
+                          "cui": "C2215425",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "admission to hospital: patient ID verified dental work",
+                          "description": "No description available",
+                          "semantic": [
+                            "Health Care Activity"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'admission to hospital: patient ID verified dental work [(Health Care Activity)]'. The Sentence and Full_text state the patient is 'in Newname hospital', implying admission. However, there is no mention of 'patient ID verification' or 'dental work'. These specific details are not supported by the text."
+                          }
+                        },
+                        "10": {
+                          "cui": "C4735769",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "referral to hospitalist",
+                          "description": "No description available",
+                          "semantic": [
+                            "Health Care Activity"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'referral to hospitalist [(Health Care Activity)]'. The Sentence and Full_text state the patient is 'in Newname hospital' with 'Dr. John Doe'. There is no mention of a 'referral' or a 'hospitalist'. The definition introduces concepts not present in the text."
+                          }
+                        },
+                        "11": {
+                          "cui": "C2215426",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "admission to hospital: patient ID verified by documentation",
+                          "description": "No description available",
+                          "semantic": [
+                            "Health Care Activity"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'admission to hospital: patient ID verified by documentation [(Health Care Activity)]'. The Sentence and Full_text state the patient is 'in Newname hospital', implying admission. However, there is no mention of 'patient ID verification' or specifically 'by documentation'. These specific details are not supported by the text."
+                          }
+                        },
+                        "12": {
+                          "cui": "C2215430",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "admission to hospital: patient ID verified by worn identification",
+                          "description": "No description available",
+                          "semantic": [
+                            "Health Care Activity"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'admission to hospital: patient ID verified by worn identification [(Health Care Activity)]'. The Sentence and Full_text state the patient is 'in Newname hospital', implying admission. However, there is no mention of 'patient ID verification' or specifically 'by worn identification'. These specific details are not supported by the text."
+                          }
+                        },
+                        "13": {
+                          "cui": "C2215431",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "admission to hospital: patient ID verified verbally",
+                          "description": "No description available",
+                          "semantic": [
+                            "Health Care Activity"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'admission to hospital: patient ID verified verbally [(Health Care Activity)]'. The Sentence and Full_text state the patient is 'in Newname hospital', implying admission. However, there is no mention of 'patient ID verification' or specifically 'verbally'. These specific details are not supported by the text."
+                          }
+                        },
+                        "14": {
+                          "cui": "C2215429",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              38,
+                              16,
+                              "Newname hospital"
+                            ]
+                          ],
+                          "name": "admission to hospital: patient ID verified by social worker",
+                          "description": "No description available",
+                          "semantic": [
+                            "Health Care Activity"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'Newname hospital'. The Definition is 'admission to hospital: patient ID verified by social worker [(Health Care Activity)]'. The Sentence and Full_text state the patient is 'in Newname hospital', implying admission. However, there is no mention of 'patient ID verification' or specifically 'by social worker'. These specific details are not supported by the text."
+                          }
+                        }
+                      },
+                      "source": "cluster-selection-api"
+                    }
+                  }
+                },
+                "3": {
+                  "text": [
+                    60,
+                    12,
+                    "Dr. John Doe"
+                  ],
+                  "intent": 1,
+                  "mappings": {
+                    "0": {
+                      "score": null,
+                      "candidates": {
+                        "0": {
+                          "cui": "C3173524",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              60,
+                              12,
+                              "Dr. John Doe"
+                            ]
+                          ],
+                          "name": "Admission evaluation note:Find:Pt:Hospital:Doc:General medicine.medical student",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The definition 'Admission evaluation note:Find:Pt:Hospital:Doc:General medicine.medical student [(Clinical Attribute)]' is too specific and contains multiple components that are not directly supported by the entity text 'Dr. John Doe', the sentence, or the full text. While Dr. John Doe is a doctor in a hospital, the definition specifies 'General medicine.medical student' which is not explicitly stated or unequivocally inferable. Therefore, it falls into Category 0."
+                          }
+                        },
+                        "1": {
+                          "cui": "C4297614",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              60,
+                              12,
+                              "Dr. John Doe"
+                            ]
+                          ],
+                          "name": "Admission evaluation note:Find:Pt:Hospital:Doc:Nurse",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The definition 'Admission evaluation note:Find:Pt:Hospital:Doc:Nurse [(Clinical Attribute)]' is not supported by the provided text. The entity text is 'Dr. John Doe', who is identified as a doctor, not a nurse. Therefore, this definition is incorrect and falls into Category 0."
+                          }
+                        },
+                        "2": {
+                          "cui": "C5689904",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              60,
+                              12,
+                              "Dr. John Doe"
+                            ]
+                          ],
+                          "name": "Progress note:Find:Pt:Hospital:Doc:Consultant",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The definition 'Progress note:Find:Pt:Hospital:Doc:Consultant [(Clinical Attribute)]' is not directly supported by the provided text. While Dr. John Doe is a doctor in a hospital, the text does not specify if this is a 'Progress note' or if Dr. Doe is a 'Consultant'. These are specific clinical attributes not confirmed by the given context. Therefore, it falls into Category 0."
+                          }
+                        },
+                        "3": {
+                          "cui": "C0583349",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              60,
+                              12,
+                              "Dr. John Doe"
+                            ]
+                          ],
+                          "name": "Under care of Accident and Emergency doctor",
+                          "description": "No description available",
+                          "semantic": [
+                            "Finding"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The definition 'Under care of Accident and Emergency doctor [(Finding)]' is not supported by the provided text. The text mentions 'Dr. John Doe' is with the patient in 'Newname hospital', but it does not specify that he is an 'Accident and Emergency doctor' or that the patient is under his care in that specific department. Therefore, it falls into Category 0."
+                          }
+                        },
+                        "4": {
+                          "cui": "C3173536",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              60,
+                              12,
+                              "Dr. John Doe"
+                            ]
+                          ],
+                          "name": "Admission evaluation note:Find:Pt:Hospital:Doc:Surgery.medical student",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The definition 'Admission evaluation note:Find:Pt:Hospital:Doc:Surgery.medical student [(Clinical Attribute)]' is too specific and contains multiple components that are not directly supported by the entity text 'Dr. John Doe', the sentence, or the full text. While Dr. John Doe is a doctor in a hospital, the definition specifies 'Surgery.medical student' which is not explicitly stated or unequivocally inferable. Therefore, it falls into Category 0."
+                          }
+                        },
+                        "5": {
+                          "cui": "C3173526",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              60,
+                              12,
+                              "Dr. John Doe"
+                            ]
+                          ],
+                          "name": "Consultation note:Find:Pt:Hospital:Doc:General medicine.medical student",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The definition 'Consultation note:Find:Pt:Hospital:Doc:General medicine.medical student [(Clinical Attribute)]' is too specific and contains multiple components that are not directly supported by the entity text 'Dr. John Doe', the sentence, or the full text. While Dr. John Doe is a doctor in a hospital, the definition specifies 'General medicine.medical student' which is not explicitly stated or unequivocally inferable. Therefore, it falls into Category 0."
+                          }
+                        },
+                        "6": {
+                          "cui": "C0801839",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              60,
+                              12,
+                              "Dr. John Doe"
+                            ]
+                          ],
+                          "name": "Hospital consultations:Find:Pt:^Patient:Doc",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The definition 'Hospital consultations:Find:Pt:^Patient:Doc [(Clinical Attribute)]' is not fully supported by the provided text. While Dr. John Doe is a doctor ('Doc') and the patient is in a hospital, the text does not explicitly state that this is a 'Hospital consultation'. It only mentions the doctor is 'with' the patient. Therefore, it falls into Category 0."
+                          }
+                        },
+                        "7": {
+                          "cui": "C5428504",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              60,
+                              12,
+                              "Dr. John Doe"
+                            ]
+                          ],
+                          "name": "patient accompanied by sister",
+                          "description": "No description available",
+                          "semantic": [
+                            "Finding"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The definition 'patient accompanied by sister [(Finding)]' is not supported by the provided text. The text mentions 'Dr. John Doe' is with the patient, but there is no mention of a 'sister' accompanying the patient. Therefore, this definition is incorrect and falls into Category 0."
+                          }
+                        },
+                        "8": {
+                          "cui": "C4284223",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              60,
+                              12,
+                              "Dr. John Doe"
+                            ]
+                          ],
+                          "name": "Admission evaluation note:Find:Pt:{Setting}:Doc:Physician",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The definition 'Admission evaluation note:Find:Pt:{Setting}:Doc:Physician [(Clinical Attribute)]' is too general and contains components not explicitly supported. While Dr. John Doe is a physician in a hospital setting, the definition specifies 'Admission evaluation note' and '{Setting}' which are not directly confirmed. The term 'Physician' is a broader category, but the other components make the definition too specific and not unequivocally supported. Therefore, it falls into Category 0."
+                          }
+                        },
+                        "9": {
+                          "cui": "C4321416",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              60,
+                              12,
+                              "Dr. John Doe"
+                            ]
+                          ],
+                          "name": "Legal name of patient",
+                          "description": "No description available",
+                          "semantic": [
+                            "Intellectual Product"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The definition 'Legal name of patient [(Intellectual Product)]' is not supported by the provided text. The entity text is 'Dr. John Doe', who is a doctor, not the patient. Furthermore, the text does not provide the patient's legal name. Therefore, this definition is incorrect and falls into Category 0."
+                          }
+                        },
+                        "10": {
+                          "cui": "C5939320",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              60,
+                              12,
+                              "Dr. John Doe"
+                            ]
+                          ],
+                          "name": "name title:Find:Pt:^Entity:Nom",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The definition 'name title:Find:Pt:^Entity:Nom [(Clinical Attribute)]' is too abstract and not directly applicable. While 'Dr. John Doe' is a name with a title, the definition is very generic ('^Entity:Nom') and does not specifically align with the context of a doctor in a hospital setting in a way that is unequivocally supported. The components are not clearly mapped to the provided text. Therefore, it falls into Category 0."
+                          }
+                        },
+                        "11": {
+                          "cui": "C5444767",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              60,
+                              12,
+                              "Dr. John Doe"
+                            ]
+                          ],
+                          "name": "Hospital stay description:Find:Pt:^Patient:Nom",
+                          "description": "No description available",
+                          "semantic": [
+                            "Clinical Attribute"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The definition 'Hospital stay description:Find:Pt:^Patient:Nom [(Clinical Attribute)]' is not directly supported by the provided text. The text mentions the patient is in 'Newname hospital', but it does not provide a 'description' of the 'Hospital stay' itself, nor does it focus on the patient's name ('^Patient:Nom') in this context. Therefore, it falls into Category 0."
+                          }
+                        }
+                      },
+                      "source": "cluster-selection-api"
+                    }
+                  }
+                }
+              }
+            },
+            "1": {
+              "text": [
+                74,
+                35,
+                "He is also suffering from diabetes."
+              ],
+              "phrases": {
+                "0": {
+                  "text": [
+                    100,
+                    8,
+                    "diabetes"
+                  ],
+                  "intent": 1,
+                  "mappings": {
+                    "0": {
+                      "score": null,
+                      "candidates": {
+                        "0": {
+                          "cui": "C3259018",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              100,
+                              8,
+                              "diabetes"
+                            ]
+                          ],
+                          "name": "Do you suffer from diabetes",
+                          "description": "No description available",
+                          "semantic": [
+                            "Intellectual Product"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Definition 'Do you suffer from diabetes [(Intellectual Product)]' is a question and its semantic type 'Intellectual Product' does not align with the Entity_text 'diabetes' which is a medical condition. The sentence and full text confirm diabetes as a medical condition the patient is suffering from, not an intellectual product."
+                          }
+                        },
+                        "1": {
+                          "cui": "C0241863",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              100,
+                              8,
+                              "diabetes"
+                            ]
+                          ],
+                          "name": "Diabetic",
+                          "description": "No description available",
+                          "semantic": [
+                            "Finding"
+                          ],
+                          "linker_v1": {
+                            "answer": "2",
+                            "reasoning": "The Entity_text is 'diabetes'. The Definition is 'Diabetic [(Finding)]'. While 'diabetes' is the condition, 'diabetic' refers to a person affected by it or a finding related to it. The sentence 'He is also suffering from diabetes' implies that the patient is diabetic. Therefore, the Definition 'Diabetic [(Finding)]' is applicable to the patient described in the sentence, making it Category 2. It's not Category 1 because 'Diabetic' is not a direct descriptor of 'diabetes' itself, but rather a related term."
+                          },
+                          "linker_v2": {
+                            "answer": "1",
+                            "reasoning": "The sentence explicitly states 'He is also suffering from diabetes.' The definition 'Diabetic [(Finding)]' directly relates to this statement, as 'diabetic' is an adjective describing someone with diabetes, which is a finding or condition."
+                          },
+                          "intent_filter": {
+                            "intent1": {
+                              "answer": "No",
+                              "reasoning": "The concept definition is not available, therefore its relevance to 'Patient-Reported Primary Health Concern' cannot be determined."
+                            }
+                          }
+                        },
+                        "2": {
+                          "cui": "C0810252",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              100,
+                              8,
+                              "diabetes"
+                            ]
+                          ],
+                          "name": "Diabetes with other manifestations",
+                          "description": "No description available",
+                          "semantic": [
+                            "Disease or Syndrome"
+                          ],
+                          "linker_v1": {
+                            "answer": "2",
+                            "reasoning": "The Entity_text is 'diabetes'. The Definition is 'Diabetes with other manifestations [(Disease or Syndrome)]'. The sentence states 'He is also suffering from diabetes.' The full text mentions 'fever, headache' in addition to diabetes. This implies that diabetes is present along with other manifestations (fever, headache), making the Definition applicable to the patient's condition as described in the sentence and full text. Thus, it is Category 2."
+                          },
+                          "linker_v2": {
+                            "answer": "0",
+                            "reasoning": "The sentence states 'He is also suffering from diabetes.' It does not provide any information about 'other manifestations' of diabetes. Therefore, this definition is too specific and not supported by the provided text."
+                          }
+                        },
+                        "3": {
+                          "cui": "C0425067",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              100,
+                              8,
+                              "diabetes"
+                            ]
+                          ],
+                          "name": "Diabetic child",
+                          "description": "No description available",
+                          "semantic": [
+                            "Finding"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'diabetes'. The Definition is 'Diabetic child [(Finding)]'. The sentence and full text mention a patient suffering from diabetes but provide no information to suggest the patient is a child. Therefore, the qualifier 'child' in the Definition is not supported by the context, making it Category 0."
+                          }
+                        },
+                        "4": {
+                          "cui": "C3166227",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              100,
+                              8,
+                              "diabetes"
+                            ]
+                          ],
+                          "name": "Problem related to diabetes",
+                          "description": "No description available",
+                          "semantic": [
+                            "Disease or Syndrome"
+                          ],
+                          "linker_v1": {
+                            "answer": "2",
+                            "reasoning": "The Entity_text is 'diabetes'. The Definition is 'Problem related to diabetes [(Disease or Syndrome)]'. The sentence states 'He is also suffering from diabetes.' This directly implies that diabetes is a problem the patient is facing. The semantic type 'Disease or Syndrome' is appropriate for diabetes. Therefore, the Definition is applicable to the patient's condition as stated in the sentence, making it Category 2."
+                          },
+                          "linker_v2": {
+                            "answer": "1",
+                            "reasoning": "The sentence states 'He is also suffering from diabetes.' The definition 'Problem related to diabetes [(Disease or Syndrome)]' is applicable because diabetes itself is a disease or syndrome, and suffering from it implies a problem related to it."
+                          },
+                          "intent_filter": {
+                            "intent1": {
+                              "answer": "No",
+                              "reasoning": "The concept definition is not available, therefore its relevance to 'Patient-Reported Primary Health Concern' cannot be determined."
+                            }
+                          }
+                        },
+                        "5": {
+                          "cui": "C3250566",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              100,
+                              8,
+                              "diabetes"
+                            ]
+                          ],
+                          "name": "diabetes with diabetic nephropathy",
+                          "description": "No description available",
+                          "semantic": [
+                            "Disease or Syndrome"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'diabetes'. The Definition is 'diabetes with diabetic nephropathy [(Disease or Syndrome)]'. The sentence and full text only state that the patient has diabetes. There is no mention or implication of diabetic nephropathy (kidney disease related to diabetes). Therefore, the specific manifestation 'diabetic nephropathy' is not supported by the context, making it Category 0."
+                          }
+                        },
+                        "6": {
+                          "cui": "C3841927",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              100,
+                              8,
+                              "diabetes"
+                            ]
+                          ],
+                          "name": "Diabetic problem",
+                          "description": "No description available",
+                          "semantic": [
+                            "Finding"
+                          ],
+                          "linker_v1": {
+                            "answer": "2",
+                            "reasoning": "The Entity_text is 'diabetes'. The Definition is 'Diabetic problem [(Finding)]'. The sentence states 'He is also suffering from diabetes.' This directly indicates that diabetes is a problem the patient is experiencing. The semantic type 'Finding' is appropriate for a medical condition like diabetes. Therefore, the Definition is applicable to the patient's condition as stated in the sentence, making it Category 2."
+                          },
+                          "linker_v2": {
+                            "answer": "1",
+                            "reasoning": "The sentence states 'He is also suffering from diabetes.' This directly implies a 'Diabetic problem [(Finding)]' as diabetes is a medical condition that presents problems for the patient. 'Diabetic problem' is a reasonable interpretation of suffering from diabetes."
+                          },
+                          "intent_filter": {
+                            "intent1": {
+                              "answer": "No",
+                              "reasoning": "The concept definition is not available, therefore its relevance to 'Patient-Reported Primary Health Concern' cannot be determined."
+                            }
+                          }
+                        },
+                        "7": {
+                          "cui": "C3250511",
+                          "negated": "0",
+                          "semantics": [],
+                          "status": "cluster",
+                          "text": [
+                            [
+                              100,
+                              8,
+                              "diabetes"
+                            ]
+                          ],
+                          "name": "diabetes with diabetic neuropathy",
+                          "description": "No description available",
+                          "semantic": [
+                            "Disease or Syndrome"
+                          ],
+                          "linker_v1": {
+                            "answer": "0",
+                            "reasoning": "The Entity_text is 'diabetes'. The Definition is 'diabetes with diabetic neuropathy [(Disease or Syndrome)]'. The sentence and full text only state that the patient has diabetes. There is no mention or implication of diabetic neuropathy (nerve damage related to diabetes). Therefore, the specific manifestation 'diabetic neuropathy' is not supported by the context, making it Category 0."
+                          }
+                        }
+                      },
+                      "source": "cluster-selection-api"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
