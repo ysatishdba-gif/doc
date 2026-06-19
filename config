@@ -1,60 +1,9 @@
-import requests
+import json
 
-URL = "https://your-custom-url"   # your endpoint
+with open("output.json") as f:
+    data = json.load(f)
 
-PAYLOAD = {
-    "text": "",
-    "extraction_mode": "general_only",
-    "intents": {
-        1: {"metadata": "Entities", "definition": "..."},
-        2: {"metadata": "...", "definition": "..."},
-    },
-    "cluster_selection_params": {
-        "cluster_set": "appointment2_v002",
-        "top_k": 150, "top_p": 10, "top_q": 20,
-        "combined": True,
-        "source_system": ["CCSR_ICD10PCS", "CDCREC", "CPT", "GO", "HL7V2.5",
-                          "HL7V3.0", "HPO", "ICD10CM", "ICD10PCS", "ICD9CM",
-                          "LNC", "MED-RT", "MEDLINEPLUS", "MSH", "NCBI", "NCI",
-                          "ORPHANET", "RXNORM", "SNOMEDCT_US", "SOP", "MCBT"],
-    },
-    "general_extraction_options": {
-        "use_marker": True, "marker_sep": ".",
-        "genai_model": "gemini-2.5-flash-lite",
-    },
-    "semantic_linking_options": {
-        "sem_v1": {"genai_model": "gemini-2.5-flash-lite"},
-        "sem_v2": {"genai_model": "gemini-2.5-flash-lite",
-                   "semantic_linking_model": "SemanticLinkerV0002"},
-        "intent_filter": {"genai_model": "gemini-2.5-flash-lite"},
-    },
-    "pipeline_steps": {
-        "run_general_extraction": True, "run_ner_extraction": False,
-        "run_semantic_linking_v1": True, "run_semantic_linking_v2": True,
-        "run_intent_filter": True, "run_deep_search": False,
-    },
-    "reasoning": ["both"],
-}
+concepts = data["root"]["output"]["concepts"]   # adjust path to match your file
 
-def analyze(text):
-    r = requests.post(URL, json={**PAYLOAD, "text": text}, timeout=320)
-    r.raise_for_status()
-    return r.json()
-
-
-def get_cuis(resp, keep_all=False):
-    rows = []
-    output = resp.get("result", {}).get("output_obj", {}).get("output", {})
-    for doc in output.values():
-        for utt in doc.get("utterances", {}).values():
-            for ph in utt.get("phrases", {}).values():
-                phrase = ph.get("text", [None, None, None])[2]
-                for m in ph.get("mappings", {}).values():
-                    for c in m.get("candidates", {}).values():
-                        if keep_all or (c.get("linker_v2") or {}).get("answer") == "1":
-                            rows.append((phrase, c["cui"], c["name"]))
-    return rows
-
-resp = analyze("Patient has fever, headache and diabetes.")
-for phrase, cui, name in get_cuis(resp):
-    print(f"{phrase:14} {cui}  {name}")
+cuis = [c["cui"] for c in concepts]
+print(cuis)
