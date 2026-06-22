@@ -1,0 +1,266 @@
+"""
+Run ONCE, leave running. Loads pickles + builds clients once. Processes the
+demo DOCUMENT once and caches it. Each request runs only the QUERY side and
+reuses the cached document. Retrieval returns shared topics + the document
+CUIs under them + the chunk text those CUIs came from.
+
+    load.py        # leave this terminal open
+
+Change DOC_INDEX + restart to use a different document.
+Changing the query needs no restart (client sends query only).
+"""
+
+from multiprocessing.connection import Listener
+
+import config  # loads hierarchy / ic / topics once
+from intents import ContextualIntentPipeline
+from cui_core import CUIExtractor
+from cui_summarizer import CUISummarizer
+from topic_adaptor import TopicAdaptor
+from document import get_document
+from config import (
+    PROJECT_ID, LOCATION, MODEL_VERSION,
+    API_URL, TOP_K, TOP_P, CLUSTER_SET, COMBINED,
+)
+
+pipeline   = ContextualIntentPipeline(project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION)
+extractor  = CUIExtractor(API_URL, top_k=TOP_K, top_p=TOP_P, cluster_set=CLUSTER_SET, combined=COMBINED)
+summarizer = CUISummarizer()
+adaptor    = TopicAdaptor()
+
+#  document to use 
+DOC_INDEX = 0
+_DOC_CACHE = None
+
+
+
+# Helpers
+
+
+def split_path(p):
+    return [s.strip() for s in p.split(">>") if s.strip()]
+
+
+def flat(raw):
+    """raw: {phrase: {"cuis": {cui: distance}}} -> ordered unique cui list."""
+    out, seen = [], set()
+    for d in raw.values():
+        for c in d.get("cuis", {}):
+            if c and c not in seen:
+                seen.add(c)
+                out.append(c)
+    return out
+
+
+def _members(tp):
+    """Member CUIs of a topic (list)."""
+    if hasattr(adaptor, "topic_member_cuis"):
+        return adaptor.topic_member_cuis(tp, with_labels=False)
+    t = adaptor.topic_id_to_topic.get(tp)
+    return list(t["members"]) if t else []
+
+
+def _summarize_and_topics(tr, cuis):
+    """Shared tail: summarize CUIs -> topics. Mutates tr in place."""
+    if not cuis:
+        tr["surviving"] = []
+        tr["removed"] = []
+        tr["topics"] = []
+        tr["topic_ids"] = []
+        tr["metrics"] = {}
+        return
+
+    summ = summarizer.summarize(cuis, sources=["SNOMEDCT_US"])
+    tr["metrics"] = summ.get("metrics", {})
+    tr["surviving"] = [
+        {"cui": r["cui"], "term": r.get("preferred_term", r["cui"]), "ic": r.get("ic", 0.0)}
+        for r in summ["surviving_cuis"]
+    ]
+    tr["removed"] = [
+        {"cui": r["cui"], "term": r.get("preferred_term", r["cui"]),
+         "by": r.get("retained_by", ""), "reason": r.get("reason", "")}
+        for r in summ.get("removed_cuis", [])
+    ]
+    surv = [r["cui"] for r in summ["surviving_cuis"]]
+    tps = adaptor.cuis_to_topics(surv)
+    tr["topics"] = [
+        {"tp": tp, "size": adaptor.topic_size(tp),
+         "ic": round(adaptor.topic_anchor_ic(tp), 3),
+         "label": adaptor.topic_label(tp)}
+        for tp in sorted(tps, key=adaptor.topic_size)
+    ]
+    tr["topic_ids"] = list(tps)
+
+
+
+# QUERY side — WITH LLM nature breakdown
+
+
+def _trace_query(text):
+    tr = {"text": text}
+
+    full = pipeline.run(query=text, output_format="full_pipeline")
+    tr["expanded"] = full.get("expanded_query", "")
+    tr["is_clinical"] = full.get("is_clinical", False)
+    if not tr["is_clinical"]:
+        tr["reason"] = full.get("reason")
+        return tr
+
+    intents_view = []
+    cuis, seen = [], set()
+    for it in full.get("intents", []):
+        iv = {
+            "intent": it.get("intent_title", ""),
+            "nature": it.get("nature", ""),
+            "description": it.get("description", ""),
+            "sub_natures": [],
+        }
+        for sn in it.get("sub_natures", []):
+            path = sn.get("category_path", "")
+            atoms = sn.get("atomic_concepts", []) or []
+            snv = {"path": path, "atomic": list(atoms),
+                   "path_cuis": [], "atomic_cuis": []}
+
+            for seg in split_path(path):
+                got = flat(extractor.extract([seg], [seg]))
+                snv["path_cuis"].append({"text": seg, "cuis": got})
+                for c in got:
+                    if c not in seen:
+                        seen.add(c); cuis.append(c)
+
+            for a in atoms:
+                a = (a or "").strip()
+                if not a:
+                    continue
+                got = flat(extractor.extract([a], [a]))
+                snv["atomic_cuis"].append({"text": a, "cuis": got})
+                for c in got:
+                    if c not in seen:
+                        seen.add(c); cuis.append(c)
+
+            iv["sub_natures"].append(snv)
+        intents_view.append(iv)
+
+    tr["intents"] = intents_view
+    tr["extracted_cuis"] = list(cuis)
+    _summarize_and_topics(tr, cuis)
+    return tr
+
+
+
+# DOC side — NO LLM, per-chunk extraction + provenance (CUI -> chunk)
+
+
+def _trace_doc(doc):
+    """`doc` from document.get_document(): {doc_id, label, category, chunks:[str]}."""
+    tr = {
+        "text": f"{doc.get('label','')}  ({doc.get('category','')})",
+        "doc_id": doc["doc_id"],
+        "is_clinical": True,
+        "chunks": [],            # [{i, preview, full, cuis}]
+    }
+
+    cuis, seen = [], set()
+    cui_to_chunks = {}           # cui -> set(chunk indices)
+    for ci, chunk in enumerate(doc.get("chunks", [])):
+        got = flat(extractor.extract([chunk], [chunk]))
+        tr["chunks"].append({
+            "i": ci,
+            "preview": chunk[:80].replace("\n", " "),
+            "full": chunk,
+            "cuis": got,
+        })
+        for c in got:
+            cui_to_chunks.setdefault(c, set()).add(ci)
+            if c not in seen:
+                seen.add(c); cuis.append(c)
+
+    tr["extracted_cuis"] = list(cuis)
+    tr["cui_to_chunks"] = {c: sorted(v) for c, v in cui_to_chunks.items()}
+    _summarize_and_topics(tr, cuis)
+
+    # for each doc topic: which doc CUIs fall under it
+    tr["topic_to_doc_cuis"] = {}
+    doc_cui_set = set(tr["extracted_cuis"])
+    for tp in tr.get("topic_ids", []):
+        hit = [c for c in _members(tp) if c in doc_cui_set]
+        tr["topic_to_doc_cuis"][tp] = hit
+    return tr
+
+
+def _build_doc_cache(index):
+    doc = get_document(index)
+    tr = _trace_doc(doc)
+    print(f"[doc cache] processed doc[{index}] '{doc['label']}' -> "
+          f"{len(tr.get('topic_ids',[]))} topics, "
+          f"{len(tr.get('surviving',[]))} surviving CUIs")
+    return tr
+
+
+
+# Request handler — query only; reuse cached doc; rich retrieval
+
+
+def handle(req):
+    global _DOC_CACHE
+    if _DOC_CACHE is None:
+        _DOC_CACHE = _build_doc_cache(req.get("doc_index", DOC_INDEX))
+
+    q = _trace_query(req["query"])
+    doc = _DOC_CACHE
+
+    q_ids = set(q.get("topic_ids", []))
+    d_ids = set(doc.get("topic_ids", []))
+    shared = q_ids & d_ids
+
+    retrieval = []
+    for tp in sorted(shared, key=lambda t: adaptor.topic_size(t)):
+        doc_cuis = doc["topic_to_doc_cuis"].get(tp, [])
+        chunk_idxs = sorted({ci for c in doc_cuis
+                             for ci in doc["cui_to_chunks"].get(c, [])})
+        chunk_text = [{"i": ci,
+                       "preview": doc["chunks"][ci]["preview"],
+                       "full": doc["chunks"][ci]["full"]}
+                      for ci in chunk_idxs]
+        retrieval.append({
+            "tp_id": tp,
+            "label": adaptor.topic_label(tp),
+            "size": adaptor.topic_size(tp),
+            "anchor_ic": round(adaptor.topic_anchor_ic(tp), 3),
+            "doc_cuis": [(c, adaptor.labels.get(c, c)) for c in doc_cuis],
+            "chunks": chunk_text,
+        })
+
+    metrics = adaptor.match(q_ids, d_ids)
+    return {"doc_result": doc, "query_result": q,
+            "shared_count": len(shared), "metrics": metrics,
+            "retrieval": retrieval}
+
+
+
+# Serve
+
+
+if __name__ == "__main__":
+    addr = ("localhost", 6000)
+    listener = Listener(addr, authkey=b"cui")
+    print(f"Loading done {addr}. Leave this terminal open.")
+    # pre-warm the document cache so the first query is fast
+    try:
+        _DOC_CACHE = _build_doc_cache(DOC_INDEX)
+    except Exception as e:
+        print(f"[doc cache] deferred (will build on first request): {e}")
+    while True:
+        conn = listener.accept()
+        try:
+            req = conn.recv()
+            conn.send(handle(req))
+        except EOFError:
+            pass
+        except Exception as e:
+            try:
+                conn.send({"error": str(e)})
+            except Exception:
+                pass
+        finally:
+            conn.close()
