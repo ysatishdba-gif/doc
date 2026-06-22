@@ -32,6 +32,15 @@ CLUSTER_SELECTION_PARAMS = {
     "source_system": ["SNOMEDCT_US"],
 }
 
+# Query side: short atomic phrases should yield a FEW focused CUIs, not 20.
+QUERY_CLUSTER_SELECTION_PARAMS = {
+    "cluster_set":   "umls",
+    "top_k":         50,
+    "top_p":         5,
+    "top_q":         3,
+    "source_system": ["SNOMEDCT_US"],
+}
+
 REASONING = ["both"]               # "semantic" | "intent" | "both"
 
 INTENTS_DEFINITION = (
