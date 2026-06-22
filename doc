@@ -17,3 +17,28 @@ Resuming: 1 docs already in concepts_by_chunk.pkl
    ... 9/17 blobs done, elapsed 390s, eta ~5m46s (workers=4)
    ... 9/17 blobs done, elapsed 420s, eta ~6m13s (workers=4)
    ... 9/17 blobs done, elapsed 450s, eta ~6m40s (workers=4)
+   ... 9/17 blobs done, elapsed 480s, eta ~7m06s (workers=4)
+   ... 9/17 blobs done, elapsed 510s, eta ~7m33s (workers=4)
+   ... 9/17 blobs done, elapsed 540s, eta ~8m00s (workers=4)
+   ... 9/17 blobs done, elapsed 570s, eta ~8m26s (workers=4)
+   ... 10/17 blobs done, elapsed 600s, eta ~7m00s (workers=4)
+   ... 10/17 blobs done, elapsed 630s, eta ~7m21s (workers=4)
+   ... 10/17 blobs done, elapsed 660s, eta ~7m42s (workers=4)
+   ... 11/17 blobs done, elapsed 690s, eta ~6m16s (workers=4)
+   ... 11/17 blobs done, elapsed 720s, eta ~6m32s (workers=4)
+   ... 12/17 blobs done, elapsed 750s, eta ~5m12s (workers=4)
+   ... 13/17 blobs done, elapsed 780s, eta ~4m00s (workers=4)
+   ... 14/17 blobs done, elapsed 810s, eta ~2m53s (workers=4)
+   ... 15/17 blobs done, elapsed 840s, eta ~1m52s (workers=4)
+
+DONE. docs=1  with-errors=1  incomplete=1  saved -> concepts_by_chunk.pkl
+
+========================================================
+PROJECTION (500 docs, MODE='blob', ~9332 API calls total)
+measured avg per-call time: 140.7s
+sequential (1 at a time): ~364h42m59s
+   workers= 2: ~182h21m29s
+   workers= 4: ~91h10m44s  <- current MAX_WORKERS
+   workers= 8: ~45h35m22s
+(actual depends on how well the API parallelizes; raise MAX_WORKERS
+ until throughput stops improving or the server starts stalling.)
