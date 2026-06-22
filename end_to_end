@@ -149,15 +149,43 @@ def run_query(text):
         print(f"  NON-CLINICAL: {full.get('reason')}")
         return {"topic_ids": set(), "topics": []}
 
-    cuis, seen = [], set()
+    # ---- NATURE BREAKDOWN (LLM decomposition) — printed first ----
+    print(f"\n  Expanded: {full.get('expanded_query','')!r}")
+    print(f"  Total intents: {full.get('total_intents_detected', len(full.get('intents', [])))}")
+    for i, it in enumerate(full.get("intents", []), 1):
+        print(f"\n  {'-'*60}")
+        print(f"  INTENT {i}: {it.get('intent_title','')}")
+        print(f"    Nature:      {it.get('nature','')}")
+        print(f"    Description: {it.get('description','')}")
+        subs = it.get("sub_natures", [])
+        print(f"    Sub-natures ({len(subs)}):")
+        for sn in subs:
+            print(f"      - {sn.get('category_path','')}")
+            for a in (sn.get("atomic_concepts") or []):
+                print(f"          atomic: {a}")
+
+    # collect ALL phrases (path segments + atomic concepts), then de-duplicate
+    # so each distinct phrase hits the API exactly once.
+    phrases, pseen = [], set()
     for it in full.get("intents", []):
         for sn in it.get("sub_natures", []):
-            phrases = _split_path(sn.get("category_path", "")) + \
-                      [a for a in (sn.get("atomic_concepts") or []) if a]
-            for ph in phrases:
-                for c in _flat(extractor.extract([ph], [ph])):
-                    if c not in seen:
-                        seen.add(c); cuis.append(c)
+            for ph in _split_path(sn.get("category_path", "")) + \
+                      [a for a in (sn.get("atomic_concepts") or []) if a]:
+                ph = (ph or "").strip()
+                k = ph.casefold()
+                if ph and k not in pseen:
+                    pseen.add(k); phrases.append(ph)
+
+    # ---- CUI EXTRACTION (after the breakdown) ----
+    print(f"\n  {'-'*60}")
+    print(f"  CUI EXTRACTION — {len(phrases)} unique phrases")
+    cuis, seen = [], set()
+    for n, ph in enumerate(phrases, 1):
+        got = _flat(extractor.extract([ph], [ph]))
+        print(f"    [{n}/{len(phrases)}] {ph!r:40s} -> {len(got)} cuis")
+        for c in got:
+            if c not in seen:
+                seen.add(c); cuis.append(c)
 
     surviving, topics, tp_ids = _topics(cuis)
     print(f"  {len(cuis)} cuis -> {len(surviving)} surviving -> {len(topics)} topics")
