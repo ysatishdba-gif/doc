@@ -1,16 +1,13 @@
 """
 extract_concepts.py
 --------------------
-PHASE 1: extract UMLS CUIs for every blob of every document.
+PHASE 1: extract UMLS CUIs for every document.
 
-Default MODE="blob": ONE API call per BLOB (faithful -- identical to extracting
-each blob on its own). Every blob of every document is put into a SINGLE pool and
-run MAX_WORKERS-at-a-time, so the calls run concurrently across the whole corpus
-(even a one-document test fans its blobs across the workers) while the number of
-simultaneous calls stays bounded at MAX_WORKERS. Per-blob checkpoint + resume.
-
-MODE="doc" (opt-in): one call for the whole document, concepts split back to
-blobs by offset -- ~Nx fewer calls but the CUIs differ from per-blob extraction.
+ONE API call per document: the document's blobs are joined into a single text,
+sent once, and the returned concepts are mapped back to each blob using the
+character offsets the API reports (verified against the surface text; offsets
+that don't reproduce the surface fall back to locating it). Documents are
+processed in parallel (MAX_WORKERS at a time), with per-doc checkpoint + resume.
 No PDFs opened.
 
 Output pickle (keyed by the reconstructed_obj.pk key):
@@ -38,7 +35,6 @@ import os
 import glob
 import time
 import pickle
-import hashlib
 import threading
 import subprocess
 
@@ -57,33 +53,15 @@ OUTPUT_PATH = "concepts_by_chunk.pkl"
 
 ONLY_DOC = 101            # test one doc (key or filename); None/"" = ALL docs
 
-# Extraction granularity:
-#   "blob" = one API call PER BLOB. Faithful -- identical to extracting each blob
-#            separately (this is what you validated). Slower: (#blobs) calls/doc.
-#   "doc"  = one API call for the whole document, CUIs split back to blobs by
-#            offset. ~#blobs x fewer calls, BUT the CUIs differ from per-blob
-#            extraction (combined context + per-request top_k/p/q budget shared
-#            across more entities). Use only if that difference is acceptable.
-MODE = "blob"
-
-MAX_WORKERS = 4           # max API calls in flight at once (blob mode: across ALL
-                          # blobs of all docs; doc mode: across docs)
+MAX_WORKERS = 4           # max API calls in flight at once (one call = one document)
 REQUEST_TIMEOUT = 600     # seconds per call
 MAX_RETRIES = 3
 RETRY_BACKOFF = 2.0
 TOKEN_TTL = 50 * 60       # refresh gcloud identity token every 50 min
-CHECKPOINT_DOCS = 1       # doc mode: save after every N finished docs
-CHECKPOINT_BLOBS = 10     # blob mode: save results + cache after every N finished calls
+CHECKPOINT_DOCS = 1       # save after every N finished docs
 HEARTBEAT_SECS = 30
-SHOW_CUIS = False         # ONLY_DOC summary: print per-blob/union CUI lists (True)
-                          # or just counts (False). Counts are usually enough.
-SEP = "\n"                # joins blobs into the doc text in doc mode
-MIN_BLOB_CHARS = 0        # blob mode: skip blobs shorter than this (0 = process all).
-                          # raise to ~3-5 to skip empty/whitespace blobs and save calls
-USE_BLOB_CACHE = True     # blob mode: call the API once per UNIQUE blob text and reuse
-                          # the result for every identical blob (within/across docs and
-                          # across runs). Faithful: identical text -> identical CUIs.
-BLOB_CACHE_PATH = "blob_cui_cache.pkl"
+SHOW_CUIS = False         # inspect(): print actual CUI lists (True) or counts (False)
+SEP = "\n"                # joins blobs into the doc text
 
 # ============================================================================
 # PAYLOAD  (only `text` changes per call)
@@ -455,12 +433,7 @@ def map_concepts_to_blobs(concepts, text, spans, blobs):
 
 
 # ============================================================================
-# PROCESS ONE DOC
-#   MODE="blob": one API call PER BLOB (faithful -- matches separate extraction)
-#   MODE="doc" : one API call for the whole doc (fast, but CUIs differ; see notes)
-# In both modes a document is the unit of parallelism, so total concurrent API
-# calls == MAX_WORKERS (blob mode runs a doc's blobs sequentially within a worker,
-# which keeps the server load bounded and avoids the burst stall).
+# PROCESS ONE DOC  (one API call for the whole document; concepts split to blobs)
 # ============================================================================
 def _doc_base(d):
     key = d["key"]
@@ -474,40 +447,11 @@ def _doc_base(d):
         "file_name": d.get("file_name"), "raw_document": d["raw_document"],
         "category": d["category"], "pages": d.get("pages"),
         "n_blobs": d["n_blobs"], "n_sections": d["n_sections"], "n_chunks": len(blobs),
-        "mode": MODE,
     }
-
-
-def _blob_record(i, blob, tokens):
-    """One API call for one blob -> a chunk record. Used by the blob-mode pool."""
-    concepts, err, secs, _sm = call_api(tokens, blob)
-    return {
-        "i": i, "blob_index": i,
-        "preview": blob[:80].replace("\n", " "),
-        "cuis": [] if err else list(concepts.keys()),
-        "error": err, "secs": round(secs, 2),
-    }
-
-
-def _finalize_blob_doc(rec):
-    """Compute union / errors / complete / doc_secs from a doc's chunk records."""
-    chunks = rec["chunks"]
-    union, seen = [], set()
-    for c in chunks:
-        for cui in (c.get("cuis") if c else None) or []:
-            if cui not in seen:
-                seen.add(cui); union.append(cui)
-    filled = [c for c in chunks if c is not None]
-    n_err = sum(1 for c in filled if c.get("error"))
-    rec["extracted_cuis"] = union
-    rec["n_errors"] = n_err
-    rec["doc_secs"] = round(sum(c.get("secs", 0) for c in filled), 2)
-    rec["complete"] = (len(filled) == len(chunks)) and n_err == 0
-    return rec
 
 
 def process_doc(d, tokens):
-    """doc MODE only: one API call for the whole document, split back by offset."""
+    """One API call for the whole document; concepts split back to blobs by offset."""
     base = _doc_base(d)
     blobs = d["chunks"]
     if not blobs:
@@ -540,16 +484,12 @@ def _hms(secs):
 
 
 def estimate(avg_call_secs, path=None, workers=None):
-    """avg_call_secs = measured latency of ONE API call (one blob in blob mode,
-    one whole-doc call in doc mode)."""
+    """avg_call_secs = measured latency of one whole-doc API call."""
     workers = workers or MAX_WORKERS
-    docs = load_documents(path)
-    nd = len(docs)
-    total_blobs = sum(len(d["chunks"]) for d in docs)
-    n_calls = total_blobs if MODE == "blob" else nd
-    total_work = n_calls * avg_call_secs
+    nd = len(load_documents(path))
+    total_work = nd * avg_call_secs
     print("\n" + "=" * 56)
-    print(f"PROJECTION ({nd} docs, MODE={MODE!r}, ~{n_calls} API calls total)")
+    print(f"PROJECTION ({nd} docs, ~{nd} API calls total)")
     print(f"measured avg per-call time: {avg_call_secs:.1f}s")
     print(f"sequential (1 at a time): ~{_hms(total_work)}")
     for w in sorted({2, 4, 8, workers}):
@@ -562,133 +502,6 @@ def estimate(avg_call_secs, path=None, workers=None):
 # ============================================================================
 # MAIN  (parallel across documents)
 # ============================================================================
-def _params_sig():
-    """Signature of the params that affect API results -- changing any of these
-    (e.g. source_system, top_k/p/q) must invalidate cached blob results."""
-    c = CLUSTER_SELECTION_PARAMS
-    return repr((c.get("cluster_set"), c.get("top_k"), c.get("top_p"),
-                 c.get("top_q"), tuple(c.get("source_system") or [])))
-
-
-def _blob_hash(t):
-    """Cache key = hash of (result-affecting params + blob text). A param change
-    yields different keys, so stale-param results are never reused."""
-    payload = _params_sig() + "\x00" + (t or "")
-    return hashlib.sha1(payload.encode("utf-8", "replace")).hexdigest()
-
-
-def _chunk_rec(i, blob, cuis, err, secs, **extra):
-    r = {"i": i, "blob_index": i, "preview": (blob or "")[:80].replace("\n", " "),
-         "cuis": cuis, "error": err, "secs": round(secs, 2)}
-    r.update(extra)
-    return r
-
-
-def _run_blob_mode(docs, results, tokens):
-    """One API call per UNIQUE blob text (cached/deduped), fanned out to every
-    occurrence. MAX_WORKERS calls in flight; per-checkpoint save + persistent cache."""
-    cache = {}
-    if USE_BLOB_CACHE and os.path.exists(BLOB_CACHE_PATH):
-        try:
-            with open(BLOB_CACHE_PATH, "rb") as f:
-                cache = pickle.load(f)
-            print(f"Loaded blob cache: {len(cache)} unique blobs already known")
-        except Exception:
-            cache = {}
-
-    # init/reuse a shell per doc; collect pending (key, i, blob) units
-    units, touched = [], []
-    for d in docs:
-        key = d["key"]; blobs = d["chunks"]
-        rec = results.get(key)
-        if not rec or rec.get("mode") != "blob" or "chunks" not in rec \
-                or len(rec["chunks"]) != len(blobs):
-            rec = {**_doc_base(d), "chunks": [None] * len(blobs),
-                   "extracted_cuis": [], "doc_secs": 0.0, "n_errors": 0,
-                   "complete": False}
-            results[key] = rec
-        if rec.get("complete"):
-            continue
-        touched.append(d)
-        for i, b in enumerate(blobs):
-            existing = rec["chunks"][i]
-            if existing is not None and not existing.get("error"):
-                continue
-            if MIN_BLOB_CHARS and len((b or "").strip()) < MIN_BLOB_CHARS:
-                rec["chunks"][i] = _chunk_rec(i, b, [], None, 0.0, skipped=True)
-                continue
-            units.append((key, i, b))
-
-    # split: cache hits filled immediately; misses grouped by identical text
-    by_hash, cached_hits = {}, 0
-    for (key, i, b) in units:
-        h = _blob_hash(b)
-        if USE_BLOB_CACHE and h in cache:
-            results[key]["chunks"][i] = _chunk_rec(i, b, list(cache[h]), None, 0.0,
-                                                   cached=True)
-            cached_hits += 1
-        else:
-            g = by_hash.setdefault(h, {"text": b, "units": []})
-            g["units"].append((key, i))
-
-    uniq = list(by_hash.items())
-    total = len(uniq)
-    print(f"{len(units)} blobs pending across {len(touched)} docs: "
-          f"{cached_hits} served from cache, {total} unique calls to make "
-          f"({MAX_WORKERS} in flight)")
-    if total == 0:
-        for d in touched:
-            _finalize_blob_doc(results[d["key"]])
-        _save(results, OUTPUT_PATH)
-        return
-
-    done = [0]; t0 = time.perf_counter(); stop = threading.Event()
-
-    def _beat():
-        while not stop.wait(HEARTBEAT_SECS):
-            el = time.perf_counter() - t0
-            rate = done[0] / max(1, el)
-            eta = (total - done[0]) / rate if rate > 0 else 0
-            print(f"   ... {done[0]}/{total} unique calls done, "
-                  f"elapsed {el:.0f}s, eta ~{_hms(eta)} (workers={MAX_WORKERS})")
-    hb = threading.Thread(target=_beat, daemon=True); hb.start()
-
-    def _save_cache():
-        if USE_BLOB_CACHE:
-            try:
-                tmp = BLOB_CACHE_PATH + ".tmp"
-                with open(tmp, "wb") as f:
-                    pickle.dump(cache, f)
-                os.replace(tmp, BLOB_CACHE_PATH)
-            except Exception:
-                pass
-
-    try:
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
-            futs = {ex.submit(call_api, tokens, info["text"]): h
-                    for h, info in uniq}
-            for fut in as_completed(futs):
-                h = futs[fut]
-                info = by_hash[h]
-                concepts, err, secs, _sm = fut.result()
-                cuis = [] if err else list(concepts.keys())
-                if not err and USE_BLOB_CACHE:
-                    cache[h] = cuis
-                for (key, i) in info["units"]:
-                    results[key]["chunks"][i] = _chunk_rec(i, info["text"], list(cuis),
-                                                           err, secs)
-                done[0] += 1
-                if done[0] % CHECKPOINT_BLOBS == 0:
-                    for d in touched:
-                        _finalize_blob_doc(results[d["key"]])
-                    _save(results, OUTPUT_PATH); _save_cache()
-    finally:
-        stop.set()
-    for d in touched:
-        _finalize_blob_doc(results[d["key"]])
-    _save_cache()
-
-
 def _run_doc_mode(docs, results, tokens):
     pending = [d for d in docs if not results.get(d["key"], {}).get("complete")]
     print(f"{len(pending)} docs to process ({len(docs) - len(pending)} already done), "
@@ -731,7 +544,7 @@ def main():
     tokens.headers(force=True)
 
     all_docs = load_documents(INPUT_PATH)
-    print(f"Loaded {len(all_docs)} documents from {INPUT_PATH}  (MODE={MODE!r})")
+    print(f"Loaded {len(all_docs)} documents from {INPUT_PATH}")
     docs = all_docs
     if ONLY_DOC:
         docs = [d for d in all_docs if _doc_matches(d, ONLY_DOC)]
@@ -748,10 +561,7 @@ def main():
             results = pickle.load(f)
         print(f"Resuming: {len(results)} docs already in {OUTPUT_PATH}")
 
-    if MODE == "blob":
-        _run_blob_mode(docs, results, tokens)
-    else:
-        _run_doc_mode(docs, results, tokens)
+    _run_doc_mode(docs, results, tokens)
 
     _save(results, OUTPUT_PATH)
     errs = sum(1 for r in results.values() if r.get("n_errors"))
@@ -762,13 +572,8 @@ def main():
     if ONLY_DOC:
         # no CUI dump -- validate the pickle later with check_output.py.
         # just project the full-run time from this doc's measured latency.
-        if MODE == "blob":
-            cs = [c.get("secs", 0) for d in docs
-                  for c in results.get(d["key"], {}).get("chunks", []) or []
-                  if c and not c.get("skipped") and c.get("secs")]
-        else:
-            cs = [results[d["key"]]["doc_secs"] for d in docs
-                  if results.get(d["key"], {}).get("doc_secs")]
+        cs = [results[d["key"]]["doc_secs"] for d in docs
+              if results.get(d["key"], {}).get("doc_secs")]
         if cs:
             estimate(sum(cs) / len(cs))
 
