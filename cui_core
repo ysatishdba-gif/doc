@@ -1091,14 +1091,14 @@ def _resolve_group(r_cuis, metadata, ic_map, hierarchy_edges, dist, index_map,
 # Both the query side and the document side go through this one method.
 
 class CUIExtractor:
-    def __init__(self, api_url=None, **_ignored_legacy_kwargs):
+    def __init__(self, api_url=None, cluster_params=None, **_ignored_legacy_kwargs):
         from config import (API_URL, GCLOUD_LOC, PIPELINE_STEPS, INTENTS,
                              CLUSTER_SELECTION_PARAMS, REASONING)
         self.url             = api_url or API_URL
         self._gcloud         = GCLOUD_LOC
         self._pipeline_steps = PIPELINE_STEPS
         self._intents        = INTENTS
-        self._cluster_params = CLUSTER_SELECTION_PARAMS
+        self._cluster_params = cluster_params or CLUSTER_SELECTION_PARAMS
         self._reasoning      = REASONING
         self.session = requests.Session()
         self.headers = self._auth_headers()
