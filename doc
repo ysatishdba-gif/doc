@@ -1,16 +1,198 @@
-{
-  "text": "Patient has fever, headache and is in Newname hospital with Dr. John Doe. He is also suffering from diabetes.",
-  "extraction_mode": "all",
-  "intents": {
-    "1": {
-      "metadata": "Entities",
-      "definition": "Identify all biomedical entities in the text."
-    }
-  },
-  "cluster_selection_params": {
-    "cluster_set": "umls",
-    "top_k": 1,
-    "top_p": 3
-  },
-  "reasoning": ["both"]
-}
+"""
+check_output.py
+---------------
+Standalone validator for concepts_by_chunk.pkl. Run it after the one-doc test or
+after the full run -- nothing here calls the API.
+
+    python check_output.py            # corpus-level validation summary (PASS/REVIEW)
+    python check_output.py 101        # detailed per-document view for one key
+
+Corpus summary checks: run status (complete/incomplete/errors), CUI sanity
+(docs that came back empty), offset->blob mapping quality, and an ADDRESS
+ROUND-TRIP that uses only the stored addresses to confirm each doc still joins
+back to reconstructed_obj.pk (blob list) and sampling_1_stats.pk (the PDF).
+"""
+
+import os
+import sys
+import pickle
+
+OUT_PATH   = "concepts_by_chunk.pkl"
+RECON_PATH = "reconstructed_obj.pk"
+STATS_PATH = "sampling_1_stats.pk"
+
+
+def _load(p):
+    return pickle.load(open(p, "rb")) if (p and os.path.exists(p)) else None
+
+
+def _samples(stats):
+    return stats.get("samples") if isinstance(stats, dict) else None
+
+
+def summary(out, recon, samples):
+    """Aggregated corpus validation -> prints PASS/REVIEW. Returns issue count."""
+    n = len(out)
+    complete = incomplete = with_err = 0
+    tot_blobs = tot_occ = tot_union = 0
+    zero_cui = []
+    mo = ms = mu = 0
+    rt_text_ok = rt_text_bad = rt_pdf_ok = rt_pdf_bad = 0
+    issues, examples = 0, []
+
+    def note(msg):
+        nonlocal issues
+        issues += 1
+        if len(examples) < 10:
+            examples.append(msg)
+
+    for k, d in out.items():
+        chunks = d.get("chunks", []) or []
+        tot_blobs += len(chunks)
+        tot_occ += sum(len(c.get("cuis", [])) for c in chunks)
+        tot_union += len(d.get("extracted_cuis", []))
+        complete += bool(d.get("complete"))
+        incomplete += (not d.get("complete"))
+        with_err += bool(d.get("n_errors"))
+        if not d.get("extracted_cuis"):
+            zero_cui.append(k)
+        m = d.get("mapping_stats") or {}
+        mo += m.get("by_offset", 0); ms += m.get("by_surface", 0); mu += m.get("unmapped", 0)
+        if d.get("n_chunks") is not None and len(chunks) != d["n_chunks"]:
+            note(f"key {k}: chunks={len(chunks)} != n_chunks={d['n_chunks']}")
+        if recon is not None:
+            try:
+                blobs = recon[d["key"]]["reconstructed"]["blobs"]
+                if d.get("n_chunks") in (None, len(blobs)):
+                    rt_text_ok += 1
+                else:
+                    rt_text_bad += 1
+                    note(f"key {k}: n_chunks={d.get('n_chunks')} != recon blobs={len(blobs)}")
+            except Exception as e:
+                rt_text_bad += 1
+                note(f"key {k}: recon round-trip failed ({e})")
+        if isinstance(samples, list) and isinstance(d.get("sample_index"), int):
+            si = d["sample_index"]
+            if 0 <= si < len(samples):
+                s = samples[si]
+                fn = s.get("file_name") if isinstance(s, dict) else s
+                if fn == d.get("file_name"):
+                    rt_pdf_ok += 1
+                else:
+                    rt_pdf_bad += 1
+                    note(f"key {k}: samples[{si}]={fn!r} != file_name={d.get('file_name')!r}")
+            else:
+                rt_pdf_bad += 1
+                note(f"key {k}: sample_index {si} out of range")
+
+    avg_union = (tot_union / n) if n else 0
+    print("=" * 60)
+    print(f"VALIDATION of {OUT_PATH}")
+    print("=" * 60)
+    print(f"docs={n}  complete={complete}  incomplete={incomplete}  with-errors={with_err}")
+    print(f"blobs={tot_blobs}  cui_occurrences={tot_occ}  avg_union/doc={avg_union:.1f}")
+    if zero_cui:
+        print(f"docs with 0 CUIs: {len(zero_cui)}  e.g. {zero_cui[:10]}"
+              + (" ..." if len(zero_cui) > 10 else ""))
+    if (mo + ms + mu) > 0:
+        tot = mo + ms + mu
+        print(f"offset mapping: by_offset={mo} ({mo*100//tot}%)  by_surface={ms}  "
+              f"unmapped={mu} ({mu*100//tot}%)   (want high by_offset, unmapped~0)")
+    print(f"round-trip text (recon): ok={rt_text_ok}  bad={rt_text_bad}"
+          if recon is not None else f"round-trip text: skipped ({RECON_PATH} not found)")
+    print(f"round-trip PDF (samples): ok={rt_pdf_ok}  bad={rt_pdf_bad}"
+          if isinstance(samples, list) else "round-trip PDF: skipped (no samples)")
+    if examples:
+        print("issues (first few):")
+        for e in examples:
+            print(f"   - {e}")
+    if issues == 0:
+        msg = "PASS -- output is well-formed and joins back to the sources"
+        if incomplete:
+            msg += f"  (note: {incomplete} doc(s) not complete -- resume to finish)"
+        print(msg)
+    else:
+        print(f"REVIEW -- {issues} issue(s) flagged above")
+    return issues
+
+
+def detail(out, recon, samples, key):
+    """Detailed per-document view with per-blob CUI counts + address round-trip."""
+    if key not in out:
+        print(f"key {key!r} not in {OUT_PATH}"); return 1
+    d = out[key]
+    chunks = d.get("chunks", []) or []
+    occ = sum(len(c.get("cuis", [])) for c in chunks)
+    issues = 0
+    print("=" * 74)
+    print(f"key={d.get('key')}  file_name={d.get('file_name')}  "
+          f"sample_index={d.get('sample_index')}  sampling_id={d.get('sampling_id')}")
+    print(f"blobs(chunks)={len(chunks)}  n_blobs(meta)={d.get('n_blobs')}  "
+          f"union_cuis={len(d.get('extracted_cuis', []))}  cui_occurrences={occ}  "
+          f"doc_secs={d.get('doc_secs')}  complete={d.get('complete')}")
+    ms = d.get("mapping_stats")
+    if ms:
+        print(f"offset mapping: by_offset={ms.get('by_offset')}  "
+              f"by_surface={ms.get('by_surface')}  unmapped={ms.get('unmapped')}")
+    for c in chunks[:8]:
+        bi = c.get("blob_index", c.get("i"))
+        tag = f"ERROR {c['error']}" if c.get("error") else f"{len(c.get('cuis', []))} cuis"
+        print(f"   blob {bi:>2}: {tag:<12} {c.get('preview', '')!r}")
+    if len(chunks) > 8:
+        print(f"   ... ({len(chunks) - 8} more blobs)")
+    errs = [c.get("i") for c in chunks if c.get("error")]
+    if errs:
+        print(f"   ERROR blobs: {errs}"); issues += len(errs)
+
+    if recon is not None:
+        if d.get("key") in recon:
+            try:
+                blobs = recon[d["key"]]["reconstructed"]["blobs"]
+                bi = chunks[0].get("blob_index", 0) if chunks else 0
+                print(f"   round-trip text : recon[{d['key']}].blobs[{bi}] "
+                      f"-> {str(blobs[bi])[:55]!r}")
+            except Exception as e:
+                print(f"   round-trip text : FAILED ({e})"); issues += 1
+        else:
+            print(f"   round-trip text : key {d.get('key')} NOT in {RECON_PATH}"); issues += 1
+    if isinstance(samples, list) and isinstance(d.get("sample_index"), int):
+        si = d["sample_index"]
+        if 0 <= si < len(samples):
+            s = samples[si]
+            fn = s.get("file_name") if isinstance(s, dict) else s
+            ok = (fn == d.get("file_name"))
+            print(f"   round-trip PDF  : samples[{si}] -> {fn!r}  "
+                  f"[{'OK' if ok else 'MISMATCH vs ' + repr(d.get('file_name'))}]")
+            if not ok:
+                issues += 1
+        else:
+            print(f"   round-trip PDF  : sample_index {si} out of range"); issues += 1
+    print("=" * 74)
+    print("PASS" if issues == 0 else f"REVIEW -- {issues} issue(s)")
+    return issues
+
+
+def main():
+    out = _load(OUT_PATH)
+    if out is None:
+        raise SystemExit(f"{OUT_PATH} not found -- run extract_concepts.py first")
+    recon = _load(RECON_PATH)
+    samples = _samples(_load(STATS_PATH))
+    if recon is None:
+        print(f"[note] {RECON_PATH} not here -- text round-trip skipped")
+    if samples is None:
+        print(f"[note] {STATS_PATH} samples not here -- PDF round-trip skipped")
+
+    if len(sys.argv) > 1:
+        arg = sys.argv[1]
+        try:
+            arg = int(arg)
+        except ValueError:
+            pass
+        detail(out, recon, samples, arg)
+    else:
+        summary(out, recon, samples)
+
+
+if __name__ == "__main__":
+    main()
