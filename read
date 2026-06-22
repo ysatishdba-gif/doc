@@ -1,14 +1,10 @@
-# Clinical Topic Retrieval — README
-
-Turns a clinical **query** and a **document** into topics, then matches them
-to retrieve the relevant document content.
 
 ---
 
-## How topics are built (one-time)
+##  topics are built (one-time)
 
 `build_topics.py` builds topics from the **network graph** + the **SNOMED
-IS-A hierarchy** (precomputed in `isa_precomputed.pkl`). No MRREL.
+IS-A hierarchy** (precomputed in `isa_precomputed.pkl`).
 
 - **Group**  = a concept + its network neighbors (who is related).
 - **Anchor** = the most-specific shared IS-A parent that groups >= 2 members
