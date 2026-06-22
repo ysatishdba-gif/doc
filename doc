@@ -1,15 +1,16 @@
-Loaded 500 documents from reconstructed_obj.pk  (MODE='doc')
-Resuming: 1 docs already in concepts_by_chunk.pkl
-499 docs to process (1 already done), 16 in parallel
-   ... 0/499 docs done, elapsed 30s (workers=16)
-   ... 0/499 docs done, elapsed 60s (workers=16)
-   ... 0/499 docs done, elapsed 90s (workers=16)
-   ... 0/499 docs done, elapsed 120s (workers=16)
-   [1/499] doc_16_sample_16: ERROR  (40s)
-   ... 1/499 docs done, elapsed 150s (workers=16)
-   ... 1/499 docs done, elapsed 180s (workers=16)
-   [2/499] doc_11_sample_11: ERROR  (57s)
-   [3/499] doc_15_sample_15: ERROR  (61s)
-   [4/499] doc_13_sample_13: ERROR  (61s)
-   [5/499] doc_2_sample_2: ERROR  (61s)
-   ... 5/499 docs done, elapsed 210s (workers=16)
+import pickle
+recon = pickle.load(open("reconstructed_obj.pk", "rb"))
+stats = pickle.load(open("sampling_1_stats.pk", "rb"))
+samples = stats.get("samples")
+
+print("records in reconstructed_obj.pk:", len(recon))
+print("entries in samples:", len(samples) if hasattr(samples, "__len__") else type(samples))
+
+# how many samples are REAL (have a filename) vs empty/placeholder
+real = 0
+if isinstance(samples, list):
+    for s in samples:
+        fn = s.get("file_name") if isinstance(s, dict) else (s if isinstance(s, str) else None)
+        if fn:
+            real += 1
+print("samples with a real filename:", real)
