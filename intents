@@ -258,6 +258,16 @@ Consider: "What are the specific pieces of information needed?"
 
 Include all specific details mentioned: exact values, names, dates, measurements, descriptors.
 
+**Self-contained meaning (IMPORTANT):**
+Each atomic_concept must name a concept that is correct ON ITS OWN, without relying on the intent_title or category_path for its meaning. The downstream system extracts each atomic_concept as a standalone phrase with NO surrounding context, so any meaning carried only by the intent or the path is LOST.
+
+If the concept's clinical meaning depends on the role its intent gives it, FOLD that role into the atomic_concept itself:
+- Allergy intent: emit "food allergy", "latex allergy", "penicillin allergy" — NOT bare "food", "latex", "penicillin".
+- Family-history intent: emit "family history of diabetes" — NOT bare "diabetes".
+- Contraindication / intolerance intent: emit "aspirin intolerance" — NOT bare "aspirin".
+
+Do NOT add a role when the atomic is ALREADY a specific, self-explaining clinical concept: "anaphylaxis", "angioedema", "hives", "prescription medications", "dosages", "blood pressure" stay exactly as-is. Never attach a role the intent does not actually assign (do not turn "anaphylaxis" into "anaphylaxis allergy"). When in doubt and the bare term already names the right concept, leave it unchanged.
+
 **Key Understanding:**
 - category_path = How to get there (the folders)
 - atomic_concepts = What's there (the files - be specific)
