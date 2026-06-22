@@ -1,23 +1,24 @@
 import pickle
-stats = pickle.load(open("sampling_1_stats.pk", "rb"))
-samples = stats["samples"]            # dict keyed 0..120
 
-# filename -> recon key
-file_to_key = {}
-for i, s in samples.items():
-    fn = s.get("file_name") or f"sample_{i}.pdf"
-    cases = s.get("cases") or []
-    if cases:
-        file_to_key[fn] = cases[0]
+data = pickle.load(open("concepts_by_chunk.pkl", "rb"))
 
-# show the table (sorted by filename)
-for fn in sorted(file_to_key, key=lambda x: int(x.split('_')[1].split('.')[0])):
-    print(f"{fn:18s} -> key {file_to_key[fn]}")
+rows = []
+for k, r in data.items():
+    rows.append((
+        r.get("file_name"),                              
+        k,                                               
+        r.get("pages"),                                 
+        r.get("n_chunks", len(r.get("chunks", []))),     
+        len(r.get("extracted_cuis", [])),                
+        r.get("complete"),
+    ))
+rows.sort(key=lambda x: str(x[0]))
 
-# reverse: key -> filename(s)
-from collections import defaultdict
-key_to_files = defaultdict(list)
-for fn, k in file_to_key.items():
-    key_to_files[k].append(fn)
-dupes = {k: v for k, v in key_to_files.items() if len(v) > 1}
-print("\nkeys mapping to >1 file (if any):", dupes)
+print(f"docs covered: {len(rows)}\n")
+print(f"{'file_name':<18}{'pages':>7}{'blobs':>7}{'cuis':>7}")
+print("-" * 45)
+for fn, k, pg, nb, nc, done in rows:
+    print(f"{str(fn):<18}{str(pg):>7}{nb:>7}{nc:>7}")
+print("-" * 45)
+print(f"total docs={len(rows)}  total blobs={sum(x[3] for x in rows)}  "
+      f"total cuis={sum(x[4] for x in rows)}")
