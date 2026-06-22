@@ -1081,98 +1081,106 @@ def _resolve_group(r_cuis, metadata, ic_map, hierarchy_edges, dist, index_map,
                 detail=f"dist {pair_dist:.3f} < tight {tight_t:.3f}"))
     return kept, audit
 
-GCLOUD_LOC = r''
+# ── Extraction API (LATEST payload) ───────────────────────────────────────────
+# Same interface as before — extract(text_list, context_list) returns
+#   {phrase: {"cuis": {cui: distance}}}
+# but sends the LATEST payload (one request per text):
+#   {text, pipeline_steps, intents, cluster_selection_params, reasoning}
+# and parses data["output"]["concepts"] = {cui: [occurrences]} where each
+# occurrence may carry "member_code_distance".
+# Both the query side and the document side go through this one method.
 
 class CUIExtractor:
-    def __init__(self, api_url, top_k=3, top_p=30,
-                 cluster_set="umls", combined=True):
-        self.url = api_url
-        self.top_k = top_k
-        self.top_p = top_p
-        self.cluster_set = cluster_set
-        self.combined = combined
+    def __init__(self, api_url=None, **_ignored_legacy_kwargs):
+        from config import (API_URL, GCLOUD_LOC, PIPELINE_STEPS, INTENTS,
+                             CLUSTER_SELECTION_PARAMS, REASONING)
+        self.url             = api_url or API_URL
+        self._gcloud         = GCLOUD_LOC
+        self._pipeline_steps = PIPELINE_STEPS
+        self._intents        = INTENTS
+        self._cluster_params = CLUSTER_SELECTION_PARAMS
+        self._reasoning      = REASONING
         self.session = requests.Session()
-        try:
-            token = subprocess.run(
-                [GCLOUD_LOC, "auth", "print-identity-token"],
-                stdout=subprocess.PIPE, universal_newlines=True,
-                timeout=_GCLOUD_TIMEOUT).stdout.strip()
-            self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-        except Exception:
-            self.headers = {"Content-Type": "application/json"}
+        self.headers = self._auth_headers()
         retry = Retry(total=_RETRY_TOTAL, backoff_factor=_RETRY_BACKOFF,
                       status_forcelist=list(_RETRY_STATUS_CODES))
         self.session.mount("https://", HTTPAdapter(max_retries=retry))
 
-    def _refresh_token(self):
-        """Refresh gcloud identity token. Called on 401 responses."""
+    def _auth_headers(self):
         try:
             token = subprocess.run(
-                ["gcloud", "auth", "print-identity-token"],
+                [self._gcloud, "auth", "print-identity-token"],
                 stdout=subprocess.PIPE, universal_newlines=True,
                 timeout=_GCLOUD_TIMEOUT).stdout.strip()
-            self.headers["Authorization"] = f"Bearer {token}"
-            log("    Extraction API: token refreshed", level="DEBUG")
-        except Exception as e:
-            log(f"    Extraction API: token refresh failed: {e}", level="WARNING")
+            return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        except Exception:
+            return {"Content-Type": "application/json"}
+
+    def _refresh_token(self):
+        self.headers = self._auth_headers()
+        log("    Extraction API: token refreshed", level="DEBUG")
+
+    def _payload(self, text):
+        return {
+            "text": text,
+            "pipeline_steps": self._pipeline_steps,
+            "intents": self._intents,
+            "cluster_selection_params": self._cluster_params,
+            "reasoning": self._reasoning,
+        }
 
     @timed("cui_extraction")
-    def extract(self, text_list, context_list):
-        """Extract CUIs per phrase via API.
+    def extract(self, text_list, context_list=None):
+        """One API call per text. Returns {phrase: {"cuis": {cui: distance}}}."""
+        per_phrase = {}
+        for text in text_list:
+            if not text or not str(text).strip():
+                continue
+            cui_dists = self._extract_one(text)
+            if cui_dists:
+                per_phrase[text] = {"cuis": cui_dists}
+        total = sum(len(v["cuis"]) for v in per_phrase.values())
+        log(f"    Extraction: {total} CUIs across {len(per_phrase)} phrases")
+        return per_phrase
 
-        Returns:
-            dict {phrase: {"cuis": {cui: distance}}}
-        """
-        payload = {
-            "cluster_set": self.cluster_set,
-            "text_list": text_list,
-            "context_list": context_list,
-            "top_k": self.top_k,
-            "top_p": self.top_p,
-            "combined": self.combined
-        }
+    def _extract_one(self, text):
         try:
-            resp = self.session.post(
-                self.url, headers=self.headers,
-                json=payload, timeout=_API_TIMEOUT)
+            resp = self.session.post(self.url, headers=self.headers,
+                                     json=self._payload(text), timeout=_API_TIMEOUT)
             if resp.status_code == 401:
                 self._refresh_token()
-                resp = self.session.post(
-                    self.url, headers=self.headers,
-                    json=payload, timeout=_API_TIMEOUT)
-            resp.raise_for_status()
+                resp = self.session.post(self.url, headers=self.headers,
+                                         json=self._payload(text), timeout=_API_TIMEOUT)
+            if resp.status_code >= 400:
+                log(f"    Extraction API HTTP {resp.status_code}: {resp.text[:300]}",
+                    level="ERROR")
+                return {}
             data = resp.json()
         except requests.exceptions.RequestException as e:
             log(f"    Extraction API error: {e}", level="ERROR")
             return {}
-        except (ValueError, KeyError) as e:
-            log(f"    Extraction API response parse error: {e}", level="ERROR")
+        except ValueError as e:
+            log(f"    Extraction API parse error: {e}", level="ERROR")
             return {}
 
-        raw_per_phrase = {}
-        output = data.get("output", {})
-        for phrase, clusters in output.items():
-            if not isinstance(clusters, list):
+        concepts = (data.get("output", {}) or {}).get("concepts", {}) or {}
+        cui_dists = {}
+        for cui, occ in concepts.items():
+            cui = str(cui)
+            if not cui:
                 continue
-            cui_dists = {}
-            for cluster in clusters:
-                for member in cluster.get("members", []):
-                    c = str(member.get("member_code", ""))
-                    if c:
-                        dist = member.get("member_code_distance")
-                        d = float(dist) if dist is not None else None
-                        if c not in cui_dists or (d is not None and d < cui_dists.get(c, float('inf'))):
-                            cui_dists[c] = d
-            if cui_dists:
-                raw_per_phrase[phrase] = cui_dists
-
-        per_phrase = {phrase: {"cuis": cui_dists}
-                      for phrase, cui_dists in raw_per_phrase.items()}
-
-        total = sum(len(v["cuis"]) for v in per_phrase.values())
-        log(f"    Extraction: {total} CUIs across {len(per_phrase)} phrases")
-
-        return per_phrase
+            occs = occ if isinstance(occ, list) else [occ]
+            best = None
+            for o in occs:
+                if not isinstance(o, dict):
+                    continue
+                d = o.get("member_code_distance")
+                if d is not None:
+                    d = float(d)
+                    if best is None or d < best:
+                        best = d
+            cui_dists[cui] = best
+        return cui_dists
 
 
 def fetch_preferred_terms(bq_client, project_id, dataset_id, cuis):
