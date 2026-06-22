@@ -1,13 +1,13 @@
 import pickle
+
 cache = pickle.load(open("doc_side_cache.pkl", "rb"))
-topics = pickle.load(open("topics.pkl", "rb"))
-try:
-    recon = pickle.load(open("reconstructed_obj.pk", "rb"))
-except Exception:
-    recon = None
+# optional extras, if you uploaded them too:
+try:    topics = pickle.load(open("topics.pkl", "rb"))
+except: topics = {}
+try:    recon  = pickle.load(open("reconstructed_obj.pk", "rb"))
+except: recon  = None
 
-import inspect_doc_cache as I
-
-I.list_docs(cache)                       # list docs
-I.dump_doc(cache, 101, recon)            # full data for PDF key 101
-I.show_topic(cache, 101, "tp_xxxx", topics, recon)   # topic -> cuis + text
+# ---- 1) list docs in the cache ----
+for k, rec in cache.items():
+    print(k, rec.get("doc_id"), "| blobs:", len(rec.get("blobs", [])),
+          "| topics:", len(rec.get("topic_ids", [])))
