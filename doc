@@ -1,12 +1,3 @@
-import pickle
-recon = pickle.load(open("reconstructed_obj.pk","rb"))
-s = pickle.load(open("sampling_1_stats.pk","rb"))["samples"][0]   # sample_0.pdf
-print("sample_0:", s["file_name"], "| n_pages", s["n_pages"], "| type", s["data_documents"], "| cases", s["cases"])
-
-c = s["cases"][0]                       # hypothesis: cases[0] is the recon key
-print(f"recon[{c}]  raw_document =", recon[c]["raw_document"],
-      "| pages =", recon[c]["reconstructed"]["pages"],
-      "| n_blobs =", len(recon[c]["reconstructed"]["blobs"]))
-
-print("recon[0]   raw_document =", recon[0]["raw_document"],
-      "| pages =", recon[0]["reconstructed"]["pages"])   # old positional guess
+sample_0: sample_0.pdf | n_pages [6] | type ['Patient Progress Note'] | cases [111]
+recon[111]  raw_document = Patient Progress Note | pages = 6 | n_blobs = 21
+recon[0]   raw_document = Discharge Summary | pages = 1
