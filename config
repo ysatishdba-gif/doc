@@ -1,32 +1,73 @@
 import os, sys, pickle
 import networkx
 
+# ─────────────────────────────────────────────────────────────────────────────
+# GCP / BigQuery (summarizer + preferred-term lookups)
+# ─────────────────────────────────────────────────────────────────────────────
 PROJECT_ID      = ""
 DATASET_ID      = ""
 EMBEDDING_TABLE = ""
 
-API_URL         = ""
-TOP_K           = 1 #Number of clusters to select (must be ≥ 1)
-TOP_P           = 3 #Number of members to retrieve per cluster (must be ≥ 1)
-CLUSTER_SET     = "umls"
-COMBINED        = True
-source_system = "SNOMED_CT"
+# ─────────────────────────────────────────────────────────────────────────────
+# EXTRACTION API  (LATEST payload — used on BOTH query and document sides)
+# Both sides call CUIExtractor.extract(), so this single config drives both.
+# ─────────────────────────────────────────────────────────────────────────────
+API_URL = ""                       # latest extraction endpoint
+GCLOUD_LOC = "gcloud"              # path to gcloud (e.g. "/.../google-cloud-sdk/bin/gcloud")
 
-OUTPUT_DIR      = "output/"
-HIERARCHY_PATH  = "networkx_cui_context_v1_3_0.pkl" 
-IC_PATH         = "ic_precomputed.pkl"
+PIPELINE_STEPS = {
+    "run_general_extraction":   True,
+    "run_ner_extraction":       False,
+    "run_semantic_linking_v1":  True,
+    "run_semantic_linking_v2":  True,
+    "run_intent_filter":        True,
+    "run_deep_search":          False,
+}
+
+CLUSTER_SELECTION_PARAMS = {
+    "cluster_set":   "umls",
+    "top_k":         150,
+    "top_p":         10,
+    "top_q":         20,
+    "source_system": ["SNOMEDCT_US"],
+}
+
+REASONING = ["both"]               # "semantic" | "intent" | "both"
+
+INTENTS_DEFINITION = (
+    "The text contains entities. An entity is used as in the Unified Medical "
+    "Language System (UMLS) Metathesaurus: a recognizable, distinct object or "
+    "concept in the real world or in a medical context (a disease, medication, "
+    "symptom, procedure, or any other concept). Identify and return ALL entities "
+    "present in the provided text, exactly as they appear. Each identified entity "
+    "may belong to a UMLS semantic type."
+)
+INTENTS = {1: {"metadata": "Entities", "definition": INTENTS_DEFINITION}}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Summarizer / topic settings
+# ─────────────────────────────────────────────────────────────────────────────
+ALLOWED_SABS    = {"SNOMEDCT_US"}  # SABFilter + matches source_system above
+
+OUTPUT_DIR       = "output/"
+HIERARCHY_PATH   = "networkx_cui_context_v1_3_0.pkl"
+IC_PATH          = "ic_precomputed.pkl"
 MEDLINEPLUS_PATH = "medlineplus.pkl"
-TOPICS_PATH = "topics.pkl"
-cache = "umls_cache.pkl"
+TOPICS_PATH      = "topics.pkl"
+cache            = "umls_cache.pkl"
 
-ALLOWED_SABS    = {"SNOMEDCT_US"}
-
+# ─────────────────────────────────────────────────────────────────────────────
+# LLM (query breakdown)
+# ─────────────────────────────────────────────────────────────────────────────
 LLM_PROJECT_ID  = PROJECT_ID
 LLM_LOCATION    = "us-central1"
-LOCATION    = "us-central1"
+LOCATION        = "us-central1"
 MODEL_VERSION   = "gemini-2.5-flash"
 LLM_MAX_TOKENS  = 1500
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Heavy pickles (loaded once at import)
+# ─────────────────────────────────────────────────────────────────────────────
 with open(HIERARCHY_PATH, "rb") as f:
     hierarchy = pickle.load(f)
 assert isinstance(hierarchy, networkx.DiGraph)
@@ -46,4 +87,5 @@ if os.path.exists(TOPICS_PATH):
 TOPICS_AVAILABLE = topics is not None
 
 print(f"config: hierarchy={hierarchy.number_of_nodes():,} nodes, "
-      f"ic={len(ic_precomputed):,}, topics={len(topics['topic_id_to_topic']) if topics else 0}")
+      f"ic={len(ic_precomputed):,}, "
+      f"topics={len(topics['topic_id_to_topic']) if topics else 0}")
