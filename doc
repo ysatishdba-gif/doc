@@ -1,105 +1,193 @@
 """
-probe_api.py
-------------
-Fire ONE request using the EXACT payload/token logic from extract_concepts.py,
-then dump the full raw response. Run this before any batch so you can confirm:
+validate_pickles.py
+-------------------
+Validate the project's pickle files. For each file it reports: whether it loads,
+its Python type, its structure (DataFrame / dict-of-docs / columnar dict / list),
+where the text chunks live, how documents are keyed/labeled, and whether the
+target document (sample_101) is present.
 
-  1. the new payload is accepted (HTTP 200, valid JSON),
-  2. where the concepts actually live in the response, and
-  3. that parse_concepts() points at the right path.
-
-Run from the same folder as extract_concepts.py:
-    python probe_api.py
-
-Writes:
-    probe_response.json  - pretty full JSON (if the body parsed)
-    probe_raw.txt        - the raw response body, always
+Run from the folder that holds the .pk files:
+    python validate_pickles.py
 """
 
-import json
-import requests
+import os
+import pickle
 
-import extract_concepts as E   # reuse the same build_payload / token / parse logic
+FILES = ["sampling_1_stats.pk", "reconstructed_obj.pk"]
+FIND  = "101"     # substring to hunt for across labels / filenames / cells
 
-# ---- what to send ----
-TEXT      = None          # set a literal string to test that, or leave None
-PROBE_DOC = "sample_101"  # if TEXT is None, pull a chunk from this doc in the pkl
-CHUNK_I   = 0             # which chunk of that doc
+# Optional deps for type-aware reporting. If a file IS a DataFrame/ndarray,
+# the unpickle itself needs these installed in your environment.
+try:
+    import pandas as pd
+except Exception:
+    pd = None
+try:
+    import numpy as np
+except Exception:
+    np = None
 
 
-def get_text():
-    if TEXT:
-        return TEXT
-    docs = E.load_documents(E.INPUT_PATH)
-    match = [t for t in docs if E._match_only(t[1], PROBE_DOC)]
-    if not match:
-        raise SystemExit(f"{PROBE_DOC!r} not found in {E.INPUT_PATH}")
-    _, label, _, chunks = match[0]
-    if not chunks:
-        raise SystemExit(f"{label} has no chunks")
-    print(f"Probing {label}  chunk {CHUNK_I} of {len(chunks)}")
-    return chunks[CHUNK_I]
+def short(v, n=70):
+    s = repr(v)
+    return s if len(s) <= n else s[:n] + " ..."
+
+
+def _g(d, k, default=None):
+    return d.get(k, default) if isinstance(d, dict) else default
+
+
+# ---------------------------------------------------------------- hunters
+def _hunt_dict_docs(obj, keys):
+    """{key: docdict} -> table of key/label/blobs + locate FIND."""
+    print(f"\n  {'KEY':>8}  {'raw_document':30}  {'file_name':20}  blobs")
+    print("  " + "-" * 70)
+    for i, k in enumerate(keys):
+        if i >= 15:
+            print(f"     ... ({len(keys) - 15} more)")
+            break
+        d = obj[k]
+        recon = _g(d, "reconstructed", d) or {}
+        rd = _g(d, "raw_document")
+        fn = _g(recon, "file_name") or _g(d, "file_name")
+        nb = len(_g(recon, "blobs", []) or [])
+        print(f"  {str(k):>8}  {str(rd):30.30}  {str(fn):20.20}  {nb}")
+
+    print(f"\n  rows containing {FIND!r}:")
+    hits = 0
+    for k in keys:
+        d = obj[k]
+        recon = _g(d, "reconstructed", d) or {}
+        fn = _g(recon, "file_name") or _g(d, "file_name")
+        hay = f"{k} | {_g(d, 'raw_document')} | {fn}".lower()
+        if FIND in hay:
+            hits += 1
+            print(f"    key={k!r}  raw_document={_g(d, 'raw_document')!r}  file_name={fn!r}")
+    if not hits:
+        print("    none found")
+
+
+def _hunt_columns(obj, keys):
+    """{name: list/array} columnar dict -> summary + locate FIND."""
+    print("  looks like a columnar dict (name -> list of values):")
+    for k in keys[:15]:
+        v = obj[k]
+        ln = len(v) if hasattr(v, "__len__") else "?"
+        ex = short(v[0]) if (ln not in (0, "?")) else ""
+        print(f"     {str(k):26} len={ln}  e.g. {ex}")
+    print(f"\n  searching columns for {FIND!r}:")
+    found = False
+    for k in keys:
+        v = obj[k]
+        try:
+            for i, item in enumerate(v):
+                if FIND in str(item).lower():
+                    print(f"    {k!r}[{i}] = {short(item)}")
+                    found = True
+                    break
+        except TypeError:
+            pass
+    if not found:
+        print("    none found")
+
+
+def _hunt_df(df):
+    print(f"\n  searching all cells for {FIND!r}:")
+    s = df.astype(str)
+    mask = s.apply(lambda c: c.str.contains(FIND, case=False, na=False))
+    hit_cols = [c for c in df.columns if bool(mask[c].any())]
+    if not hit_cols:
+        print("    no cell matches.")
+        return
+    for c in hit_cols[:10]:
+        rows = [r for r in df.index if bool(mask.loc[r, c])]
+        if rows:
+            print(f"    column {c!r}: index {rows} -> {short(df.loc[rows[0], c])}")
+
+
+# ---------------------------------------------------------------- describe
+def describe(obj, name):
+    print("=" * 78)
+    print(f"FILE: {name}")
+    print("=" * 78)
+    t = type(obj)
+    print(f"python type : {t.__module__}.{t.__name__}")
+
+    if pd is not None and isinstance(obj, pd.DataFrame):
+        print(f"DataFrame shape: {obj.shape}  (rows x cols)")
+        print(f"index   (first 8): {list(obj.index[:8])}")
+        print(f"columns (first 12): {list(obj.columns[:12])}")
+        print("\nhead:")
+        try:
+            with pd.option_context("display.max_columns", 8, "display.width", 200):
+                print(obj.head(3))
+        except Exception:
+            print(obj.head(3))
+        _hunt_df(obj)
+        return
+
+    if pd is not None and isinstance(obj, pd.Series):
+        print(f"Series len={len(obj)}  dtype={obj.dtype}")
+        print(obj.head(10))
+        return
+
+    if isinstance(obj, dict):
+        keys = list(obj.keys())
+        kt = type(keys[0]).__name__ if keys else "n/a"
+        print(f"dict len={len(keys)}  key type={kt}")
+        print(f"keys: first={keys[:5]}  last={keys[-3:]}")
+        if not keys:
+            return
+        first = obj[keys[0]]
+        print(f"value type: {type(first).__name__}")
+        if isinstance(first, dict):
+            print(f"value keys: {list(first.keys())}")
+            recon = first.get("reconstructed", first)
+            if isinstance(recon, dict):
+                print(f"  reconstructed keys: {list(recon.keys())}")
+            _hunt_dict_docs(obj, keys)
+        elif isinstance(first, (list, tuple)) or (np is not None and isinstance(first, np.ndarray)):
+            _hunt_columns(obj, keys)
+        else:
+            print(f"sample value: {short(first)}")
+        return
+
+    if isinstance(obj, (list, tuple)):
+        print(f"{t.__name__} len={len(obj)}")
+        if obj:
+            print(f"element type: {type(obj[0]).__name__}")
+            if isinstance(obj[0], dict):
+                print(f"element keys: {list(obj[0].keys())}")
+                _hunt_dict_docs({i: v for i, v in enumerate(obj)}, list(range(len(obj))))
+            else:
+                print(f"first element: {short(obj[0])}")
+        return
+
+    # fallback for unknown objects
+    print(f"value: {short(obj, 200)}")
+    for attr in ("shape", "columns", "index", "keys", "__len__"):
+        if hasattr(obj, attr):
+            print(f"  has .{attr}")
 
 
 def main():
-    if not E.API_URL.strip():
-        raise SystemExit("Set API_URL in extract_concepts.py first.")
-
-    text = get_text()
-    print(f"TEXT ({len(text)} chars): {text[:200]!r}\n")
-
-    tokens = E.TokenManager(E.GCLOUD_LOC)
-    payload = E.build_payload(text)
-
-    # show exactly what is being sent (intents.definition trimmed for readability)
-    shown = json.loads(json.dumps(payload))
-    for k in shown.get("intents", {}):
-        d = shown["intents"][k].get("definition", "")
-        shown["intents"][k]["definition"] = d[:120] + " ...[trimmed]"
-    print("PAYLOAD BEING SENT:")
-    print(json.dumps(shown, indent=2, ensure_ascii=False))
-    print()
-
-    resp = requests.post(E.API_URL, json=payload,
-                         headers=tokens.headers(), timeout=E.REQUEST_TIMEOUT)
-    print(f"HTTP {resp.status_code}   Content-Type={resp.headers.get('Content-Type')}\n")
-
-    with open("probe_raw.txt", "w", encoding="utf-8") as f:
-        f.write(resp.text)
-
-    try:
-        data = resp.json()
-    except ValueError:
-        print("Response is NOT valid JSON. First 1500 chars:\n")
-        print(resp.text[:1500])
-        print("\nSaved full body -> probe_raw.txt")
-        return
-
-    with open("probe_response.json", "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-    # ---- structure report ----
-    if isinstance(data, dict):
-        print("TOP-LEVEL KEYS:", list(data.keys()))
-        if isinstance(data.get("output"), dict):
-            print("output KEYS:  ", list(data["output"].keys()))
-    else:
-        print("Response is a", type(data).__name__, "not a dict.")
-
-    concepts = E.parse_concepts(data)
-    print(f"\nparse_concepts() -> {len(concepts)} concepts "
-          f"(expects data['output']['concepts'])")
-    if concepts:
-        cui, meta = next(iter(concepts.items()))
-        print(f"  first concept {cui}:")
-        print("  " + json.dumps(meta, indent=2, ensure_ascii=False)[:600]
-              .replace("\n", "\n  "))
-    else:
-        print("  -> EMPTY. Either the payload didn't trigger extraction, or the")
-        print("     concepts are under a different key. Open probe_response.json,")
-        print("     find the CUIs, then fix parse_concepts() in extract_concepts.py.")
-
-    print("\nSaved -> probe_response.json (full)  +  probe_raw.txt (raw body)")
+    print(f"cwd: {os.getcwd()}\n")
+    for f in FILES:
+        if not os.path.exists(f):
+            print("=" * 78)
+            print(f"FILE: {f}  -- NOT FOUND in this folder")
+            print("=" * 78 + "\n")
+            continue
+        try:
+            with open(f, "rb") as fh:
+                obj = pickle.load(fh)
+        except Exception as e:
+            print("=" * 78)
+            print(f"FILE: {f}  -- FAILED TO LOAD: {type(e).__name__}: {e}")
+            print("=" * 78 + "\n")
+            continue
+        describe(obj, f)
+        print()
 
 
 if __name__ == "__main__":
