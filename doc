@@ -1,16 +1,3 @@
-import pickle
-recon = pickle.load(open("reconstructed_obj.pk", "rb"))
-stats = pickle.load(open("sampling_1_stats.pk", "rb"))
-samples = stats.get("samples")
-
-print("records in reconstructed_obj.pk:", len(recon))
-print("entries in samples:", len(samples) if hasattr(samples, "__len__") else type(samples))
-
-# how many samples are REAL (have a filename) vs empty/placeholder
-real = 0
-if isinstance(samples, list):
-    for s in samples:
-        fn = s.get("file_name") if isinstance(s, dict) else (s if isinstance(s, str) else None)
-        if fn:
-            real += 1
-print("samples with a real filename:", real)
+records in reconstructed_obj.pk: 500
+entries in samples: 121
+samples with a real filename: 0
