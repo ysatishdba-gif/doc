@@ -59,6 +59,11 @@ API_URL     = ""                          # <-- new internal extraction endpoint
 INPUT_PATH  = "reconstructed_obj.pk"      # a single .pk/.pkl file OR a folder of them
 OUTPUT_PATH = "concepts_by_chunk.pkl"     # new pkl this script writes
 
+# Test one doc first, then do all. Set to a filename stem (e.g. "sample_101")
+# to process ONLY that document; set to None (or "") to process every document.
+# Matched against each doc's `raw_document` (filename), NOT the pickle index.
+ONLY_DOC = "sample_101"
+
 MAX_WORKERS      = 8        # concurrent API calls (lower if the API rate-limits)
 REQUEST_TIMEOUT  = 600      # seconds per call
 MAX_RETRIES      = 3        # attempts per chunk on transient errors
@@ -226,6 +231,18 @@ def _records_from_obj(obj, stem):
         yield key, label, category, chunks
 
 
+def _match_only(label, only):
+    """True if `label` (a filename like 'sample_101.pdf') matches ONLY_DOC.
+
+    Exact stem match so 'sample_101' does NOT also catch 'sample_1011'.
+    """
+    if not only:
+        return True
+    lab = str(label)
+    stem = os.path.splitext(os.path.basename(lab))[0]
+    return only == stem or only == lab
+
+
 def load_documents(path):
     """Return a list of (doc_key, label, category, chunks). Accepts file or dir."""
     if os.path.isdir(path):
@@ -263,8 +280,19 @@ def main():
     tokens = TokenManager(GCLOUD_LOC)
     tokens.headers(force=True)                       # fail fast on auth/config
 
-    docs = load_documents(INPUT_PATH)
-    print(f"Loaded {len(docs)} documents from {INPUT_PATH}")
+    all_docs = load_documents(INPUT_PATH)
+    print(f"Loaded {len(all_docs)} documents from {INPUT_PATH}")
+
+    docs = all_docs
+    if ONLY_DOC:
+        docs = [t for t in all_docs if _match_only(t[1], ONLY_DOC)]
+        if not docs:
+            print(f"\nNo document matched ONLY_DOC={ONLY_DOC!r}. Available labels:")
+            for k, lab, *_ in all_docs[:40]:
+                print(f"   key={str(k):>8}  {lab}")
+            raise SystemExit(1)
+        print(f"ONLY_DOC={ONLY_DOC!r} -> processing {len(docs)} document(s): "
+              f"{[t[1] for t in docs]}")
 
     results = {}
     if os.path.exists(OUTPUT_PATH):                  # resume
@@ -336,6 +364,11 @@ def main():
           f"sum(unique CUIs per doc)={cui_sum}  chunk-errors={errs}")
     print(f"Saved -> {OUTPUT_PATH}")
 
+    if ONLY_DOC:                                  # show the tested doc in detail
+        for key, *_ in docs:
+            print()
+            inspect(key, OUTPUT_PATH)
+
 
 def peek(path=OUTPUT_PATH, n=3):
     """Quick sanity check of the output pkl."""
@@ -349,6 +382,41 @@ def peek(path=OUTPUT_PATH, n=3):
         for c in d["chunks"][:3]:
             tag = f"ERR {c['error']}" if c.get("error") else f"{len(c['cuis'])} cuis"
             print(f"   chunk {c['i']:>2}: {tag:<10} {c['preview']!r}")
+
+
+def inspect(key=None, path=OUTPUT_PATH, max_chunks=None, sample_concept=True):
+    """Detailed view of ONE document's extraction -- use to judge the test run.
+
+    Prints each chunk's CUIs and dumps one full concept entry so you can confirm
+    parse_concepts() grabbed the right structure from the NEW API response.
+    """
+    import json as _json
+    with open(path, "rb") as f:
+        r = pickle.load(f)
+    if key is None:
+        key = next(iter(r))
+    d = r[key]
+    print("=" * 70)
+    print(f"{d['doc_id']}   chunks={d['n_chunks']}   "
+          f"union_cuis={len(d['extracted_cuis'])}")
+    print("=" * 70)
+    chunks = d["chunks"] if max_chunks is None else d["chunks"][:max_chunks]
+    shown = False
+    for c in chunks:
+        if c.get("error"):
+            print(f"[chunk {c['i']:>2}] ERROR: {c['error']}")
+            continue
+        print(f"[chunk {c['i']:>2}] {len(c['cuis'])} cuis  {c['preview']!r}")
+        if c["cuis"]:
+            print(f"            {c['cuis']}")
+        if sample_concept and not shown and c["concepts"]:
+            cui, meta = next(iter(c["concepts"].items()))
+            blob = _json.dumps(meta, indent=2, ensure_ascii=False)[:800]
+            print("\n  -- sample concept (verify parse_concepts path) --")
+            print(f"  {cui}:")
+            print("  " + blob.replace("\n", "\n  ") + "\n")
+            shown = True
+    print(f"UNION ({len(d['extracted_cuis'])}): {d['extracted_cuis']}")
 
 
 if __name__ == "__main__":
