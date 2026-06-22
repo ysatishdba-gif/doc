@@ -51,7 +51,17 @@ STATS_PATH  = "sampling_1_stats.pk"        # filename manifest; None to skip
 OUTPUT_PATH = "concepts_by_chunk.pkl"
 
 ONLY_DOC = 101            # test one doc (key or filename); None/"" = ALL docs
-MAX_WORKERS = 4           # documents processed in parallel
+
+# Extraction granularity:
+#   "blob" = one API call PER BLOB. Faithful -- identical to extracting each blob
+#            separately (this is what you validated). Slower: (#blobs) calls/doc.
+#   "doc"  = one API call for the whole document, CUIs split back to blobs by
+#            offset. ~#blobs x fewer calls, BUT the CUIs differ from per-blob
+#            extraction (combined context + per-request top_k/p/q budget shared
+#            across more entities). Use only if that difference is acceptable.
+MODE = "blob"
+
+MAX_WORKERS = 4           # documents processed in parallel == max concurrent API calls
 REQUEST_TIMEOUT = 600     # seconds per call (one call = one whole document)
 MAX_RETRIES = 3
 RETRY_BACKOFF = 2.0
@@ -351,14 +361,27 @@ def _doc_text_and_spans(blobs):
     return SEP.join(parts), spans
 
 
-def _offsets(occ):
-    """All character start offsets in one concept-occurrence's `text` field."""
+def _spans_of(occ):
+    """Yield (start, length, surface) tuples from one occurrence's `text` field.
+    Handles both [start,len,surface] and [[s,l,surface],...]."""
     t = occ.get("text") if isinstance(occ, dict) else None
     if not isinstance(t, list) or not t:
         return []
-    if isinstance(t[0], (int, float)):           # [start, len, surface]
-        return [int(t[0])]
-    return [int(x[0]) for x in t if isinstance(x, list) and x]  # [[s,l,txt],...]
+    if isinstance(t[0], (int, float)):                       # [start, len, surface]
+        s = surface = None
+        try:
+            s, length, surface = int(t[0]), int(t[1]), (t[2] if len(t) > 2 else "")
+        except (ValueError, TypeError):
+            return []
+        return [(s, length, surface)]
+    out = []
+    for x in t:                                              # [[s,l,surface], ...]
+        if isinstance(x, list) and len(x) >= 2:
+            try:
+                out.append((int(x[0]), int(x[1]), (x[2] if len(x) > 2 else "")))
+            except (ValueError, TypeError):
+                pass
+    return out
 
 
 def _blob_of(offset, spans):
@@ -368,25 +391,61 @@ def _blob_of(offset, spans):
     return None
 
 
-def map_concepts_to_blobs(concepts, spans, n_blobs):
-    """Return (per_blob_cuis: list[list[str]], union: list[str])."""
-    per = [[] for _ in range(n_blobs)]
-    seen = [set() for _ in range(n_blobs)]
+def _blob_containing(surface, blobs, start_blob=0):
+    """First blob index whose text contains `surface` (offset fallback)."""
+    if not surface:
+        return None
+    for i in range(len(blobs)):
+        if surface in blobs[i]:
+            return i
+    return None
+
+
+def map_concepts_to_blobs(concepts, text, spans, blobs):
+    """Assign each CUI to blob(s) using the API's char offsets, but ONLY trust an
+    offset when text[start:start+len] reproduces the surface string; otherwise
+    fall back to finding the surface text in a blob. Returns
+    (per_blob_cuis, union, stats) where stats reveals how reliable mapping was.
+    """
+    n = len(blobs)
+    per = [[] for _ in range(n)]
+    seen = [set() for _ in range(n)]
     union, useen = [], set()
+    stats = {"by_offset": 0, "by_surface": 0, "unmapped": 0}
     for cui, occ_list in concepts.items():
         if cui not in useen:
             useen.add(cui); union.append(cui)
         occs = occ_list if isinstance(occ_list, list) else [occ_list]
+        targets = set()
         for occ in occs:
-            for off in _offsets(occ):
-                bi = _blob_of(off, spans)
-                if bi is not None and cui not in seen[bi]:
-                    seen[bi].add(cui); per[bi].append(cui)
-    return per, union
+            for (start, length, surface) in _spans_of(occ):
+                bi = None
+                if surface and 0 <= start <= len(text) and \
+                        text[start:start + length] == surface:
+                    bi = _blob_of(start, spans)         # offset verified against surface
+                    if bi is not None:
+                        stats["by_offset"] += 1
+                if bi is None and surface:              # offset drifted -> locate surface
+                    bi = _blob_containing(surface, blobs)
+                    if bi is not None:
+                        stats["by_surface"] += 1
+                if bi is None:
+                    stats["unmapped"] += 1
+                else:
+                    targets.add(bi)
+        for bi in targets:
+            if cui not in seen[bi]:
+                seen[bi].add(cui); per[bi].append(cui)
+    return per, union, stats
 
 
 # ============================================================================
-# PROCESS ONE DOC  (one API call -> per-blob CUIs)
+# PROCESS ONE DOC
+#   MODE="blob": one API call PER BLOB (faithful -- matches separate extraction)
+#   MODE="doc" : one API call for the whole doc (fast, but CUIs differ; see notes)
+# In both modes a document is the unit of parallelism, so total concurrent API
+# calls == MAX_WORKERS (blob mode runs a doc's blobs sequentially within a worker,
+# which keeps the server load bounded and avoids the burst stall).
 # ============================================================================
 def process_doc(d, tokens):
     key = d["key"]
@@ -400,11 +459,35 @@ def process_doc(d, tokens):
         "file_name": d.get("file_name"), "raw_document": d["raw_document"],
         "category": d["category"], "pages": d.get("pages"),
         "n_blobs": d["n_blobs"], "n_sections": d["n_sections"], "n_chunks": len(blobs),
+        "mode": MODE,
     }
     if not blobs:
         return key, {**base, "chunks": [], "extracted_cuis": [],
                      "doc_secs": 0.0, "server_ms": {}, "n_errors": 0, "complete": True}
 
+    if MODE == "blob":
+        # ---- faithful: one call per blob, exactly as separate extraction ----
+        chunk_records, union, useen = [], [], set()
+        total_secs, n_err = 0.0, 0
+        for i, b in enumerate(blobs):
+            concepts, err, secs, _server_ms = call_api(tokens, b)
+            total_secs += secs
+            cuis = [] if err else list(concepts.keys())
+            if err:
+                n_err += 1
+            for c in cuis:
+                if c not in useen:
+                    useen.add(c); union.append(c)
+            chunk_records.append({
+                "i": i, "blob_index": i,
+                "preview": b[:80].replace("\n", " "),
+                "cuis": cuis, "error": err,
+            })
+        return key, {**base, "chunks": chunk_records, "extracted_cuis": union,
+                     "doc_secs": round(total_secs, 2),
+                     "n_errors": n_err, "complete": (n_err == 0)}
+
+    # ---- fast: combine all blobs into one call, split back by offset ----
     text, spans = _doc_text_and_spans(blobs)
     concepts, err, secs, server_ms = call_api(tokens, text)
     if err:
@@ -413,13 +496,13 @@ def process_doc(d, tokens):
         return key, {**base, "chunks": chunks, "extracted_cuis": [],
                      "doc_secs": round(secs, 2), "server_ms": server_ms,
                      "error": err, "n_errors": 1, "complete": False}
-
-    per_blob, union = map_concepts_to_blobs(concepts, spans, len(blobs))
+    per_blob, union, mstats = map_concepts_to_blobs(concepts, text, spans, blobs)
     chunks = [{"i": i, "blob_index": i, "preview": blobs[i][:80].replace("\n", " "),
                "cuis": per_blob[i]} for i in range(len(blobs))]
     return key, {**base, "chunks": chunks, "extracted_cuis": union,
                  "doc_secs": round(secs, 2), "server_ms": server_ms,
-                 "n_errors": 0, "complete": True}
+                 "mapping_stats": mstats, "n_errors": 0, "complete": True}
+
 
 
 # ============================================================================
@@ -434,9 +517,11 @@ def estimate(avg_doc_secs, path=None, workers=None):
     workers = workers or MAX_WORKERS
     docs = load_documents(path)
     nd = len(docs)
+    blobs = sum(len(d["chunks"]) for d in docs)
+    calls = blobs if MODE == "blob" else nd
     print("\n" + "=" * 56)
-    print(f"PROJECTION ({nd} docs, 1 API call each)")
-    print(f"measured avg per-doc latency: {avg_doc_secs:.1f}s")
+    print(f"PROJECTION ({nd} docs, MODE={MODE!r}, ~{calls} API calls total)")
+    print(f"measured avg per-doc time: {avg_doc_secs:.1f}s")
     print(f"sequential: ~{_hms(nd * avg_doc_secs)}")
     for w in sorted({2, 4, 8, workers}):
         mark = "  <- current MAX_WORKERS" if w == workers else ""
@@ -534,6 +619,11 @@ def inspect(key=None, path=OUTPUT_PATH, max_chunks=None):
     print(f"pages={d.get('pages')}  blobs={d['n_chunks']}  "
           f"union_cuis={len(d['extracted_cuis'])}  doc_secs={d.get('doc_secs')}  "
           f"server_ms={sm}")
+    ms = d.get("mapping_stats")
+    if ms:
+        print(f"blob mapping: by_offset={ms.get('by_offset')}  "
+              f"by_surface={ms.get('by_surface')}  unmapped={ms.get('unmapped')}  "
+              f"(want most by_offset, unmapped~0)")
     print("=" * 70)
     chunks = d["chunks"] if max_chunks is None else d["chunks"][:max_chunks]
     for c in chunks:
