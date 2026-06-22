@@ -1,13 +1,548 @@
-Loaded 500 documents from reconstructed_obj.pk
-ONLY_DOC=101 -> 1 doc(s): [(101, 'sample_101.pdf')]
-[1/1] doc_101_sample_101: 17 chunks, pages=2
-    submitting 17 chunk(s) across 4 workers...
-      ... still working: 0/17 chunks, elapsed 30s (workers=4)
-      ... still working: 0/17 chunks, elapsed 60s (workers=4)
-      ... still working: 0/17 chunks, elapsed 90s (workers=4)
-      ... still working: 0/17 chunks, elapsed 120s (workers=4)
-      ... still working: 0/17 chunks, elapsed 150s (workers=4)
-      ... still working: 0/17 chunks, elapsed 180s (workers=4)
-      ... still working: 0/17 chunks, elapsed 210s (workers=4)
-      ... still working: 0/17 chunks, elapsed 240s (workers=4)
-      ... still working: 0/17 chunks, elapsed 270s (workers=4)
+"""
+extract_concepts.py
+--------------------
+PHASE 1: extract UMLS CUIs for every blob of every document, fast.
+
+ONE API call per DOCUMENT (not per blob): the doc's blobs are joined into a
+single text, sent once, and the returned concepts are mapped back to each blob
+using the character offsets the API reports. This cuts calls ~Nx (N = blobs/doc),
+sends the large prompt once per doc, and avoids the within-doc concurrency stall.
+Documents are processed in parallel (MAX_WORKERS docs at a time). No PDFs opened.
+
+Output pickle (keyed by the reconstructed_obj.pk key):
+
+    { key: {
+        "doc_id": "doc_101_sample_101",
+        # ADDRESS (join back to sources / PDFs):
+        "key": 101, "input_file": None, "sampling_id": "sampling_1",
+        "sample_index": 101, "file_name": "sample_101.pdf",
+        # metadata:
+        "raw_document": "...", "category": "...", "pages": 2,
+        "n_blobs": 17, "n_sections": 17, "n_chunks": 17,
+        "chunks": [ {"i":0,"blob_index":0,"preview":"...","cuis":["C..."]}, ... ],
+        "extracted_cuis": ["C...", ...],   # doc-level union
+        "doc_secs": 41.2, "server_ms": {"extraction_ms":..,"matching_ms":..},
+        "n_errors": 0, "complete": True,
+      }, ... }
+
+Recover text / PDF from an address:
+    reconstructed_obj.pk[key]['reconstructed']['blobs'][blob_index]
+    sampling_1_stats.pk['samples'][sample_index]
+"""
+
+import os
+import glob
+import time
+import pickle
+import threading
+import subprocess
+
+import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# ============================================================================
+# CONFIG  -- set the first two, tune the rest
+# ============================================================================
+GCLOUD_LOC  = r"C:\path\to\gcloud.cmd"    # Windows: the .cmd; *nix: "gcloud"
+API_URL     = ""                           # internal extraction endpoint
+
+INPUT_PATH  = "reconstructed_obj.pk"       # a single .pk/.pkl file OR a folder
+STATS_PATH  = "sampling_1_stats.pk"        # filename manifest; None to skip
+OUTPUT_PATH = "concepts_by_chunk.pkl"
+
+ONLY_DOC = 101            # test one doc (key or filename); None/"" = ALL docs
+MAX_WORKERS = 4           # documents processed in parallel
+REQUEST_TIMEOUT = 600     # seconds per call (one call = one whole document)
+MAX_RETRIES = 3
+RETRY_BACKOFF = 2.0
+TOKEN_TTL = 50 * 60       # refresh gcloud identity token every 50 min
+CHECKPOINT_DOCS = 1       # save OUTPUT_PATH after every N finished docs
+HEARTBEAT_SECS = 30
+SEP = "\n"                # joins blobs into the doc text (1 char -> exact offsets)
+
+# ============================================================================
+# PAYLOAD  (only `text` changes per call)
+# ============================================================================
+PIPELINE_STEPS = {
+    "run_general_extraction": True,
+    "run_ner_extraction": False,
+    "run_semantic_linking_v1": False,
+    "run_semantic_linking_v2": False,
+    "run_intent_filter": False,
+    "run_deep_search": False,
+}
+
+INTENTS_DEFINITION = """
+The text contains entities. Entity's description is similar to as an entity is used in Unified Medical Language System (UMLS) Metathesaurus.
+It is generally used to refer to a recognizable, distinct object or concept in the real world or in a medical context.
+For example, entity can be a disease, medication, symptom of a disease or any other concept.
+Identify and return ALL entities available in the provided text and exactly as they appear in the text.
+Additionally, there are list of semantic types mentioned here: ["Acquired Abnormality", "Activity", "Age Group", "Amino Acid Sequence", "Amino Acid, Peptide, or Protein", "Amphibian", "Anatomical Abnormality", "Anatomical Structure", "Animal", "Antibiotic", "Archaeon", "Bacterium", "Behavior", "Biologic Function", "Biologically Active Substance", "Biomedical Occupation or Discipline", "Biomedical or Dental Material", "Bird", "Body Location or Region", "Body Part, Organ, or Organ Component", "Body Space or Junction", "Body Substance", "Body System", "Carbohydrate Sequence", "Cell", "Cell Component", "Cell Function", "Cell or Molecular Dysfunction", "Chemical", "Chemical Viewed Functionally", "Chemical Viewed Structurally", "Classification", "Clinical Attribute", "Clinical Drug", "Conceptual Entity", "Congenital Abnormality", "Daily or Recreational Activity", "Diagnostic Procedure", "Disease or Syndrome", "Drug Delivery Device", "Educational Activity", "Element, Ion, or Isotope", "Embryonic Structure", "Entity", "Environmental Effect of Humans", "Enzyme", "Eukaryote", "Event", "Experimental Model of Disease", "Family Group", "Finding", "Fish", "Food", "Fully Formed Anatomical Structure", "Functional Concept", "Fungus", "Gene or Genome", "Genetic Function", "Geographic Area", "Governmental or Regulatory Activity", "Group", "Group Attribute", "Hazardous or Poisonous Substance", "Health Care Activity", "Health Care Related Organization", "Hormone", "Human", "Human-caused Phenomenon or Process", "Idea or Concept", "Immunologic Factor", "Indicator, Reagent, or Diagnostic Aid", "Individual Behavior", "Injury or Poisoning", "Inorganic Chemical", "Intellectual Product", "Laboratory or Test Result", "Laboratory Procedure", "Language", "Machine Activity", "Mammal", "Manufactured Object", "Medical Device", "Mental or Behavioral Dysfunction", "Mental Process", "Molecular Biology Research Technique", "Molecular Function", "Molecular Sequence", "Natural Phenomenon or Process", "Neoplastic Process", "Nucleic Acid, Nucleoside, or Nucleotide", "Nucleotide Sequence", "Occupation or Discipline", "Occupational Activity", "Organ or Tissue Function", "Organic Chemical", "Organism", "Organism Attribute", "Organism Function", "Organization", "Pathologic Function", "Patient or Disabled Group", "Pharmacologic Substance", "Phenomenon or Process", "Physical Object", "Physiologic Function", "Plant", "Population Group", "Professional or Occupational Group", "Professional Society", "Qualitative Concept", "Quantitative Concept", "Receptor", "Regulation or Law", "Reptile", "Research Activity", "Research Device", "Self-help or Relief Organization", "Sign or Symptom", "Social Behavior", "Spatial Concept", "Substance", "Temporal Concept", "Therapeutic or Preventive Procedure", "Tissue", "Vertebrate", "Virus", "Vitamin"]. Each identified entity can belong to a specific semantic type.
+"""
+
+INTENTS = {1: {"metadata": "Entities", "definition": INTENTS_DEFINITION}}
+CLUSTER_SELECTION_PARAMS = {
+    "cluster_set": "umls", "top_k": 150, "top_p": 10, "top_q": 20,
+    "source_system": ["ICD10CM"],
+}
+REASONING = ["both"]
+
+
+def build_payload(text):
+    return {
+        "text": text,
+        "pipeline_steps": PIPELINE_STEPS,
+        "intents": INTENTS,
+        "cluster_selection_params": CLUSTER_SELECTION_PARAMS,
+        "reasoning": REASONING,
+    }
+
+
+def parse_concepts(data):
+    """{cui: [occurrence, ...]} from data['output']['concepts']."""
+    out = data.get("output", data) if isinstance(data, dict) else {}
+    c = out.get("concepts", {}) if isinstance(out, dict) else {}
+    return c if isinstance(c, dict) else {}
+
+
+def parse_timings(data):
+    if not isinstance(data, dict):
+        return {}
+    tm = (data.get("details", {}) or {}).get("timings_ms", {}) or {}
+    return {"extraction_ms": tm.get("step_1_extraction_ms"),
+            "matching_ms": tm.get("step_2_matching_ms")}
+
+
+# ============================================================================
+# AUTH + HTTP
+# ============================================================================
+class TokenManager:
+    def __init__(self, gcloud_loc, ttl=TOKEN_TTL):
+        self._gcloud, self._ttl = gcloud_loc, ttl
+        self._token, self._fetched_at = None, 0.0
+        self._lock = threading.Lock()
+
+    def _fetch(self):
+        p = subprocess.run([self._gcloud, "auth", "print-identity-token"],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if p.returncode != 0:
+            raise RuntimeError(f"gcloud failed: {p.stderr.strip()}")
+        tok = (p.stdout or "").strip()
+        if not tok:
+            raise RuntimeError("gcloud returned an empty identity token")
+        return tok
+
+    def headers(self, force=False):
+        with self._lock:
+            now = time.time()
+            if force or self._token is None or (now - self._fetched_at) > self._ttl:
+                self._token = self._fetch()
+                self._fetched_at = now
+            return {"Authorization": f"Bearer {self._token}",
+                    "Content-Type": "application/json"}
+
+
+_thread_local = threading.local()
+
+
+def _session():
+    s = getattr(_thread_local, "session", None)
+    if s is None:
+        s = requests.Session()
+        _thread_local.session = s
+    return s
+
+
+def call_api(tokens, text):
+    """One API call. Returns (concepts, error, secs, server_ms)."""
+    payload = build_payload(text)
+    last_err, a0 = None, time.perf_counter()
+    for attempt in range(1, MAX_RETRIES + 1):
+        a0 = time.perf_counter()
+        try:
+            resp = _session().post(API_URL, json=payload,
+                                   headers=tokens.headers(), timeout=REQUEST_TIMEOUT)
+            if resp.status_code == 401:
+                tokens.headers(force=True)
+                raise requests.HTTPError("401 Unauthorized (refreshed token)")
+            resp.raise_for_status()
+            try:
+                data = resp.json()
+            except ValueError:
+                return ({}, f"JSON decode failed (HTTP {resp.status_code}): "
+                        f"{resp.text[:300]}", time.perf_counter() - a0, {})
+            return parse_concepts(data), None, time.perf_counter() - a0, parse_timings(data)
+        except (requests.RequestException, RuntimeError) as e:
+            last_err = str(e)
+            if attempt < MAX_RETRIES:
+                time.sleep(RETRY_BACKOFF * attempt)
+    return {}, f"failed after {MAX_RETRIES} attempts: {last_err}", time.perf_counter() - a0, {}
+
+
+# ============================================================================
+# INPUT
+# ============================================================================
+LINK_FIELDS = ("recon_index", "reconstructed_index", "doc_index", "index", "id")
+
+
+def build_filemap(stats):
+    """{'sampling_id':..., 'by_key': {recon_key: {'file_name':..,'sample_index':i}}}."""
+    out = {"sampling_id": None, "by_key": {}}
+    if not isinstance(stats, dict):
+        return out
+    out["sampling_id"] = stats.get("sampling_id")
+    samples = stats.get("samples")
+
+    def _fn(s):
+        if isinstance(s, dict):
+            return s.get("file_name") or s.get("filename") or s.get("name")
+        return s if isinstance(s, str) else None
+
+    if isinstance(samples, list):
+        for i, s in enumerate(samples):
+            key = i
+            if isinstance(s, dict):
+                for lf in LINK_FIELDS:
+                    if isinstance(s.get(lf), int):
+                        key = s[lf]
+                        break
+            out["by_key"][key] = {"file_name": _fn(s), "sample_index": i}
+    elif isinstance(samples, dict):
+        for k, s in samples.items():
+            try:
+                out["by_key"][int(k)] = {"file_name": _fn(s), "sample_index": k}
+            except (ValueError, TypeError):
+                pass
+    return out
+
+
+def _records_from_obj(obj, stem, addr):
+    items = obj.items() if isinstance(obj, dict) else enumerate(obj)
+    for idx, d in items:
+        if not isinstance(d, dict):
+            continue
+        recon = d.get("reconstructed", d)
+        raw_document = (d.get("raw_document") or recon.get("raw_document")
+                        or f"doc_{idx}")
+        info = addr["by_key"].get(idx, {}) if stem is None else {}
+        file_name = (recon.get("file_name") or d.get("file_name") or info.get("file_name"))
+        blobs = recon.get("blobs") or []
+        chunks = [b for b in blobs if isinstance(b, str) and b.strip()]
+        if not chunks:
+            t = recon.get("text", "")
+            chunks = [t] if isinstance(t, str) and t.strip() else []
+        yield {
+            "key": idx if stem is None else f"{stem}#{idx}",
+            "input_file": stem,
+            "sampling_id": addr.get("sampling_id"),
+            "sample_index": info.get("sample_index"),
+            "file_name": file_name,
+            "raw_document": raw_document,
+            "category": recon.get("document", ""),
+            "pages": recon.get("pages"),
+            "n_blobs": len(blobs),
+            "n_sections": len(recon.get("sections") or []),
+            "chunks": chunks,
+        }
+
+
+def load_documents(path=None, stats_path=None):
+    path = path or INPUT_PATH
+    stats_path = stats_path if stats_path is not None else STATS_PATH
+    addr = {"sampling_id": None, "by_key": {}}
+    if stats_path and os.path.exists(stats_path):
+        try:
+            with open(stats_path, "rb") as f:
+                addr = build_filemap(pickle.load(f))
+        except Exception as e:
+            print(f"[warn] could not read {stats_path}: {e}")
+    if os.path.isdir(path):
+        files = sorted(glob.glob(os.path.join(path, "*.pk")) +
+                       glob.glob(os.path.join(path, "*.pkl")))
+        if not files:
+            raise FileNotFoundError(f"no .pk/.pkl files in {path}")
+        out = []
+        for fp in files:
+            st = os.path.splitext(os.path.basename(fp))[0]
+            with open(fp, "rb") as f:
+                out.extend(_records_from_obj(pickle.load(f), st, addr))
+        return out
+    with open(path, "rb") as f:
+        return list(_records_from_obj(pickle.load(f), None, addr))
+
+
+def _match_only(label, only, key=None):
+    if not only:
+        return True
+    import re as _re
+    o = str(only).strip().casefold()
+    lab = str(label).strip().casefold()
+    stem = os.path.splitext(os.path.basename(lab))[0]
+    if o == stem or o == lab or f"{o}.pdf" == lab:
+        return True
+    if _re.search(rf"(?:^|[^0-9a-z]){_re.escape(o)}(?:[^0-9a-z]|$)", lab):
+        return True
+    if key is not None and o == str(key).strip().casefold():
+        return True
+    return False
+
+
+def _doc_matches(d, only):
+    if not only:
+        return True
+    return (_match_only(d.get("file_name") or "", only, d["key"])
+            or _match_only(d.get("raw_document") or "", only, d["key"]))
+
+
+def list_docs(path=None, n=None):
+    docs = load_documents(path)
+    print(f"{len(docs)} documents")
+    for i, d in enumerate(docs):
+        if n and i >= n:
+            print(f"   ... ({len(docs) - n} more)"); break
+        print(f"{str(d['key']):>6}  {str(d.get('file_name')):18.18}  "
+              f"{str(d['raw_document']):28.28}  pages={d.get('pages')}  blobs={len(d['chunks'])}")
+
+
+def validate_docs(path=None, stats_path=None, sample=20):
+    docs = load_documents(path, stats_path)
+    n = len(docs)
+    no_chunks = [d for d in docs if not d["chunks"]]
+    no_name = [d for d in docs if not d.get("file_name")]
+    total_chunks = sum(len(d["chunks"]) for d in docs)
+    total_pages = sum(d["pages"] for d in docs if isinstance(d.get("pages"), int))
+    print(f"VALIDATION ({n} docs)  total_blobs={total_chunks}  total_pages={total_pages}")
+    print(f"{'KEY':>6}  {'file_name':18}  {'pages':>5}  {'blobs':>5}  flags")
+    for d in docs[:sample]:
+        flags = []
+        if not d["chunks"]:
+            flags.append("NO-CHUNKS")
+        if not isinstance(d.get("pages"), int):
+            flags.append("NO-PAGES")
+        if not d.get("file_name"):
+            flags.append("no-name")
+        print(f"{str(d['key']):>6}  {str(d.get('file_name')):18.18}  "
+              f"{str(d.get('pages')):>5}  {len(d['chunks']):>5}  {','.join(flags)}")
+    if n > sample:
+        print(f"   ... ({n - sample} more)")
+    print(f"docs w/ 0 blobs: {len(no_chunks)} {[d['key'] for d in no_chunks][:15]}")
+    print(f"docs w/o name  : {len(no_name)} {[d['key'] for d in no_name][:15]}")
+    print(f"ready to extract: {n - len(no_chunks)}/{n}")
+    return docs
+
+
+# ============================================================================
+# OUTPUT + offset->blob mapping
+# ============================================================================
+def _save(obj, path):
+    tmp = f"{path}.tmp"
+    with open(tmp, "wb") as f:
+        pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
+    os.replace(tmp, path)
+
+
+def _doc_text_and_spans(blobs):
+    """Join blobs with SEP; return (text, spans) where spans[i]=(start,end)."""
+    spans, cur, parts = [], 0, []
+    for b in blobs:
+        spans.append((cur, cur + len(b)))
+        parts.append(b)
+        cur += len(b) + len(SEP)
+    return SEP.join(parts), spans
+
+
+def _offsets(occ):
+    """All character start offsets in one concept-occurrence's `text` field."""
+    t = occ.get("text") if isinstance(occ, dict) else None
+    if not isinstance(t, list) or not t:
+        return []
+    if isinstance(t[0], (int, float)):           # [start, len, surface]
+        return [int(t[0])]
+    return [int(x[0]) for x in t if isinstance(x, list) and x]  # [[s,l,txt],...]
+
+
+def _blob_of(offset, spans):
+    for i, (s, e) in enumerate(spans):
+        if s <= offset < e:
+            return i
+    return None
+
+
+def map_concepts_to_blobs(concepts, spans, n_blobs):
+    """Return (per_blob_cuis: list[list[str]], union: list[str])."""
+    per = [[] for _ in range(n_blobs)]
+    seen = [set() for _ in range(n_blobs)]
+    union, useen = [], set()
+    for cui, occ_list in concepts.items():
+        if cui not in useen:
+            useen.add(cui); union.append(cui)
+        occs = occ_list if isinstance(occ_list, list) else [occ_list]
+        for occ in occs:
+            for off in _offsets(occ):
+                bi = _blob_of(off, spans)
+                if bi is not None and cui not in seen[bi]:
+                    seen[bi].add(cui); per[bi].append(cui)
+    return per, union
+
+
+# ============================================================================
+# PROCESS ONE DOC  (one API call -> per-blob CUIs)
+# ============================================================================
+def process_doc(d, tokens):
+    key = d["key"]
+    blobs = d["chunks"]
+    name = d.get("file_name") or d["raw_document"]
+    stem = os.path.splitext(os.path.basename(str(name)))[0]
+    base = {
+        "doc_id": f"doc_{key}_{stem.replace(' ', '_')}",
+        "key": key, "input_file": d.get("input_file"),
+        "sampling_id": d.get("sampling_id"), "sample_index": d.get("sample_index"),
+        "file_name": d.get("file_name"), "raw_document": d["raw_document"],
+        "category": d["category"], "pages": d.get("pages"),
+        "n_blobs": d["n_blobs"], "n_sections": d["n_sections"], "n_chunks": len(blobs),
+    }
+    if not blobs:
+        return key, {**base, "chunks": [], "extracted_cuis": [],
+                     "doc_secs": 0.0, "server_ms": {}, "n_errors": 0, "complete": True}
+
+    text, spans = _doc_text_and_spans(blobs)
+    concepts, err, secs, server_ms = call_api(tokens, text)
+    if err:
+        chunks = [{"i": i, "blob_index": i, "preview": b[:80].replace("\n", " "),
+                   "cuis": []} for i, b in enumerate(blobs)]
+        return key, {**base, "chunks": chunks, "extracted_cuis": [],
+                     "doc_secs": round(secs, 2), "server_ms": server_ms,
+                     "error": err, "n_errors": 1, "complete": False}
+
+    per_blob, union = map_concepts_to_blobs(concepts, spans, len(blobs))
+    chunks = [{"i": i, "blob_index": i, "preview": blobs[i][:80].replace("\n", " "),
+               "cuis": per_blob[i]} for i in range(len(blobs))]
+    return key, {**base, "chunks": chunks, "extracted_cuis": union,
+                 "doc_secs": round(secs, 2), "server_ms": server_ms,
+                 "n_errors": 0, "complete": True}
+
+
+# ============================================================================
+# ESTIMATE
+# ============================================================================
+def _hms(secs):
+    secs = int(secs); h, r = divmod(secs, 3600); m, s = divmod(r, 60)
+    return f"{h}h{m:02d}m{s:02d}s" if h else f"{m}m{s:02d}s"
+
+
+def estimate(avg_doc_secs, path=None, workers=None):
+    workers = workers or MAX_WORKERS
+    docs = load_documents(path)
+    nd = len(docs)
+    print("\n" + "=" * 56)
+    print(f"PROJECTION ({nd} docs, 1 API call each)")
+    print(f"measured avg per-doc latency: {avg_doc_secs:.1f}s")
+    print(f"sequential: ~{_hms(nd * avg_doc_secs)}")
+    for w in sorted({2, 4, 8, workers}):
+        mark = "  <- current MAX_WORKERS" if w == workers else ""
+        print(f"   workers={w:>2}: ~{_hms(nd / w * avg_doc_secs)}{mark}")
+    print("(real time between sequential and ideal, depending on the API.)")
+
+
+# ============================================================================
+# MAIN  (parallel across documents)
+# ============================================================================
+def main():
+    if not API_URL.strip():
+        raise SystemExit("Set API_URL first.")
+    tokens = TokenManager(GCLOUD_LOC)
+    tokens.headers(force=True)
+
+    all_docs = load_documents(INPUT_PATH)
+    print(f"Loaded {len(all_docs)} documents from {INPUT_PATH}")
+    docs = all_docs
+    if ONLY_DOC:
+        docs = [d for d in all_docs if _doc_matches(d, ONLY_DOC)]
+        if not docs:
+            print(f"No document matched ONLY_DOC={ONLY_DOC!r}. Available:")
+            for d in all_docs[:60]:
+                print(f"   key={str(d['key']):>6}  {d.get('file_name')}  {d['raw_document']}")
+            raise SystemExit(1)
+        print(f"ONLY_DOC={ONLY_DOC!r} -> {[(d['key'], d.get('file_name')) for d in docs]}")
+
+    results = {}
+    if os.path.exists(OUTPUT_PATH):
+        with open(OUTPUT_PATH, "rb") as f:
+            results = pickle.load(f)
+        print(f"Resuming: {len(results)} docs already in {OUTPUT_PATH}")
+
+    pending = [d for d in docs if not results.get(d["key"], {}).get("complete")]
+    print(f"{len(pending)} docs to process ({len(docs) - len(pending)} already done), "
+          f"{MAX_WORKERS} in parallel")
+    if not pending:
+        print("nothing to do.")
+    else:
+        done = [0]
+        t0 = time.perf_counter()
+        stop = threading.Event()
+
+        def _beat():
+            while not stop.wait(HEARTBEAT_SECS):
+                print(f"   ... {done[0]}/{len(pending)} docs done, "
+                      f"elapsed {time.perf_counter()-t0:.0f}s (workers={MAX_WORKERS})")
+        hb = threading.Thread(target=_beat, daemon=True); hb.start()
+        try:
+            with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+                futs = {ex.submit(process_doc, d, tokens): d["key"] for d in pending}
+                for fut in as_completed(futs):
+                    key, rec = fut.result()
+                    results[key] = rec
+                    done[0] += 1
+                    sm = rec.get("server_ms", {}) or {}
+                    extra = ""
+                    if isinstance(sm.get("matching_ms"), (int, float)):
+                        extra = f" match={sm['matching_ms']/1000:.0f}s"
+                    state = "ERROR" if rec.get("n_errors") else (
+                        f"{len(rec['extracted_cuis'])} cuis / {rec['n_chunks']} blobs")
+                    print(f"   [{done[0]}/{len(pending)}] {rec['doc_id']}: {state}  "
+                          f"({rec['doc_secs']:.0f}s{extra})")
+                    if done[0] % CHECKPOINT_DOCS == 0:
+                        _save(results, OUTPUT_PATH)
+        finally:
+            stop.set()
+
+    _save(results, OUTPUT_PATH)
+    errs = sum(1 for r in results.values() if r.get("n_errors"))
+    print(f"\nDONE. docs={len(results)}  doc-errors={errs}  saved -> {OUTPUT_PATH}")
+
+    if ONLY_DOC:
+        for d in docs:
+            print(); inspect(d["key"], OUTPUT_PATH)
+        secs = [results[d["key"]]["doc_secs"] for d in docs
+                if isinstance(results.get(d["key"], {}).get("doc_secs"), (int, float))
+                and results[d["key"]]["doc_secs"] > 0]
+        if secs:
+            estimate(sum(secs) / len(secs))
+
+
+def inspect(key=None, path=OUTPUT_PATH, max_chunks=None):
+    with open(path, "rb") as f:
+        r = pickle.load(f)
+    if key is None:
+        key = next(iter(r))
+    d = r[key]
+    print("=" * 70)
+    print(d["doc_id"])
+    print(f"ADDRESS: key={d.get('key')}  file_name={d.get('file_name')}  "
+          f"sampling_id={d.get('sampling_id')}  sample_index={d.get('sample_index')}")
+    sm = d.get("server_ms", {}) or {}
+    print(f"pages={d.get('pages')}  blobs={d['n_chunks']}  "
+          f"union_cuis={len(d['extracted_cuis'])}  doc_secs={d.get('doc_secs')}  "
+          f"server_ms={sm}")
+    print("=" * 70)
+    chunks = d["chunks"] if max_chunks is None else d["chunks"][:max_chunks]
+    for c in chunks:
+        print(f"[blob {c.get('blob_index', c.get('i')):>2}] {len(c['cuis'])} cuis  "
+              f"{c['preview']!r}")
+        if c["cuis"]:
+            print(f"           {c['cuis']}")
+    print(f"\nUNION ({len(d['extracted_cuis'])}): {d['extracted_cuis']}")
+
+
+if __name__ == "__main__":
+    main()
