@@ -1,13 +1,16 @@
-import pickle
+KEY = 101
+rec = cache[KEY]
 
-cache = pickle.load(open("doc_side_cache.pkl", "rb"))
-# optional extras, if you uploaded them too:
-try:    topics = pickle.load(open("topics.pkl", "rb"))
-except: topics = {}
-try:    recon  = pickle.load(open("reconstructed_obj.pk", "rb"))
-except: recon  = None
+def full_text(i, fallback):
+    try:    return recon[rec.get("key", KEY)]["reconstructed"]["blobs"][i]
+    except: return fallback
 
-# ---- 1) list docs in the cache ----
-for k, rec in cache.items():
-    print(k, rec.get("doc_id"), "| blobs:", len(rec.get("blobs", [])),
-          "| topics:", len(rec.get("topic_ids", [])))
+print("doc_id:", rec["doc_id"], "| blobs:", len(rec["blobs"]),
+      "| topics:", len(rec["topic_ids"]))
+for b in rec["blobs"]:
+    print(f"\n[blob {b['i']}]  {len(b['cuis'])} cuis -> "
+          f"{len(b['surviving'])} surviving -> {len(b['topics'])} topics")
+    print("  text:", full_text(b["i"], b.get("preview",""))[:300])
+    print("  cuis:", b["cuis"])
+    for t in b["topics"]:
+        print(f"    {t['tp']}  size={t['size']}  IC={t['ic']}  '{t['label']}'")
