@@ -85,12 +85,16 @@ OUTPUT_PATH = "concepts_by_chunk.pkl"     # new pkl this script writes
 # sample_101.pdf == samples[101] in sampling_1_stats.pk == key 101 here.
 ONLY_DOC = 101
 
-MAX_WORKERS      = 8        # concurrent API calls (lower if the API rate-limits)
-REQUEST_TIMEOUT  = 600      # seconds per call
+MAX_WORKERS      = 4        # concurrent API calls. The matching step (~65s) only
+                            # partly parallelizes server-side; 4 is a stable start,
+                            # raise toward 8 if the server keeps up, lower to 2 if it stalls.
+REQUEST_TIMEOUT  = 300      # seconds per call. Must exceed the matching step (~65-150s);
+                            # 300 fails a truly-hung request in 5 min instead of hanging.
 MAX_RETRIES      = 3        # attempts per chunk on transient errors
 RETRY_BACKOFF    = 2.0      # base seconds, multiplied by attempt number
 TOKEN_TTL        = 50 * 60  # refresh identity token every 50 min (tokens last ~1h)
-CHECKPOINT_EVERY = 1        # save OUTPUT_PATH after every N documents
+CHECKPOINT_CHUNKS = 3       # save OUTPUT_PATH after every N chunks (mid-doc resume)
+HEARTBEAT_SECS   = 30       # print a "still working" line every N seconds
 
 # ============================================================================
 # PAYLOAD TEMPLATE  (only `text` changes per call)
@@ -527,14 +531,14 @@ def main():
     for n, d in enumerate(docs, 1):
         key = d["key"]
         chunks = d["chunks"]
-        if results.get(key, {}).get("complete"):
+        prior = results.get(key, {})
+        if prior.get("complete"):
             print(f"[{n}/{len(docs)}] skip {key} (done)")
             continue
 
         name = d.get("file_name") or d["raw_document"]
         stem = os.path.splitext(os.path.basename(str(name)))[0]
         doc_id = f"doc_{key}_{stem.replace(' ', '_')}"
-        print(f"[{n}/{len(docs)}] {doc_id}: {len(chunks)} chunks, pages={d.get('pages')}")
 
         base = {
             "doc_id": doc_id,
@@ -555,63 +559,111 @@ def main():
 
         if not chunks:
             results[key] = {**base, "chunks": [], "extracted_cuis": [], "complete": True}
-            if n % CHECKPOINT_EVERY == 0:
-                _save(results, OUTPUT_PATH)
+            _save(results, OUTPUT_PATH)
             continue
 
-        chunk_records = [None] * len(chunks)
-        chunk_secs = []
-        ext_ms, match_ms = [], []
-        doc_t0 = time.perf_counter()
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
-            futs = {ex.submit(extract_chunk, tokens, ch): i
-                    for i, ch in enumerate(chunks)}
-            for fut in as_completed(futs):
-                i = futs[fut]
-                concepts, err, secs, server_ms = fut.result()
-                chunk_secs.append(secs)
-                if isinstance(server_ms.get("extraction_ms"), (int, float)):
-                    ext_ms.append(server_ms["extraction_ms"])
-                if isinstance(server_ms.get("matching_ms"), (int, float)):
-                    match_ms.append(server_ms["matching_ms"])
-                chunk_records[i] = {
-                    "i": i,
-                    "blob_index": i,                 # ADDRESS: blobs[i] in reconstructed_obj.pk[key]
-                    "preview": chunks[i][:80].replace("\n", " "),
-                    "cuis": list(concepts.keys()),   # <-- just the concept list
-                    "error": err,
-                    "secs": round(secs, 3),
-                    "server_ms": server_ms,
-                }
-                tag = f"ERROR: {err}" if err else f"{len(concepts)} concepts"
-                print(f"    [chunk {i:>2}] {tag}  ({secs:.1f}s)")
-        doc_wall = time.perf_counter() - doc_t0
-        cavg = sum(chunk_secs) / len(chunk_secs)
-        split = ""
-        if ext_ms and match_ms:
-            split = (f"  [server avg: extract={sum(ext_ms)/len(ext_ms)/1000:.1f}s "
-                     f"match={sum(match_ms)/len(match_ms)/1000:.1f}s]")
-        print(f"    doc wall={doc_wall:.1f}s  chunks={len(chunks)}  "
-              f"per-chunk avg={cavg:.1f}s "
-              f"med={statistics.median(chunk_secs):.1f}s "
-              f"min={min(chunk_secs):.1f}s max={max(chunk_secs):.1f}s{split}")
+        # reuse any partial progress for this doc (chunk-level resume)
+        if (prior.get("chunks") and len(prior["chunks"]) == len(chunks)):
+            chunk_records = prior["chunks"]
+        else:
+            chunk_records = [None] * len(chunks)
+        pending = [i for i, r in enumerate(chunk_records)
+                   if not r or r.get("error") or "cuis" not in r]
+        done0 = len(chunks) - len(pending)
+        print(f"[{n}/{len(docs)}] {doc_id}: {len(chunks)} chunks, pages={d.get('pages')}"
+              + (f"  (resuming: {done0} done, {len(pending)} left)" if done0 else ""))
+
+        # persist the partial shell now so progress survives an interrupt
+        results[key] = {**base, "chunks": chunk_records,
+                        "extracted_cuis": [], "complete": False}
+        _save(results, OUTPUT_PATH)
+
+        doc_secs_run = None
+        if not pending:                      # everything was already done in a prior run
+            done = [True]
+        else:
+            chunk_secs, ext_ms, match_ms = [], [], []
+            done = [done0]
+            doc_t0 = time.perf_counter()
+
+            # heartbeat so a long-but-alive wave isn't mistaken for a hang
+            stop = threading.Event()
+
+            def _beat():
+                while not stop.wait(HEARTBEAT_SECS):
+                    print(f"      ... still working: {done[0]}/{len(chunks)} chunks, "
+                          f"elapsed {time.perf_counter()-doc_t0:.0f}s "
+                          f"(workers={MAX_WORKERS})")
+            hb = threading.Thread(target=_beat, daemon=True)
+            hb.start()
+
+            print(f"    submitting {len(pending)} chunk(s) across {MAX_WORKERS} workers...")
+            try:
+                with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+                    futs = {ex.submit(extract_chunk, tokens, chunks[i]): i
+                            for i in pending}
+                    for fut in as_completed(futs):
+                        i = futs[fut]
+                        concepts, err, secs, server_ms = fut.result()
+                        chunk_secs.append(secs)
+                        if isinstance(server_ms.get("extraction_ms"), (int, float)):
+                            ext_ms.append(server_ms["extraction_ms"])
+                        if isinstance(server_ms.get("matching_ms"), (int, float)):
+                            match_ms.append(server_ms["matching_ms"])
+                        chunk_records[i] = {
+                            "i": i,
+                            "blob_index": i,             # ADDRESS: blobs[i] in reconstructed_obj.pk[key]
+                            "preview": chunks[i][:80].replace("\n", " "),
+                            "cuis": list(concepts.keys()),
+                            "error": err,
+                            "secs": round(secs, 3),
+                            "server_ms": server_ms,
+                        }
+                        done[0] += 1
+                        tag = f"ERROR: {err}" if err else f"{len(concepts)} concepts"
+                        print(f"    [chunk {i:>2}] {tag}  ({secs:.1f}s)  "
+                              f"[{done[0]}/{len(chunks)}]")
+                        results[key]["chunks"] = chunk_records
+                        if done[0] % CHECKPOINT_CHUNKS == 0:   # checkpoint mid-doc
+                            _save(results, OUTPUT_PATH)
+            finally:
+                stop.set()
+
+            doc_wall = time.perf_counter() - doc_t0
+            doc_secs_run = round(doc_wall, 2)
+            if chunk_secs:
+                split = ""
+                if ext_ms and match_ms:
+                    split = (f"  [server avg: extract={sum(ext_ms)/len(ext_ms)/1000:.1f}s "
+                             f"match={sum(match_ms)/len(match_ms)/1000:.1f}s]")
+                print(f"    doc wall={doc_wall:.1f}s  this-run chunks={len(chunk_secs)}  "
+                      f"per-chunk avg={sum(chunk_secs)/len(chunk_secs):.1f}s "
+                      f"min={min(chunk_secs):.1f}s max={max(chunk_secs):.1f}s{split}")
 
         # order-preserving union of CUIs across chunks
         union, seen = [], set()
         for rec in chunk_records:
-            for c in rec["cuis"]:
+            for c in (rec.get("cuis") if rec else None) or []:
                 if c not in seen:
                     seen.add(c)
                     union.append(c)
 
+        n_err = sum(1 for r in chunk_records if r and r.get("error"))
+        per_chunk_avg = None
+        secs_vals = [r["secs"] for r in chunk_records if r and isinstance(r.get("secs"), (int, float))]
+        if secs_vals:
+            per_chunk_avg = round(sum(secs_vals) / len(secs_vals), 2)
+
         results[key] = {**base, "chunks": chunk_records,
                         "extracted_cuis": union,
-                        "doc_secs": round(doc_wall, 2),
-                        "per_chunk_avg_secs": round(cavg, 2),
-                        "complete": True}
-
-        if n % CHECKPOINT_EVERY == 0:
-            _save(results, OUTPUT_PATH)
+                        "doc_secs": doc_secs_run,
+                        "per_chunk_avg_secs": per_chunk_avg,
+                        "n_errors": n_err,
+                        "complete": (n_err == 0)}   # leave incomplete if chunks errored -> retried on re-run
+        _save(results, OUTPUT_PATH)
+        if n_err:
+            print(f"    note: {n_err} chunk(s) errored -- doc left INCOMPLETE; "
+                  f"re-run to retry just those.")
 
     _save(results, OUTPUT_PATH)
 
