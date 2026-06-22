@@ -1,13 +1,20 @@
-import pickle, pprint
+import pickle
 
 data = pickle.load(open("concepts_by_chunk.pkl", "rb"))
 
-print("docs in file:", len(data))
-print("keys:", list(data)[:10], "...")
+rows = []
+for k, r in data.items():
+    rows.append((
+        r.get("file_name"),                              # name
+        k,                                               # recon key
+        r.get("pages"),                                  # pages
+        r.get("n_chunks", len(r.get("chunks", []))),     # blobs
+        len(r.get("extracted_cuis", [])),                # cui count (doc union)
+        r.get("complete"),
+    ))
+rows.sort(key=lambda x: str(x[0]))
 
-k = next(iter(data))            # first doc; or set k = 332 for a specific one
-rec = data[k]
-
-print("\ntop-level fields:", list(rec.keys()))
-print("\none full record:")
-pprint.pprint(rec, width=100, sort_dicts=False)
+print(f"docs covered: {len(rows)}\n")
+print(f"{'file_name':<18}{'key':>6}{'pages':>7}{'blobs':>7}{'cuis':>7}  done")
+print("-" * 54)
+for fn, k, pg, nb, nc, done in
