@@ -1,3 +1,13 @@
-records in reconstructed_obj.pk: 500
-entries in samples: 121
-samples with a real filename: 0
+import pickle
+stats = pickle.load(open("sampling_1_stats.pk", "rb"))
+samples = stats["samples"]
+recon = pickle.load(open("reconstructed_obj.pk", "rb"))
+
+print("samples type:", type(samples), "| element type:", type(samples[0]))
+for i in (0, 1, 2):
+    print(f"samples[{i}] =", repr(samples[i])[:300])
+
+print("\nrecon key type:", type(next(iter(recon))), "| first keys:", list(recon)[:5])
+k = next(iter(recon))
+print("one record's top keys:", list(recon[k].keys()))
+print("reconstructed sub-keys:", list(recon[k].get("reconstructed", {}).keys()))
