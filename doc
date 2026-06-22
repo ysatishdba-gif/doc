@@ -1,6 +1,13 @@
-Loaded 121 sampled docs from reconstructed_obj.pk (of 500 total; ONLY_SAMPLED=True)  MODE='doc'  ONLY_DOC=101
-ONLY_DOC=101 -> [(101, 'sample_109.pdf'), (332, 'sample_101.pdf')]
-2 docs to process (0 already done), 4 in parallel
-   ... 0/2 docs done, elapsed 30s (workers=4)
-   ... 0/2 docs done, elapsed 60s (workers=4)
-   [1/2] doc_332_sample_101: ERROR: 500 Server Error: Internal Server Error for url:
+import pickle, pprint
+
+data = pickle.load(open("concepts_by_chunk.pkl", "rb"))
+
+print("docs in file:", len(data))
+print("keys:", list(data)[:10], "...")
+
+k = next(iter(data))            # first doc; or set k = 332 for a specific one
+rec = data[k]
+
+print("\ntop-level fields:", list(rec.keys()))
+print("\none full record:")
+pprint.pprint(rec, width=100, sort_dicts=False)
