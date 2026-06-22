@@ -1,439 +1,228 @@
-config: hierarchy=24,055,828 nodes, ic=2,678,304, topics=91851
-TopicAdaptor: 91,851 topics, 373,077 CUIs with topics, top_k=3
-[doc cache] reusing doc_side_cache.pkl for doc_101_sample_109 (17 blobs, 634 topics)
+"""
+end_to_end.py
+-------------
+End-to-end run (no socket server):
 
-######################################################################
-# QUERY  'meications'
-######################################################################
+  DOCUMENT side: read pre-extracted per-blob CUIs from concepts_by_chunk.pkl
+                 (NO extraction API calls) -> summarize per blob -> topics per
+                 blob -> doc topic set. Cached to a pickle so it's built once.
+  QUERY side:    LLM breakdown -> concepts -> CUIs via the LATEST API (the only
+                 live API call) -> summarize -> topics.
+  MATCH:         query topics vs document topics, with per-blob provenance.
 
-  Expanded: 'Current active medication list including prescription medications, over-the-counter medications, herbal supplements, and vitamins, specifying dosages, frequencies, routes of administration, start dates, stop dates, indications, adverse effects, and patient compliance.'
-  Total intents: 1
+Pick the document by recon key or file name in DOC_SELECT.
 
-  ------------------------------------------------------------
-  INTENT 1: Current Active Medication List
-    Nature:      Patient Management / Medication Review
-    Description: This intent captures a comprehensive overview of a patient's current active medications, including all types of pharmacological and supplemental agents, along with critical details for safe and effective management.
-    Sub-natures (5):
-      - Medication >> Identification
-          atomic: prescription medications
-          atomic: over-the-counter medications
-          atomic: herbal supplements
-          atomic: vitamins
-      - Medication >> Administration >> Dosage
-          atomic: dosages
-          atomic: frequencies
-          atomic: routes of administration
-      - Medication >> Administration >> Duration
-          atomic: start dates
-          atomic: stop dates
-      - Medication >> Clinical Context
-          atomic: indications
-          atomic: adverse effects
-      - Medication >> Patient Management >> Adherence
-          atomic: patient compliance
+Edit DOC_SELECT and QUERY, then:
+    python end_to_end.py
 
-  ------------------------------------------------------------
-  CUI EXTRACTION — 20 unique phrases
-13:40:02     Extraction: 20 CUIs across 1 phrases
-    [1/20] 'Medication'                             -> 20 cuis
-13:40:16     Extraction: 20 CUIs across 1 phrases
-    [2/20] 'Identification'                         -> 20 cuis
-13:40:32     Extraction: 20 CUIs across 1 phrases
-    [3/20] 'prescription medications'               -> 20 cuis
-13:40:47     Extraction: 20 CUIs across 1 phrases
-    [4/20] 'over-the-counter medications'           -> 20 cuis
-13:41:03     Extraction: 20 CUIs across 1 phrases
-    [5/20] 'herbal supplements'                     -> 20 cuis
-13:41:19     Extraction: 20 CUIs across 1 phrases
-    [6/20] 'vitamins'                               -> 20 cuis
-13:41:28     Extraction: 20 CUIs across 1 phrases
-    [7/20] 'Administration'                         -> 20 cuis
-13:41:47     Extraction: 20 CUIs across 1 phrases
-    [8/20] 'Dosage'                                 -> 20 cuis
-13:42:04     Extraction: 20 CUIs across 1 phrases
-    [9/20] 'dosages'                                -> 20 cuis
-13:42:13     Extraction: 20 CUIs across 1 phrases
-    [10/20] 'frequencies'                            -> 20 cuis
-13:42:26     Extraction: 20 CUIs across 1 phrases
-    [11/20] 'routes of administration'               -> 20 cuis
-13:42:39     Extraction: 20 CUIs across 1 phrases
-    [12/20] 'Duration'                               -> 20 cuis
-13:42:50     Extraction: 20 CUIs across 1 phrases
-    [13/20] 'start dates'                            -> 20 cuis
-13:43:09     Extraction: 20 CUIs across 1 phrases
-    [14/20] 'stop dates'                             -> 20 cuis
-13:43:20     Extraction: 20 CUIs across 1 phrases
-    [15/20] 'Clinical Context'                       -> 20 cuis
-13:43:32     Extraction: 20 CUIs across 1 phrases
-    [16/20] 'indications'                            -> 20 cuis
-13:43:41     Extraction: 20 CUIs across 1 phrases
-    [17/20] 'adverse effects'                        -> 20 cuis
-13:43:50     Extraction: 20 CUIs across 1 phrases
-    [18/20] 'Patient Management'                     -> 20 cuis
-13:44:04     Extraction: 20 CUIs across 1 phrases
-    [19/20] 'Adherence'                              -> 20 cuis
-13:44:15     Extraction: 20 CUIs across 1 phrases
-    [20/20] 'patient compliance'                     -> 20 cuis
-13:44:33     Embeddings: 357/357 (100.0%) | dim=3072
-13:44:55     Component depth: 2 (ancestor_depth=5)
-13:44:55       Component hub exclusion: 2 ancestors (degree=0, freq=2, freq_threshold=18)
-13:44:55     Graph Components: 357 CUIs -> 357 components (max=1, singletons=357, hub_ancestors_excluded=2)
-  357 cuis -> 357 surviving -> 266 topics
-    tp_38587c435fec  size=   2  IC=0.806  'C2364055'
-    tp_9196b43ffa7c  size=   3  IC=0.709  'C5397218'
-    tp_e7913c18bc32  size=   3  IC=0.914  'C4041048'
-    tp_f295ccaeba88  size=   3  IC=0.914  'C0376249'
-    tp_680219d00349  size=   3  IC=0.914  'C3266697'
-    tp_b68933e780c7  size=   3  IC=0.914  'C0420262'
-    tp_98b7105f222d  size=   3  IC=0.8  'C0425082'
-    tp_0e6537e71d2a  size=   3  IC=0.914  'C0444921'
-    tp_3d5d3470e41d  size=   3  IC=0.59  'C0585282'
-    tp_83d64fd8953c  size=   3  IC=0.914  'C4038742'
-    tp_8c6a681284a6  size=   3  IC=0.914  'C1287197'
-    tp_d6ea608da844  size=   3  IC=0.914  'C1283218'
-    tp_fd9d28381c59  size=   3  IC=0.914  'C1444708'
-    tp_b7fdca9e917a  size=   3  IC=0.914  'C1287265'
-    tp_aaba1e187c3c  size=   3  IC=0.914  'C0563072'
-    tp_961483409865  size=   3  IC=0.914  'C1286344'
-    tp_8ccc6a2e08ee  size=   3  IC=0.875  'C1287271'
-    tp_2d2a2ec2e6f4  size=   3  IC=0.914  'C0205212'
-    tp_b69a865395d0  size=   3  IC=0.914  'C3266724'
-    tp_32b987d78ad0  size=   3  IC=0.914  'C1444661'
-    tp_8eff5806e60f  size=   4  IC=0.892  'C0518532'
-    tp_87f90fae88af  size=   4  IC=0.892  'C1298642'
-    tp_b84006a9b5cf  size=   4  IC=0.892  'C1827563'
-    tp_a53cfc413d5a  size=   4  IC=0.892  'C1272794'
-    tp_5918292002ba  size=   4  IC=0.892  'C5229524'
-    tp_73e293daafea  size=   4  IC=0.515  'C5546094'
-    tp_1271eda2abda  size=   4  IC=0.829  'C1272693'
-    tp_adf16045bff9  size=   4  IC=0.892  'C2959439'
-    tp_b9935d7d7e28  size=   4  IC=0.86  'C1292787'
-    tp_a62458f5c050  size=   4  IC=0.892  'C3164394'
-    tp_aee16703f00f  size=   4  IC=0.779  'C0556070'
-    tp_3ae729413dfb  size=   4  IC=0.892  'C1531783'
-    tp_437cecef684b  size=   4  IC=0.892  'C0420258'
-    tp_3204cf72d7a2  size=   4  IC=0.892  'C1531784'
-    tp_c4d2ff7ce3b5  size=   4  IC=0.892  'C5769439'
-    tp_3388b2369732  size=   4  IC=0.691  'C1272566'
-    tp_0bde58a148da  size=   4  IC=0.892  'C5547264'
-    tp_98d40991e5d9  size=   4  IC=0.892  'C0558054'
-    tp_6f3b83c0cfeb  size=   4  IC=0.779  'C1444645'
-    tp_4cf443a29d27  size=   4  IC=0.892  'C2364172'
-    tp_6edb5713f021  size=   4  IC=0.892  'C0562943'
-    tp_7dec878d87b6  size=   4  IC=0.892  'C1285672'
-    tp_48fdd965e286  size=   4  IC=0.892  'C0517785'
-    tp_ce7f16cb38c8  size=   4  IC=0.892  'C1299419'
-    tp_f4d6d969928d  size=   5  IC=0.875  'C0556072'
-    tp_84faa464f3e4  size=   5  IC=0.779  'C0573812'
-    tp_17c2ef8d668b  size=   5  IC=0.875  'C0584671'
-    tp_702b98d94ba2  size=   5  IC=0.875  'C0560026'
-    tp_d88148c527f9  size=   5  IC=0.643  'C0565961'
-    tp_80cfbb1a73f0  size=   5  IC=0.74  'C0586400'
-    tp_dec2cde7c303  size=   5  IC=0.766  'C1522217'
-    tp_3219f77b7289  size=   5  IC=0.77  'C3872529'
-    tp_f163b92ad730  size=   5  IC=0.789  'C0556142'
-    tp_9ab30c427f61  size=   5  IC=0.8  'C1636185'
-    tp_6def5fb53643  size=   5  IC=0.875  'C1272276'
-    tp_dbe5dfd7c0cd  size=   5  IC=0.712  'C0474415'
-    tp_ddb05fc2469c  size=   5  IC=0.875  'C0451610'
-    tp_3fc8687ec578  size=   5  IC=0.875  'C1287536'
-    tp_7e9d37139cd6  size=   5  IC=0.875  'C1301593'
-    tp_d1a5a2e609fb  size=   5  IC=0.875  'C3163907'
-    tp_d9ae2641f167  size=   5  IC=0.875  'C0439623'
-    tp_e695468f6342  size=   6  IC=0.86  'C0277778'
-    tp_0b7dc3ae5159  size=   6  IC=0.86  'C0547050'
-    tp_000e2cdfab57  size=   6  IC=0.821  'C1294312'
-    tp_9e74dff0bf8d  size=   6  IC=0.86  'C1286518'
-    tp_c143c3116400  size=   6  IC=0.77  'C0678766'
-    tp_10e2019621c2  size=   6  IC=0.86  'C0449244'
-    tp_6e7fbb1f4d44  size=   6  IC=0.86  'C1287250'
-    tp_f904ec8566d8  size=   6  IC=0.838  'C1562512'
-    tp_73ccde84d5ad  size=   6  IC=0.65  'C0585283'
-    tp_7aab9259d850  size=   6  IC=0.86  'C0420247'
-    tp_7f3666066fd5  size=   6  IC=0.86  'C1629024'
-    tp_292a41edc971  size=   6  IC=0.784  'C5818433'
-    tp_714b833536f0  size=   6  IC=0.86  'C0566251'
-    tp_0f68169e7830  size=   6  IC=0.848  'C1265611'
-    tp_ea4950149d44  size=   6  IC=0.86  'C1272688'
-    tp_4af9837bc9f3  size=   6  IC=0.763  'C0582388'
-    tp_85b1423fc82a  size=   6  IC=0.766  'C1444638'
-    tp_a13fc728f66f  size=   6  IC=0.829  'C2960476'
-    tp_dea8cc8fc825  size=   6  IC=0.8  'C0474145'
-    tp_a42c4247fbe9  size=   7  IC=0.697  'C0518041'
-    tp_d34f56f9d9cf  size=   7  IC=0.779  'C0439480'
-    tp_c93dd70f3fd9  size=   7  IC=0.848  'C1287217'
-    tp_f0b089282d6e  size=   7  IC=0.719  'C0344124'
-    tp_a02b2cc5427f  size=   7  IC=0.789  'C1321605'
-    tp_ef85ae5fc6d5  size=   7  IC=0.848  'C1285626'
-    tp_1c0a3cb12f56  size=   7  IC=0.821  'C5546704'
-    tp_7fd7d26d8128  size=   7  IC=0.848  'C0586401'
-    tp_43a27692cf0b  size=   7  IC=0.848  'C1161275'
-    tp_3574aff7e6f2  size=   7  IC=0.848  'C0429928'
-    tp_ab27335320c1  size=   7  IC=0.848  'C1444252'
-    tp_fb19d48f4b29  size=   7  IC=0.821  'C0678798'
-    tp_a2c832f7368a  size=   8  IC=0.838  'C0586402'
-    tp_7bb003663e47  size=   8  IC=0.829  'C0586409'
-    tp_22e4b75b942d  size=   8  IC=0.743  'C0449238'
-    tp_2f26e4841942  size=   8  IC=0.77  'C1827636'
-    tp_ff9ca08a0b1d  size=   8  IC=0.702  'C0557964'
-    tp_98e5f472ec55  size=   8  IC=0.821  'C1532652'
-    tp_8e300bdf2321  size=   8  IC=0.838  'C2733299'
-    tp_4a74a7b8ee28  size=   8  IC=0.838  'C1608430'
-    tp_f417ba74ab9a  size=   8  IC=0.838  'C0150523'
-    tp_2550f6d6628a  size=   8  IC=0.838  'C1272227'
-    tp_0744feeeb6f3  size=   8  IC=0.838  'C0178602'
-    tp_27d37efde9b8  size=   9  IC=0.829  'C1285596'
-    tp_49168239292f  size=   9  IC=0.813  'C0337617'
-    tp_2026a046d6f0  size=   9  IC=0.766  'C1285777'
-    tp_ac021c1d7421  size=   9  IC=0.806  'C3164742'
-    tp_47a4b8218f46  size=   9  IC=0.8  'C2239117'
-    tp_ff27a793d9ad  size=   9  IC=0.829  'C0578015'
-    tp_afa6360ba318  size=   9  IC=0.8  'C1444643'
-    tp_26936b106649  size=   9  IC=0.721  'C1444644'
-    tp_d7206bdf43be  size=   9  IC=0.735  'C0439610'
-    tp_fab244a64593  size=   9  IC=0.829  'C0277767'
-    tp_afda7f5faa30  size=   9  IC=0.779  'C1285529'
-    tp_4f0176de8ea8  size=  10  IC=0.581  'C2732635'
-    tp_34133024c61d  size=  10  IC=0.658  'C1279755'
-    tp_b726e7c3cfdd  size=  10  IC=0.821  'C0580740'
-    tp_e2469b25b003  size=  10  IC=0.821  'C0556071'
-    tp_1b54e358875b  size=  10  IC=0.8  'C1292853'
-    tp_3649590ffd40  size=  10  IC=0.821  'C4708854'
-    tp_50a4ea31ca41  size=  10  IC=0.8  'C0086439'
-    tp_c49e1a088a81  size=  10  IC=0.821  'C0261543'
-    tp_274d5fd432c7  size=  10  IC=0.738  'C0556141'
-    tp_283c65967dba  size=  10  IC=0.702  'C0579004'
-    tp_b01bf9425bb8  size=  10  IC=0.77  'C1948053'
-    tp_3d728f37116d  size=  11  IC=0.444  'C1285400'
-    tp_7a827a4fcf19  size=  11  IC=0.813  'C5192769'
-    tp_419c1f7db2a4  size=  11  IC=0.732  'C0376405'
-    tp_8e9fd64ee0d7  size=  11  IC=0.756  'C0150143'
-    tp_07292ec466a4  size=  11  IC=0.784  'C0013790'
-    tp_28721b6621b1  size=  11  IC=0.749  'C3495038'
-    tp_1e69675113dd  size=  12  IC=0.779  'C1285650'
-    tp_0195362eb153  size=  12  IC=0.806  'C0560331'
-    tp_ec8d464bb9cd  size=  12  IC=0.759  'C0439614'
-    tp_879879de3d62  size=  12  IC=0.677  'C0565964'
-    tp_81b0c7535625  size=  12  IC=0.695  'C1285661'
-    tp_8a3c5cb7948e  size=  12  IC=0.689  'C1298906'
-    tp_56915641700f  size=  12  IC=0.645  'C1286902'
-    tp_31b191689c3c  size=  12  IC=0.703  'C0242295'
-    tp_fa07d922e9a4  size=  12  IC=0.806  'C0600140'
-    tp_93ebbd079491  size=  12  IC=0.584  'C0237121'
-    tp_c01762c1caf2  size=  12  IC=0.779  'C1275526'
-    tp_731f039e119c  size=  13  IC=0.681  'C4040090'
-    tp_e476c17a05b5  size=  13  IC=0.8  'C0560344'
-    tp_6de07d9c1c37  size=  13  IC=0.8  'C1268546'
-    tp_3c4c2da1693a  size=  14  IC=0.794  'C0681579'
-    tp_49494935e19a  size=  14  IC=0.763  'C0412786'
-    tp_f84c93fdd28b  size=  14  IC=0.794  'C0451613'
-    tp_103b78397cd6  size=  14  IC=0.775  'C0746935'
-    tp_58f00f3eb294  size=  14  IC=0.784  'C0559964'
-    tp_e98d45921510  size=  14  IC=0.794  'C0460116'
-    tp_8da8c67754e0  size=  14  IC=0.794  'C1827568'
-    tp_3da517179344  size=  14  IC=0.7  'C0033080'
-    tp_238a4b100696  size=  15  IC=0.714  'C0449438'
-    tp_1f3c66877da9  size=  15  IC=0.7  'C1286384'
-    tp_f4ce0a687936  size=  15  IC=0.723  'C0557053'
-    tp_5866999989f6  size=  15  IC=0.703  'C0555877'
-    tp_584041a127be  size=  15  IC=0.732  'C1690487'
-    tp_e3928b612a63  size=  15  IC=0.756  'C0449235'
-    tp_003ac5ede174  size=  15  IC=0.789  'C1277226'
-    tp_238a767eb69d  size=  16  IC=0.652  'C1285598'
-    tp_c71b246d805c  size=  17  IC=0.657  'C0304471'
-    tp_9b8ce9fa2c2e  size=  17  IC=0.668  'C1286506'
-    tp_596bf5ef56bc  size=  18  IC=0.573  'C0439603'
-    tp_0946e0943d87  size=  18  IC=0.766  'C5687765'
-    tp_77f15ef7fbc8  size=  19  IC=0.763  'C0455002'
-    tp_515b5e6fa0ab  size=  19  IC=0.77  'C0556112'
-    tp_20c04d159c42  size=  19  IC=0.675  'C1287182'
-    tp_f44b8dbe0a87  size=  19  IC=0.721  'C1299559'
-    tp_6b3f70095d71  size=  19  IC=0.709  'C0520253'
-    tp_8f706257099a  size=  20  IC=0.684  'C1828392'
-    tp_5c5ed1b43ee1  size=  21  IC=0.74  'C0585296'
-    tp_39b2573e2364  size=  21  IC=0.517  'C0678695'
-    tp_8390612e8961  size=  21  IC=0.763  'C0517861'
-    tp_61d3c66260a5  size=  21  IC=0.721  'C1512911'
-    tp_c5873d58dc01  size=  22  IC=0.633  'C0418591'
-    tp_8f0b8c02a789  size=  22  IC=0.711  'C0566633'
-    tp_011d394528ff  size=  22  IC=0.658  'C0028719'
-    tp_553368163620  size=  22  IC=0.328  'C0420206'
-    tp_3e01d31c81dc  size=  23  IC=0.521  'C1273999'
-    tp_e50eb5022106  size=  23  IC=0.756  'C0335141'
-    tp_a6fb5e725431  size=  23  IC=0.697  'C0557061'
-    tp_c9c9ab4161ab  size=  24  IC=0.565  'C1285579'
-    tp_e34fdb944f6f  size=  24  IC=0.743  'C0585328'
-    tp_2127a5d44ac5  size=  24  IC=0.673  'C0201267'
-    tp_0b4b03686225  size=  24  IC=0.603  'C0042890'
-    tp_8bc0cd863efa  size=  24  IC=0.643  'C0556386'
-    tp_92a11e3f5ffc  size=  25  IC=0.588  'C1562672'
-    tp_51377efdcb72  size=  25  IC=0.659  'C0428580'
-    tp_81969e418e83  size=  26  IC=0.489  'C1286350'
-    tp_7cc2b46730c8  size=  28  IC=0.606  'C0401775'
-    tp_3ae14954584c  size=  28  IC=0.74  'C1720399'
-    tp_119f1a2791ef  size=  29  IC=0.711  'C0338666'
-    tp_0b9f98ba6e34  size=  29  IC=0.702  'C0442721'
-    tp_a507e7113cb3  size=  32  IC=0.459  'C1290928'
-    tp_01cc7305c793  size=  33  IC=0.712  'C2240391'
-    tp_984d8980eb52  size=  36  IC=0.697  'C1273560'
-    tp_3d1593b6b315  size=  36  IC=0.562  'C0204923'
-    tp_f2d77b8752d6  size=  37  IC=0.498  'C0439545'
-    tp_46cd179411da  size=  37  IC=0.684  'C0542304'
-    tp_d771afe6f57e  size=  38  IC=0.709  'C1636187'
-    tp_55cc092a3fd1  size=  39  IC=0.714  'C0560154'
-    tp_27f6e5b1945c  size=  39  IC=0.711  'C1273562'
-    tp_22d18a9f5e39  size=  40  IC=0.672  'C1720083'
-    tp_b25cebe4b832  size=  41  IC=0.711  'C0456764'
-    tp_133008c8127a  size=  41  IC=0.525  'C1266850'
-    tp_e8e32a5aa9b8  size=  41  IC=0.698  'C5769003'
-    tp_753eec5ef5d5  size=  42  IC=0.628  'C0150270'
-    tp_1ec5724df764  size=  43  IC=0.622  'C2198255'
-    tp_51548015cf41  size=  44  IC=0.549  'C0562434'
-    tp_7649fcdc9b7f  size=  44  IC=0.615  'C0150600'
-    tp_945e606d5497  size=  45  IC=0.697  'C1644714'
-    tp_90f1491c1f1a  size=  49  IC=0.697  'C1443543'
-    tp_a5da9f7cea71  size=  49  IC=0.584  'C0558007'
-    tp_410b7494ad14  size=  50  IC=0.651  'C0332168'
-    tp_d9207b5af001  size=  51  IC=0.666  'C1532493'
-    tp_fa33a754695a  size=  53  IC=0.539  'C0199176'
-    tp_004eb4090733  size=  53  IC=0.443  'C0558012'
-    tp_f59aa0bdec9a  size=  54  IC=0.549  'C0030695'
-    tp_b323a8f29893  size=  61  IC=0.676  'C0332118'
-    tp_63139992367f  size=  62  IC=0.654  'C0586146'
-    tp_efcfd3539843  size=  63  IC=0.624  'C1286390'
-    tp_ec38be73e213  size=  68  IC=0.647  'C0439659'
-    tp_54ac4c8227ba  size=  69  IC=0.66  'C1276746'
-    tp_90d63bad1dac  size=  69  IC=0.63  'C1271367'
-    tp_c099ea548863  size=  70  IC=0.561  'C5878995'
-    tp_14eace0edcd2  size=  71  IC=0.603  'C3839928'
-    tp_921818de926d  size=  74  IC=0.523  'C5234928'
-    tp_1f94891e7678  size=  75  IC=0.603  'C1264636'
-    tp_4b3204448d6e  size=  76  IC=0.536  'C0441472'
-    tp_159ccc0ba3d6  size=  79  IC=0.423  'C0184665'
-    tp_9a57ea20867b  size=  80  IC=0.399  'C0282354'
-    tp_83c94a07cd97  size=  80  IC=0.581  'C0586814'
-    tp_19f7642ed897  size=  84  IC=0.624  'C4707888'
-    tp_aa84853f4982  size=  85  IC=0.413  'C0370003'
-    tp_8e046283cb57  size=  90  IC=0.517  'C0344107'
-    tp_a9182958b348  size=  91  IC=0.495  'C0085672'
-    tp_9bc52a913d9e  size=  94  IC=0.307  'C1293116'
-    tp_0aad8297c6de  size=  94  IC=0.266  'C1285164'
-    tp_0a0abe3aa4aa  size=  95  IC=0.623  'C0442795'
-    tp_862cf5f09be1  size=  95  IC=0.275  'C1285578'
-    tp_08150c2c49ae  size=  98  IC=0.604  'C0013153'
-    tp_150160ec8092  size= 100  IC=0.565  'C0392335'
-    tp_cadf5715b473  size= 103  IC=0.557  'C5880095'
-    tp_7060a7d5428a  size= 103  IC=0.383  'C1531482'
-    tp_baea916d43a7  size= 107  IC=0.443  'C3469597'
-    tp_5dc1e0737d23  size= 107  IC=0.623  'C4546005'
-    tp_7727df7c4a00  size= 109  IC=0.431  'C4018909'
-    tp_33377a8435b1  size= 115  IC=0.202  'C0439861'
-    tp_c057b6573e78  size= 122  IC=0.557  'C2959665'
-    tp_72ce7b2a8e90  size= 133  IC=0.383  'C1293083'
-    tp_49bff36ba5c5  size= 154  IC=0.553  'C1271399'
-    tp_41e7ec798c3a  size= 162  IC=0.406  'C0559546'
-    tp_be8755a91890  size= 163  IC=0.395  'C1273870'
-    tp_9ef45658e892  size= 170  IC=0.142  'C0184661'
-    tp_9b994c3e17fa  size= 170  IC=0.432  'C0041755'
-    tp_4780c862e025  size= 196  IC=0.377  'C0013221'
-    tp_57b7a03fc948  size= 219  IC=0.459  'C1443286'
-    tp_9eae671b7891  size= 242  IC=0.51  'C2733037'
-    tp_d6c9b5ec4cac  size= 266  IC=0.109  'C0012634'
-    tp_8c352c61a9f5  size= 270  IC=0.199  'C0013227'
-    tp_71ac3187eac9  size= 353  IC=0.535  'C0205159'
-    tp_618472c771d3  size= 388  IC=0.083  'C0037088'
-    tp_3d0cf6fc6233  size= 389  IC=0.22  'C1261322'
-    tp_a99ae16471ea  size= 612  IC=0.5  'C1285556'
-    tp_d62abac874eb  size= 851  IC=0.316  'C2316799'
+Needs: concepts_by_chunk.pkl (per-blob CUIs), the summarizer's services
+(BigQuery + network graph), topics.pkl, gcloud auth + config.API_URL (query side).
+"""
 
-######################################################################
-# MATCH  (query topics vs document topics)
-######################################################################
-  shared topics: 29   scored(top-3-by-IC)=3   sum_inv_size=0.75   max_anchor_ic=0.9144
+import os
+import pickle
 
-  >>> tp_b68933e780c7  size=3  IC=0.914  'C0420262'
-      from blob(s): [12]
+import config  # loads hierarchy / ic / topics once
+from intents import ContextualIntentPipeline
+from cui_core import CUIExtractor
+from cui_summarizer import CUISummarizer
+from topic_adaptor import TopicAdaptor
+from config import PROJECT_ID, LOCATION, MODEL_VERSION, API_URL, QUERY_CLUSTER_SELECTION_PARAMS
 
-  >>> tp_437cecef684b  size=4  IC=0.892  'C0420258'
-      from blob(s): [11]
+CONCEPTS_PATH = "concepts_by_chunk.pkl"   # per-blob CUIs (from extract_concepts.py)
+DOC_SELECT    = 101                        # recon key (int) or file name ("sample_101.pdf")
+QUERY         = "medical history, physical examination, performance status"
+SOURCES       = ["SNOMEDCT_US"]
+DOC_CACHE     = "doc_side_cache.pkl"       # summarized document side, keyed by recon key
+REBUILD_DOC   = False                      # True to re-summarize the document side
 
-  >>> tp_7aab9259d850  size=6  IC=0.86  'C0420247'
-      from blob(s): [10]
+pipeline   = ContextualIntentPipeline(project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION)
+extractor  = CUIExtractor(API_URL, cluster_params=QUERY_CLUSTER_SELECTION_PARAMS)  # query side only
+summarizer = CUISummarizer()
+adaptor    = TopicAdaptor()
 
-  >>> tp_714b833536f0  size=6  IC=0.86  'C0566251'
-      from blob(s): [5]
 
-  >>> tp_ab27335320c1  size=7  IC=0.848  'C1444252'
-      from blob(s): [10]
+def _flat(raw):
+    out, seen = [], set()
+    for d in raw.values():
+        for c in d.get("cuis", {}):
+            if c and c not in seen:
+                seen.add(c); out.append(c)
+    return out
 
-  >>> tp_c01762c1caf2  size=12  IC=0.779  'C1275526'
-      from blob(s): [10, 12]
 
-  >>> tp_584041a127be  size=15  IC=0.732  'C1690487'
-      from blob(s): [0, 7, 8, 9, 12]
+def _split_path(p):
+    return [s.strip() for s in p.split(">>") if s.strip()]
 
-  >>> tp_e34fdb944f6f  size=24  IC=0.743  'C0585328'
-      from blob(s): [11]
 
-  >>> tp_3ae14954584c  size=28  IC=0.74  'C1720399'
-      from blob(s): [11, 12]
+def _topics(cuis):
+    """cuis -> (surviving_cuis, [topic dicts], topic_id set)."""
+    if not cuis:
+        return [], [], set()
+    summ = summarizer.summarize(cuis, sources=SOURCES)
+    surviving = [c["cui"] for c in summ["surviving_cuis"]]
+    tps = sorted(adaptor.cuis_to_topics(surviving), key=adaptor.topic_size)
+    topics = [{"tp": tp, "size": adaptor.topic_size(tp),
+               "ic": round(adaptor.topic_anchor_ic(tp), 3),
+               "label": adaptor.topic_label(tp)} for tp in tps]
+    return surviving, topics, set(t["tp"] for t in topics)
 
-  >>> tp_46cd179411da  size=37  IC=0.684  'C0542304'
-      from blob(s): [10, 13]
 
-  >>> tp_22d18a9f5e39  size=40  IC=0.672  'C1720083'
-      from blob(s): [11]
+# ── DOCUMENT side: read pre-extracted CUIs -> summarize -> topics (cached) ────
+def _find_doc_record(concepts, select):
+    """Find a doc in concepts_by_chunk.pkl by recon key (int) or file name (str)."""
+    if select in concepts:                      # direct recon-key hit
+        return select, concepts[select]
+    sel = str(select).strip().casefold()
+    sel_stem = sel[:-4] if sel.endswith(".pdf") else sel
+    for k, rec in concepts.items():
+        fn = str(rec.get("file_name") or "").casefold()
+        if fn == sel or fn[:-4] == sel_stem or str(k).casefold() == sel:
+            return k, rec
+    raise KeyError(f"{select!r} not found in {CONCEPTS_PATH} "
+                   f"(keys look like {list(concepts)[:5]} ...)")
 
-  >>> tp_945e606d5497  size=45  IC=0.697  'C1644714'
-      from blob(s): [11, 12]
 
-  >>> tp_63139992367f  size=62  IC=0.654  'C0586146'
-      from blob(s): [11]
+def load_or_build_document(select):
+    """Document side for `select`, summarized once and cached to DOC_CACHE.
+    Reused across runs/queries. No extraction API calls — CUIs come from
+    concepts_by_chunk.pkl."""
+    concepts = pickle.load(open(CONCEPTS_PATH, "rb"))
+    key, rec = _find_doc_record(concepts, select)
 
-  >>> tp_efcfd3539843  size=63  IC=0.624  'C1286390'
-      from blob(s): [1]
+    cache = {}
+    if os.path.exists(DOC_CACHE):
+        try:
+            with open(DOC_CACHE, "rb") as f:
+                cache = pickle.load(f)
+        except Exception:
+            cache = {}
+    if not REBUILD_DOC and key in cache:
+        d = cache[key]
+        print(f"[doc cache] reusing {DOC_CACHE} for {d['doc_id']} "
+              f"({len(d['blobs'])} blobs, {len(d['topic_ids'])} topics)")
+        d = dict(d); d["topic_ids"] = set(d["topic_ids"])
+        return d
 
-  >>> tp_90d63bad1dac  size=69  IC=0.63  'C1271367'
-      from blob(s): [4, 7, 8, 13]
+    d = run_document(key, rec)
+    to_store = dict(d); to_store["topic_ids"] = sorted(d["topic_ids"])
+    cache[key] = to_store
+    with open(DOC_CACHE, "wb") as f:
+        pickle.dump(cache, f)
+    print(f"[doc cache] saved {d['doc_id']} to {DOC_CACHE}")
+    return d
 
-  >>> tp_54ac4c8227ba  size=69  IC=0.66  'C1276746'
-      from blob(s): [7, 13]
 
-  >>> tp_14eace0edcd2  size=71  IC=0.603  'C3839928'
-      from blob(s): [11]
+def run_document(key, rec):
+    """Summarize each blob's pre-extracted CUIs -> topics. No extraction calls."""
+    doc_id = rec.get("doc_id", f"doc_{key}")
+    chunks = rec.get("chunks", [])
+    print("#" * 70)
+    print(f"# DOCUMENT  {doc_id}   ({len(chunks)} blobs)   [CUIs from {CONCEPTS_PATH}]")
+    print("#" * 70)
 
-  >>> tp_921818de926d  size=74  IC=0.523  'C5234928'
-      from blob(s): [7]
+    blobs, doc_topic_ids, tp_to_blobs = [], set(), {}
+    for ch in chunks:
+        i = ch.get("blob_index", ch.get("i"))
+        cuis = ch.get("cuis", []) or []
+        surviving, topics, tp_ids = _topics(cuis)
+        for tp in tp_ids:
+            doc_topic_ids.add(tp)
+            tp_to_blobs.setdefault(tp, []).append(i)
+        blobs.append({"i": i, "preview": ch.get("preview", ""),
+                      "cuis": cuis, "surviving": surviving, "topics": topics})
+        print(f"  [blob {i:>2}] {len(cuis):>3} cuis -> {len(surviving):>3} surviving "
+              f"-> {len(topics):>3} topics   {ch.get('preview','')[:50]!r}")
 
-  >>> tp_159ccc0ba3d6  size=79  IC=0.423  'C0184665'
-      from blob(s): [12]
+    print(f"\n  DOC topic set: {len(doc_topic_ids)} distinct topics")
+    return {"doc_id": doc_id, "key": key, "blobs": blobs,
+            "topic_ids": doc_topic_ids, "tp_to_blobs": tp_to_blobs}
 
-  >>> tp_83c94a07cd97  size=80  IC=0.581  'C0586814'
-      from blob(s): [7, 10]
 
-  >>> tp_cadf5715b473  size=103  IC=0.557  'C5880095'
-      from blob(s): [11]
+# ── QUERY side: LLM breakdown -> extract -> summarize -> topics ───────────────
+def run_query(text):
+    print("\n" + "#" * 70)
+    print(f"# QUERY  {text!r}")
+    print("#" * 70)
+    full = pipeline.run(query=text, output_format="full_pipeline")
+    if not full.get("is_clinical", False):
+        print(f"  NON-CLINICAL: {full.get('reason')}")
+        return {"topic_ids": set(), "topics": []}
 
-  >>> tp_72ce7b2a8e90  size=133  IC=0.383  'C1293083'
-      from blob(s): [12]
+    # ---- NATURE BREAKDOWN (LLM decomposition) — printed first ----
+    print(f"\n  Expanded: {full.get('expanded_query','')!r}")
+    print(f"  Total intents: {full.get('total_intents_detected', len(full.get('intents', [])))}")
+    for i, it in enumerate(full.get("intents", []), 1):
+        print(f"\n  {'-'*60}")
+        print(f"  INTENT {i}: {it.get('intent_title','')}")
+        print(f"    Nature:      {it.get('nature','')}")
+        print(f"    Description: {it.get('description','')}")
+        subs = it.get("sub_natures", [])
+        print(f"    Sub-natures ({len(subs)}):")
+        for sn in subs:
+            print(f"      - {sn.get('category_path','')}")
+            for a in (sn.get("atomic_concepts") or []):
+                print(f"          atomic: {a}")
 
-  >>> tp_49bff36ba5c5  size=154  IC=0.553  'C1271399'
-      from blob(s): [7]
+    # Extract ATOMIC CONCEPTS only (the real clinical terms). category_path
+    # segments are navigation labels ("Administration", "Dosage"), not concepts,
+    # so we skip them — unless a sub-nature has no atomic_concepts, in which case
+    # the path segments are the only signal available.
+    phrases, pseen = [], set()
+    for it in full.get("intents", []):
+        for sn in it.get("sub_natures", []):
+            atoms = [a for a in (sn.get("atomic_concepts") or []) if a and a.strip()]
+            src = atoms if atoms else _split_path(sn.get("category_path", ""))
+            for ph in src:
+                ph = (ph or "").strip()
+                k = ph.casefold()
+                if ph and k not in pseen:
+                    pseen.add(k); phrases.append(ph)
 
-  >>> tp_41e7ec798c3a  size=162  IC=0.406  'C0559546'
-      from blob(s): [13, 15]
+    # ---- CUI EXTRACTION (after the breakdown) ----
+    print(f"\n  {'-'*60}")
+    print(f"  CUI EXTRACTION — {len(phrases)} unique phrases")
+    cuis, seen = [], set()
+    for n, ph in enumerate(phrases, 1):
+        got = _flat(extractor.extract([ph], [ph]))
+        print(f"    [{n}/{len(phrases)}] {ph!r:40s} -> {len(got)} cuis")
+        for c in got:
+            if c not in seen:
+                seen.add(c); cuis.append(c)
 
-  >>> tp_be8755a91890  size=163  IC=0.395  'C1273870'
-      from blob(s): [14]
+    surviving, topics, tp_ids = _topics(cuis)
+    print(f"  {len(cuis)} cuis -> {len(surviving)} surviving -> {len(topics)} topics")
+    for t in topics:
+        print(f"    {t['tp']}  size={t['size']:>4}  IC={t['ic']}  '{t['label']}'")
+    return {"topic_ids": tp_ids, "topics": topics}
 
-  >>> tp_d6c9b5ec4cac  size=266  IC=0.109  'C0012634'
-      from blob(s): [7]
 
-  >>> tp_71ac3187eac9  size=353  IC=0.535  'C0205159'
-      from blob(s): [7, 8]
+def main():
+    doc = load_or_build_document(DOC_SELECT)
+    qry = run_query(QUERY)
 
-  >>> tp_618472c771d3  size=388  IC=0.083  'C0037088'
-      from blob(s): [4, 7, 8]
+    print("\n" + "#" * 70)
+    print("# MATCH  (query topics vs document topics)")
+    print("#" * 70)
+    m = adaptor.match(qry["topic_ids"], doc["topic_ids"])
+    shared = qry["topic_ids"] & doc["topic_ids"]
+    print(f"  shared topics: {len(shared)}   "
+          f"scored(top-{adaptor.top_k}-by-IC)={m['count']}   "
+          f"sum_inv_size={m['sum_inv_size']}   max_anchor_ic={m['max_anchor_ic']}")
+    if not shared:
+        print("  no shared topics — query and document do not overlap.")
+    else:
+        for tp in sorted(shared, key=adaptor.topic_size):
+            blobs = doc["tp_to_blobs"].get(tp, [])
+            print(f"\n  >>> {tp}  size={adaptor.topic_size(tp)}  "
+                  f"IC={round(adaptor.topic_anchor_ic(tp),3)}  "
+                  f"'{adaptor.topic_label(tp)}'")
+            print(f"      from blob(s): {sorted(set(blobs))}")
+    try:
+        summarizer.close()
+    except Exception:
+        pass
 
-  >>> tp_3d0cf6fc6233  size=389  IC=0.22  'C1261322'
-      from blob(s): [8]
+
+if __name__ == "__main__":
+    main()
