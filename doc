@@ -1,8 +1,12 @@
-samples type: <class 'dict'> | element type: <class 'dict'>
-samples[0] = {'cases': [111], 'data_documents': ['Patient Progress Note'], 'reconstructed_documents': ['Medical Document > Clinical Record > Multi-Patient Chart > Comprehensive Patient Documentation > Clinical Notes & Administrative Records'], 'n_pages': [6], 'file_name': 'sample_0.pdf'}
-samples[1] = {'cases': [28], 'data_documents': ['Clinical Progress Note'], 'reconstructed_documents': ['Medical Document > Clinical Note > Progress Note > Outpatient Visit Note > Follow-up Visit'], 'n_pages': [1], 'file_name': 'sample_1.pdf'}
-samples[2] = {'cases': [159], 'data_documents': ['Patient Discharge Summary'], 'reconstructed_documents': ['Medical Record > Hospital Document > Discharge Summary > Surgical Discharge Summary > Appendectomy Discharge Summary'], 'n_pages': [1], 'file_name': 'sample_2.pdf'}
+import pickle
+recon = pickle.load(open("reconstructed_obj.pk","rb"))
+s = pickle.load(open("sampling_1_stats.pk","rb"))["samples"][0]   # sample_0.pdf
+print("sample_0:", s["file_name"], "| n_pages", s["n_pages"], "| type", s["data_documents"], "| cases", s["cases"])
 
-recon key type: <class 'int'> | first keys: [0, 1, 2, 3, 4]
-one record's top keys: ['raw_document', 'reconstructed']
-reconstructed sub-keys: ['text', 'pages', 'document', 'blobs', 'sections', 'topics', 'tables', 'figures']
+c = s["cases"][0]                       # hypothesis: cases[0] is the recon key
+print(f"recon[{c}]  raw_document =", recon[c]["raw_document"],
+      "| pages =", recon[c]["reconstructed"]["pages"],
+      "| n_blobs =", len(recon[c]["reconstructed"]["blobs"]))
+
+print("recon[0]   raw_document =", recon[0]["raw_document"],
+      "| pages =", recon[0]["reconstructed"]["pages"])   # old positional guess
