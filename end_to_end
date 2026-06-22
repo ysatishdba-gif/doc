@@ -1,0 +1,180 @@
+"""
+end_to_end.py
+-------------
+ASK #2 — one self-contained end-to-end run (no socket server):
+
+  DOCUMENT side: get one doc's blobs -> extract CUIs per blob via the LATEST API
+                 -> summarize per blob -> topics per blob -> doc topic set.
+  QUERY side:    LLM breakdown -> concepts -> CUIs via the LATEST API
+                 -> summarize -> topics.
+  MATCH:         query topics vs document topics (TopicAdaptor.match), with
+                 per-blob provenance for each shared topic.
+
+Both sides call CUIExtractor.extract(), which now sends the latest payload, so
+"latest API on both query and document side" is satisfied by construction.
+
+Edit DOC_INDEX and QUERY below, then:
+    python end_to_end.py
+
+Needs the same environment as load.py (gcloud auth, BigQuery, the network
+graph, topics.pkl, reconstructed_obj.pk) and config.API_URL set.
+"""
+
+import os
+import pickle
+
+import config  # loads hierarchy / ic / topics once
+from intents import ContextualIntentPipeline
+from cui_core import CUIExtractor
+from cui_summarizer import CUISummarizer
+from topic_adaptor import TopicAdaptor
+from document import get_document
+from config import PROJECT_ID, LOCATION, MODEL_VERSION, API_URL
+
+DOC_INDEX   = 0
+QUERY       = "medical history, physical examination, performance status"
+SOURCES     = ["SNOMEDCT_US"]
+DOC_CACHE   = "doc_side_cache.pkl"   # processed document side, keyed by DOC_INDEX
+REBUILD_DOC = False                  # set True to force re-processing the document
+
+pipeline   = ContextualIntentPipeline(project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION)
+extractor  = CUIExtractor(API_URL)
+summarizer = CUISummarizer()
+adaptor    = TopicAdaptor()
+
+
+def _flat(raw):
+    out, seen = [], set()
+    for d in raw.values():
+        for c in d.get("cuis", {}):
+            if c and c not in seen:
+                seen.add(c); out.append(c)
+    return out
+
+
+def _split_path(p):
+    return [s.strip() for s in p.split(">>") if s.strip()]
+
+
+def _topics(cuis):
+    """cuis -> (surviving_cuis, [topic dicts], topic_id set)."""
+    if not cuis:
+        return [], [], set()
+    summ = summarizer.summarize(cuis, sources=SOURCES)
+    surviving = [c["cui"] for c in summ["surviving_cuis"]]
+    tps = sorted(adaptor.cuis_to_topics(surviving), key=adaptor.topic_size)
+    topics = [{"tp": tp, "size": adaptor.topic_size(tp),
+               "ic": round(adaptor.topic_anchor_ic(tp), 3),
+               "label": adaptor.topic_label(tp)} for tp in tps]
+    return surviving, topics, set(t["tp"] for t in topics)
+
+
+# ── DOCUMENT side: per-blob extract -> summarize -> topics ────────────────────
+# ── DOCUMENT side: process once, cache to pickle, reuse ───────────────────────
+def load_or_build_document(index):
+    """Return the processed document side for `index`, building it via the API
+    only once and caching to DOC_CACHE. Reused on later runs (and across queries)."""
+    cache = {}
+    if os.path.exists(DOC_CACHE):
+        try:
+            with open(DOC_CACHE, "rb") as f:
+                cache = pickle.load(f)
+        except Exception:
+            cache = {}
+    if not REBUILD_DOC and index in cache:
+        d = cache[index]
+        print(f"[doc cache] reusing {DOC_CACHE} for doc[{index}] "
+              f"({len(d['blobs'])} blobs, {len(d['topic_ids'])} topics) — no API calls")
+        # topic_ids stored as a list in the pickle; restore as a set for matching
+        d = dict(d); d["topic_ids"] = set(d["topic_ids"])
+        return d
+
+    d = run_document(index)
+    to_store = dict(d); to_store["topic_ids"] = sorted(d["topic_ids"])  # set -> list for pickle
+    cache[index] = to_store
+    with open(DOC_CACHE, "wb") as f:
+        pickle.dump(cache, f)
+    print(f"[doc cache] saved doc[{index}] to {DOC_CACHE}")
+    return d
+
+
+def run_document(index):
+    doc = get_document(index)
+    print("#" * 70)
+    print(f"# DOCUMENT  {doc['doc_id']}   ({len(doc['chunks'])} blobs)")
+    print("#" * 70)
+
+    blobs, doc_topic_ids, tp_to_blobs = [], set(), {}
+    for i, chunk in enumerate(doc["chunks"]):
+        cuis = _flat(extractor.extract([chunk], [chunk]))
+        surviving, topics, tp_ids = _topics(cuis)
+        for tp in tp_ids:
+            doc_topic_ids.add(tp)
+            tp_to_blobs.setdefault(tp, []).append(i)
+        blobs.append({"i": i, "preview": chunk[:80].replace("\n", " "),
+                      "full": chunk, "cuis": cuis,
+                      "surviving": surviving, "topics": topics})
+        print(f"  [blob {i:>2}] {len(cuis):>3} cuis -> {len(surviving):>3} surviving "
+              f"-> {len(topics):>3} topics   {chunk[:50]!r}")
+
+    print(f"\n  DOC topic set: {len(doc_topic_ids)} distinct topics")
+    return {"doc_id": doc["doc_id"], "blobs": blobs,
+            "topic_ids": doc_topic_ids, "tp_to_blobs": tp_to_blobs}
+
+
+# ── QUERY side: LLM breakdown -> extract -> summarize -> topics ───────────────
+def run_query(text):
+    print("\n" + "#" * 70)
+    print(f"# QUERY  {text!r}")
+    print("#" * 70)
+    full = pipeline.run(query=text, output_format="full_pipeline")
+    if not full.get("is_clinical", False):
+        print(f"  NON-CLINICAL: {full.get('reason')}")
+        return {"topic_ids": set(), "topics": []}
+
+    cuis, seen = [], set()
+    for it in full.get("intents", []):
+        for sn in it.get("sub_natures", []):
+            phrases = _split_path(sn.get("category_path", "")) + \
+                      [a for a in (sn.get("atomic_concepts") or []) if a]
+            for ph in phrases:
+                for c in _flat(extractor.extract([ph], [ph])):
+                    if c not in seen:
+                        seen.add(c); cuis.append(c)
+
+    surviving, topics, tp_ids = _topics(cuis)
+    print(f"  {len(cuis)} cuis -> {len(surviving)} surviving -> {len(topics)} topics")
+    for t in topics:
+        print(f"    {t['tp']}  size={t['size']:>4}  IC={t['ic']}  '{t['label']}'")
+    return {"topic_ids": tp_ids, "topics": topics}
+
+
+def main():
+    doc = load_or_build_document(DOC_INDEX)
+    qry = run_query(QUERY)
+
+    print("\n" + "#" * 70)
+    print("# MATCH  (query topics vs document topics)")
+    print("#" * 70)
+    m = adaptor.match(qry["topic_ids"], doc["topic_ids"])
+    shared = qry["topic_ids"] & doc["topic_ids"]
+    print(f"  shared topics: {len(shared)}   "
+          f"scored(top-{adaptor.top_k}-by-IC)={m['count']}   "
+          f"sum_inv_size={m['sum_inv_size']}   max_anchor_ic={m['max_anchor_ic']}")
+    if not shared:
+        print("  no shared topics — query and document do not overlap.")
+    else:
+        for tp in sorted(shared, key=adaptor.topic_size):
+            blobs = doc["tp_to_blobs"].get(tp, [])
+            print(f"\n  >>> {tp}  size={adaptor.topic_size(tp)}  "
+                  f"IC={round(adaptor.topic_anchor_ic(tp),3)}  "
+                  f"'{adaptor.topic_label(tp)}'")
+            print(f"      from blob(s): {sorted(set(blobs))}")
+    try:
+        summarizer.close()
+    except Exception:
+        pass
+
+
+if __name__ == "__main__":
+    main()
