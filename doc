@@ -1,455 +1,111 @@
 """
-extract_concepts.py
---------------------
-PHASE 1 of the topic-modeling pipeline.
+probe_api.py
+------------
+Fire ONE request using the EXACT payload/token logic from extract_concepts.py,
+then dump the full raw response. Run this before any batch so you can confirm:
 
-Reads the reconstructed documents pickle (chunks == `blobs`), calls the internal
-concept/CUI extraction API ONCE PER CHUNK (new payload), and writes a new pickle
-that stores the extracted concepts per chunk, plus a per-document union of CUIs.
+  1. the new payload is accepted (HTTP 200, valid JSON),
+  2. where the concepts actually live in the response, and
+  3. that parse_concepts() points at the right path.
 
-The new API takes a single `text` string per call (not a batched list), so this
-fans the chunks out across a small thread pool. It is resumable (re-running skips
-documents already finished), refreshes the gcloud identity token mid-run, retries
-transient failures, and checkpoints after every document.
+Run from the same folder as extract_concepts.py:
+    python probe_api.py
 
-Output pickle shape (keyed by the SAME doc index as the input file):
-
-    {
-      <doc_key>: {
-        "doc_id":         "doc_0_<label>",
-        "raw_document":   <label>,
-        "category":       <reconstructed['document']>,
-        "n_chunks":       <int>,
-        "chunks": [
-            {
-              "i":        0,
-              "text":     "<full chunk text>",
-              "preview":  "<first 80 chars, newlines flattened>",
-              "cuis":     ["C0015967", ...],          # == list(concepts.keys())
-              "concepts": {"C0015967": {...}, ...},     # full API concept dict
-              "error":    None or "<message>",
-            },
-            ...
-        ],
-        "extracted_cuis": ["C...", ...],   # union across chunks, order-preserving
-        "complete":       True,
-      },
-      ...
-    }
-
-`extracted_cuis` is exactly the input PHASE 2 (summarize + topic formation) needs.
+Writes:
+    probe_response.json  - pretty full JSON (if the body parsed)
+    probe_raw.txt        - the raw response body, always
 """
 
-import os
-import glob
-import time
-import pickle
-import threading
-import subprocess
-
+import json
 import requests
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# ============================================================================
-# CONFIG  -- set these three, tune the rest
-# ============================================================================
-GCLOUD_LOC  = r"C:\path\to\gcloud.cmd"   # Windows: the .cmd; *nix: "gcloud"
-API_URL     = ""                          # <-- new internal extraction endpoint
+import extract_concepts as E   # reuse the same build_payload / token / parse logic
 
-INPUT_PATH  = "reconstructed_obj.pk"      # a single .pk/.pkl file OR a folder of them
-OUTPUT_PATH = "concepts_by_chunk.pkl"     # new pkl this script writes
-
-# Test one doc first, then do all. Set to None (or "") to process EVERY document.
-# Otherwise set a document identifier; the matcher accepts either:
-#   - a filename stem, e.g. "sample_101"  (matches raw_document / file_name), OR
-#   - the integer pickle key, e.g. 101     (matches the dict key directly).
-# NOTE for reconstructed_obj.pk: `raw_document` is a TYPE label ("Discharge
-# Summary"), not a filename, and file_name is None -- so use the integer KEY.
-# sample_101.pdf == samples[101] in sampling_1_stats.pk == key 101 here.
-ONLY_DOC = 101
-
-MAX_WORKERS      = 8        # concurrent API calls (lower if the API rate-limits)
-REQUEST_TIMEOUT  = 600      # seconds per call
-MAX_RETRIES      = 3        # attempts per chunk on transient errors
-RETRY_BACKOFF    = 2.0      # base seconds, multiplied by attempt number
-TOKEN_TTL        = 50 * 60  # refresh identity token every 50 min (tokens last ~1h)
-CHECKPOINT_EVERY = 1        # save OUTPUT_PATH after every N documents
-
-# ============================================================================
-# PAYLOAD TEMPLATE  (only `text` changes per call)
-# ============================================================================
-PIPELINE_STEPS = {
-    "run_general_extraction": True,
-    "run_ner_extraction": False,
-    "run_semantic_linking_v1": False,
-    "run_semantic_linking_v2": False,
-    "run_intent_filter": False,
-    "run_deep_search": False,
-}
-
-INTENTS_DEFINITION = """
-The text contains entities. Entity's description is similar to as an entity is used in Unified Medical Language System (UMLS) Metathesaurus.
-It is generally used to refer to a recognizable, distinct object or concept in the real world or in a medical context.
-For example, entity can be a disease, medication, symptom of a disease or any other concept.
-Identify and return ALL entities available in the provided text and exactly as they appear in the text.
-Additionally, there are list of semantic types mentioned here: ["Acquired Abnormality", "Activity", "Age Group", "Amino Acid Sequence", "Amino Acid, Peptide, or Protein", "Amphibian", "Anatomical Abnormality", "Anatomical Structure", "Animal", "Antibiotic", "Archaeon", "Bacterium", "Behavior", "Biologic Function", "Biologically Active Substance", "Biomedical Occupation or Discipline", "Biomedical or Dental Material", "Bird", "Body Location or Region", "Body Part, Organ, or Organ Component", "Body Space or Junction", "Body Substance", "Body System", "Carbohydrate Sequence", "Cell", "Cell Component", "Cell Function", "Cell or Molecular Dysfunction", "Chemical", "Chemical Viewed Functionally", "Chemical Viewed Structurally", "Classification", "Clinical Attribute", "Clinical Drug", "Conceptual Entity", "Congenital Abnormality", "Daily or Recreational Activity", "Diagnostic Procedure", "Disease or Syndrome", "Drug Delivery Device", "Educational Activity", "Element, Ion, or Isotope", "Embryonic Structure", "Entity", "Environmental Effect of Humans", "Enzyme", "Eukaryote", "Event", "Experimental Model of Disease", "Family Group", "Finding", "Fish", "Food", "Fully Formed Anatomical Structure", "Functional Concept", "Fungus", "Gene or Genome", "Genetic Function", "Geographic Area", "Governmental or Regulatory Activity", "Group", "Group Attribute", "Hazardous or Poisonous Substance", "Health Care Activity", "Health Care Related Organization", "Hormone", "Human", "Human-caused Phenomenon or Process", "Idea or Concept", "Immunologic Factor", "Indicator, Reagent, or Diagnostic Aid", "Individual Behavior", "Injury or Poisoning", "Inorganic Chemical", "Intellectual Product", "Laboratory or Test Result", "Laboratory Procedure", "Language", "Machine Activity", "Mammal", "Manufactured Object", "Medical Device", "Mental or Behavioral Dysfunction", "Mental Process", "Molecular Biology Research Technique", "Molecular Function", "Molecular Sequence", "Natural Phenomenon or Process", "Neoplastic Process", "Nucleic Acid, Nucleoside, or Nucleotide", "Nucleotide Sequence", "Occupation or Discipline", "Occupational Activity", "Organ or Tissue Function", "Organic Chemical", "Organism", "Organism Attribute", "Organism Function", "Organization", "Pathologic Function", "Patient or Disabled Group", "Pharmacologic Substance", "Phenomenon or Process", "Physical Object", "Physiologic Function", "Plant", "Population Group", "Professional or Occupational Group", "Professional Society", "Qualitative Concept", "Quantitative Concept", "Receptor", "Regulation or Law", "Reptile", "Research Activity", "Research Device", "Self-help or Relief Organization", "Sign or Symptom", "Social Behavior", "Spatial Concept", "Substance", "Temporal Concept", "Therapeutic or Preventive Procedure", "Tissue", "Vertebrate", "Virus", "Vitamin"]. Each identified entity can belong to a specific semantic type.
-"""
-
-INTENTS = {
-    1: {
-        "metadata": "Entities",
-        "definition": INTENTS_DEFINITION,
-    },
-}
-
-CLUSTER_SELECTION_PARAMS = {
-    "cluster_set": "umls",
-    "top_k": 150,
-    "top_p": 10,
-    "top_q": 20,
-    "source_system": ["ICD10CM"],
-}
-
-REASONING = ["both"]  # semantic | intent | both
+# ---- what to send ----
+TEXT      = None          # set a literal string to test that, or leave None
+PROBE_DOC = 101           # if TEXT is None, pull a chunk from this doc (key or file_name)
+CHUNK_I   = 0             # which chunk of that doc
 
 
-def build_payload(text: str) -> dict:
-    """Per-chunk request body. Only `text` varies; everything else is constant."""
-    return {
-        "text": text,
-        "pipeline_steps": PIPELINE_STEPS,
-        "intents": INTENTS,
-        "cluster_selection_params": CLUSTER_SELECTION_PARAMS,
-        "reasoning": REASONING,
-    }
+def get_text():
+    if TEXT:
+        return TEXT
+    docs = E.load_documents()
+    match = [d for d in docs if E._doc_matches(d, PROBE_DOC)]
+    if not match:
+        print(f"{PROBE_DOC!r} not found. Available (key, file_name, raw_document):")
+        for d in docs[:60]:
+            print(f"   key={str(d['key']):>8}  {str(d.get('file_name')):18.18}  {d['raw_document']}")
+        raise SystemExit("\nSet PROBE_DOC to a file_name, a key, or None.")
+    d = match[0]
+    label = d.get("file_name") or d["raw_document"]
+    chunks = d["chunks"]
+    if not chunks:
+        raise SystemExit(f"{label} has no chunks")
+    print(f"Probing {label}  (key {d['key']}, pages {d.get('pages')})  "
+          f"chunk {CHUNK_I} of {len(chunks)}")
+    return chunks[CHUNK_I]
 
 
-def parse_concepts(data: dict) -> dict:
-    """Pull the {cui: {...}} concepts dict out of the API response.
-
-    Defaults to data["output"]["concepts"] (your current path). If your response
-    nests differently, this is the one place to adjust.
-    """
-    out = data.get("output", data) if isinstance(data, dict) else {}
-    concepts = out.get("concepts", {}) if isinstance(out, dict) else {}
-    return concepts if isinstance(concepts, dict) else {}
-
-
-# ============================================================================
-# AUTH  -- one token, refreshed on TTL or on a 401
-# ============================================================================
-class TokenManager:
-    def __init__(self, gcloud_loc: str, ttl: int = TOKEN_TTL):
-        self._gcloud = gcloud_loc
-        self._ttl = ttl
-        self._token = None
-        self._fetched_at = 0.0
-        self._lock = threading.Lock()
-
-    def _fetch(self) -> str:
-        p = subprocess.run(
-            [self._gcloud, "auth", "print-identity-token"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        if p.returncode != 0:
-            raise RuntimeError(f"gcloud failed: {p.stderr.strip()}")
-        token = (p.stdout or "").strip()
-        if not token:
-            raise RuntimeError("gcloud returned an empty identity token")
-        return token
-
-    def headers(self, force: bool = False) -> dict:
-        with self._lock:
-            now = time.time()
-            if force or self._token is None or (now - self._fetched_at) > self._ttl:
-                self._token = self._fetch()
-                self._fetched_at = now
-            return {
-                "Authorization": f"Bearer {self._token}",
-                "Content-Type": "application/json",
-            }
-
-
-# ============================================================================
-# HTTP  -- per-thread session, retry, 401 -> refresh + retry
-# ============================================================================
-_thread_local = threading.local()
-
-
-def _session() -> requests.Session:
-    s = getattr(_thread_local, "session", None)
-    if s is None:
-        s = requests.Session()
-        _thread_local.session = s
-    return s
-
-
-def extract_chunk(tokens: TokenManager, text: str):
-    """Call the API for ONE chunk. Returns (concepts_dict, error_or_None)."""
-    payload = build_payload(text)
-    last_err = None
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            resp = _session().post(
-                API_URL,
-                json=payload,
-                headers=tokens.headers(),
-                timeout=REQUEST_TIMEOUT,
-            )
-            if resp.status_code == 401:
-                tokens.headers(force=True)          # token likely expired mid-run
-                raise requests.HTTPError("401 Unauthorized (refreshed token)")
-            resp.raise_for_status()
-            try:
-                data = resp.json()
-            except ValueError:
-                return {}, f"JSON decode failed (HTTP {resp.status_code}): {resp.text[:300]}"
-            return parse_concepts(data), None
-        except (requests.RequestException, RuntimeError) as e:
-            last_err = str(e)
-            if attempt < MAX_RETRIES:
-                time.sleep(RETRY_BACKOFF * attempt)
-    return {}, f"failed after {MAX_RETRIES} attempts: {last_err}"
-
-
-# ============================================================================
-# INPUT  -- load docs + their chunks (blobs) from one file or a folder
-# ============================================================================
-def _records_from_obj(obj, stem):
-    """Yield (doc_key, label, category, chunks[list[str]]) from one loaded pkl."""
-    items = obj.items() if isinstance(obj, dict) else enumerate(obj)
-    for idx, d in items:
-        if not isinstance(d, dict):
-            continue
-        recon = d.get("reconstructed", d)            # tolerate a flat shape too
-        label = (d.get("raw_document")
-                 or recon.get("raw_document")
-                 or recon.get("file_name")
-                 or f"doc_{idx}")
-        category = recon.get("document", "")
-        blobs = recon.get("blobs") or []
-        chunks = [b for b in blobs if isinstance(b, str) and b.strip()]
-        if not chunks:                               # fallback: whole text = 1 chunk
-            t = recon.get("text", "")
-            chunks = [t] if isinstance(t, str) and t.strip() else []
-        key = idx if stem is None else f"{stem}#{idx}"
-        yield key, label, category, chunks
-
-
-def _match_only(label, only, key=None):
-    """Tolerant match of a document against ONLY_DOC.
-
-    Matches case-insensitively / trimmed on: the filename stem, the full label,
-    '<only>.pdf', `only` appearing as a whole token inside the label, OR the
-    pickle key itself (so ONLY_DOC can be an index like 101 or "101").
-    Whole-token matching keeps 'sample_101' from also catching 'sample_1011'.
-    """
-    if not only:
-        return True
-    import re as _re
-    o = str(only).strip().casefold()
-    lab = str(label).strip().casefold()
-    stem = os.path.splitext(os.path.basename(lab))[0]
-    if o == stem or o == lab or f"{o}.pdf" == lab:
-        return True
-    if _re.search(rf"(?:^|[^0-9a-z]){_re.escape(o)}(?:[^0-9a-z]|$)", lab):
-        return True
-    if key is not None and o == str(key).strip().casefold():
-        return True
-    return False
-
-
-def list_docs(path=None, n=None):
-    """Print every document's key + label + chunk count so you can pick ONLY_DOC."""
-    docs = load_documents(path or INPUT_PATH)
-    print(f"{len(docs)} documents in {path or INPUT_PATH}")
-    print(f"{'KEY':>8}  {'label (raw_document/file_name)':36}  chunks")
-    print("-" * 56)
-    for i, (key, label, _cat, chunks) in enumerate(docs):
-        if n and i >= n:
-            print(f"   ... ({len(docs) - n} more)")
-            break
-        print(f"{str(key):>8}  {str(label):36.36}  {len(chunks)}")
-
-
-def load_documents(path):
-    """Return a list of (doc_key, label, category, chunks). Accepts file or dir."""
-    if os.path.isdir(path):
-        files = sorted(glob.glob(os.path.join(path, "*.pk")) +
-                       glob.glob(os.path.join(path, "*.pkl")))
-        if not files:
-            raise FileNotFoundError(f"no .pk/.pkl files in {path}")
-        out = []
-        for fp in files:
-            stem = os.path.splitext(os.path.basename(fp))[0]
-            with open(fp, "rb") as f:
-                out.extend(_records_from_obj(pickle.load(f), stem))
-        return out
-    with open(path, "rb") as f:
-        return list(_records_from_obj(pickle.load(f), None))
-
-
-# ============================================================================
-# OUTPUT  -- atomic save so a crash mid-write can't corrupt the pkl
-# ============================================================================
-def _save(obj, path):
-    tmp = f"{path}.tmp"
-    with open(tmp, "wb") as f:
-        pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
-    os.replace(tmp, path)
-
-
-# ============================================================================
-# MAIN
-# ============================================================================
 def main():
-    if not API_URL.strip():
-        raise SystemExit("Set API_URL to the new extraction endpoint first.")
+    if not E.API_URL.strip():
+        raise SystemExit("Set API_URL in extract_concepts.py first.")
 
-    tokens = TokenManager(GCLOUD_LOC)
-    tokens.headers(force=True)                       # fail fast on auth/config
+    text = get_text()
+    print(f"TEXT ({len(text)} chars): {text[:200]!r}\n")
 
-    all_docs = load_documents(INPUT_PATH)
-    print(f"Loaded {len(all_docs)} documents from {INPUT_PATH}")
+    tokens = E.TokenManager(E.GCLOUD_LOC)
+    payload = E.build_payload(text)
 
-    docs = all_docs
-    if ONLY_DOC:
-        docs = [t for t in all_docs if _match_only(t[1], ONLY_DOC, t[0])]
-        if not docs:
-            print(f"\nNo document matched ONLY_DOC={ONLY_DOC!r}. "
-                  f"Available (key + label):")
-            for k, lab, *_ in all_docs[:60]:
-                print(f"   key={str(k):>8}  {lab}")
-            print("\nSet ONLY_DOC to one of the labels above, or its KEY.")
-            raise SystemExit(1)
-        print(f"ONLY_DOC={ONLY_DOC!r} -> processing {len(docs)} document(s): "
-              f"{[t[1] for t in docs]}")
+    # show exactly what is being sent (intents.definition trimmed for readability)
+    shown = json.loads(json.dumps(payload))
+    for k in shown.get("intents", {}):
+        d = shown["intents"][k].get("definition", "")
+        shown["intents"][k]["definition"] = d[:120] + " ...[trimmed]"
+    print("PAYLOAD BEING SENT:")
+    print(json.dumps(shown, indent=2, ensure_ascii=False))
+    print()
 
-    results = {}
-    if os.path.exists(OUTPUT_PATH):                  # resume
-        with open(OUTPUT_PATH, "rb") as f:
-            results = pickle.load(f)
-        print(f"Resuming: {len(results)} documents already done in {OUTPUT_PATH}")
+    resp = requests.post(E.API_URL, json=payload,
+                         headers=tokens.headers(), timeout=E.REQUEST_TIMEOUT)
+    print(f"HTTP {resp.status_code}   Content-Type={resp.headers.get('Content-Type')}\n")
 
-    for n, (key, label, category, chunks) in enumerate(docs, 1):
-        if results.get(key, {}).get("complete"):
-            print(f"[{n}/{len(docs)}] skip {key} (done)")
-            continue
+    with open("probe_raw.txt", "w", encoding="utf-8") as f:
+        f.write(resp.text)
 
-        doc_id = f"doc_{key}_{str(label).replace(' ', '_')}"
-        print(f"[{n}/{len(docs)}] {doc_id}: {len(chunks)} chunks")
+    try:
+        data = resp.json()
+    except ValueError:
+        print("Response is NOT valid JSON. First 1500 chars:\n")
+        print(resp.text[:1500])
+        print("\nSaved full body -> probe_raw.txt")
+        return
 
-        if not chunks:
-            results[key] = {"doc_id": doc_id, "raw_document": label,
-                            "category": category, "n_chunks": 0,
-                            "chunks": [], "extracted_cuis": [], "complete": True}
-            if n % CHECKPOINT_EVERY == 0:
-                _save(results, OUTPUT_PATH)
-            continue
+    with open("probe_response.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
-        chunk_records = [None] * len(chunks)
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
-            futs = {ex.submit(extract_chunk, tokens, ch): i
-                    for i, ch in enumerate(chunks)}
-            for fut in as_completed(futs):
-                i = futs[fut]
-                concepts, err = fut.result()
-                chunk_records[i] = {
-                    "i": i,
-                    "text": chunks[i],
-                    "preview": chunks[i][:80].replace("\n", " "),
-                    "cuis": list(concepts.keys()),
-                    "concepts": concepts,
-                    "error": err,
-                }
-                tag = f"ERROR: {err}" if err else f"{len(concepts)} concepts"
-                print(f"    [chunk {i:>2}] {tag}")
+    # ---- structure report ----
+    if isinstance(data, dict):
+        print("TOP-LEVEL KEYS:", list(data.keys()))
+        if isinstance(data.get("output"), dict):
+            print("output KEYS:  ", list(data["output"].keys()))
+    else:
+        print("Response is a", type(data).__name__, "not a dict.")
 
-        # order-preserving union of CUIs across chunks
-        union, seen = [], set()
-        for rec in chunk_records:
-            for c in rec["cuis"]:
-                if c not in seen:
-                    seen.add(c)
-                    union.append(c)
+    concepts = E.parse_concepts(data)
+    print(f"\nparse_concepts() -> {len(concepts)} concepts "
+          f"(expects data['output']['concepts'])")
+    if concepts:
+        cui, meta = next(iter(concepts.items()))
+        print(f"  first concept {cui}:")
+        print("  " + json.dumps(meta, indent=2, ensure_ascii=False)[:600]
+              .replace("\n", "\n  "))
+    else:
+        print("  -> EMPTY. Either the payload didn't trigger extraction, or the")
+        print("     concepts are under a different key. Open probe_response.json,")
+        print("     find the CUIs, then fix parse_concepts() in extract_concepts.py.")
 
-        results[key] = {
-            "doc_id": doc_id,
-            "raw_document": label,
-            "category": category,
-            "n_chunks": len(chunks),
-            "chunks": chunk_records,
-            "extracted_cuis": union,
-            "complete": True,
-        }
-
-        if n % CHECKPOINT_EVERY == 0:
-            _save(results, OUTPUT_PATH)
-
-    _save(results, OUTPUT_PATH)
-
-    total_chunks = sum(r["n_chunks"] for r in results.values())
-    cui_sum = sum(len(r["extracted_cuis"]) for r in results.values())
-    errs = sum(1 for r in results.values() for c in r["chunks"] if c.get("error"))
-    print(f"\nDONE. docs={len(results)}  chunks={total_chunks}  "
-          f"sum(unique CUIs per doc)={cui_sum}  chunk-errors={errs}")
-    print(f"Saved -> {OUTPUT_PATH}")
-
-    if ONLY_DOC:                                  # show the tested doc in detail
-        for key, *_ in docs:
-            print()
-            inspect(key, OUTPUT_PATH)
-
-
-def peek(path=OUTPUT_PATH, n=3):
-    """Quick sanity check of the output pkl."""
-    with open(path, "rb") as f:
-        r = pickle.load(f)
-    print(f"{len(r)} documents in {path}")
-    for k in list(r.keys())[:n]:
-        d = r[k]
-        print(f"\n[{k}] {d['doc_id']}  chunks={d['n_chunks']}  "
-              f"union_cuis={len(d['extracted_cuis'])}")
-        for c in d["chunks"][:3]:
-            tag = f"ERR {c['error']}" if c.get("error") else f"{len(c['cuis'])} cuis"
-            print(f"   chunk {c['i']:>2}: {tag:<10} {c['preview']!r}")
-
-
-def inspect(key=None, path=OUTPUT_PATH, max_chunks=None, sample_concept=True):
-    """Detailed view of ONE document's extraction -- use to judge the test run.
-
-    Prints each chunk's CUIs and dumps one full concept entry so you can confirm
-    parse_concepts() grabbed the right structure from the NEW API response.
-    """
-    import json as _json
-    with open(path, "rb") as f:
-        r = pickle.load(f)
-    if key is None:
-        key = next(iter(r))
-    d = r[key]
-    print("=" * 70)
-    print(f"{d['doc_id']}   chunks={d['n_chunks']}   "
-          f"union_cuis={len(d['extracted_cuis'])}")
-    print("=" * 70)
-    chunks = d["chunks"] if max_chunks is None else d["chunks"][:max_chunks]
-    shown = False
-    for c in chunks:
-        if c.get("error"):
-            print(f"[chunk {c['i']:>2}] ERROR: {c['error']}")
-            continue
-        print(f"[chunk {c['i']:>2}] {len(c['cuis'])} cuis  {c['preview']!r}")
-        if c["cuis"]:
-            print(f"            {c['cuis']}")
-        if sample_concept and not shown and c["concepts"]:
-            cui, meta = next(iter(c["concepts"].items()))
-            blob = _json.dumps(meta, indent=2, ensure_ascii=False)[:800]
-            print("\n  -- sample concept (verify parse_concepts path) --")
-            print(f"  {cui}:")
-            print("  " + blob.replace("\n", "\n  ") + "\n")
-            shown = True
-    print(f"UNION ({len(d['extracted_cuis'])}): {d['extracted_cuis']}")
+    print("\nSaved -> probe_response.json (full)  +  probe_raw.txt (raw body)")
 
 
 if __name__ == "__main__":
