@@ -1,142 +1,16 @@
-Expanded: 'Known allergy history, including specific allergens (e.g., medications, food, environmental factors, insect stings, latex), the nature and severity of the allergic reaction (e.g., rash, hives, anaphylaxis, angioedema, shortness of breath, gastrointestinal symptoms), the date of the reaction, and any management or treatment required.'
-  Total intents: 1
+import pickle
+recon  = pickle.load(open("reconstructed_obj.pk","rb"))
+stats  = pickle.load(open("sampling_1_stats.pk","rb"))
+samples = stats["samples"]
 
-  ------------------------------------------------------------
-  INTENT 1: Allergy History
-    Nature:      Patient Safety / Clinical History
-    Description: This intent captures a patient's known allergies, including the specific substances, the nature and severity of reactions, the timing of these reactions, and any required management or treatment. This information is critical for patient safety and clinical decision-making.
-    Sub-natures (5):
-      - Allergy >> Allergen >> Substance
-          atomic: medication
-          atomic: food
-          atomic: environmental factor
-          atomic: insect sting
-          atomic: latex
-          atomic: specific allergen
-      - Allergy >> Reaction >> Manifestation
-          atomic: rash
-          atomic: hives
-          atomic: anaphylaxis
-          atomic: angioedema
-          atomic: shortness of breath
-          atomic: gastrointestinal symptoms
-      - Allergy >> Reaction >> Degree
-          atomic: mild reaction
-          atomic: moderate reaction
-          atomic: severe reaction
-          atomic: life-threatening reaction
-      - Allergy >> Reaction >> Timing
-          atomic: date of reaction
-      - Allergy >> Management >> Intervention
-          atomic: allergy treatment
-          atomic: allergy management
+# filename -> recon key, via cases[0]
+def key_for(filename):
+    stem = filename.replace(".pdf","")
+    i = int(stem.split("_")[1])
+    return samples[i]["cases"][0]
 
-  ------------------------------------------------------------
-  CUI EXTRACTION — 19 unique phrases
-14:32:34     Extraction: 3 CUIs across 1 phrases
-    [1/19] 'medication'                             -> 3 cuis
-14:32:42     Extraction: 3 CUIs across 1 phrases
-    [2/19] 'food'                                   -> 3 cuis
-14:32:49     Extraction: 3 CUIs across 1 phrases
-    [3/19] 'environmental factor'                   -> 3 cuis
-14:32:56     Extraction: 3 CUIs across 1 phrases
-    [4/19] 'insect sting'                           -> 3 cuis
-14:33:06     Extraction API HTTP 500: {"status":0,"service":"concept-coding-api-1.0.1","output":"","details":{"timestamp":"2026-06-22T19:33:06.128104","request_id":"concept-coding-api-1.0.1-3578f520-1771-4595-b89f-659c21c3c0c2"},"error":{"message":"Error in step_1_extraction: Error in convert_metadata_to_standard: General extraction pro
-14:33:06     Extraction: 0 CUIs across 0 phrases
-    [5/19] 'latex'                                  -> 0 cuis
-14:33:13     Extraction: 3 CUIs across 1 phrases
-    [6/19] 'specific allergen'                      -> 3 cuis
-14:33:22     Extraction: 3 CUIs across 1 phrases
-    [7/19] 'rash'                                   -> 3 cuis
-14:33:31     Extraction: 3 CUIs across 1 phrases
-    [8/19] 'hives'                                  -> 3 cuis
-14:33:37     Extraction: 3 CUIs across 1 phrases
-    [9/19] 'anaphylaxis'                            -> 3 cuis
-14:33:46     Extraction: 3 CUIs across 1 phrases
-    [10/19] 'angioedema'                             -> 3 cuis
-14:33:53     Extraction: 3 CUIs across 1 phrases
-    [11/19] 'shortness of breath'                    -> 3 cuis
-14:33:59     Extraction: 3 CUIs across 1 phrases
-    [12/19] 'gastrointestinal symptoms'              -> 3 cuis
-14:34:10     Extraction: 3 CUIs across 1 phrases
-    [13/19] 'mild reaction'                          -> 3 cuis
-14:34:24     Extraction: 4 CUIs across 1 phrases
-    [14/19] 'moderate reaction'                      -> 4 cuis
-14:34:30     Extraction: 3 CUIs across 1 phrases
-    [15/19] 'severe reaction'                        -> 3 cuis
-14:34:37     Extraction: 3 CUIs across 1 phrases
-    [16/19] 'life-threatening reaction'              -> 3 cuis
-14:34:44     Extraction: 4 CUIs across 1 phrases
-    [17/19] 'date of reaction'                       -> 4 cuis
-14:34:53     Extraction: 3 CUIs across 1 phrases
-    [18/19] 'allergy treatment'                      -> 3 cuis
-14:35:02     Extraction: 3 CUIs across 1 phrases
-    [19/19] 'allergy management'                     -> 3 cuis
-14:35:12     Embeddings: 54/54 (100.0%) | dim=3072
-14:35:12     Fast path: 54 CUIs (54 with embeddings)
-14:35:12     TopicBuilder: n=31, k=20, edge_threshold=0.337
-14:35:12     TopicBuilder: graph has 44 edges (of 465 possible)
-14:35:12     TopicBuilder: Louvain produced 9 communities (sizes: [11, 4, 4, 3, 3, 2, 2, 1, 1])
-14:35:12     TopicBuilder: final 7 topic groups (sizes: [13, 4, 4, 3, 3, 2, 2])
-14:35:12     Fast path: Louvain ran (31 surviving CUIs)
-  54 cuis -> 31 surviving -> 37 topics
-    tp_13b8fe17b11a  size=   2  IC=0.848  'C0079626'
-    tp_bf58b89e8731  size=   2  IC=0.505  'C1302687'
-    tp_3c427cc70c28  size=   3  IC=0.914  'C0344165'
-    tp_21f777389c49  size=   3  IC=0.806  'C4751004'
-    tp_e40583a479b6  size=   4  IC=0.8  'C0336998'
-    tp_437cecef684b  size=   4  IC=0.892  'C0420258'
-    tp_b6f866d1ce0b  size=   5  IC=0.821  'C0336997'
-    tp_b4dafd601e28  size=   6  IC=0.86  'C1288185'
-    tp_b216d897ab5f  size=   6  IC=0.86  'C4749630'
-    tp_2b6a03f0e3ee  size=   7  IC=0.621  'C1304531'
-    tp_977212f0b8d3  size=   8  IC=0.789  'C1096052'
-    tp_d3586671f7e3  size=   9  IC=0.806  'C0149526'
-    tp_e324bc74f638  size=   9  IC=0.829  'C1319166'
-    tp_13e0287e123e  size=   9  IC=0.642  'C0277566'
-    tp_1e9c93366d45  size=  10  IC=0.821  'C0439793'
-    tp_0fc51681f09f  size=  11  IC=0.74  'C1636200'
-    tp_f424b0e3dd56  size=  13  IC=0.794  'C0026605'
-    tp_b23b6ffcdf9d  size=  15  IC=0.393  'C4546033'
-    tp_12cf88786593  size=  21  IC=0.712  'C0002994'
-    tp_c5cf30819fb4  size=  22  IC=0.291  'C1290011'
-    tp_31c698935e5d  size=  28  IC=0.689  'C2919691'
-    tp_263982817d86  size=  31  IC=0.378  'C1291906'
-    tp_1988dc11682a  size=  32  IC=0.642  'C0333228'
-    tp_b97f3a505db9  size=  35  IC=0.68  'C0013404'
-    tp_984d8980eb52  size=  36  IC=0.697  'C1273560'
-    tp_a0e8b67aa504  size=  37  IC=0.216  'C0263978'
-    tp_bf6e52939535  size=  38  IC=0.501  'C0261675'
-    tp_ea3b9f6c8a78  size=  47  IC=0.644  'C0042109'
-    tp_a5da9f7cea71  size=  49  IC=0.584  'C0558007'
-    tp_59406119d8bf  size=  53  IC=0.588  'C1444073'
-    tp_63139992367f  size=  62  IC=0.654  'C0586146'
-    tp_efcfd3539843  size=  63  IC=0.624  'C1286390'
-    tp_ec38be73e213  size=  68  IC=0.647  'C0439659'
-    tp_67f834adff4f  size=  72  IC=0.41  'C0016452'
-    tp_33377a8435b1  size= 115  IC=0.202  'C0439861'
-    tp_eaeae13f12a3  size= 195  IC=0.297  'C0037274'
-    tp_d6c9b5ec4cac  size= 266  IC=0.109  'C0012634'
-
-######################################################################
-# MATCH  (query topics vs document topics)
-######################################################################
-  shared topics: 6   scored(top-3-by-IC)=3   sum_inv_size=0.2947   max_anchor_ic=0.8919
-
-  >>> tp_437cecef684b  size=4  IC=0.892  'C0420258'
-      from blob(s): [11]
-
-  >>> tp_b97f3a505db9  size=35  IC=0.68  'C0013404'
-      from blob(s): [14]
-
-  >>> tp_59406119d8bf  size=53  IC=0.588  'C1444073'
-      from blob(s): [13]
-
-  >>> tp_63139992367f  size=62  IC=0.654  'C0586146'
-      from blob(s): [11]
-
-  >>> tp_efcfd3539843  size=63  IC=0.624  'C1286390'
-      from blob(s): [1]
-
-  >>> tp_d6c9b5ec4cac  size=266  IC=0.109  'C0012634'
-      from blob(s): [7]
+print("sample_109.pdf ->", key_for("sample_109.pdf"))   # expect 101
+print("sample_101.pdf ->", key_for("sample_101.pdf"))   # expect 332
+# sanity: the recon record at that key
+k = key_for("sample_109.pdf")
+print(k, recon[k]["raw_document"], "pages:", recon[k]["reconstructed"]["pages"])
