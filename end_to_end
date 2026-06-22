@@ -1,44 +1,23 @@
 import pickle
+stats = pickle.load(open("sampling_1_stats.pk", "rb"))
+samples = stats["samples"]            # dict keyed 0..120
 
-KEY = 332   # recon key
+# filename -> recon key
+file_to_key = {}
+for i, s in samples.items():
+    fn = s.get("file_name") or f"sample_{i}.pdf"
+    cases = s.get("cases") or []
+    if cases:
+        file_to_key[fn] = cases[0]
 
-cache  = pickle.load(open("doc_side_cache.pkl", "rb"))
-try:    recon = pickle.load(open("reconstructed_obj.pk", "rb"))
-except: recon = None
+# show the table (sorted by filename)
+for fn in sorted(file_to_key, key=lambda x: int(x.split('_')[1].split('.')[0])):
+    print(f"{fn:18s} -> key {file_to_key[fn]}")
 
-if KEY not in cache:
-    raise SystemExit(f"key {KEY} not in cache. available keys: {list(cache)[:20]}")
-
-rec = cache[KEY]
-
-def full_text(i, fallback):
-    try:    return recon[rec.get("key", KEY)]["reconstructed"]["blobs"][i]
-    except: return fallback
-
-print("=" * 70)
-print("doc_id :", rec["doc_id"])              # e.g. doc_332_sample_101 (key + filename)
-print("key    :", rec.get("key", KEY))
-print("blobs  :", len(rec["blobs"]))
-print("topics :", len(rec["topic_ids"]), "distinct (doc-level union)")
-print("=" * 70)
-
-# ---- per blob: CUIs + surviving CUIs + topics ----
-for b in rec["blobs"]:
-    print(f"\n[blob {b['i']}]  {len(b['cuis'])} cuis -> "
-          f"{len(b['surviving'])} surviving -> {len(b['topics'])} topics")
-    print("  text     :", full_text(b["i"], b.get("preview",""))[:200])
-    print("  cuis     :", b["cuis"])
-    print("  surviving:", b["surviving"])
-    for t in b["topics"]:
-        print(f"    topic {t['tp']}  size={t['size']}  IC={t['ic']}  '{t['label']}'")
-
-# ---- doc-level rollups ----
-print("\n" + "-" * 70)
-all_cuis = sorted({c for b in rec["blobs"] for c in b["cuis"]})
-print(f"ALL CUIs in doc ({len(all_cuis)}):")
-print(" ", all_cuis)
-print(f"\nDOC topic_ids ({len(rec['topic_ids'])}):")
-print(" ", rec["topic_ids"])
-print(f"\ntp_to_blobs (which blob each topic came from):")
-for tp, blobs in rec.get("tp_to_blobs", {}).items():
-    print(f"  {tp} -> blobs {blobs}")
+# reverse: key -> filename(s)
+from collections import defaultdict
+key_to_files = defaultdict(list)
+for fn, k in file_to_key.items():
+    key_to_files[k].append(fn)
+dupes = {k: v for k, v in key_to_files.items() if len(v) > 1}
+print("\nkeys mapping to >1 file (if any):", dupes)
