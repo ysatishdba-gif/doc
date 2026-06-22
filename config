@@ -6,30 +6,8 @@ DATASET_ID      = ""
 EMBEDDING_TABLE = ""
 
 API_URL         = ""
-
-PIPELINE_STEPS = {
-    "run_general_extraction": True,
-    "run_ner_extraction": False,
-    "run_semantic_linking_v1": False,
-    "run_semantic_linking_v2": False,
-    "run_intent_filter": False,
-    "run_deep_search": False,
-}
-
-INTENTS_DEFINITION = """
-The text contains entities. Entity's description is similar to as an entity is used in Unified Medical Language System (UMLS) Metathesaurus.
-It is generally used to refer to a recognizable, distinct object or concept in the real world or in a medical context.
-For example, entity can be a disease, medication, symptom of a disease or any other concept.
-Identify and return ALL entities available in the provided text and exactly as they appear in the text.
-Additionally, there are list of semantic types mentioned here: ["Acquired Abnormality", "Activity", "Age Group", "Amino Acid Sequence", "Amino Acid, Peptide, or Protein", "Amphibian", "Anatomical Abnormality", "Anatomical Structure", "Animal", "Antibiotic", "Archaeon", "Bacterium", "Behavior", "Biologic Function", "Biologically Active Substance", "Biomedical Occupation or Discipline", "Biomedical or Dental Material", "Bird", "Body Location or Region", "Body Part, Organ, or Organ Component", "Body Space or Junction", "Body Substance", "Body System", "Carbohydrate Sequence", "Cell", "Cell Component", "Cell Function", "Cell or Molecular Dysfunction", "Chemical", "Chemical Viewed Functionally", "Chemical Viewed Structurally", "Classification", "Clinical Attribute", "Clinical Drug", "Conceptual Entity", "Congenital Abnormality", "Daily or Recreational Activity", "Diagnostic Procedure", "Disease or Syndrome", "Drug Delivery Device", "Educational Activity", "Element, Ion, or Isotope", "Embryonic Structure", "Entity", "Environmental Effect of Humans", "Enzyme", "Eukaryote", "Event", "Experimental Model of Disease", "Family Group", "Finding", "Fish", "Food", "Fully Formed Anatomical Structure", "Functional Concept", "Fungus", "Gene or Genome", "Genetic Function", "Geographic Area", "Governmental or Regulatory Activity", "Group", "Group Attribute", "Hazardous or Poisonous Substance", "Health Care Activity", "Health Care Related Organization", "Hormone", "Human", "Human-caused Phenomenon or Process", "Idea or Concept", "Immunologic Factor", "Indicator, Reagent, or Diagnostic Aid", "Individual Behavior", "Injury or Poisoning", "Inorganic Chemical", "Intellectual Product", "Laboratory or Test Result", "Laboratory Procedure", "Language", "Machine Activity", "Mammal", "Manufactured Object", "Medical Device", "Mental or Behavioral Dysfunction", "Mental Process", "Molecular Biology Research Technique", "Molecular Function", "Molecular Sequence", "Natural Phenomenon or Process", "Neoplastic Process", "Nucleic Acid, Nucleoside, or Nucleotide", "Nucleotide Sequence", "Occupation or Discipline", "Occupational Activity", "Organ or Tissue Function", "Organic Chemical", "Organism", "Organism Attribute", "Organism Function", "Organization", "Pathologic Function", "Patient or Disabled Group", "Pharmacologic Substance", "Phenomenon or Process", "Physical Object", "Physiologic Function", "Plant", "Population Group", "Professional or Occupational Group", "Professional Society", "Qualitative Concept", "Quantitative Concept", "Receptor", "Regulation or Law", "Reptile", "Research Activity", "Research Device", "Self-help or Relief Organization", "Sign or Symptom", "Social Behavior", "Spatial Concept", "Substance", "Temporal Concept", "Therapeutic or Preventive Procedure", "Tissue", "Vertebrate", "Virus", "Vitamin"]. Each identified entity can belong to a specific semantic type.
-"""
-
-INTENTS = {1: {"metadata": "Entities", "definition": INTENTS_DEFINITION}}
-CLUSTER_SELECTION_PARAMS = {
-    "cluster_set": "umls", "top_k": 150, "top_p": 10, "top_q": 20,
-    "source_system": ["SNOMEDCT_US"],
-}
-REASONING = ["both"]
+TOP_K           = 1 #Number of clusters to select (must be ≥ 1)
+TOP_P           = 3 #Number of members to retrieve per cluster (must be ≥ 1)
 CLUSTER_SET     = "umls"
 COMBINED        = True
 source_system = "SNOMED_CT"
