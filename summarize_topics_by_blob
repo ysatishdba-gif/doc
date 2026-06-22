@@ -1,0 +1,85 @@
+"""
+summarize_topics_by_blob.py
+---------------------------
+ASK #1 — for each blob's CUIs: summarize -> topics.
+
+Reads the per-blob CUIs already extracted with the LATEST API
+(concepts_by_chunk.pkl from extract_concepts.py), runs the CUISummarizer on
+each blob's CUIs, looks up topics for the surviving CUIs (topics.pkl via
+TopicAdaptor), and writes topics_by_chunk.pkl.
+
+No extraction API calls here — it reuses the CUIs you already have. It does
+need the summarizer's services (BigQuery + the network graph) and topics.pkl,
+i.e. the same environment as load.py.
+
+Run:
+    python summarize_topics_by_blob.py
+"""
+
+import pickle
+
+from cui_summarizer import CUISummarizer
+from topic_adaptor import TopicAdaptor
+
+IN_PATH  = "concepts_by_chunk.pkl"     # per-blob CUIs (from extract_concepts.py)
+OUT_PATH = "topics_by_chunk.pkl"
+SOURCES  = ["SNOMEDCT_US"]
+
+
+def topics_for(adaptor, cuis):
+    tps = sorted(adaptor.cuis_to_topics(cuis), key=adaptor.topic_size)
+    return [{"tp": tp, "size": adaptor.topic_size(tp),
+             "ic": round(adaptor.topic_anchor_ic(tp), 3),
+             "label": adaptor.topic_label(tp)} for tp in tps]
+
+
+def main():
+    data = pickle.load(open(IN_PATH, "rb"))
+    summarizer = CUISummarizer()
+    adaptor = TopicAdaptor()
+
+    out = {}
+    for key, rec in data.items():
+        doc = {k: rec.get(k) for k in
+               ("doc_id", "key", "file_name", "sampling_id", "sample_index",
+                "raw_document", "pages", "n_chunks")}
+        doc_chunks, doc_topic_ids = [], set()
+
+        for ch in rec.get("chunks", []):
+            cuis = ch.get("cuis", []) or []
+            if cuis:
+                summ = summarizer.summarize(cuis, sources=SOURCES)
+                surviving = [c["cui"] for c in summ["surviving_cuis"]]
+                topics = topics_for(adaptor, surviving)
+                metrics = summ.get("metrics", {})
+            else:
+                surviving, topics, metrics = [], [], {}
+            tp_ids = [t["tp"] for t in topics]
+            doc_topic_ids.update(tp_ids)
+            doc_chunks.append({
+                "blob_index":     ch.get("blob_index", ch.get("i")),
+                "preview":        ch.get("preview", ""),
+                "cuis":           cuis,
+                "surviving_cuis": surviving,
+                "topic_ids":      tp_ids,
+                "topics":         topics,
+                "metrics":        metrics,
+            })
+
+        doc["chunks"]    = doc_chunks
+        doc["topic_ids"] = sorted(doc_topic_ids)        # doc-level union of blob topics
+        out[key] = doc
+        print(f"{doc['doc_id']}: {len(doc_chunks)} blobs -> "
+              f"{len(doc['topic_ids'])} distinct topics")
+
+    with open(OUT_PATH, "wb") as f:
+        pickle.dump(out, f)
+    print(f"\nsaved {OUT_PATH}  ({len(out)} docs)")
+    try:
+        summarizer.close()
+    except Exception:
+        pass
+
+
+if __name__ == "__main__":
+    main()
