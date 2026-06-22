@@ -1,13 +1,8 @@
-import pickle
-stats = pickle.load(open("sampling_1_stats.pk", "rb"))
-samples = stats["samples"]
-recon = pickle.load(open("reconstructed_obj.pk", "rb"))
+samples type: <class 'dict'> | element type: <class 'dict'>
+samples[0] = {'cases': [111], 'data_documents': ['Patient Progress Note'], 'reconstructed_documents': ['Medical Document > Clinical Record > Multi-Patient Chart > Comprehensive Patient Documentation > Clinical Notes & Administrative Records'], 'n_pages': [6], 'file_name': 'sample_0.pdf'}
+samples[1] = {'cases': [28], 'data_documents': ['Clinical Progress Note'], 'reconstructed_documents': ['Medical Document > Clinical Note > Progress Note > Outpatient Visit Note > Follow-up Visit'], 'n_pages': [1], 'file_name': 'sample_1.pdf'}
+samples[2] = {'cases': [159], 'data_documents': ['Patient Discharge Summary'], 'reconstructed_documents': ['Medical Record > Hospital Document > Discharge Summary > Surgical Discharge Summary > Appendectomy Discharge Summary'], 'n_pages': [1], 'file_name': 'sample_2.pdf'}
 
-print("samples type:", type(samples), "| element type:", type(samples[0]))
-for i in (0, 1, 2):
-    print(f"samples[{i}] =", repr(samples[i])[:300])
-
-print("\nrecon key type:", type(next(iter(recon))), "| first keys:", list(recon)[:5])
-k = next(iter(recon))
-print("one record's top keys:", list(recon[k].keys()))
-print("reconstructed sub-keys:", list(recon[k].get("reconstructed", {}).keys()))
+recon key type: <class 'int'> | first keys: [0, 1, 2, 3, 4]
+one record's top keys: ['raw_document', 'reconstructed']
+reconstructed sub-keys: ['text', 'pages', 'document', 'blobs', 'sections', 'topics', 'tables', 'figures']
