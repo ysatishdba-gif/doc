@@ -1,24 +1,18 @@
 import pickle
 
 data = pickle.load(open("concepts_by_chunk.pkl", "rb"))
-
-rows = []
-for k, r in data.items():
-    rows.append((
-        r.get("file_name"),                              
-        k,                                               
-        r.get("pages"),                                 
-        r.get("n_chunks", len(r.get("chunks", []))),     
-        len(r.get("extracted_cuis", [])),                
-        r.get("complete"),
-    ))
+rows = [(r.get("file_name"), k, r.get("pages"),
+         r.get("n_chunks", len(r.get("chunks", []))),
+         len(r.get("extracted_cuis", [])),
+         r.get("complete"), r.get("n_errors", 0)) for k, r in data.items()]
 rows.sort(key=lambda x: str(x[0]))
 
-print(f"docs covered: {len(rows)}\n")
-print(f"{'file_name':<18}{'pages':>7}{'blobs':>7}{'cuis':>7}")
-print("-" * 45)
-for fn, k, pg, nb, nc, done in rows:
-    print(f"{str(fn):<18}{str(pg):>7}{nb:>7}{nc:>7}")
-print("-" * 45)
-print(f"total docs={len(rows)}  total blobs={sum(x[3] for x in rows)}  "
-      f"total cuis={sum(x[4] for x in rows)}")
+print(f"docs: {len(rows)}\n")
+print(f"{'file_name':<18}{'key':>8}{'pages':>7}{'blobs':>7}{'cuis':>7}{'ok':>5}{'errs':>6}")
+print("-" * 58)
+for fn, k, pg, nb, nc, done, errs in rows:
+    print(f"{str(fn):<18}{str(k):>8}{str(pg):>7}{nb:>7}{nc:>7}{('Y' if done else 'N'):>5}{errs:>6}")
+print("-" * 58)
+ok = sum(1 for x in rows if x[5])
+print(f"docs={len(rows)}  succeeded={ok}  failed={len(rows)-ok}  "
+      f"blobs={sum(x[3] for x in rows)}  cuis={sum(x[4] for x in rows)}")
