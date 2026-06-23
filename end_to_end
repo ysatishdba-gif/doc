@@ -1,6 +1,95 @@
-import requests, extract_concepts as E, pickle, time
-text = pickle.load(open(E.INPUT_PATH,"rb"))[27]["reconstructed"]["blobs"][5]
-for i in range(5):
-    r = requests.post(E.API_URL, json=E.build_payload(text), headers=E.get_token(), timeout=120)
-    print(i, r.status_code)
-    time.sleep(10)
+"""
+compare_err_text.py — compare ERRORED blob texts vs SUCCEEDED blob texts
+to look for input patterns (length, characters, structure) that might
+correlate with the API rejecting them. Reads local pickles only; no API calls.
+
+  python compare_err_text.py
+"""
+import pickle, re, unicodedata
+from collections import Counter
+
+import extract_concepts as E
+
+results = pickle.load(open(E.OUTPUT_PATH, "rb"))
+recon   = pickle.load(open(E.INPUT_PATH, "rb"))
+
+
+def text_for(key, bi):
+    try:
+        return recon[key]["reconstructed"]["blobs"][bi]
+    except Exception:
+        return None
+
+
+def features(t):
+    if t is None:
+        return None
+    n = len(t)
+    nonascii = sum(1 for ch in t if ord(ch) > 127)
+    digits = sum(ch.isdigit() for ch in t)
+    letters = sum(ch.isalpha() for ch in t)
+    spaces = sum(ch.isspace() for ch in t)
+    punct = n - digits - letters - spaces
+    ctrl = sum(1 for ch in t if unicodedata.category(ch).startswith("C") and ch not in "\n\r\t")
+    return {
+        "len": n,
+        "letters%": round(100*letters/n) if n else 0,
+        "digits%": round(100*digits/n) if n else 0,
+        "punct%": round(100*punct/n) if n else 0,
+        "nonascii": nonascii,
+        "ctrl": ctrl,                       # invisible/control chars (excl. normal whitespace)
+        "lines": t.count("\n") + 1,
+        "blank": 1 if not t.strip() else 0,
+    }
+
+
+err, ok = [], []
+for key, rec in results.items():
+    for c in rec.get("chunks", []) or []:
+        if not c:
+            continue
+        bi = c.get("blob_index", c.get("i"))
+        t = text_for(key, bi)
+        f = features(t)
+        if f is None:
+            continue
+        (err if c.get("error") else ok).append((key, bi, t, f))
+
+print(f"errored blobs: {len(err)}   succeeded blobs: {len(ok)}\n")
+
+
+def summarize(group, label):
+    if not group:
+        print(f"{label}: (none)"); return
+    keys = ["len", "letters%", "digits%", "punct%", "nonascii", "ctrl", "lines", "blank"]
+    print(f"{label} (n={len(group)}) — median / min / max:")
+    for k in keys:
+        vals = sorted(f[k] for _, _, _, f in group)
+        med = vals[len(vals)//2]
+        print(f"   {k:<10} med={med:<6} min={vals[0]:<6} max={vals[-1]}")
+    print()
+
+
+summarize(err, "ERRORED")
+summarize(ok, "SUCCEEDED")
+
+# show the shortest + longest errored texts, and a few full samples
+err_sorted = sorted(err, key=lambda x: x[3]["len"])
+print("="*70)
+print("SAMPLE ERRORED TEXTS (shortest first):")
+for key, bi, t, f in err_sorted[:6]:
+    print(f"\n--- key {key} blob {bi}  len={f['len']} nonascii={f['nonascii']} ctrl={f['ctrl']} ---")
+    print(repr(t[:300]))
+
+print("\n" + "="*70)
+print("SAMPLE SUCCEEDED TEXTS (for contrast):")
+for key, bi, t, f in ok[:4]:
+    print(f"\n--- key {key} blob {bi}  len={f['len']} ---")
+    print(repr(t[:200]))
+
+# flags: any errored text with control chars / non-ascii / blank
+print("\n" + "="*70)
+flagged = [(k,b,f) for k,b,_,f in err if f["ctrl"] or f["blank"] or f["nonascii"]]
+print(f"errored texts with control chars / blank / non-ascii: {len(flagged)} of {len(err)}")
+for k,b,f in flagged[:15]:
+    print(f"   key {k} blob {b}: ctrl={f['ctrl']} nonascii={f['nonascii']} blank={f['blank']} len={f['len']}")
