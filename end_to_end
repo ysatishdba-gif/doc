@@ -28,20 +28,43 @@ INPUT_PATH  = E.INPUT_PATH           # reconstructed_obj.pk   (full blob text by
 MAX_WORKERS = 8                      # calls in flight for the retry pass
 SAVE_EVERY  = 50                     # checkpoint results after this many calls
 
+# Optional targeting — retry only part of the errored set.
+#   ONLY_DOC  : a recon key (int) or file name ("sample_109.pdf"); None = all docs
+#   ONLY_BLOB : a blob_index (int) within ONLY_DOC; None = all errored blobs in that doc
+ONLY_DOC  = None
+ONLY_BLOB = None
 
-def gather_errored(results):
-    """Every blob that has a real error -> (key, blob_index).
+
+def _doc_matches(rec, key, sel):
+    if sel is None:
+        return True
+    if sel == key:
+        return True
+    s = str(sel).strip().casefold()
+    fn = str(rec.get("file_name") or "").casefold()
+    stem = s[:-4] if s.endswith(".pdf") else s
+    return fn == s or fn[:-4] == stem or str(key).casefold() == s
+
+
+def gather_errored(results, only_doc=None, only_blob=None):
+    """Every blob that has a real error -> (key, blob_index), optionally filtered
+    to one doc (recon key or file name) and/or one blob_index.
     A successful blob (even one with 0 CUIs) is stored with error=None and is
     NOT included. Skipped blobs (skipped=True) are not errors and are excluded."""
     out = []
     for key, rec in results.items():
+        if not _doc_matches(rec, key, only_doc):
+            continue
         for c in rec.get("chunks", []) or []:
             if not c:
                 continue
             err = c.get("error")
             if err in (None, "", False) or c.get("skipped"):
                 continue                                  # success / empty / skipped -> leave alone
-            out.append((key, c.get("blob_index", c.get("i"))))
+            bi = c.get("blob_index", c.get("i"))
+            if only_blob is not None and bi != only_blob:
+                continue
+            out.append((key, bi))
     return out
 
 
@@ -60,15 +83,28 @@ def main():
     results = pickle.load(open(OUTPUT_PATH, "rb"))
     recon   = pickle.load(open(INPUT_PATH, "rb"))
 
-    errored = gather_errored(results)
+    all_errored = gather_errored(results)
+    errored = gather_errored(results, ONLY_DOC, ONLY_BLOB)
     total_blobs = sum(len(r.get("chunks", []) or []) for r in results.values())
     err_docs = {k for k, _ in errored}
+    if ONLY_DOC is not None or ONLY_BLOB is not None:
+        print(f"target               : ONLY_DOC={ONLY_DOC!r} ONLY_BLOB={ONLY_BLOB!r}")
     print(f"blobs in file        : {total_blobs}")
-    print(f"errored (will retry) : {len(errored)} across {len(err_docs)} docs")
-    print(f"clean / 0-error      : {total_blobs - len(errored)}  (skipped — no API call)")
+    print(f"errored total        : {len(all_errored)}")
+    print(f"selected (will retry): {len(errored)} across {len(err_docs)} docs")
     if not errored:
-        print("nothing to retry.")
+        print("nothing to retry for this selection.")
         return
+
+    # show errored blobs per doc (fewest first) to help pick easy docs to close
+    if ONLY_DOC is None:
+        from collections import Counter
+        per_doc = Counter(k for k, _ in all_errored)
+        print("\nerrored blobs per doc (fewest first):")
+        for k, n in sorted(per_doc.items(), key=lambda x: x[1]):
+            fn = results[k].get("file_name", "")
+            print(f"  key {k:<6} {fn:<20} {n} errored")
+        print()
 
     # resolve each errored blob's full text by address, dedup identical texts
     by_hash, unresolved = {}, 0
