@@ -96,14 +96,17 @@ def main():
         print("nothing to retry for this selection.")
         return
 
-    # show errored blobs per doc (fewest first) to help pick easy docs to close
+    # show errored blob indices per doc (fewest first) to help pick easy docs to close
     if ONLY_DOC is None:
-        from collections import Counter
-        per_doc = Counter(k for k, _ in all_errored)
+        from collections import defaultdict
+        per_doc = defaultdict(list)
+        for k, bi in all_errored:
+            per_doc[k].append(bi)
         print("\nerrored blobs per doc (fewest first):")
-        for k, n in sorted(per_doc.items(), key=lambda x: x[1]):
+        for k, blist in sorted(per_doc.items(), key=lambda x: len(x[1])):
             fn = results[k].get("file_name", "")
-            print(f"  key {k:<6} {fn:<20} {n} errored")
+            blist = sorted(blist)
+            print(f"  key {k:<6} {fn:<20} {len(blist):>3} errored  blobs={blist}")
         print()
 
     # resolve each errored blob's full text by address, dedup identical texts
