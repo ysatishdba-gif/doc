@@ -1,61 +1,11 @@
-errored blobs: 52   succeeded blobs: 467
+target               : ONLY_DOC=27 ONLY_BLOB=5
+blobs in file        : 2235
+errored total        : 52
+selected (will retry): 1 across 1 docs
+1 unique texts to retry (1 in flight)
 
-ERRORED (n=52) — median / min / max:
-   len        med=274    min=11     max=1181
-   letters%   med=75     min=25     max=94
-   digits%    med=4      min=0      max=31
-   punct%     med=7      min=0      max=70
-   nonascii   med=0      min=0      max=1
-   ctrl       med=0      min=0      max=0
-   lines      med=5      min=1      max=39
-   blank      med=0      min=0      max=0
+  [1/1] ERR  'Discharge Instructions:\n* Follow up with Cardiolog'  HTTP 500: {"status":0,"service":"concept-coding-api-1.0.1","output":"","details"
 
-SUCCEEDED (n=467) — median / min / max:
-   len        med=172    min=23     max=1614
-   letters%   med=76     min=20     max=92
-   digits%    med=3      min=0      max=37
-   punct%     med=7      min=0      max=58
-   nonascii   med=0      min=0      max=4
-   ctrl       med=0      min=0      max=0
-   lines      med=1      min=1      max=18
-   blank      med=0      min=0      max=0
-
-======================================================================
-SAMPLE ERRORED TEXTS (shortest first):
-
---- key 2 blob 11  len=11 nonascii=0 ctrl=0 ---
-'Page 1 of 2'
-
---- key 40 blob 2  len=16 nonascii=0 ctrl=0 ---
-'PATHOLOGY REPORT'
-
---- key 2 blob 5  len=28 nonascii=0 ctrl=0 ---
-'Allergies: Penicillin (rash)'
-
---- key 434 blob 11  len=36 nonascii=0 ctrl=0 ---
-'Specimen ID: A-23-12345\nBlock ID: A1'
-
---- key 159 blob 0  len=38 nonascii=0 ctrl=0 ---
-'PATIENT DISCHARGE SUMMARY\nCONFIDENTIAL'
-
---- key 6 blob 8  len=42 nonascii=0 ctrl=0 ---
-'Physician Signature: Dr. Michael Green, MD'
-
-======================================================================
-SAMPLE SUCCEEDED TEXTS (for contrast):
-
---- key 332 blob 0  len=71 ---
-'DISCHARGE SUMMARY - John Doe - MRN: 12345678 - 2023-10-20 - Page 1 of 5'
-
---- key 332 blob 1  len=106 ---
-'PATIENT NAME: John Doe DOB: 1955-03-22 MRN: 12345678 ADMISSION DATE: 2023-10-15 DISCHARGE DATE: 2023-10-20'
-
---- key 332 blob 3  len=76 ---
-'ALLERGIES:\n* Penicillin (Rash)\n* Codeine (Nausea)\n* No known food allergies.'
-
---- key 332 blob 4  len=223 ---
-'PAST MEDICAL HISTORY:\n* Hypertension (diagnosed 10 years ago, controlled with Lisinopril)\n* Type 2 Diabetes Mellitus (diagnosed 5 years ago, controlled with Metformin)\n* Hyperlipidemia\n* Status post A'
-
-======================================================================
-errored texts with control chars / blank / non-ascii: 1 of 52
-   key 2 blob 9: ctrl=0 nonascii=1 blank=0 len=738
+saved codes_by_blob.pkl
+unique texts: fixed=0  still erroring=1  |  errored blobs remaining in file: 52
+run again to retry the remaining (those that fail repeatedly are likely deterministic server-side failures).
