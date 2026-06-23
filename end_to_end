@@ -591,12 +591,13 @@ def _run_blob_mode(docs, results):
             if MIN_BLOB_CHARS and len((b or "").strip()) < MIN_BLOB_CHARS:
                 rec["chunks"][i] = _chunk_rec(i, b, [], None, 0.0, skipped=True)
                 continue
-            units.append((key, i, b))
+            is_retry = ex is not None and bool(ex.get("error"))   # errored before -> force fresh
+            units.append((key, i, b, is_retry))
 
     by_hash, cached_hits = {}, 0
-    for (key, i, b) in units:
+    for (key, i, b, is_retry) in units:
         h = _blob_hash(b)
-        if USE_BLOB_CACHE and h in cache:
+        if USE_BLOB_CACHE and not is_retry and h in cache:    # never serve a retry from cache
             results[key]["chunks"][i] = _chunk_rec(i, b, list(cache[h]), None, 0.0,
                                                    cached=True)
             cached_hits += 1
