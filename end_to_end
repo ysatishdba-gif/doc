@@ -1,2 +1,6 @@
-500
-{"status":0,"service":"concept-coding-api-1.0.1","output":"","details":{"timestamp":"2026-06-23T18:19:34.864459","request_id":""},"error":{"message":"Error in step_1_extraction: Error in general_extraction_response: Error in call_general_extraction_api_async: Server error '500 Internal Server Error' for url ''\nFor more information check: "}}
+import requests, extract_concepts as E, pickle, time
+text = pickle.load(open(E.INPUT_PATH,"rb"))[27]["reconstructed"]["blobs"][5]
+for i in range(5):
+    r = requests.post(E.API_URL, json=E.build_payload(text), headers=E.get_token(), timeout=120)
+    print(i, r.status_code)
+    time.sleep(10)
