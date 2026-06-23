@@ -1,227 +1,150 @@
 """
-end_to_end.py
--------------
-End-to-end run (no socket server):
+retry_errors.py — gather the errored blobs from a finished run and retry ONLY those.
 
-  DOCUMENT side: read pre-extracted per-blob CUIs from codes_by_blob.pkl
-                 (NO extraction API calls) -> summarize per blob -> topics per
-                 blob -> doc topic set. Cached to a pickle so it's built once.
-  QUERY side:    LLM breakdown -> concepts -> CUIs via the LATEST API (the only
-                 live API call) -> summarize -> topics.
-  MATCH:         query topics vs document topics, with per-blob provenance.
+Workflow:
+  Phase 1 :  python extract_concepts.py        # bulk pass (e.g. MAX_WORKERS=8)
+  Phase 2 :  python retry_errors.py            # collect every errored blob (with
+                                               # its address), re-call the API for
+                                               # just those, patch results back.
 
-Pick the document by recon key or file name in DOC_SELECT.
+This does NOT re-scan or re-run completed docs — it touches only blobs whose
+saved record carries an "error". Each errored blob is addressed by
+(recon key, blob_index); the full text is read from reconstructed_obj.pk at that
+address. Identical texts are deduped into one call. Successful retries overwrite
+the errored slot in codes_by_blob.pkl and the doc is re-finalized
+(extracted_cuis / n_errors / complete recomputed). Blobs that fail again keep
+their error and will be picked up by the next retry pass.
 
-Edit DOC_SELECT and QUERY, then:
-    python end_to_end.py
-
-Needs: codes_by_blob.pkl (per-blob CUIs), the summarizer's services
-(BigQuery + network graph), topics.pkl, gcloud auth + config.API_URL (query side).
+Reuses extract_concepts.py's own functions so the payload, parsing, and
+finalization are identical to the main run.
 """
-
-import os
 import pickle
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import config  # loads hierarchy / ic / topics once
-from intents import ContextualIntentPipeline
-from cui_core import CUIExtractor
-from cui_summarizer import CUISummarizer
-from topic_adaptor import TopicAdaptor
-from config import PROJECT_ID, LOCATION, MODEL_VERSION, API_URL, QUERY_CLUSTER_SELECTION_PARAMS
+import extract_concepts as E
 
-CONCEPTS_PATH = "codes_by_blob.pkl"   # per-blob CUIs (from extract_concepts.py)
-DOC_SELECT    = 101                        # recon key (int) or file name ("sample_101.pdf")
-QUERY         = "medical history, physical examination, performance status"
-SOURCES       = ["SNOMEDCT_US"]
-DOC_CACHE     = "doc_side_cache.pkl"       # summarized document side, keyed by recon key
-REBUILD_DOC   = False                      # True to re-summarize the document side
-
-pipeline   = ContextualIntentPipeline(project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION)
-extractor  = CUIExtractor(API_URL, cluster_params=QUERY_CLUSTER_SELECTION_PARAMS)  # query side only
-summarizer = CUISummarizer()
-adaptor    = TopicAdaptor()
+OUTPUT_PATH = E.OUTPUT_PATH          # codes_by_blob.pkl  (read + written back)
+INPUT_PATH  = E.INPUT_PATH           # reconstructed_obj.pk   (full blob text by address)
+MAX_WORKERS = 8                      # calls in flight for the retry pass
+SAVE_EVERY  = 50                     # checkpoint results after this many calls
 
 
-def _flat(raw):
-    out, seen = [], set()
-    for d in raw.values():
-        for c in d.get("cuis", {}):
-            if c and c not in seen:
-                seen.add(c); out.append(c)
+def gather_errored(results):
+    """Every blob that has a real error -> (key, blob_index).
+    A successful blob (even one with 0 CUIs) is stored with error=None and is
+    NOT included. Skipped blobs (skipped=True) are not errors and are excluded."""
+    out = []
+    for key, rec in results.items():
+        for c in rec.get("chunks", []) or []:
+            if not c:
+                continue
+            err = c.get("error")
+            if err in (None, "", False) or c.get("skipped"):
+                continue                                  # success / empty / skipped -> leave alone
+            out.append((key, c.get("blob_index", c.get("i"))))
     return out
 
 
-def _split_path(p):
-    return [s.strip() for s in p.split(">>") if s.strip()]
-
-
-def _topics(cuis):
-    """cuis -> (surviving_cuis, [topic dicts], topic_id set)."""
-    if not cuis:
-        return [], [], set()
-    summ = summarizer.summarize(cuis, sources=SOURCES)
-    surviving = [c["cui"] for c in summ["surviving_cuis"]]
-    tps = sorted(adaptor.cuis_to_topics(surviving), key=adaptor.topic_size)
-    topics = [{"tp": tp, "size": adaptor.topic_size(tp),
-               "ic": round(adaptor.topic_anchor_ic(tp), 3),
-               "label": adaptor.topic_label(tp)} for tp in tps]
-    return surviving, topics, set(t["tp"] for t in topics)
-
-
-# ── DOCUMENT side: read pre-extracted CUIs -> summarize -> topics (cached) ────
-def _find_doc_record(concepts, select):
-    """Find a doc in codes_by_blob.pkl by recon key (int) or file name (str)."""
-    if select in concepts:                      # direct recon-key hit
-        return select, concepts[select]
-    sel = str(select).strip().casefold()
-    sel_stem = sel[:-4] if sel.endswith(".pdf") else sel
-    for k, rec in concepts.items():
-        fn = str(rec.get("file_name") or "").casefold()
-        if fn == sel or fn[:-4] == sel_stem or str(k).casefold() == sel:
-            return k, rec
-    raise KeyError(f"{select!r} not found in {CONCEPTS_PATH} "
-                   f"(keys look like {list(concepts)[:5]} ...)")
-
-
-def load_or_build_document(select):
-    """Document side for `select`, summarized once and cached to DOC_CACHE.
-    Reused across runs/queries. No extraction API calls — CUIs come from
-    codes_by_blob.pkl."""
-    concepts = pickle.load(open(CONCEPTS_PATH, "rb"))
-    key, rec = _find_doc_record(concepts, select)
-
-    cache = {}
-    if os.path.exists(DOC_CACHE):
-        try:
-            with open(DOC_CACHE, "rb") as f:
-                cache = pickle.load(f)
-        except Exception:
-            cache = {}
-    if not REBUILD_DOC and key in cache:
-        d = cache[key]
-        print(f"[doc cache] reusing {DOC_CACHE} for {d['doc_id']} "
-              f"({len(d['blobs'])} blobs, {len(d['topic_ids'])} topics)")
-        d = dict(d); d["topic_ids"] = set(d["topic_ids"])
-        return d
-
-    d = run_document(key, rec)
-    to_store = dict(d); to_store["topic_ids"] = sorted(d["topic_ids"])
-    cache[key] = to_store
-    with open(DOC_CACHE, "wb") as f:
-        pickle.dump(cache, f)
-    print(f"[doc cache] saved {d['doc_id']} to {DOC_CACHE}")
-    return d
-
-
-def run_document(key, rec):
-    """Summarize each blob's pre-extracted CUIs -> topics. No extraction calls."""
-    doc_id = rec.get("doc_id", f"doc_{key}")
-    chunks = rec.get("chunks", [])
-    print("#" * 70)
-    print(f"# DOCUMENT  {doc_id}   ({len(chunks)} blobs)   [CUIs from {CONCEPTS_PATH}]")
-    print("#" * 70)
-
-    blobs, doc_topic_ids, tp_to_blobs = [], set(), {}
-    for ch in chunks:
-        i = ch.get("blob_index", ch.get("i"))
-        cuis = ch.get("cuis", []) or []
-        surviving, topics, tp_ids = _topics(cuis)
-        for tp in tp_ids:
-            doc_topic_ids.add(tp)
-            tp_to_blobs.setdefault(tp, []).append(i)
-        blobs.append({"i": i, "preview": ch.get("preview", ""),
-                      "cuis": cuis, "surviving": surviving, "topics": topics})
-        print(f"  [blob {i:>2}] {len(cuis):>3} cuis -> {len(surviving):>3} surviving "
-              f"-> {len(topics):>3} topics   {ch.get('preview','')[:50]!r}")
-
-    print(f"\n  DOC topic set: {len(doc_topic_ids)} distinct topics")
-    return {"doc_id": doc_id, "key": key, "blobs": blobs,
-            "topic_ids": doc_topic_ids, "tp_to_blobs": tp_to_blobs}
-
-
-# ── QUERY side: LLM breakdown -> extract -> summarize -> topics ───────────────
-def run_query(text):
-    print("\n" + "#" * 70)
-    print(f"# QUERY  {text!r}")
-    print("#" * 70)
-    full = pipeline.run(query=text, output_format="full_pipeline")
-    if not full.get("is_clinical", False):
-        print(f"  NON-CLINICAL: {full.get('reason')}")
-        return {"topic_ids": set(), "topics": []}
-
-    # ---- NATURE BREAKDOWN (LLM decomposition) — printed first ----
-    print(f"\n  Expanded: {full.get('expanded_query','')!r}")
-    print(f"  Total intents: {full.get('total_intents_detected', len(full.get('intents', [])))}")
-    for i, it in enumerate(full.get("intents", []), 1):
-        print(f"\n  {'-'*60}")
-        print(f"  INTENT {i}: {it.get('intent_title','')}")
-        print(f"    Nature:      {it.get('nature','')}")
-        print(f"    Description: {it.get('description','')}")
-        subs = it.get("sub_natures", [])
-        print(f"    Sub-natures ({len(subs)}):")
-        for sn in subs:
-            print(f"      - {sn.get('category_path','')}")
-            for a in (sn.get("atomic_concepts") or []):
-                print(f"          atomic: {a}")
-
-    # Extract ATOMIC CONCEPTS only (the real clinical terms). category_path
-    # segments are navigation labels ("Administration", "Dosage"), not concepts,
-    # so we skip them — unless a sub-nature has no atomic_concepts, in which case
-    # the path segments are the only signal available.
-    phrases, pseen = [], set()
-    for it in full.get("intents", []):
-        for sn in it.get("sub_natures", []):
-            atoms = [a for a in (sn.get("atomic_concepts") or []) if a and a.strip()]
-            src = atoms if atoms else _split_path(sn.get("category_path", ""))
-            for ph in src:
-                ph = (ph or "").strip()
-                k = ph.casefold()
-                if ph and k not in pseen:
-                    pseen.add(k); phrases.append(ph)
-
-    # ---- CUI EXTRACTION (after the breakdown) ----
-    print(f"\n  {'-'*60}")
-    print(f"  CUI EXTRACTION — {len(phrases)} unique phrases")
-    cuis, seen = [], set()
-    for n, ph in enumerate(phrases, 1):
-        got = _flat(extractor.extract([ph], [ph]))
-        print(f"    [{n}/{len(phrases)}] {ph!r:40s} -> {len(got)} cuis")
-        for c in got:
-            if c not in seen:
-                seen.add(c); cuis.append(c)
-
-    surviving, topics, tp_ids = _topics(cuis)
-    print(f"  {len(cuis)} cuis -> {len(surviving)} surviving -> {len(topics)} topics")
-    for t in topics:
-        print(f"    {t['tp']}  size={t['size']:>4}  IC={t['ic']}  '{t['label']}'")
-    return {"topic_ids": tp_ids, "topics": topics}
+def _resolve_text(recon, key, blob_index):
+    """Full blob text from reconstructed_obj.pk at (key, blob_index)."""
+    rec = recon.get(key) if isinstance(recon, dict) else None
+    if not rec:
+        return None
+    blobs = (rec.get("reconstructed") or {}).get("blobs")
+    if blobs is None or not (0 <= blob_index < len(blobs)):
+        return None
+    return blobs[blob_index]
 
 
 def main():
-    doc = load_or_build_document(DOC_SELECT)
-    qry = run_query(QUERY)
+    results = pickle.load(open(OUTPUT_PATH, "rb"))
+    recon   = pickle.load(open(INPUT_PATH, "rb"))
 
-    print("\n" + "#" * 70)
-    print("# MATCH  (query topics vs document topics)")
-    print("#" * 70)
-    m = adaptor.match(qry["topic_ids"], doc["topic_ids"])
-    shared = qry["topic_ids"] & doc["topic_ids"]
-    print(f"  shared topics: {len(shared)}   "
-          f"scored(top-{adaptor.top_k}-by-IC)={m['count']}   "
-          f"sum_inv_size={m['sum_inv_size']}   max_anchor_ic={m['max_anchor_ic']}")
-    if not shared:
-        print("  no shared topics — query and document do not overlap.")
-    else:
-        for tp in sorted(shared, key=adaptor.topic_size):
-            blobs = doc["tp_to_blobs"].get(tp, [])
-            print(f"\n  >>> {tp}  size={adaptor.topic_size(tp)}  "
-                  f"IC={round(adaptor.topic_anchor_ic(tp),3)}  "
-                  f"'{adaptor.topic_label(tp)}'")
-            print(f"      from blob(s): {sorted(set(blobs))}")
+    errored = gather_errored(results)
+    total_blobs = sum(len(r.get("chunks", []) or []) for r in results.values())
+    err_docs = {k for k, _ in errored}
+    print(f"blobs in file        : {total_blobs}")
+    print(f"errored (will retry) : {len(errored)} across {len(err_docs)} docs")
+    print(f"clean / 0-error      : {total_blobs - len(errored)}  (skipped — no API call)")
+    if not errored:
+        print("nothing to retry.")
+        return
+
+    # resolve each errored blob's full text by address, dedup identical texts
+    by_hash, unresolved = {}, 0
+    for (key, bi) in errored:
+        text = _resolve_text(recon, key, bi)
+        if not text or not str(text).strip():
+            unresolved += 1
+            continue
+        h = E._blob_hash(text)
+        by_hash.setdefault(h, {"text": text, "units": []})["units"].append((key, bi))
+    if unresolved:
+        print(f"  ({unresolved} could not be addressed in {INPUT_PATH} — left as-is)")
+
+    uniq = list(by_hash.items())
+    print(f"{len(uniq)} unique texts to retry ({MAX_WORKERS} in flight)\n")
+    if not uniq:
+        return
+
+    # optional: keep the blob cache consistent on success
+    cache = {}
+    if E.USE_BLOB_CACHE:
+        try:
+            with open(E.BLOB_CACHE_PATH, "rb") as f:
+                cache = pickle.load(f)
+        except Exception:
+            cache = {}
+
+    touched, done, fixed, still_err = set(), 0, 0, 0
+    def _checkpoint():
+        for k in touched:
+            E._finalize_blob_doc(results[k])
+        E._save(results, OUTPUT_PATH)              # atomic (temp + os.replace)
+        if E.USE_BLOB_CACHE:
+            E._save(cache, E.BLOB_CACHE_PATH)      # atomic
+
+    ex = ThreadPoolExecutor(max_workers=MAX_WORKERS)
     try:
-        summarizer.close()
-    except Exception:
-        pass
+        futs = {ex.submit(E.call_api, info["text"]): h for h, info in uniq}
+        for fut in as_completed(futs):
+            h = futs[fut]; info = by_hash[h]
+            concepts, err, secs, _sm = fut.result()
+            cuis = [] if err else list(concepts.keys())
+            if not err and E.USE_BLOB_CACHE:
+                cache[h] = cuis
+            for (key, bi) in info["units"]:
+                results[key]["chunks"][bi] = E._chunk_rec(bi, info["text"], list(cuis), err, secs)
+                touched.add(key)
+            done += 1
+            if err:
+                still_err += 1
+                print(f"  [{done}/{len(uniq)}] ERR  {info['text'][:50]!r}  {str(err)[:80]}")
+            else:
+                fixed += 1
+                print(f"  [{done}/{len(uniq)}] {len(cuis):>3} cuis  {info['text'][:50]!r}")
+            if done % SAVE_EVERY == 0:
+                _checkpoint()
+    except KeyboardInterrupt:
+        print("\ninterrupted — saving progress so far, then stopping...")
+        ex.shutdown(wait=False, cancel_futures=True)
+        _checkpoint()
+        remaining = len(gather_errored(results))
+        print(f"saved {OUTPUT_PATH}. errored blobs remaining: {remaining} "
+              f"(re-run to continue).")
+        return
+    finally:
+        ex.shutdown(wait=False)
+
+    _checkpoint()
+
+    remaining = len(gather_errored(results))
+    print(f"\nsaved {OUTPUT_PATH}")
+    print(f"unique texts: fixed={fixed}  still erroring={still_err}  "
+          f"|  errored blobs remaining in file: {remaining}")
+    if remaining:
+        print("run again to retry the remaining (those that fail repeatedly are "
+              "likely deterministic server-side failures).")
 
 
 if __name__ == "__main__":
