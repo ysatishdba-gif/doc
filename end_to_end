@@ -1,11 +1,4 @@
-target               : ONLY_DOC=27 ONLY_BLOB=5
-blobs in file        : 2235
-errored total        : 52
-selected (will retry): 1 across 1 docs
-1 unique texts to retry (1 in flight)
-
-  [1/1] ERR  'Discharge Instructions:\n* Follow up with Cardiolog'  HTTP 500: {"status":0,"service":"concept-coding-api-1.0.1","output":"","details"
-
-saved codes_by_blob.pkl
-unique texts: fixed=0  still erroring=1  |  errored blobs remaining in file: 52
-run again to retry the remaining (those that fail repeatedly are likely deterministic server-side failures).
+import requests, extract_concepts as E
+text = E_recon = __import__("pickle").load(open(E.INPUT_PATH,"rb"))[27]["reconstructed"]["blobs"][5]
+r = requests.post(E.API_URL, json=E.build_payload(text), headers=E.get_token(), timeout=120)
+print(r.status_code); print(r.text[:1500])
