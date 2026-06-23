@@ -1,14 +1,31 @@
-import pickle
-data = pickle.load(open("concepts_by_chunk.pkl", "rb"))
+doc_101_sample_109  — 1/17 blobs errored, complete=False
+  blob 16: 500 Server Error: Internal Server Error for url: 
+     text[:100]: 'PATIENT EDUCATION: Patient education provided regarding post-operative expectati'
 
-tot = err = 0
-for k, r in data.items():
-    chunks = r.get("chunks", [])
-    e = [c for c in chunks if c and c.get("error")]
-    tot += len(chunks); err += len(e)
-    if e:
-        print(f"\n{r.get('doc_id', k)}  — {len(e)}/{len(chunks)} blobs errored, complete={r.get('complete')}")
-        for c in e[:3]:
-            print(f"  blob {c.get('blob_index')}: {str(c.get('error'))[:180]}")
-            print(f"     text[:100]: {c.get('preview','')[:100]!r}")
-print(f"\nTOTAL: {err}/{tot} blobs errored")
+doc_332_sample_101  — 1/20 blobs errored, complete=False
+  blob 2: 500 Server Error: Internal Server Error for url: 
+     text[:100]: 'PATIENT DEMOGRAPHICS: * Name: John Doe * Date of Birth: 1955-03-22 * Sex: Male *'
+
+doc_112_sample_18  — 1/20 blobs errored, complete=False
+  blob 13: 500 Server Error: Internal Server Error for url: 
+     text[:100]: 'REFERRALS: None'
+
+doc_106_sample_133  — 2/15 blobs errored, complete=False
+  blob 8: 500 Server Error: Internal Server Error for url: 
+     text[:100]: 'PROCEDURES PERFORMED: - Percutaneous Coronary Intervention (PCI) with drug-eluti'
+  blob 9: 500 Server Error: Internal Server Error for url: 
+     text[:100]: 'IMAGING RESULTS SUMMARY: Chest X-ray (10/26/2023): No acute cardiopulmonary proc'
+
+doc_237_sample_106  — 7/63 blobs errored, complete=False
+  blob 0: 500 Server Error: Internal Server Error for url: 
+     text[:100]: 'Lab Report - Confidential Page 1 of 2'
+  blob 25: 500 Server Error: Internal Server Error for url: 
+     text[:100]: 'eGFR 90 mL/min/1.73m2 (>60)'
+  blob 29: 500 Server Error: Internal Server Error for url: 
+     text[:100]: 'CO2 25 mEq/L (22-32)'
+
+doc_265_sample_105  — 2/25 blobs errored, complete=False
+  blob 6: 500 Server Error: Internal Server Error for url: 
+     text[:100]: 'HOSPITAL COURSE SUMMARY: Patient presented to ED with chest pain radiating to th'
+  blob 20: 500 Server Error: Internal Server Error for url: 
+     text[:100]: 'PATIENT EDUCATION: Patient and family educated on: - Signs of heart failure exac'
