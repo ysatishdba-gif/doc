@@ -1,95 +1,61 @@
-"""
-compare_err_text.py — compare ERRORED blob texts vs SUCCEEDED blob texts
-to look for input patterns (length, characters, structure) that might
-correlate with the API rejecting them. Reads local pickles only; no API calls.
+errored blobs: 52   succeeded blobs: 467
 
-  python compare_err_text.py
-"""
-import pickle, re, unicodedata
-from collections import Counter
+ERRORED (n=52) — median / min / max:
+   len        med=274    min=11     max=1181
+   letters%   med=75     min=25     max=94
+   digits%    med=4      min=0      max=31
+   punct%     med=7      min=0      max=70
+   nonascii   med=0      min=0      max=1
+   ctrl       med=0      min=0      max=0
+   lines      med=5      min=1      max=39
+   blank      med=0      min=0      max=0
 
-import extract_concepts as E
+SUCCEEDED (n=467) — median / min / max:
+   len        med=172    min=23     max=1614
+   letters%   med=76     min=20     max=92
+   digits%    med=3      min=0      max=37
+   punct%     med=7      min=0      max=58
+   nonascii   med=0      min=0      max=4
+   ctrl       med=0      min=0      max=0
+   lines      med=1      min=1      max=18
+   blank      med=0      min=0      max=0
 
-results = pickle.load(open(E.OUTPUT_PATH, "rb"))
-recon   = pickle.load(open(E.INPUT_PATH, "rb"))
+======================================================================
+SAMPLE ERRORED TEXTS (shortest first):
 
+--- key 2 blob 11  len=11 nonascii=0 ctrl=0 ---
+'Page 1 of 2'
 
-def text_for(key, bi):
-    try:
-        return recon[key]["reconstructed"]["blobs"][bi]
-    except Exception:
-        return None
+--- key 40 blob 2  len=16 nonascii=0 ctrl=0 ---
+'PATHOLOGY REPORT'
 
+--- key 2 blob 5  len=28 nonascii=0 ctrl=0 ---
+'Allergies: Penicillin (rash)'
 
-def features(t):
-    if t is None:
-        return None
-    n = len(t)
-    nonascii = sum(1 for ch in t if ord(ch) > 127)
-    digits = sum(ch.isdigit() for ch in t)
-    letters = sum(ch.isalpha() for ch in t)
-    spaces = sum(ch.isspace() for ch in t)
-    punct = n - digits - letters - spaces
-    ctrl = sum(1 for ch in t if unicodedata.category(ch).startswith("C") and ch not in "\n\r\t")
-    return {
-        "len": n,
-        "letters%": round(100*letters/n) if n else 0,
-        "digits%": round(100*digits/n) if n else 0,
-        "punct%": round(100*punct/n) if n else 0,
-        "nonascii": nonascii,
-        "ctrl": ctrl,                       # invisible/control chars (excl. normal whitespace)
-        "lines": t.count("\n") + 1,
-        "blank": 1 if not t.strip() else 0,
-    }
+--- key 434 blob 11  len=36 nonascii=0 ctrl=0 ---
+'Specimen ID: A-23-12345\nBlock ID: A1'
 
+--- key 159 blob 0  len=38 nonascii=0 ctrl=0 ---
+'PATIENT DISCHARGE SUMMARY\nCONFIDENTIAL'
 
-err, ok = [], []
-for key, rec in results.items():
-    for c in rec.get("chunks", []) or []:
-        if not c:
-            continue
-        bi = c.get("blob_index", c.get("i"))
-        t = text_for(key, bi)
-        f = features(t)
-        if f is None:
-            continue
-        (err if c.get("error") else ok).append((key, bi, t, f))
+--- key 6 blob 8  len=42 nonascii=0 ctrl=0 ---
+'Physician Signature: Dr. Michael Green, MD'
 
-print(f"errored blobs: {len(err)}   succeeded blobs: {len(ok)}\n")
+======================================================================
+SAMPLE SUCCEEDED TEXTS (for contrast):
 
+--- key 332 blob 0  len=71 ---
+'DISCHARGE SUMMARY - John Doe - MRN: 12345678 - 2023-10-20 - Page 1 of 5'
 
-def summarize(group, label):
-    if not group:
-        print(f"{label}: (none)"); return
-    keys = ["len", "letters%", "digits%", "punct%", "nonascii", "ctrl", "lines", "blank"]
-    print(f"{label} (n={len(group)}) — median / min / max:")
-    for k in keys:
-        vals = sorted(f[k] for _, _, _, f in group)
-        med = vals[len(vals)//2]
-        print(f"   {k:<10} med={med:<6} min={vals[0]:<6} max={vals[-1]}")
-    print()
+--- key 332 blob 1  len=106 ---
+'PATIENT NAME: John Doe DOB: 1955-03-22 MRN: 12345678 ADMISSION DATE: 2023-10-15 DISCHARGE DATE: 2023-10-20'
 
+--- key 332 blob 3  len=76 ---
+'ALLERGIES:\n* Penicillin (Rash)\n* Codeine (Nausea)\n* No known food allergies.'
 
-summarize(err, "ERRORED")
-summarize(ok, "SUCCEEDED")
+--- key 332 blob 4  len=223 ---
+'PAST MEDICAL HISTORY:\n* Hypertension (diagnosed 10 years ago, controlled with Lisinopril)\n* Type 2 Diabetes Mellitus (diagnosed 5 years ago, controlled with Metformin)\n* Hyperlipidemia\n* Status post A'
 
-# show the shortest + longest errored texts, and a few full samples
-err_sorted = sorted(err, key=lambda x: x[3]["len"])
-print("="*70)
-print("SAMPLE ERRORED TEXTS (shortest first):")
-for key, bi, t, f in err_sorted[:6]:
-    print(f"\n--- key {key} blob {bi}  len={f['len']} nonascii={f['nonascii']} ctrl={f['ctrl']} ---")
-    print(repr(t[:300]))
-
-print("\n" + "="*70)
-print("SAMPLE SUCCEEDED TEXTS (for contrast):")
-for key, bi, t, f in ok[:4]:
-    print(f"\n--- key {key} blob {bi}  len={f['len']} ---")
-    print(repr(t[:200]))
-
-# flags: any errored text with control chars / non-ascii / blank
-print("\n" + "="*70)
-flagged = [(k,b,f) for k,b,_,f in err if f["ctrl"] or f["blank"] or f["nonascii"]]
-print(f"errored texts with control chars / blank / non-ascii: {len(flagged)} of {len(err)}")
-for k,b,f in flagged[:15]:
-    print(f"   key {k} blob {b}: ctrl={f['ctrl']} nonascii={f['nonascii']} blank={f['blank']} len={f['len']}")
+======================================================================
+errored texts with control chars / blank / non-ascii: 1 of 52
+   key 2 blob 9: ctrl=0 nonascii=1 blank=0 len=738
