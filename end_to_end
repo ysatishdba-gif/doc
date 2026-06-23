@@ -1,18 +1,14 @@
 import pickle
-
 data = pickle.load(open("concepts_by_chunk.pkl", "rb"))
-rows = [(r.get("file_name"), k, r.get("pages"),
-         r.get("n_chunks", len(r.get("chunks", []))),
-         len(r.get("extracted_cuis", [])),
-         r.get("complete"), r.get("n_errors", 0)) for k, r in data.items()]
-rows.sort(key=lambda x: str(x[0]))
 
-print(f"docs: {len(rows)}\n")
-print(f"{'file_name':<18}{'key':>8}{'pages':>7}{'blobs':>7}{'cuis':>7}{'ok':>5}{'errs':>6}")
-print("-" * 58)
-for fn, k, pg, nb, nc, done, errs in rows:
-    print(f"{str(fn):<18}{str(k):>8}{str(pg):>7}{nb:>7}{nc:>7}{('Y' if done else 'N'):>5}{errs:>6}")
-print("-" * 58)
-ok = sum(1 for x in rows if x[5])
-print(f"docs={len(rows)}  succeeded={ok}  failed={len(rows)-ok}  "
-      f"blobs={sum(x[3] for x in rows)}  cuis={sum(x[4] for x in rows)}")
+tot = err = 0
+for k, r in data.items():
+    chunks = r.get("chunks", [])
+    e = [c for c in chunks if c and c.get("error")]
+    tot += len(chunks); err += len(e)
+    if e:
+        print(f"\n{r.get('doc_id', k)}  — {len(e)}/{len(chunks)} blobs errored, complete={r.get('complete')}")
+        for c in e[:3]:
+            print(f"  blob {c.get('blob_index')}: {str(c.get('error'))[:180]}")
+            print(f"     text[:100]: {c.get('preview','')[:100]!r}")
+print(f"\nTOTAL: {err}/{tot} blobs errored")
