@@ -1,0 +1,220 @@
+from google.cloud import storage
+from google import genai
+import json
+import subprocess
+
+def auth_gcp(gcloud_loc: str):
+    '''
+    # Authenticate with GCP environment within the program
+
+    :param gcloud_loc: location of gcloud credentials.json file
+    '''
+
+    tmp = subprocess.run([gcloud_loc, 'auth', 'application-default', 'login'], stdout=subprocess.PIPE)
+    if tmp.returncode == 1:
+        raise Exception("GCloud login failed")
+
+
+def get_token(GCLOUD_LOC):
+    '''
+    Get GCP token within the program
+    '''
+    # Get the identity token
+    tmp = subprocess.run([GCLOUD_LOC, 'auth', 'print-identity-token'], stdout=subprocess.PIPE, universal_newlines=True)
+    token = str(tmp.stdout).strip()
+
+    # Set the headers including the Authorization and Content-Type
+    headers = {
+        "Authorization": f"Bearer {token}",
+    }
+    return headers
+
+def read_json_from_gcs(project_id, source_blob_name, bucket):
+    # Initialize the client
+    client = storage.Client(project=project_id)
+
+    # Get the bucket and the specific blob (file)
+    bucket = client.bucket(bucket)
+    blob = bucket.blob(source_blob_name)
+
+    # Download the content as a string
+    json_data = blob.download_as_text()
+
+    # Parse the JSON string into a Python dictionary
+    return json.loads(json_data)
+
+
+def save_json_to_gcs(project_id, source_blob_name, bucket, results):
+    # Initialize the client
+    client = storage.Client(project=project_id)
+
+    # Get the bucket and the specific blob (file)
+    bucket = client.bucket(bucket)
+    blob = bucket.blob(source_blob_name)
+
+    # Download the content as a string
+    json_data = json.dumps(results, indent=4)
+
+    # Parse the JSON string into a Python dictionary
+    blob.upload_from_string(
+        data=json_data,
+        content_type='application/json'
+    )
+
+def get_genai_payload(temp_transactions):
+    temp_payload = f""" I have a list of transactions mentioned between <transactions> and <transactions> where each transaction has two elements. The first element is the id of the temporal concept
+            and the second element is the temporal concept name. For each temporal concept, you need to perform the two steps mentioned between <steps> and </steps>.
+            The output must be a dictionary with the selected temporal concept id, its generated formula, and the reason
+            for selecting temporal concept and its generated formula. Return empty list if no temporal concept passes step 1. 
+            <transactions> {temp_transactions} <transactions>
+            
+            <steps>
+            1) Identify and select the temporal concept whose ENTIRE NAME description and not just part of the name indicates a quantifiable, discrete, and measurable duration of time such as 3 years, 2 days etc., instead of abstract temporal concepts such as adolescence, age, anniversary etc. Example: For temporal concepts: 3 years, 2 years, past 3 years, less than 1 year, I felt good in past 30 days, worse in 3 months. 3 years, 2 years, past 3 years, less than 1 year should be selected and not others.
+            2) Only if the temporal concept is selected in step 1 then follow this step and next steps. In this step, check if the temporal concept is a range. If it is, then take the maximum time of that concept such as for '2 to 3 days', '6 to 9 months', use it has '3 days', and '9 months' respectively. If it is not a range then ignore this step.
+            3) Next, convert temporal concept to standard temporal concept such as 3 years to 3Y, 2 years to 2Y, 2 month to 2M etc. It is critical that a standardized component such as years to Y should be applied the same way to all selected temporal concepts that has year related terms in their name. Example: 2 years, 3 year, 3y should be 2Y, 3Y, 3Y.
+            4) Finally, create a formula string using standardized temporal concept name as "ref_point - standard temporal concept". Example: ref_point - 3Y
+            </steps>
+
+            * Examples *
+            ** input **
+            
+            transactions = [[id_1, 'age'], [id_2, 'adolesence'], ['id_3', '3 years'], ['id_4', 'anniverseries'], ['id_5', '1 year'],
+                            ['id_6', 'Rejection of care - presence and frequency in last 7D'], ['id_7', 'less than one year']]
+
+            ** output **
+            [{{"selected_id": 'id_3',
+                "formula": 'ref_point - 3Y',
+                "reasoning": this is temporal concept indicates concrete measurement of time and formula is provided as mentioned in prompt name with years mapped to a standard term Y.
+            }},
+            {{"selected_id": 'id_5',
+                "formula": 'ref_point - 1Y',
+                "reasoning": this is temporal concept indicates concrete measurement of time and formula is provided as mentioned in prompt name with year mapped to a standard term Y.
+            }},
+            {{"selected_id": 'id_7',
+                "formula": 'ref_point - 1Y',
+                "reasoning": this is temporal concept indicates concrete measurement of time and formula is provided as mentioned in prompt name with year mapped to a standard term Y.
+            }}]
+
+            
+            """
+
+    return temp_payload
+
+
+def get_genai_resp(temp_payload, project_id, location):
+    client = genai.Client(vertexai=True, project=project_id, location=location)
+    response_schema = {
+        "type": "array",
+        "description": "A list of processed temporal concepts.",
+        "items":{
+        "type": "object",
+        "description": "The processed output for a single record type name.",
+        "required": [
+            "selected_id",
+            "formula",
+            "reasoning"
+        ],
+        "properties": {
+            "selected_id": {
+                "type": "string",
+                "description": "unique id of temporal concept"
+            },
+            "formula": {
+                "type": "string",
+                "description": "a string of formula generated for temporal concept"
+            },
+            "reasoning": {
+                "type": "string",
+                "description": "Brief explanation for selecting the temporal concept and the formula"
+            }
+        }
+    }
+    }
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=temp_payload,
+        config={
+            "response_mime_type": "application/json",
+            "response_schema": response_schema,
+        },
+    )
+
+    resp_dict = json.loads(response.text)
+
+    return resp_dict
+
+# Setup parameters
+gcloud_loc = '/Users/xxxxxxx/google-cloud-sdk/bin/gcloud'
+auth_gcp(gcloud_loc)
+headers = get_token(gcloud_loc)
+
+project_id = ""
+location = "us-central1"
+source_blob_name = "Normalized_loinc_classes/temporal_norm_code_to_loinc_codes_dict.json"
+bucket = ""
+
+# load identified temporal related concepts (loinc and umls)
+temporal_codes_dict = read_json_from_gcs(project_id, source_blob_name, bucket)
+all_temporal_codes=temporal_codes_dict['loinc_related_temporal_codes']
+all_temporal_codes.update(temporal_codes_dict['umls_related_temporal_concept_codes'])
+
+# create transactions
+transaction_dict = {i:{'code': cui, 'name': cui_name}for i, (cui, cui_name) in enumerate(all_temporal_codes.items())}
+
+transactions=[[i, concept['name']] for i, concept in transaction_dict.items()]
+all_results = []
+
+# Process all the transactions to identify formula
+bs=100
+for i in range(0, len(transactions), bs):
+    print(i)
+    temp_transactions=transactions[i:i+bs]
+
+    temp_payload = get_genai_payload(temp_transactions)
+
+    resp = get_genai_resp(temp_payload, project_id, location)
+
+    all_results.append(resp)
+
+# reload identified temporal related concepts (loinc and umls)
+temporal_codes_dict = read_json_from_gcs(project_id, source_blob_name, bucket)
+loinc_temporals = list(temporal_codes_dict['loinc_related_temporal_codes'].keys())
+umls_temporals = list(temporal_codes_dict['umls_related_temporal_concept_codes'].keys())
+
+# has formula
+has_formula_temporals = []
+has_formula_ids = []
+for result in all_results:
+    for temp_dict in result:
+        t_id = int(temp_dict['selected_id'])
+        cui_code = transaction_dict[t_id]['code']
+        has_formula_ids.append(t_id)
+        cui_name = transaction_dict[t_id]['name']
+        has_formula_temporals.append({'code': cui_code,
+                    'name': cui_name,
+                    'formula': temp_dict['formula'].upper(),
+                    'reasoning': temp_dict['reasoning'],
+                    'code_system': 'loinc' if cui_code in loinc_temporals else 'umls'})
+
+no_formula_temporals=[]
+# does not have formula
+for transact_id in transaction_dict:
+    if transact_id not in has_formula_ids:
+        cui_code = transaction_dict[transact_id]['code']
+        cui_name = transaction_dict[transact_id]['name']
+        no_formula_temporals.append({'code': cui_code,
+                                      'name': cui_name,
+                                      'formula': None,
+                                      'reasoning': 'llm did not provide formula for this concept',
+                                      'code_system': 'loinc' if cui_code in loinc_temporals else 'umls'})
+
+
+
+# create final dictionary
+final_dict={'has_formula':[], 'no_formula': []}
+final_dict['has_formula'] = has_formula_temporals
+final_dict['no_formula'] = no_formula_temporals
+
+
+source_blob_name = "Normalized_loinc_classes/temporal_norm_code_to_formula.json"
+save_json_to_gcs(project_id, source_blob_name, bucket, final_dict)
