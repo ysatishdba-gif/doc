@@ -16,7 +16,58 @@ from google.cloud import storage
 from google.genai import types
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from norm_temporal import TemporalFormulaResolver
+from typing import Protocol, TypedDict, runtime_checkable
+
+
+# --------------------------------------------------------------------------- #
+# Retrieval-signal coding contracts.
+#
+# Temporal mapping (now) and record-type coding (later) are owned by other
+# modules and injected here. We code against these interfaces, so whatever a
+# teammate ships just plugs in without changing this file. Until a real
+# implementation is provided, the Null* stand-ins keep everything working:
+# record types stay strings and temporal stays the raw phrase, both with empty
+# code slots — i.e. structurally code-ready, exactly as the dev notes require.
+# --------------------------------------------------------------------------- #
+class RecordType(TypedDict):
+    name: str
+    code: Optional[str]
+    system: Optional[str]
+
+
+class TemporalMapping(TypedDict):
+    signal: str            # the generated phrase, e.g. "last 3 years"
+    code: Optional[str]    # teammate-provided (CUI/LOINC); None until coded
+    formula: Optional[str]  # teammate-provided, e.g. "ref_point - 3Y"
+
+
+@runtime_checkable
+class TemporalResolver(Protocol):
+    """Teammate's temporal module implements this."""
+    def resolve(self, signals: List[str]) -> List[TemporalMapping]: ...
+
+
+@runtime_checkable
+class ConceptCoder(Protocol):
+    """Future Concept Coding module implements this for record types."""
+    def code_record_types(self, names: List[str]) -> List[RecordType]: ...
+
+
+class NullTemporalResolver:
+    """Default until the temporal module is injected: passes the phrase
+    through with empty code/formula slots."""
+
+    def resolve(self, signals: List[str]) -> List[TemporalMapping]:
+        return [{"signal": s, "code": None, "formula": None} for s in signals]
+
+
+class NullConceptCoder:
+    """Default until Concept Coding is injected: keeps record types as strings,
+    structurally code-ready (code/system present, set to None)."""
+
+    def code_record_types(self, names: List[str]) -> List[RecordType]:
+        return [{"name": n, "code": None, "system": None} for n in names]
+
 
 # Silence noisy SDK / HTTP client loggers.
 for _name in ("google_genai", "httpx", "httpcore", "urllib3", "google"):
@@ -540,7 +591,6 @@ class FlatRetrievalSignals(BaseModel):
     author_roles: List[str] = Field(default_factory=list)
     longitudinal_scope: List[str] = Field(default_factory=list)
     temporal_signal: List[str] = Field(default_factory=list)
-    temporal_signal_normalized: List[str] = Field(default_factory=list)
     content_signals: List[str] = Field(default_factory=list)
     clinical_setting: List[str] = Field(default_factory=list)
     context_sentences: List[str] = Field(default_factory=list)
@@ -556,7 +606,6 @@ class FlatRetrievalSignals(BaseModel):
             author_roles=_as_list(ctx.author_roles),
             longitudinal_scope=_as_list(ctx.longitudinal_scope),
             temporal_signal=[],
-            temporal_signal_normalized=[],
             content_signals=_as_list(ctx.content_signals),
             clinical_setting=_as_list(ctx.clinical_setting),
             context_sentences=[],
@@ -646,7 +695,8 @@ class ExtractionResult:
         temporal: Optional[TemporalExtractionOutput],
         processing_time: float,
         representative_terms: Optional[List[str]] = None,
-        resolver: Optional["TemporalFormulaResolver"] = None,
+        resolver: Optional[TemporalResolver] = None,
+        coder: Optional[ConceptCoder] = None,
     ):
         self.original_query = original_query
         self.expansion = expansion
@@ -654,7 +704,8 @@ class ExtractionResult:
         self.context = context
         self.temporal = temporal
         self.processing_time = processing_time
-        self._resolver = resolver or TemporalFormulaResolver.empty()
+        self._resolver = resolver or NullTemporalResolver()
+        self._coder = coder or NullConceptCoder()
       
         self.representative_terms_list: List[str] = list(representative_terms or [])
 
@@ -751,12 +802,23 @@ class ExtractionResult:
             return result if result else [NO_TEMPORAL_PLACEHOLDER]
         return [NO_TEMPORAL_PLACEHOLDER]
 
-    def _normalized_temporal(self, temporal_signals: List[str]) -> List[str]:
-        """Map generated temporal_signal strings to their normalized formulas
-        (e.g. 'ref_point - 3Y') via the resolver. The 'current' placeholder and
-        any signal that doesn't match a known concept contribute nothing."""
-        real = [s for s in (temporal_signals or []) if s != NO_TEMPORAL_PLACEHOLDER]
-        return self._resolver.resolve_many(real)
+    def _structured_signals(self, raw: Dict[str, Any]) -> Dict[str, Any]:
+        """Project a raw signals dict into the API's code-ready shape using the
+        injected temporal resolver and concept coder. The 'current' temporal
+        placeholder is dropped before mapping."""
+        temporal_in = [
+            s for s in (raw.get("temporal_signal") or [])
+            if s != NO_TEMPORAL_PLACEHOLDER
+        ]
+        return {
+            "record_types": self._coder.code_record_types(raw.get("record_types") or []),
+            "temporal": self._resolver.resolve(temporal_in),
+            "authors": list(raw.get("author_roles") or []),
+            "longitudinal_scope": list(raw.get("longitudinal_scope") or []),
+            "content_signals": list(raw.get("content_signals") or []),
+            "clinical_setting": list(raw.get("clinical_setting") or []),
+            "context_sentences": list(raw.get("context_sentences") or []),
+        }
 
     def _build_ctx(self, concept_name: str) -> RetrievalContext:
         cc = self._get_concept_context(concept_name)
@@ -832,9 +894,6 @@ class ExtractionResult:
                     signals.temporal_signal = self._temporal_for_candidate(
                         i.intent_title, c.strip()
                     )
-                    signals.temporal_signal_normalized = self._normalized_temporal(
-                        signals.temporal_signal
-                    )
                     signals.context_sentences = self._build_context_sentences(
                         c.strip(), rich_ctx
                     )
@@ -899,7 +958,6 @@ class ExtractionResult:
             author_roles=_union(lambda s: s.author_roles),
             longitudinal_scope=_union(lambda s: s.longitudinal_scope),
             temporal_signal=temporal,
-            temporal_signal_normalized=_union(lambda s: s.temporal_signal_normalized),
             content_signals=_union(lambda s: s.content_signals),
             clinical_setting=_union(lambda s: s.clinical_setting),
             context_sentences=_union(lambda s: s.context_sentences),
@@ -924,9 +982,6 @@ class ExtractionResult:
                     signals = FlatRetrievalSignals.from_retrieval_context(rich_ctx)
                     signals.temporal_signal = self._temporal_for_candidate(
                         intent.intent_title, c.strip()
-                    )
-                    signals.temporal_signal_normalized = self._normalized_temporal(
-                        signals.temporal_signal
                     )
                     signals.context_sentences = self._build_context_sentences(
                         c.strip(), rich_ctx
@@ -1029,12 +1084,14 @@ class ContextualIntentPipeline:
         project: str,
         location: str = "us-central1",
         model: str = "gemini-2.5-flash",
-        temporal_resolver: Optional[TemporalFormulaResolver] = None,
+        temporal_resolver: Optional[TemporalResolver] = None,
+        concept_coder: Optional[ConceptCoder] = None,
     ):
         self.project = project
         self.location = location
         self.model_name = model
-        self._temporal_resolver = temporal_resolver or TemporalFormulaResolver.empty()
+        self._temporal_resolver = temporal_resolver or NullTemporalResolver()
+        self._concept_coder = concept_coder or NullConceptCoder()
        
         self._tls = threading.local()
 
@@ -1231,7 +1288,12 @@ class ContextualIntentPipeline:
 
     # -- main entry points --
 
-    def extract(self, query: str, verbose: bool = False) -> ExtractionResult:
+    def extract(
+        self,
+        query: str,
+        verbose: bool = False,
+        include_retrieval_signals: bool = False,
+    ) -> ExtractionResult:
         if not query or not query.strip():
             raise ValueError("Empty query provided")
 
@@ -1252,8 +1314,11 @@ class ContextualIntentPipeline:
             intent_out = f_int.result()
             rep_terms = f_rep.result()
 
-        # Step 3 — contextual environment (facets + lifecycle qualifier in one call)
-        context = self.build_context(query, expansion.expanded_query, intent_out)
+        # Step 3 — contextual environment (the retrieval-signal source). Only
+        # call it when signals are requested; otherwise skip the 4th LLM call.
+        context = None
+        if include_retrieval_signals:
+            context = self.build_context(query, expansion.expanded_query, intent_out)
 
         temporal: Optional[TemporalExtractionOutput] = None
         if context is not None:
@@ -1282,7 +1347,8 @@ class ContextualIntentPipeline:
 
         return ExtractionResult(
             query, expansion, intent_out, context, temporal, processing_time,
-            rep_terms.representative_terms, resolver=self._temporal_resolver,
+            rep_terms.representative_terms,
+            resolver=self._temporal_resolver, coder=self._concept_coder,
         )
 
     def run(
@@ -1398,8 +1464,10 @@ def run_single_query(
     return {"query": query, "status": "completed", "files": files}
 
 
-def minimal_pipeline(pipeline, q) -> Dict[str, Any]:
-   
+def minimal_pipeline(
+    pipeline, q, include_retrieval_signals: bool = False
+) -> Dict[str, Any]:
+
     t0 = datetime.utcnow()
 
     expansion = pipeline.expand_query(q)
@@ -1413,7 +1481,11 @@ def minimal_pipeline(pipeline, q) -> Dict[str, Any]:
         intent_out = f_int.result()
         rep_terms = f_rep.result()
 
-    context = pipeline.build_context(q, expansion.expanded_query, intent_out)
+    # 4th LLM call (the retrieval-signal source) only when signals are
+    # requested; otherwise skip it — 3 calls instead of 4.
+    context = None
+    if include_retrieval_signals:
+        context = pipeline.build_context(q, expansion.expanded_query, intent_out)
 
     temporal: Optional[TemporalExtractionOutput] = None
     if context is not None:
@@ -1424,177 +1496,38 @@ def minimal_pipeline(pipeline, q) -> Dict[str, Any]:
     processing_time = (datetime.utcnow() - t0).total_seconds()
     result = ExtractionResult(
         q, expansion, intent_out, context, temporal, processing_time,
-        rep_terms.representative_terms, resolver=pipeline._temporal_resolver,
+        rep_terms.representative_terms,
+        resolver=pipeline._temporal_resolver, coder=pipeline._concept_coder,
     )
 
     fp = result.to_full_pipeline()
-    # print(f"Total time: {processing_time:.1f}s")
 
-    return Format_MinimalPipeline(
-        question=q,
-        expanded_query=fp.get("expanded_query"),
-        representative_terms=fp.get("representative_terms"),
-        total_intents_detected=fp.get("total_intents_detected"),
-        intents=fp.get("intents"),
-    ).model_dump()
+    out: Dict[str, Any] = {
+        "question": q,
+        "expanded_query": fp.get("expanded_query"),
+        "representative_terms": fp.get("representative_terms"),
+        "total_intents_detected": fp.get("total_intents_detected"),
+        "intents": fp.get("intents") or [],
+    }
 
-
-if __name__ == "__main__":
-
-    PROJECT_ID = PROJECT_ID
-    LOCATION = "us-central1"
-    MODEL_VERSION = "gemini-2.5-flash"
-
-    # To attach normalized temporal formulas, build a resolver from the table
-    # produced by norm_temporal.py and pass it in. Without it, the
-    # pipeline behaves exactly as before (temporal_signal_normalized stays []).
-    #   from google.cloud import storage
-    #   resolver = TemporalFormulaResolver.from_gcs(
-    #       storage.Client(project=PROJECT_ID), BUCKET_NAME,
-    #       "Normalized_loinc_classes/temporal_norm_code_to_formula.json",
-    #   )
-    #   # or, from a local copy of the table:
-    #   # resolver = TemporalFormulaResolver.from_file("temporal_norm_code_to_formula.json")
-    pipeline = ContextualIntentPipeline(
-        project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION,
-        # temporal_resolver=resolver,
-    )
-
-
-    #  Single query test 
-
-    test_queries = [
-"elevated psa","tell me a joke"
-    ]
-    
-    results = []
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {
-            executor.submit(minimal_pipeline, pipeline, query): query
-            for query in test_queries
-        }
-        for idx, future in enumerate(as_completed(futures), 2):
-            res = future.result()
-            results.append(res)
-    
-            valid, err = validate_schema(res, "minimal_pipeline")
-            filename = f"query{idx}_pipeline.json"
-            save_json(res, filename)
-    
-            # Compact highlights — not the full payload.
-            print(f"Query     : {res.get('question', '')[:80]}")
-            rep = res.get("representative_terms") or []
-            print(
-                f"Status    : "
-                f"intents: {res.get('total_intents_detected')}"
+    # Retrieval signals are opt-in. When ON, project each intent's (and each
+    # candidate's) raw signals into the code-ready shape (record types ->
+    # {name, code, system}, temporal -> {signal, code, formula}). When OFF,
+    # drop the block so the response matches the pre-signals contract
+    # (backward-compatible for clients not using retrieval signals).
+    for it in out["intents"]:
+        candidates = it.get("final_candidates") or []
+        if include_retrieval_signals:
+            it["retrieval_signals"] = result._structured_signals(
+                it.get("retrieval_signals") or {}
             )
-            print(f"Rep terms : {', '.join(rep) if rep else '—'}")
-            if not valid:
-                print(f"Schema    : FAILED — {err}")
-            print("-" * 60)
+            for fc in candidates:
+                fc["retrieval_signals"] = result._structured_signals(
+                    fc.get("retrieval_signals") or {}
+                )
+        else:
+            it.pop("retrieval_signals", None)
+            for fc in candidates:
+                fc.pop("retrieval_signals", None)
 
-  
-     # From GCS
-   
-
-    
-#     BUCKET_NAME = BUCKET_NAME
-#     FILE_PATH = FILE_PATH
-#     BATCH_WORKERS = 4
-#     OUTPUT_FILE = "rep-term.json"
-
-#     def load_json_from_gcs(bucket_name, blob_name):
-#         client = storage.Client()
-#         bucket = client.bucket(bucket_name)
-#         blob = bucket.blob(blob_name)
-#         data = blob.download_as_text()
-#         return json.loads(data)
-
-#     def _summarize(pr: Dict[str, Any]) -> Dict[str, Any]:
-#         return {
-#             "query": pr.get("question", ""),
-#             "representative_terms": list(pr.get("representative_terms") or []),
-#             "temporal_signals": _collect_temporal_signals(pr),
-#             "record_types": _collect_record_types(pr),
-#         }
-
-#     data = load_json_from_gcs(BUCKET_NAME, FILE_PATH)
-#     questions = list(data.keys())
-#     print(f"Total questions: {len(questions)}")
-
-#     if not questions:
-#         raise SystemExit(1)
-
-#     summaries: List[Optional[Dict[str, Any]]] = [None] * len(questions)
-#     with ThreadPoolExecutor(max_workers=BATCH_WORKERS) as executor:
-#         future_to_idx = {
-#             executor.submit(minimal_pipeline, pipeline, q): i
-#             for i, q in enumerate(questions)
-#         }
-#         for fut in as_completed(future_to_idx):
-#             i = future_to_idx[fut]
-#             try:
-#                 summaries[i] = _summarize(fut.result())
-#             except Exception as e:
-#                 summaries[i] = {
-#                     "query": questions[i],
-#                     "representative_terms": [],
-#                     "temporal_signals": [],
-#                     "record_types": [],
-#                     "error": str(e),
-#                 }
-
-#     summaries = [s for s in summaries if s is not None]
-
-#     for s in summaries:
-#         print(f"Q : {s['query']}")
-#         print(f"  rep terms  : {s['representative_terms']}")
-#         print(f"  temporal   : {s['temporal_signals']}")
-#         print(f"  records    : {s['record_types']}")
-
-#     with open(OUTPUT_FILE, "w") as f:
-#         json.dump(summaries, f, indent=2)
-#     print(f"Saved {len(summaries)} -> {OUTPUT_FILE}")
-
-
-     # From csv
-
-#     CSV_FILE_PATH = "shopping_list1.csv"
-#     OUTPUT_FILE = "decision-tree-derived.json"
-#     BATCH_WORKERS = 16  
-
-#     df = pd.read_csv(CSV_FILE_PATH, encoding="cp1252")
-#     questions = df["Shopping List Item"].dropna().astype(str).tolist()
-#     print(f"Total questions: {len(questions)}")
-
-#     def _process_one(q: str) -> Dict[str, Any]:
-#         try:
-#             pr = minimal_pipeline(pipeline, q)
-#             return {
-#                 "query": q,
-#                 "representative_terms": pr.get("representative_terms", []),
-#                 "temporal_signals": _collect_temporal_signals(pr),
-#                 "record_types": _collect_record_types(pr),
-#             }
-#         except Exception as e:
-#             print(f"Failed: {q} ({e})")
-#             return {
-#                 "query": q,
-#                 "representative_terms": [], "temporal_signals": [],
-#                 "record_types": [], "error": str(e),
-#             }
-
-#     # Preserve input order in the output
-#     results: List[Optional[Dict[str, Any]]] = [None] * len(questions)
-#     with ThreadPoolExecutor(max_workers=BATCH_WORKERS) as executor:
-#         future_to_idx = {
-#             executor.submit(_process_one, q): i for i, q in enumerate(questions)
-#         }
-#         for fut in as_completed(future_to_idx):
-#             results[future_to_idx[fut]] = fut.result()
-
-#     results = [r for r in results if r is not None]
-
-#     with open(OUTPUT_FILE, "w") as f:
-#         json.dump(results, f, indent=2)
-#     print(f"Saved {len(results)} -> {OUTPUT_FILE}")
+    return out
