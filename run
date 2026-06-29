@@ -1,17 +1,13 @@
 """
-run.py — end-to-end test of the contextual intent pipeline with
-normalized temporal signals.
+run.py — quick end-to-end test of the Intent Finder pipeline.
 
-Place this file in the SAME folder as:
-    - intent.py
-    - norm_temporal.py
+Place this file in the same folder as intent.py.
 
 Prereqs:
     pip install google-genai google-cloud-storage pydantic pandas
     # Application Default Credentials set up ONCE in your environment:
     #   gcloud auth application-default login
-    # (or set GOOGLE_APPLICATION_CREDENTIALS to a service-account key file).
-    # The same ADC covers BOTH Vertex (genai) and GCS (storage) — no re-auth.
+    # (or GOOGLE_APPLICATION_CREDENTIALS) — used for the Vertex (Gemini) calls.
 
 Run:
     python run.py
@@ -19,65 +15,44 @@ Run:
 
 import json
 
-from google.cloud import storage
-
-from norm_temporal import (
-    TemporalFormulaConfig,
-    TemporalFormulaResolver,
-    run as build_temporal_table,
-)
 from intent import ContextualIntentPipeline, minimal_pipeline
 
 
-# ── Step 0: config — fill these in ───────────────────────────────────────
-PROJECT_ID   = ""          # e.g. "my-gcp-project"
-LOCATION     = "us-central1"
-BUCKET       = ""          # e.g. "my-bucket"
-FORMULA_BLOB = "Normalized_loinc_classes/temporal_norm_code_to_formula.json"
-MODEL        = "gemini-2.5-flash"
+# ── config ───────────────────────────────────────────────────────────────
+PROJECT_ID = ""          # e.g. "my-gcp-project"
+LOCATION   = "us-central1"
+MODEL      = "gemini-2.5-flash"
 
-# First run only: set True to (re)generate the formula table in GCS.
-# Leave False afterwards — the resolver just reads the existing table.
-BUILD_TABLE  = False
+# Retrieval-signals toggle. True  -> include the retrieval_signals block
+# (runs the 4th LLM call). False -> omit it and skip that call (3 calls).
+INCLUDE_RETRIEVAL_SIGNALS = True
 
-# Query to test.
 QUERY = "elevated psa in last 3 years"
 
 
 def main() -> None:
-    # One client; the pipeline's Vertex client reuses the same ADC.
-    storage_client = storage.Client(project=PROJECT_ID)
-
-    # ── Step 1 (optional, first run): build the temporal formula table ──
-    if BUILD_TABLE:
-        print("Building temporal formula table ...")
-        build_temporal_table(
-            TemporalFormulaConfig(
-                project_id=PROJECT_ID, bucket=BUCKET, location=LOCATION,
-            ),
-            storage_client=storage_client,
-        )
-
-    # ── Step 2: build the resolver + pipeline ──
-    try:
-        resolver = TemporalFormulaResolver.from_gcs(storage_client, BUCKET, FORMULA_BLOB)
-    except Exception as e:
-        print(
-            f"[warn] could not load temporal formula table ({e}). "
-            f"Running WITHOUT normalized temporal — set BUILD_TABLE=True to "
-            f"create the table first."
-        )
-        resolver = TemporalFormulaResolver.empty()
-
+    # When your teammate hands you the temporal module (and, later, the
+    # record-type coder), import and inject them here. They only need to match
+    # the TemporalResolver / ConceptCoder interfaces defined in intent.py:
+    #     TemporalResolver.resolve(signals)        -> [{signal, code, formula}]
+    #     ConceptCoder.code_record_types(names)    -> [{name,  code, system}]
+    # Until then, the built-in Null* stand-ins are used: record types stay
+    # strings and temporal stays the raw phrase, both with null code slots
+    # (structurally code-ready).
+    #
+    #   from teammate_temporal import TemporalModule
+    #   pipeline = ContextualIntentPipeline(
+    #       project=PROJECT_ID, location=LOCATION, model=MODEL,
+    #       temporal_resolver=TemporalModule(),
+    #       # concept_coder=RecordTypeCoder(),   # when available
+    #   )
     pipeline = ContextualIntentPipeline(
-        project=PROJECT_ID,
-        location=LOCATION,
-        model=MODEL,
-        temporal_resolver=resolver,
+        project=PROJECT_ID, location=LOCATION, model=MODEL,
     )
 
-    # ── Step 3: run a query and print ──
-    out = minimal_pipeline(pipeline, QUERY)
+    out = minimal_pipeline(
+        pipeline, QUERY, include_retrieval_signals=INCLUDE_RETRIEVAL_SIGNALS
+    )
     print(json.dumps(out, indent=2))
 
 
