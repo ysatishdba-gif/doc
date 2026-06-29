@@ -16,6 +16,8 @@ from google.cloud import storage
 from google.genai import types
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from norm_temporal import TemporalFormulaResolver
+
 # Silence noisy SDK / HTTP client loggers.
 for _name in ("google_genai", "httpx", "httpcore", "urllib3", "google"):
     logging.getLogger(_name).setLevel(logging.WARNING)
@@ -538,6 +540,7 @@ class FlatRetrievalSignals(BaseModel):
     author_roles: List[str] = Field(default_factory=list)
     longitudinal_scope: List[str] = Field(default_factory=list)
     temporal_signal: List[str] = Field(default_factory=list)
+    temporal_signal_normalized: List[str] = Field(default_factory=list)
     content_signals: List[str] = Field(default_factory=list)
     clinical_setting: List[str] = Field(default_factory=list)
     context_sentences: List[str] = Field(default_factory=list)
@@ -553,6 +556,7 @@ class FlatRetrievalSignals(BaseModel):
             author_roles=_as_list(ctx.author_roles),
             longitudinal_scope=_as_list(ctx.longitudinal_scope),
             temporal_signal=[],
+            temporal_signal_normalized=[],
             content_signals=_as_list(ctx.content_signals),
             clinical_setting=_as_list(ctx.clinical_setting),
             context_sentences=[],
@@ -642,6 +646,7 @@ class ExtractionResult:
         temporal: Optional[TemporalExtractionOutput],
         processing_time: float,
         representative_terms: Optional[List[str]] = None,
+        resolver: Optional["TemporalFormulaResolver"] = None,
     ):
         self.original_query = original_query
         self.expansion = expansion
@@ -649,6 +654,7 @@ class ExtractionResult:
         self.context = context
         self.temporal = temporal
         self.processing_time = processing_time
+        self._resolver = resolver or TemporalFormulaResolver.empty()
       
         self.representative_terms_list: List[str] = list(representative_terms or [])
 
@@ -745,6 +751,13 @@ class ExtractionResult:
             return result if result else [NO_TEMPORAL_PLACEHOLDER]
         return [NO_TEMPORAL_PLACEHOLDER]
 
+    def _normalized_temporal(self, temporal_signals: List[str]) -> List[str]:
+        """Map generated temporal_signal strings to their normalized formulas
+        (e.g. 'ref_point - 3Y') via the resolver. The 'current' placeholder and
+        any signal that doesn't match a known concept contribute nothing."""
+        real = [s for s in (temporal_signals or []) if s != NO_TEMPORAL_PLACEHOLDER]
+        return self._resolver.resolve_many(real)
+
     def _build_ctx(self, concept_name: str) -> RetrievalContext:
         cc = self._get_concept_context(concept_name)
         if cc is None:
@@ -819,6 +832,9 @@ class ExtractionResult:
                     signals.temporal_signal = self._temporal_for_candidate(
                         i.intent_title, c.strip()
                     )
+                    signals.temporal_signal_normalized = self._normalized_temporal(
+                        signals.temporal_signal
+                    )
                     signals.context_sentences = self._build_context_sentences(
                         c.strip(), rich_ctx
                     )
@@ -883,6 +899,7 @@ class ExtractionResult:
             author_roles=_union(lambda s: s.author_roles),
             longitudinal_scope=_union(lambda s: s.longitudinal_scope),
             temporal_signal=temporal,
+            temporal_signal_normalized=_union(lambda s: s.temporal_signal_normalized),
             content_signals=_union(lambda s: s.content_signals),
             clinical_setting=_union(lambda s: s.clinical_setting),
             context_sentences=_union(lambda s: s.context_sentences),
@@ -907,6 +924,9 @@ class ExtractionResult:
                     signals = FlatRetrievalSignals.from_retrieval_context(rich_ctx)
                     signals.temporal_signal = self._temporal_for_candidate(
                         intent.intent_title, c.strip()
+                    )
+                    signals.temporal_signal_normalized = self._normalized_temporal(
+                        signals.temporal_signal
                     )
                     signals.context_sentences = self._build_context_sentences(
                         c.strip(), rich_ctx
@@ -1009,10 +1029,12 @@ class ContextualIntentPipeline:
         project: str,
         location: str = "us-central1",
         model: str = "gemini-2.5-flash",
+        temporal_resolver: Optional[TemporalFormulaResolver] = None,
     ):
         self.project = project
         self.location = location
         self.model_name = model
+        self._temporal_resolver = temporal_resolver or TemporalFormulaResolver.empty()
        
         self._tls = threading.local()
 
@@ -1260,7 +1282,7 @@ class ContextualIntentPipeline:
 
         return ExtractionResult(
             query, expansion, intent_out, context, temporal, processing_time,
-            rep_terms.representative_terms,
+            rep_terms.representative_terms, resolver=self._temporal_resolver,
         )
 
     def run(
@@ -1402,7 +1424,7 @@ def minimal_pipeline(pipeline, q) -> Dict[str, Any]:
     processing_time = (datetime.utcnow() - t0).total_seconds()
     result = ExtractionResult(
         q, expansion, intent_out, context, temporal, processing_time,
-        rep_terms.representative_terms,
+        rep_terms.representative_terms, resolver=pipeline._temporal_resolver,
     )
 
     fp = result.to_full_pipeline()
@@ -1423,8 +1445,19 @@ if __name__ == "__main__":
     LOCATION = "us-central1"
     MODEL_VERSION = "gemini-2.5-flash"
 
+    # To attach normalized temporal formulas, build a resolver from the table
+    # produced by norm_temporal.py and pass it in. Without it, the
+    # pipeline behaves exactly as before (temporal_signal_normalized stays []).
+    #   from google.cloud import storage
+    #   resolver = TemporalFormulaResolver.from_gcs(
+    #       storage.Client(project=PROJECT_ID), BUCKET_NAME,
+    #       "Normalized_loinc_classes/temporal_norm_code_to_formula.json",
+    #   )
+    #   # or, from a local copy of the table:
+    #   # resolver = TemporalFormulaResolver.from_file("temporal_norm_code_to_formula.json")
     pipeline = ContextualIntentPipeline(
-        project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION
+        project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION,
+        # temporal_resolver=resolver,
     )
 
 
