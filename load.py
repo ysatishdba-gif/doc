@@ -90,30 +90,6 @@ INTENT_EXTRACTION_PROMPT = """
 You are a clinical intent extraction engine for medical document retrieval.
 
 ====================================================
-CLINICAL VALIDATION
-====================================================
-
-Default: is_clinical = true
-
-A query is clinical if it has ANY connection to human health, healthcare
-delivery, biomedical science, or clinical practice. This includes but is
-not limited to: patient care, disease, symptoms, treatment, medications,
-anatomy, diagnostics, medical devices, healthcare operations, clinical
-documentation, public health, nutrition as it relates to health, mental
-health, rehabilitation, or any topic a healthcare professional might
-encounter in practice.
-
-Set is_clinical = false ONLY when the query has absolutely zero
-connection to any aspect of human health or healthcare. Examples of
-non-clinical: "best restaurants in Chicago", "how to fix a flat tire",
-"explain quantum computing."
-
-When uncertain, default to clinical. It is better to process a
-borderline query than to reject a legitimate one.
-
-When is_clinical = false, set reason and return empty intents.
-
-====================================================
 CORE PRINCIPLES
 ====================================================
 
@@ -476,8 +452,6 @@ class Intent(BaseModel):
 
 
 class IntentExtractionResponse(BaseModel):
-    is_clinical: bool
-    reason: Optional[str] = None
     total_intents_detected: int = 0
     intents: List[Intent] = Field(default_factory=list)
 
@@ -489,8 +463,6 @@ class IntentExtractionResponse(BaseModel):
 
 # Full internal object after both pipeline steps
 class IntentExtractionOutput(BaseModel):
-    is_clinical: bool
-    reason: Optional[str] = None
     original_query: str
     expanded_query: str
     total_intents_detected: int = 0
@@ -620,23 +592,17 @@ class IntentWithContext(BaseModel):
 class Format_IntentExtraction(BaseModel):
     user_query: str
     intents: List[IntentSummaryItem]
-    is_clinical: bool
-    rejected_reason: Optional[str] = None
     representative_terms: list = Field(default_factory=list)
 
 
 class Format_FinalQueries(BaseModel):
     user_query: str
-    is_clinical: bool
-    rejected_reason: Optional[str] = None
     representative_terms: list = Field(default_factory=list)
     total_candidates: int
     final_candidates: List[FinalCandidateItem]
 
 
 class Format_NatureBreakdown(BaseModel):
-    is_clinical: bool
-    reason: Optional[str] = None
     original_query: str
     total_intents_detected: int
     representative_terms: list = Field(default_factory=list)
@@ -644,8 +610,6 @@ class Format_NatureBreakdown(BaseModel):
 
 
 class Format_FullPipeline(BaseModel):
-    is_clinical: bool
-    reason: Optional[str] = None
     original_query: str
     expanded_query: str
     total_intents_detected: int
@@ -657,7 +621,6 @@ class Format_MinimalPipeline(BaseModel):
 
     question: str
     expanded_query: Optional[str] = None
-    is_clinical: Optional[bool] = None
     representative_terms: list = Field(default_factory=list)
     total_intents_detected: Optional[int] = None
     intents: Optional[List[IntentWithContext]] = None
@@ -811,8 +774,8 @@ class ExtractionResult:
             seen.add(key)
             terms.append(t_clean)
 
-        # Backstop: never blank for a clinical query with intents.
-        if not terms and self.intents.is_clinical and self.intents.intents:
+        # Backstop: never blank when there are intents.
+        if not terms and self.intents.intents:
             for i in self.intents.intents:
                 t_clean = i.intent_title.strip()
                 if not t_clean:
@@ -835,8 +798,6 @@ class ExtractionResult:
         result = Format_IntentExtraction(
             user_query=self.original_query,
             intents=items,
-            is_clinical=self.intents.is_clinical,
-            rejected_reason=self.intents.reason,
             representative_terms=self._representative_terms(),
         )
         return result.model_dump()
@@ -873,8 +834,6 @@ class ExtractionResult:
                     )
         result = Format_FinalQueries(
             user_query=self.original_query,
-            is_clinical=self.intents.is_clinical,
-            rejected_reason=self.intents.reason,
             representative_terms=self._representative_terms(),
             total_candidates=len(candidates),
             final_candidates=candidates,
@@ -892,8 +851,6 @@ class ExtractionResult:
             for i in self.intents.intents
         ]
         result = Format_NatureBreakdown(
-            is_clinical=self.intents.is_clinical,
-            reason=self.intents.reason,
             original_query=self.intents.original_query,
             total_intents_detected=self.intents.total_intents_detected,
             representative_terms=self._representative_terms(),
@@ -984,8 +941,6 @@ class ExtractionResult:
             )
 
         result = Format_FullPipeline(
-            is_clinical=self.intents.is_clinical,
-            reason=self.intents.reason,
             original_query=self.original_query,
             expanded_query=self.expansion.expanded_query,
             total_intents_detected=self.intents.total_intents_detected,
@@ -1180,14 +1135,10 @@ class ContextualIntentPipeline:
         raw: IntentExtractionResponse = self._call_model(
             prompt,
             IntentExtractionResponse,
-            fallback=IntentExtractionResponse(
-                is_clinical=False, reason="LLM call failed"
-            ),
+            fallback=IntentExtractionResponse(),
             max_tokens=8192,
         )
         return IntentExtractionOutput(
-            is_clinical=raw.is_clinical,
-            reason=raw.reason,
             original_query=original_query,
             expanded_query=expanded_query,
             total_intents_detected=len(raw.intents),
@@ -1202,7 +1153,7 @@ class ContextualIntentPipeline:
     ) -> Optional[ContextualEnvironmentOutput]:
         """Step 3 — map each atomic concept's documentation facets AND
         produce lifecycle qualifiers per intent / candidate in one LLM call."""
-        if not intent_out.is_clinical or not intent_out.intents:
+        if not intent_out.intents:
             return None
 
         # Flat list of unique concepts (Task 1 target list)
@@ -1299,16 +1250,12 @@ class ContextualIntentPipeline:
             sub_nature_count = sum(len(i.sub_natures) for i in intent_out.intents)
             print(f"Query     : {query[:80]}")
             print(f"Expanded  : {expansion.expanded_query[:80]}")
-            if intent_out.is_clinical:
-                print("Status    : Clinical")
-                print(
-                    f"Intents: {intent_out.total_intents_detected} | "
-                    f"sub natures: {sub_nature_count} | "
-                    f"candidates: {candidate_count} | "
-                    f"time: {processing_time:.1f}s"
-                )
-            else:
-                print(f"Status    : Non-clinical — {intent_out.reason}")
+            print(
+                f"Intents: {intent_out.total_intents_detected} | "
+                f"sub natures: {sub_nature_count} | "
+                f"candidates: {candidate_count} | "
+                f"time: {processing_time:.1f}s"
+            )
             print()
 
         return ExtractionResult(
@@ -1464,7 +1411,6 @@ def minimal_pipeline(pipeline, q) -> Dict[str, Any]:
     return Format_MinimalPipeline(
         question=q,
         expanded_query=fp.get("expanded_query"),
-        is_clinical=fp.get("is_clinical"),
         representative_terms=fp.get("representative_terms"),
         total_intents_detected=fp.get("total_intents_detected"),
         intents=fp.get("intents"),
@@ -1507,7 +1453,6 @@ if __name__ == "__main__":
             rep = res.get("representative_terms") or []
             print(
                 f"Status    : "
-                f"clinical: {res.get('is_clinical')} | "
                 f"intents: {res.get('total_intents_detected')}"
             )
             print(f"Rep terms : {', '.join(rep) if rep else '—'}")
