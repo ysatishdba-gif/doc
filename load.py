@@ -5,7 +5,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
@@ -36,15 +36,17 @@ class RecordType(TypedDict):
 
 
 class TemporalMapping(TypedDict):
-    signal: str            # the generated phrase, e.g. "last 3 years"
-    code: Optional[str]    # teammate-provided (CUI/LOINC); None until coded
-    formula: Optional[str]  # teammate-provided, e.g. "ref_point - 3Y"
+    # Each field may be text, an int, or null. A query's temporal list can also
+    # mix entries (e.g. a phrase "last 3 years" alongside a bare year 2023).
+    signal: Union[str, int]            # e.g. "last 3 years" or 2023
+    code: Optional[Union[str, int]]    # teammate-provided (CUI/LOINC); None until coded
+    formula: Optional[Union[str, int]]  # teammate-provided, e.g. "ref_point - 3Y"
 
 
 @runtime_checkable
 class TemporalResolver(Protocol):
     """Teammate's temporal module implements this."""
-    def resolve(self, signals: List[str]) -> List[TemporalMapping]: ...
+    def resolve(self, signals: List[Union[str, int]]) -> List[TemporalMapping]: ...
 
 
 @runtime_checkable
@@ -57,7 +59,7 @@ class NullTemporalResolver:
     """Default until the temporal module is injected: passes the phrase
     through with empty code/formula slots."""
 
-    def resolve(self, signals: List[str]) -> List[TemporalMapping]:
+    def resolve(self, signals: List[Union[str, int]]) -> List[TemporalMapping]:
         return [{"signal": s, "code": None, "formula": None} for s in signals]
 
 
@@ -590,7 +592,7 @@ class FlatRetrievalSignals(BaseModel):
     record_types: List[str] = Field(default_factory=list)
     author_roles: List[str] = Field(default_factory=list)
     longitudinal_scope: List[str] = Field(default_factory=list)
-    temporal_signal: List[str] = Field(default_factory=list)
+    temporal_signal: List[Union[str, int]] = Field(default_factory=list)
     content_signals: List[str] = Field(default_factory=list)
     clinical_setting: List[str] = Field(default_factory=list)
     context_sentences: List[str] = Field(default_factory=list)
@@ -936,13 +938,21 @@ class ExtractionResult:
     @staticmethod
     def _merge_signals(candidates: List[FinalCandidateItem]) -> FlatRetrievalSignals:
 
-        def _union(getter) -> List[str]:
+        def _union(getter) -> List[Any]:
             seen_vals: dict = {}
             for fc in candidates:
                 for val in getter(fc.retrieval_signals):
-                    val = val.strip() if isinstance(val, str) else val
-                    if val and val.lower() not in seen_vals:
-                        seen_vals[val.lower()] = val
+                    if isinstance(val, str):
+                        val = val.strip()
+                        if not val:
+                            continue
+                        key = val.lower()
+                    else:
+                        if val is None:
+                            continue
+                        key = val  # int (or other scalar): dedup by value
+                    if key not in seen_vals:
+                        seen_vals[key] = val
             return list(seen_vals.values())
 
         temporal = _union(lambda s: s.temporal_signal)
