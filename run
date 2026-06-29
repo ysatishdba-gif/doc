@@ -1,0 +1,85 @@
+"""
+run.py — end-to-end test of the contextual intent pipeline with
+normalized temporal signals.
+
+Place this file in the SAME folder as:
+    - intent.py
+    - norm_temporal.py
+
+Prereqs:
+    pip install google-genai google-cloud-storage pydantic pandas
+    # Application Default Credentials set up ONCE in your environment:
+    #   gcloud auth application-default login
+    # (or set GOOGLE_APPLICATION_CREDENTIALS to a service-account key file).
+    # The same ADC covers BOTH Vertex (genai) and GCS (storage) — no re-auth.
+
+Run:
+    python run.py
+"""
+
+import json
+
+from google.cloud import storage
+
+from norm_temporal import (
+    TemporalFormulaConfig,
+    TemporalFormulaResolver,
+    run as build_temporal_table,
+)
+from intent import ContextualIntentPipeline, minimal_pipeline
+
+
+# ── Step 0: config — fill these in ───────────────────────────────────────
+PROJECT_ID   = ""          # e.g. "my-gcp-project"
+LOCATION     = "us-central1"
+BUCKET       = ""          # e.g. "my-bucket"
+FORMULA_BLOB = "Normalized_loinc_classes/temporal_norm_code_to_formula.json"
+MODEL        = "gemini-2.5-flash"
+
+# First run only: set True to (re)generate the formula table in GCS.
+# Leave False afterwards — the resolver just reads the existing table.
+BUILD_TABLE  = False
+
+# Query to test.
+QUERY = "elevated psa in last 3 years"
+
+
+def main() -> None:
+    # One client; the pipeline's Vertex client reuses the same ADC.
+    storage_client = storage.Client(project=PROJECT_ID)
+
+    # ── Step 1 (optional, first run): build the temporal formula table ──
+    if BUILD_TABLE:
+        print("Building temporal formula table ...")
+        build_temporal_table(
+            TemporalFormulaConfig(
+                project_id=PROJECT_ID, bucket=BUCKET, location=LOCATION,
+            ),
+            storage_client=storage_client,
+        )
+
+    # ── Step 2: build the resolver + pipeline ──
+    try:
+        resolver = TemporalFormulaResolver.from_gcs(storage_client, BUCKET, FORMULA_BLOB)
+    except Exception as e:
+        print(
+            f"[warn] could not load temporal formula table ({e}). "
+            f"Running WITHOUT normalized temporal — set BUILD_TABLE=True to "
+            f"create the table first."
+        )
+        resolver = TemporalFormulaResolver.empty()
+
+    pipeline = ContextualIntentPipeline(
+        project=PROJECT_ID,
+        location=LOCATION,
+        model=MODEL,
+        temporal_resolver=resolver,
+    )
+
+    # ── Step 3: run a query and print ──
+    out = minimal_pipeline(pipeline, QUERY)
+    print(json.dumps(out, indent=2))
+
+
+if __name__ == "__main__":
+    main()
