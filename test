@@ -1,13 +1,13 @@
 """
 slim_temporal.py — read the big temporal formula JSON from GCS and keep only the
-fields the runtime needs: name (match key), cui (output), and code_system (so
-LOINC-vs-UMLS prioritization works).
+fields the runtime needs: name (match key), cui (output), and code_system.
 
-Output shape:   { name: {"cui": <code>, "system": <loinc|umls|...>} }
+Output shape:   { name: [ {"cui": <code>, "system": <loinc|umls|...>}, ... ] }
 
-Priority: when the SAME name exists under more than one system, the higher-
-priority system wins (LOINC before UMLS). This mirrors step2's LOINC-first,
-UMLS-fallback behavior at the data level.
+No prioritization here. If a name exists under more than one code/system, ALL of
+its entries are kept (priority, e.g. LOINC-first, is handled at match time, the
+way step2 does it). Only exact-duplicate rows (same name + cui + system) are
+collapsed.
 
 Fill in CONFIG, then:  python slim_temporal.py
 Requires google-cloud-storage + ADC creds.
@@ -22,9 +22,6 @@ BUCKET     = ""        # your GCS bucket
 SRC_PATH   = "Normalized_loinc_classes/temporal_norm_code_to_formula.json"
 OUT_LOCAL  = "temporal_name_to_cui.json"
 OUT_GCS    = ""        # e.g. "Normalized_loinc_classes/temporal_name_to_cui.json"; "" to skip
-# lower number = higher priority. A name colliding across systems keeps the best.
-SYSTEM_PRIORITY = {"loinc": 0, "umls": 1}
-_DEFAULT_RANK = 99
 # ─────────────────────────────────────────────────────────────────────
 
 
@@ -38,18 +35,11 @@ def write_json_to_gcs(project_id, blob_path, bucket, obj):
     blob.upload_from_string(json.dumps(obj), content_type="application/json")
 
 
-def _rank(system):
-    return SYSTEM_PRIORITY.get((system or "").strip().lower(), _DEFAULT_RANK)
-
-
 def slim(vocab):
-    """Return ({name: {cui, system}}, total_rows, by_system, collisions, dups_same, skipped)."""
+    """Return ({name: [{cui, system}, ...]}, total_rows, total_entries, skipped, exact_dups)."""
     rows = (vocab.get("has_formula") or []) + (vocab.get("no_formula") or [])
-    # sort so higher-priority systems come first -> first-wins == priority-wins
-    rows = sorted(rows, key=lambda r: _rank(r.get("code_system")))
-
-    out, by_system = {}, {}
-    collisions = dups_same = skipped = 0
+    out, seen = {}, {}
+    total_entries = skipped = exact_dups = 0
     for r in rows:
         name = r.get("name")
         cui  = r.get("code")
@@ -57,29 +47,29 @@ def slim(vocab):
         if not name or not cui:
             skipped += 1
             continue
-        if name in out:
-            if out[name]["system"] != sysm:
-                collisions += 1     # same name, different system -> higher-priority one already kept
-            else:
-                dups_same += 1
+        key = (cui, sysm)
+        if key in seen.get(name, set()):
+            exact_dups += 1            # identical name+cui+system -> collapse
             continue
-        out[name] = {"cui": cui, "system": sysm}
-        by_system[sysm] = by_system.get(sysm, 0) + 1
-    return out, len(rows), by_system, collisions, dups_same, skipped
+        out.setdefault(name, []).append({"cui": cui, "system": sysm})
+        seen.setdefault(name, set()).add(key)
+        total_entries += 1
+    return out, len(rows), total_entries, skipped, exact_dups
 
 
 def main():
     vocab = read_json_from_gcs(PROJECT_ID, SRC_PATH, BUCKET)
-    out, total, by_system, collisions, dups_same, skipped = slim(vocab)
+    out, total, entries, skipped, exact_dups = slim(vocab)
+    multi = {n: v for n, v in out.items() if len(v) > 1}
 
     print(f"rows read                  : {total:,}")
-    print(f"unique name -> cui          : {len(out):,}")
-    print(f"  by system                 : {by_system}")
-    print(f"cross-system name collisions: {collisions:,} (kept higher-priority system)")
-    print(f"duplicate (same name+system): {dups_same:,} (kept first)")
+    print(f"unique names (match keys)   : {len(out):,}")
+    print(f"total entries (cui,system)  : {entries:,}")
+    print(f"names with >1 entry         : {len(multi):,} (all kept)")
+    print(f"exact-duplicate rows dropped: {exact_dups:,}")
     print(f"skipped (no name/cui)       : {skipped:,}")
-    print("sample:")
-    for name, v in list(out.items())[:10]:
+    print("sample (a multi-entry name if any):")
+    for name, v in (list(multi.items())[:5] or list(out.items())[:5]):
         print(f"   {name!r}: {v}")
 
     with open(OUT_LOCAL, "w") as f:
