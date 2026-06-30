@@ -1,8 +1,38 @@
-{'code': 'C4722677', 'name': 'Less Than One Year', 'formula': 'REF_POINT - 1Y', 'reasoning': "The temporal concept 'Less Than One Year' is a quantifiable, discrete, and measurable duration. The maximum duration, '1 Year', is taken as per the instructions and converted to the standard unit 'Y'. The formula is then constructed as 'ref_point - 1Y'.", 'code_system': 'loinc'}
-{'code': 'C1442455', 'name': '2 Days', 'formula': 'REF_POINT - 2D', 'reasoning': "The temporal concept '2 Days' is a quantifiable, discrete, and measurable duration. It is not a range, so the duration remains '2 Days'. This is then converted to the standard unit 'D' for days. The formula is then constructed as 'ref_point - 2D'.", 'code_system': 'loinc'}
-{'code': 'C3843197', 'name': 'One or Two Days', 'formula': 'REF_POINT - 2D', 'reasoning': "The temporal concept 'One or Two Days' is a quantifiable, discrete, and measurable duration. As it is a range, the maximum duration, '2 Days', is taken as per the instructions and converted to the standard unit 'D' for days. The formula is then constructed as 'ref_point - 2D'.", 'code_system': 'loinc'}
-{'code': 'C4699613', 'name': '<2 years', 'formula': 'REF_POINT - 2Y', 'reasoning': "The temporal concept '<2 years' is a quantifiable, discrete, and measurable duration. As it indicates a maximum, '2 years', is taken as per the instructions and converted to the standard unit 'Y' for years. The formula is then constructed as 'ref_point - 2Y'.", 'code_system': 'loinc'}
-{'code': 'C3840931', 'name': '11-15 minutes', 'formula': 'REF_POINT - 15MIN', 'reasoning': "The temporal concept '11-15 minutes' is a quantifiable, discrete, and measurable duration. As it is a range, the maximum duration, '15 minutes', is taken as per the instructions and converted to the standard unit 'Min' for minutes. The formula is then constructed as 'ref_point - 15Min'.", 'code_system': 'loinc'}
-{'code': 'C3843328', 'name': '26-32 days', 'formula': 'REF_POINT - 32D', 'reasoning': "The temporal concept '26-32 days' is a quantifiable, discrete, and measurable duration. As it is a range, the maximum duration, '32 days', is taken as per the instructions and converted to the standard unit 'D' for days. The formula is then constructed as 'ref_point - 32D'.", 'code_system': 'loinc'}
-{'code': 'C1442445', 'name': '10 Hours', 'formula': 'REF_POINT - 10H', 'reasoning': "The temporal concept '10 Hours' is a quantifiable, discrete, and measurable duration. It is not a range, so the duration remains '10 Hours'. This is then converted to the standard unit 'H' for hours. The formula is then constructed as 'ref_point - 10H'.", 'code_system': 'loinc'}
-{'code': 'C4699574', 'name': '<3 hours', 'formula': 'REF_POINT - 3H', 'reasoning': "The temporal concept '<3 hours' is a quantifiable, discrete, and measurable duration. As it indicates a maximum, '3 hours', is taken as per the instructions and converted to the standard unit 'H' for hours. The formula is then constructed as 'ref_point - 3H'.", 'code_system': 'loinc'}
+This repository contains logics used to normalize loinc codes, identify  doctype related and temporal related normalized loincs under normalize_loincs directory.
+It also contains adi_shopping_list_pipeline_exp_logic directory. It contains multiple steps as mentioned in its corresponding section below:
+
+
+** normalized_loincs directory **: 
+This directory contains multiple logics that were developed for loinc related cui/concept normalization discovery work
+
+1) normalization_with_concur_retry_local_subnet.py - This logic normalizes/identifies component codes for loinc related concepts.
+
+2) identify_doctype_norm_loincs.py - This logic filters out document type related codes from the normalized LOINC codes.
+
+3) identify_temporal_norm_loincs.py - This logic filters out temporal related codes from the normalized LOINC codes.
+
+** adi_shopping_list_pipeline_exp_logic **: This is a spike logic that combines various approaches to generate adi shopping list.
+   Hence, each step is a separate program and there is interdependency amongst the steps. Once each of the steps are refined further and finalized, these
+   steps would be wrapped into single automated program. 
+
+1) config.py - contains variables information required across various steps*.py files
+
+2) utils.py - contains gcs file read and cui_dictionary read methods
+
+**** - steps to generate shopping list - *****
+**** Note: Each step needs to be run individually because there are multiple llm calls involved in each step and it would result in 
+**** high latency to import into other dependent steps, so each step is separated out and need to be run manually. Run each step manually/sequentially and store their results.
+
+3) map_doctypes_to_norm_class_step1.py - Map doctypes of nature breakdown results to a normalized doctype loinc class
+
+4) map_temporal_to_norm_class_step2.py - Map temporal concepts of nature breakdown results to a normalized temporal loinc class
+
+5) doc_freq_analysis_step3.py - Get doctype frequency analysis for each normalized doctype of nature breakdown results. IT IS DEPENDENT ON loinc_class_doctype_map_dict variable of step1.py file.
+
+6) normalized_temporal_summary_step4.py - Get temporal summary of normalized temporal concepts of nature breakdown results.  IT IS DEPENDENT ON step2.py and step3.py results.
+
+7) rep_term_doctype_filter_step5.py - Identify relevant representative terms for their corresponding doctypes. Return doctype to relevant rep_terms dictionary. IT IS DEPENDENT on step3.py and step4.py results.
+
+8) combine_results_step6.py - It combines results from step 3, 4, 5 to generate final shopping list. IT IS DEPENDENT ON step3.py, step4.py, and step4.py results
+
+** merge_multiple_shopping_lists.py - This merges each final shopping list generated for dt based, cohort based, and clinical guidelines based results.
