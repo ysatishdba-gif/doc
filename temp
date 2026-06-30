@@ -1,3 +1,12 @@
-d = read_json_from_gcs(project_id, "Normalized_loinc_classes/temporal_norm_code_to_formula.json", bucket)
-print(len(d.get('has_formula', [])), len(d.get('no_formula', [])))
-print([x['name'] for x in d.get('has_formula', [])][:25])
+import json
+from google.cloud import storage
+
+BUCKET  = "<your-bucket>"
+PATH    = "Normalized_loinc_classes/temporal_norm_code_to_formula.json"
+PROJECT = "<your-project>"
+
+blob = storage.Client(project=PROJECT).bucket(BUCKET).blob(PATH)
+d = json.loads(blob.download_as_text())
+
+for k in ("has_formula", "no_formula"):
+    print(k, len(d.get(k, [])))
