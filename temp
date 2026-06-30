@@ -1,2 +1,7 @@
-has_formula 1420
-no_formula 4227
+from config import project_id, bucket
+from utils import read_json_from_gcs
+
+d = read_json_from_gcs(project_id, "Normalized_loinc_classes/temporal_norm_code_to_formula.json", bucket)
+sample = (d.get("has_formula", []) + d.get("no_formula", []))[:8]
+for x in sample:
+    print(x)            # full entry — keys + a few values
