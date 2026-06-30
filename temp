@@ -1,15 +1,1 @@
- "has_formula": [
-        {
-            "code": "C4722677",
-            "name": "Less Than One Year",
-            "formula": "REF_POINT - 1Y",
-            "reasoning": "The temporal concept 'Less Than One Year' is a quantifiable, discrete, and measurable duration. The maximum duration, '1 Year', is taken as per the instructions and converted to the standard unit 'Y'. The formula is then constructed as 'ref_point - 1Y'.",
-            "code_system": "loinc"
-        },
-        {
-            "code": "C1442455",
-            "name": "2 Days",
-            "formula": "REF_POINT - 2D",
-            "reasoning": "The temporal concept '2 Days' is a quantifiable, discrete, and measurable duration. It is not a range, so the duration remains '2 Days'. This is then converted to the standard unit 'D' for days. The formula is then constructed as 'ref_point - 2D'.",
-            "code_system": "loinc"
-        },
+And since we now have gs://<>/Normalized_loinc_classes/temporal_norm_code_to_formula.json, you can replace temporal_norm_code_json to  "Normalized_loinc_classes/temporal_norm_code_to_formula.json" in config.py file
