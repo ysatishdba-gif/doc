@@ -1,7 +1,13 @@
 """
-slim_temporal.py — read the big temporal formula JSON from GCS and keep ONLY
-{name: cui}.  name = the match target;  cui = the output (the file's 'code' field).
-Drops formula, reasoning, code_system so the file you load at runtime is small.
+slim_temporal.py — read the big temporal formula JSON from GCS and keep only the
+fields the runtime needs: name (match key), cui (output), and code_system (so
+LOINC-vs-UMLS prioritization works).
+
+Output shape:   { name: {"cui": <code>, "system": <loinc|umls|...>} }
+
+Priority: when the SAME name exists under more than one system, the higher-
+priority system wins (LOINC before UMLS). This mirrors step2's LOINC-first,
+UMLS-fallback behavior at the data level.
 
 Fill in CONFIG, then:  python slim_temporal.py
 Requires google-cloud-storage + ADC creds.
@@ -15,8 +21,10 @@ PROJECT_ID = ""        # e.g. "my-gcp-project"
 BUCKET     = ""        # your GCS bucket
 SRC_PATH   = "Normalized_loinc_classes/temporal_norm_code_to_formula.json"
 OUT_LOCAL  = "temporal_name_to_cui.json"
-OUT_GCS    = ""        # e.g. "Normalized_loinc_classes/temporal_name_to_cui.json"
-                       # leave "" to skip the GCS upload
+OUT_GCS    = ""        # e.g. "Normalized_loinc_classes/temporal_name_to_cui.json"; "" to skip
+# lower number = higher priority. A name colliding across systems keeps the best.
+SYSTEM_PRIORITY = {"loinc": 0, "umls": 1}
+_DEFAULT_RANK = 99
 # ─────────────────────────────────────────────────────────────────────
 
 
@@ -30,41 +38,55 @@ def write_json_to_gcs(project_id, blob_path, bucket, obj):
     blob.upload_from_string(json.dumps(obj), content_type="application/json")
 
 
+def _rank(system):
+    return SYSTEM_PRIORITY.get((system or "").strip().lower(), _DEFAULT_RANK)
+
+
 def slim(vocab):
-    """Return ({name: cui}, total_rows, dup_names, skipped)."""
+    """Return ({name: {cui, system}}, total_rows, by_system, collisions, dups_same, skipped)."""
     rows = (vocab.get("has_formula") or []) + (vocab.get("no_formula") or [])
-    name_to_cui = {}
-    dups = skipped = 0
+    # sort so higher-priority systems come first -> first-wins == priority-wins
+    rows = sorted(rows, key=lambda r: _rank(r.get("code_system")))
+
+    out, by_system = {}, {}
+    collisions = dups_same = skipped = 0
     for r in rows:
-        name, cui = r.get("name"), r.get("code")
+        name = r.get("name")
+        cui  = r.get("code")
+        sysm = (r.get("code_system") or "").strip().lower()
         if not name or not cui:
             skipped += 1
             continue
-        if name in name_to_cui:          # same name, seen already -> keep first
-            dups += 1
+        if name in out:
+            if out[name]["system"] != sysm:
+                collisions += 1     # same name, different system -> higher-priority one already kept
+            else:
+                dups_same += 1
             continue
-        name_to_cui[name] = cui
-    return name_to_cui, len(rows), dups, skipped
+        out[name] = {"cui": cui, "system": sysm}
+        by_system[sysm] = by_system.get(sysm, 0) + 1
+    return out, len(rows), by_system, collisions, dups_same, skipped
 
 
 def main():
     vocab = read_json_from_gcs(PROJECT_ID, SRC_PATH, BUCKET)
-    name_to_cui, total, dups, skipped = slim(vocab)
+    out, total, by_system, collisions, dups_same, skipped = slim(vocab)
 
-    print(f"rows read             : {total:,}")
-    print(f"unique name -> cui    : {len(name_to_cui):,}")
-    print(f"duplicate names       : {dups:,} (kept first)")
-    print(f"skipped (no name/cui) : {skipped:,}")
+    print(f"rows read                  : {total:,}")
+    print(f"unique name -> cui          : {len(out):,}")
+    print(f"  by system                 : {by_system}")
+    print(f"cross-system name collisions: {collisions:,} (kept higher-priority system)")
+    print(f"duplicate (same name+system): {dups_same:,} (kept first)")
+    print(f"skipped (no name/cui)       : {skipped:,}")
     print("sample:")
-    for name, cui in list(name_to_cui.items())[:10]:
-        print(f"   {name!r}: {cui!r}")
+    for name, v in list(out.items())[:10]:
+        print(f"   {name!r}: {v}")
 
     with open(OUT_LOCAL, "w") as f:
-        json.dump(name_to_cui, f)
+        json.dump(out, f)
     print(f"\nsaved -> {OUT_LOCAL}")
-
     if OUT_GCS:
-        write_json_to_gcs(PROJECT_ID, OUT_GCS, BUCKET, name_to_cui)
+        write_json_to_gcs(PROJECT_ID, OUT_GCS, BUCKET, out)
         print(f"uploaded -> gs://{BUCKET}/{OUT_GCS}")
 
 
