@@ -1,12 +1,2 @@
-import json
-from google.cloud import storage
-
-BUCKET  = "<your-bucket>"
-PATH    = "Normalized_loinc_classes/temporal_norm_code_to_formula.json"
-PROJECT = "<your-project>"
-
-blob = storage.Client(project=PROJECT).bucket(BUCKET).blob(PATH)
-d = json.loads(blob.download_as_text())
-
-for k in ("has_formula", "no_formula"):
-    print(k, len(d.get(k, [])))
+has_formula 1420
+no_formula 4227
