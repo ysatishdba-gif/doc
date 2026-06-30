@@ -1,1 +1,38 @@
-{'Y': 'REF_POINT - 1Y', 'D': 'REF_POINT - 2D', 'MIN': 'REF_POINT - 15MIN', 'H': 'REF_POINT - 10H', 'M': 'REF_POINT - 4M', 'W': 'REF_POINT - 1W', '.5H': 'REF_POINT - 6.5H', 'S': 'REF_POINT - 2000S', 'MO': 'REF_POINT - 12MO', '.6H': 'REF_POINT - 2.6H', '.3H': 'REF_POINT - 1.3H', '.25H': 'REF_POINT - 2.25H', '.5D': 'REF_POINT - 2.5D', '.75H': 'REF_POINT - 2.75H', '.0MIN': 'REF_POINT - 80.0MIN', '.0H': 'REF_POINT - 2.0H', '.0W': 'REF_POINT - 2.0W', '.0D': 'REF_POINT - 3.0D', '.0Y': 'REF_POINT - 10.0Y', '.17H': 'REF_POINT - 2.17H', '.5MIN': 'REF_POINT - 1.5MIN', '.0S': 'REF_POINT - 1.0S', 'MS': 'REF_POINT - 100MS', 'WK': 'REF_POINT - 8WK', '.1M': 'REF_POINT - 0.1M'}
+This repository contains logics used to normalize loinc codes, identify  doctype related and temporal related normalized loincs under normalize_loincs directory.
+It also contains adi_shopping_list_pipeline_exp_logic directory. It contains multiple steps as mentioned in its corresponding section below:
+
+
+** normalized_loincs directory **: 
+This directory contains multiple logics that were developed for loinc related cui/concept normalization discovery work
+
+1) normalization_with_concur_retry_local_subnet.py - This logic normalizes/identifies component codes for loinc related concepts.
+
+2) identify_doctype_norm_loincs.py - This logic filters out document type related codes from the normalized LOINC codes.
+
+3) identify_temporal_norm_loincs.py - This logic filters out temporal related codes from the normalized LOINC codes.
+
+** adi_shopping_list_pipeline_exp_logic **: This is a spike logic that combines various approaches to generate adi shopping list.
+   Hence, each step is a separate program and there is interdependency amongst the steps. Once each of the steps are refined further and finalized, these
+   steps would be wrapped into single automated program. 
+
+1) config.py - contains variables information required across various steps*.py files
+
+2) utils.py - contains gcs file read and cui_dictionary read methods
+
+**** - steps to generate shopping list - *****
+**** Note: Each step needs to be run individually because there are multiple llm calls involved in each step and it would result in 
+**** high latency to import into other dependent steps, so each step is separated out and need to be run manually. Run each step manually/sequentially and store their results.
+
+3) map_doctypes_to_norm_class_step1.py - Map doctypes of nature breakdown results to a normalized doctype loinc class
+
+4) map_temporal_to_norm_class_step2.py - Map temporal concepts of nature breakdown results to a normalized temporal loinc class
+
+5) doc_freq_analysis_step3.py - Get doctype frequency analysis for each normalized doctype of nature breakdown results. IT IS DEPENDENT ON loinc_class_doctype_map_dict variable of step1.py file.
+
+6) normalized_temporal_summary_step4.py - Get temporal summary of normalized temporal concepts of nature breakdown results.  IT IS DEPENDENT ON step2.py and step3.py results.
+
+7) rep_term_doctype_filter_step5.py - Identify relevant representative terms for their corresponding doctypes. Return doctype to relevant rep_terms dictionary. IT IS DEPENDENT on step3.py and step4.py results.
+
+8) combine_results_step6.py - It combines results from step 3, 4, 5 to generate final shopping list. IT IS DEPENDENT ON step3.py, step4.py, and step4.py results
+
+** merge_multiple_shopping_lists.py - This merges each final shopping list generated for dt based, cohort based, and clinical guidelines based results.
