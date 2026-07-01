@@ -1,13 +1,12 @@
 """
 run.py — end-to-end Intent Finder pipeline with the temporal matcher wired in.
 
-Place alongside intent.py, temporal_match.py, api.py.
+Place alongside intent.py, temporal_match.py, api.py, and your local
+temporal_name_to_cui.json (the {name: [{cui, system}, ...]} file).
 
 Prereqs:
     pip install google-genai google-cloud-storage pydantic pandas
     # ADC once:  gcloud auth application-default login
-    # And build the slim temporal file once with slim_temporal.py, then point
-    # SLIM_TEMPORAL_PATH at it (GCS blob) — see below.
 
 Run:
     python run.py
@@ -23,14 +22,10 @@ from temporal_match import TemporalMatcher, make_gemini_call
 PROJECT_ID = ""          # e.g. "my-gcp-project"
 LOCATION   = "us-central1"
 MODEL      = "gemini-2.5-flash"
-BUCKET     = ""          # GCS bucket holding the slim temporal file
 
-# the {name: [{cui, system}, ...]} file produced by slim_temporal.py
-SLIM_TEMPORAL_PATH = "Normalized_loinc_classes/temporal_name_to_cui.json"
-
-# Cap candidate names per match prompt (None = send all ~5,500). Lower it if you
-# want smaller/cheaper match prompts.
-MAX_TEMPORAL_CANDIDATES = None
+# Local slim temporal file: { name: [ {"cui", "system"}, ... ] }.
+# Use an absolute path if you launch python from a different directory.
+SLIM_TEMPORAL_FILE = "temporal_name_to_cui.json"
 
 INCLUDE_RETRIEVAL_SIGNALS = True
 QUERY = "elevated psa in last 3 years"
@@ -40,13 +35,12 @@ def build_pipeline() -> ContextualIntentPipeline:
     # One Gemini caller for the matcher, same model settings as the pipeline.
     gemini_call = make_gemini_call(PROJECT_ID, LOCATION, MODEL)
 
-    # Load the slim file ONCE and build the matcher (step2's matching, in-process).
-    temporal_matcher = TemporalMatcher.from_gcs(
-        PROJECT_ID, BUCKET, SLIM_TEMPORAL_PATH, gemini_call,
-        max_candidates=MAX_TEMPORAL_CANDIDATES,
-    )
-    # local file instead of GCS:
-    #   temporal_matcher = TemporalMatcher.from_file("temporal_name_to_cui.json", gemini_call)
+    # Load the slim file ONCE from local disk and build the matcher.
+    # All concept names are used as match candidates, regardless of count.
+    temporal_matcher = TemporalMatcher.from_file(SLIM_TEMPORAL_FILE, gemini_call)
+    # from GCS instead:
+    #   temporal_matcher = TemporalMatcher.from_gcs(
+    #       PROJECT_ID, BUCKET, "path/to/temporal_name_to_cui.json", gemini_call)
 
     return ContextualIntentPipeline(
         project=PROJECT_ID, location=LOCATION, model=MODEL,
