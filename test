@@ -1,193 +1,73 @@
 """
-temporal_match.py — step2's temporal matching, moved in-process as a resolver.
+run.py — end-to-end Intent Finder pipeline with the temporal matcher wired in.
 
-For each generated temporal phrase, an LLM picks the single best normalized
-concept NAME from the slim file (temporal_name_to_cui.json), or None — exactly
-like map_temporal_to_norm_class_step2.py. The matched name is looked up to its
-codes. Plugs into the pipeline through the TemporalResolver interface:
+Place alongside intent.py, temporal_match.py, api.py, and your local
+temporal_name_to_cui.json (the {name: [{cui, system}, ...]} file).
 
-    resolve(signals) -> [{"signal", "matched_name", "codes": [{"cui","system"}, ...]}]
+Prereqs:
+    pip install google-genai google-cloud-storage pydantic pandas
+    # ADC once:  gcloud auth application-default login
 
-TWO-TIER matching, LOINC-first (step2's two-pass): the file's own names are the
-candidate set — nothing hardcoded is passed in. Each phrase is matched FIRST
-against the LOINC-sourced concepts; only if that returns None is it matched
-against the UMLS-sourced concepts. The split comes from each entry's `system`
-field in the file. A LOINC hit returns the LOINC code(s); a UMLS hit returns the
-UMLS code(s).
+Run:
+    python run.py
 """
 
 import json
-from typing import Any, Callable, Dict, List, Optional, Tuple
 
-GeminiCall = Callable[[str], Dict[str, Any]]   # prompt -> parsed JSON dict
-
-
-# ---- step2 matching prompt (ported verbatim) ----
-def _build_match_prompt(temporal_type_name: str, transactions: List[List[str]]) -> str:
-    return f""" I have a temporal type name mentioned between <temporal type name> and <temporal type name>. 
-            I have a list of transactions mentioned between <transactions> and <transactions> where each transaction has two elements. The first element is the id of the temporal class
-            and the second element is the temporal class name. Your task is to identify a single temporal class that is the most closely aligned and hence a best choice/match compared to all other temporal classes
-            to the temporal type name. ** It is critical to select only one temporal class and if no temporal class is considered to be the best choice then return None ** The output must be a dictionary with the best choice temporal class id, its name, and the reason
-            for choosing that temporal class.
-            <temporal type name> {temporal_type_name} <temporal type name>
-            <transactions> {transactions} <transactions>
-
-            * Examples *
-            ** input **
-            temporal type name = 'historical'
-            transactions = [[id_1, 'Historical'], [id_2, 'Histological type'], ['id_3', 'history']]
-
-            ** output **
-            {{"selected_temporal_class_id": 'id_1',
-                "selected_temporal_class_name": 'Historical',
-                "reasoning": this is the most closest alignment and a best choice with temporal type name amongst other choices
-            }}
-
-            ** input **
-            temporal type name = 'full history'
-            transactions = [[id_1, 'Occupation history'], [id_2, 'disease history'], ['id_3', 'full time history']]
-
-            ** output **
-            {{"selected_temporal_class_id": 'id_3',
-                "selected_temporal_class_name": 'full time history',
-                "reasoning":  this is the most closest alignment and a best choice with temporal type name amongst other choices
-            }}
-
-            ** input **
-            temporal type name = 'most recent'
-            transactions = [[id_1, 'Most recent treponemal test type'], [id_2, 'most recent pregnancy'], ['id_3', 'pre most recent time']]
-
-            ** output **
-            {{"selected_temporal_class_id": None,
-                "selected_temporal_class_name": None,
-                "reasoning":  None of the temporal classes are best choice. 'Most recent treponemal test type' is too specific whereas 'most recent' is general and hence it is also not a best choice.
-            }}
-
-            """
+from intent import ContextualIntentPipeline, minimal_pipeline
+from temporal_match import TemporalMatcher, make_gemini_call
 
 
-_MATCH_SCHEMA = {
-    "type": "object",
-    "required": ["selected_temporal_class_id", "selected_temporal_class_name", "reasoning"],
-    "properties": {
-        "selected_temporal_class_id":   {"type": "string"},
-        "selected_temporal_class_name": {"type": "string"},
-        "reasoning":                    {"type": "string"},
-    },
-}
+# ── config ───────────────────────────────────────────────────────────────
+PROJECT_ID = ""          # e.g. "my-gcp-project"
+LOCATION   = "us-central1"
+MODEL      = "gemini-2.5-flash"
+
+# Local slim temporal file: { name: [ {"cui", "system"}, ... ] }.
+# Use an absolute path if you launch python from a different directory.
+SLIM_TEMPORAL_FILE = "temporal_name_to_cui.json"
+
+# Where to write the result. Set to an absolute path if you want it elsewhere.
+OUTPUT_FILE = "intent_output.json"
+
+INCLUDE_RETRIEVAL_SIGNALS = True
+QUERY = "elevated psa in last 3 years"
 
 
-def make_gemini_call(project: str, location: str, model: str) -> GeminiCall:
-    """Build a prompt -> dict caller backed by Vertex Gemini (matches the
-    pipeline's model settings)."""
-    from google import genai
+def build_pipeline() -> ContextualIntentPipeline:
+    # One Gemini caller for the matcher, same model settings as the pipeline.
+    gemini_call = make_gemini_call(PROJECT_ID, LOCATION, MODEL)
 
-    client = genai.Client(vertexai=True, project=project, location=location)
+    # Load the slim file ONCE from local disk and build the matcher.
+    # All concept names are used as match candidates, regardless of count.
+    temporal_matcher = TemporalMatcher.from_file(SLIM_TEMPORAL_FILE, gemini_call)
+    # from GCS instead:
+    #   temporal_matcher = TemporalMatcher.from_gcs(
+    #       PROJECT_ID, BUCKET, "path/to/temporal_name_to_cui.json", gemini_call)
 
-    def _call(prompt: str) -> Dict[str, Any]:
-        resp = client.models.generate_content(
-            model=model,
-            contents=prompt,
-            config={"response_mime_type": "application/json",
-                    "response_schema": _MATCH_SCHEMA},
-        )
-        return json.loads(resp.text)
-
-    return _call
-
-
-def _is_none(sel_id: Any) -> bool:
-    return sel_id is None or str(sel_id).strip().lower() in ("none", "null", "")
+    return ContextualIntentPipeline(
+        project=PROJECT_ID, location=LOCATION, model=MODEL,
+        temporal_resolver=temporal_matcher,
+        # concept_coder=...,   # record-type coding, when available
+    )
 
 
-def _is_loinc(entry: Dict[str, str]) -> bool:
-    return str(entry.get("system", "")).strip().lower() == "loinc"
+def main() -> None:
+    pipeline = build_pipeline()
+    out = minimal_pipeline(
+        pipeline, QUERY, include_retrieval_signals=INCLUDE_RETRIEVAL_SIGNALS
+    )
+
+    text = json.dumps(out, indent=2, ensure_ascii=False)
+
+    # write to a JSON file ...
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        f.write(text)
+
+    # ... and print it
+    print(text)
+    print(f"\n[written to {OUTPUT_FILE}]")
 
 
-class TemporalMatcher:
-    """Matches temporal phrases -> normalized concept names + codes, LOINC-first.
-
-    name_to_codes is the slim file: { name: [ {"cui","system"}, ... ] }. The
-    names are split into a LOINC-sourced pool and a UMLS-sourced pool by each
-    entry's `system` field. Each phrase is matched against the LOINC pool first;
-    only on None is it matched against the UMLS pool. gemini_call is
-    prompt -> parsed-JSON dict (use make_gemini_call()). max_candidates optionally
-    caps how many names go into each prompt.
-    """
-
-    def __init__(
-        self,
-        name_to_codes: Dict[str, List[Dict[str, str]]],
-        gemini_call: GeminiCall,
-        max_candidates: Optional[int] = None,
-    ):
-        self._call = gemini_call
-        self._max = max_candidates
-
-        # Split the file into two candidate pools by source vocabulary.
-        self._loinc: Dict[str, List[Dict[str, str]]] = {}
-        self._umls: Dict[str, List[Dict[str, str]]] = {}
-        for name, entries in name_to_codes.items():
-            loinc = [e for e in (entries or []) if _is_loinc(e)]
-            umls = [e for e in (entries or []) if not _is_loinc(e)]
-            if loinc:
-                self._loinc[name] = loinc
-            if umls:
-                self._umls[name] = umls
-        self._loinc_names = list(self._loinc.keys())
-        self._umls_names = list(self._umls.keys())
-
-    @classmethod
-    def from_file(cls, path: str, gemini_call: GeminiCall, **kw) -> "TemporalMatcher":
-        with open(path) as f:
-            return cls(json.load(f), gemini_call, **kw)
-
-    @classmethod
-    def from_gcs(cls, project: str, bucket: str, blob_path: str,
-                 gemini_call: GeminiCall, **kw) -> "TemporalMatcher":
-        from google.cloud import storage
-        blob = storage.Client(project=project).bucket(bucket).blob(blob_path)
-        return cls(json.loads(blob.download_as_text()), gemini_call, **kw)
-
-    def pool_sizes(self) -> Dict[str, int]:
-        return {"loinc": len(self._loinc_names), "umls": len(self._umls_names)}
-
-    def _match_in(self, phrase: str, names: List[str]) -> Optional[str]:
-        """One LLM pass: best matching name from `names`, or None."""
-        if not names:
-            return None
-        names = names[: self._max] if self._max else names
-        id_to_name = {f"id_{i+1}": n for i, n in enumerate(names)}
-        transactions = [[f"id_{i+1}", n] for i, n in enumerate(names)]
-        resp = self._call(_build_match_prompt(phrase, transactions))
-        sel_id = (resp or {}).get("selected_temporal_class_id")
-        if _is_none(sel_id):
-            return None
-        return id_to_name.get(sel_id)   # None if the model returns an unknown id
-
-    def _match_one(self, phrase: str) -> Tuple[Optional[str], List[Dict[str, str]]]:
-        """LOINC pool first; UMLS pool only if LOINC returns None."""
-        name = self._match_in(phrase, self._loinc_names)
-        if name is not None:
-            return name, list(self._loinc[name])          # LOINC code(s)
-        name = self._match_in(phrase, self._umls_names)
-        if name is not None:
-            return name, list(self._umls[name])            # UMLS fallback code(s)
-        return None, []
-
-    def resolve(self, signals: List[Any]) -> List[Dict[str, Any]]:
-        # Match each UNIQUE phrase once, then map results back over the input.
-        uniq = list(dict.fromkeys(
-            s for s in signals if isinstance(s, str) and s.strip()
-        ))
-        matched = {p: self._match_one(p) for p in uniq}
-
-        out: List[Dict[str, Any]] = []
-        for s in signals:
-            name, codes = matched.get(s, (None, []))
-            out.append({
-                "signal": s,
-                "matched_name": name,
-                "codes": list(codes),
-            })
-        return out
+if __name__ == "__main__":
+    main()
