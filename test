@@ -1,7 +1,6 @@
-signal:"YYYY-MM-DD to YYYY-MM-DD"
-matched_name:"Daytime (6am-6pm)"
-cui:"C3842444"
-system:"loinc"
-
-
-some times : susoected as temporal, and sometimes null,onoginh,pending
+import json
+d = json.load(open("temporal_name_to_cui.json"))
+positional = sorted(k for k in d if not any(c.isdigit() for c in k))  # non-duration names
+print(len(positional))
+for k in positional[:150]:
+    print(k)
