@@ -1,5 +1,4 @@
-import pathlib
-for f in pathlib.Path(".").glob("*.py"):
-    for i, line in enumerate(f.read_text().splitlines(), 1):
-        if "null" in line and '"null"' not in line and "'null'" not in line and "#" not in line:
-            print(f, i, line)
+Nature_breakdown.py 21    "execution_count": null,
+Nature_breakdown.py 35    "execution_count": null,
+Nature_breakdown.py 1652    "execution_count": null,
+normalised_temporal.py 5    "execution_count": null,
