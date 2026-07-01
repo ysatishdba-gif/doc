@@ -1,0 +1,16 @@
+# ── configure ──────────────────────────────────────────────────────────
+PROJECT_ID = ""          # e.g. "my-gcp-project"
+LOCATION   = "us-central1"
+MODEL      = "gemini-2.5-flash"
+
+# local slim file, in the SAME folder as this notebook (absolute path also fine)
+SLIM_TEMPORAL_FILE = "temporal_name_to_cui.json"
+
+# ── build the pipeline (loads the slim file once; wires the temporal matcher) ──
+gemini_call      = make_gemini_call(PROJECT_ID, LOCATION, MODEL)
+temporal_matcher = TemporalMatcher.from_file(SLIM_TEMPORAL_FILE, gemini_call)
+
+pipeline = ContextualIntentPipeline(
+    project=PROJECT_ID, location=LOCATION, model=MODEL,
+    temporal_resolver=temporal_matcher,
+)
