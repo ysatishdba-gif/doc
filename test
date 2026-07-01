@@ -1,15 +1,32 @@
-import json
-d = json.load(open("temporal_name_to_cui.json"))
-names = list(d)
-low = {n.lower(): n for n in names}
-
-targets = ["current","present","ongoing","future","planned","anticipated",
-           "past","historical","prior","previous","recent","most recent",
-           "onset","initial","first","new"]
-
-for t in targets:
-    exact = low.get(t)                                    # exact concept, e.g. "Current"
-    cui   = d[exact][0]["cui"] if exact else None
-    contains = [n for n in names if t in n.lower()][:6]   # concepts containing the word
-    print(f"{t:11} exact={str(exact):20} cui={cui}")
-    print(f"            competes-> {contains}")
+current     exact=None                 cui=None
+            competes-> ['Current state', 'Current level of confidence I can prepare my own meals (for example: plan and cook full meals by myself)', 'Level of Current Pain', 'Body weight^pre current pregnancy', 'Current level of confidence I can keep doing my usual activities at work', 'Current level of confidence I can take care of others (for example: cook for others, help them dress, watch children)']
+present     exact=Present              cui=C0150312
+            competes-> ['Present at least four days', 'Present less than one month or duration unspecified', 'Have you ever seen or been present when another person was shot at, stabbed, struck, kicked, beaten, slapped around, or otherwise physically harmed', 'Present most of the time in a one month period or longer', 'Behavior present, not of recent onset', 'Present at least one week']
+ongoing     exact=None                 cui=None
+            competes-> ['Is it still ongoing', 'Ongoing episode']
+future      exact=Future               cui=C0016884
+            competes-> ["Thinking about your child's life, my child expects to have success in the future", 'Thinking about my life, I expect to have a family in the future', 'Fear what will happen in the future since illness', 'No - I am hoping to become pregnant in the near future', 'Because of my health situation I feel uncertain about the future', 'expected future']
+planned     exact=None                 cui=None
+            competes-> ['Planned Repeat Activity Until Rule Cessation Pause Quantity', 'Planned Activity Repeat Duration', 'Planned Option Relationship Pause Quantity', 'Study Protocol Version Planned Duration', 'Study Site Planned Duration', 'Planned Duration']
+anticipated exact=Anticipated          cui=C3840775
+            competes-> ['Anticipated', 'Anticipated duration of harm to the patient', 'Anticipated discharge date']
+past        exact=None                 cui=None
+            competes-> ['More than 30 days ago but within the past 12 months', 'In past 3 years', 'Within the past 12 months', 'More than 12 months ago but within the past 3 years', 'Past Week', 'Past 4 Weeks']
+historical  exact=None                 cui=None
+            competes-> ['Historical Aspects', 'modern American historical period', 'historical periods by century/decade', 'historical period']
+prior       exact=None                 cui=None
+            competes-> ['Prior to Age Twenty', 'Results suggest prior exposure to mumps. Unable to interpret IgM result.', 'Prior device use', 'Prior postnatal diagnosis of CCHD', '1p36 deletion prior risk &#x7C; Fetus &#x7C; Deletions', 'Results suggest prior exposure and immunity to mumps, or a convalescent stage of infection.']
+previous    exact=Previous             cui=C0205156
+            competes-> ['Previously discovered', 'Previous', 'MD diagnosis of previous disease', 'Guardian previously informed of patient condition', 'Previous cesarean deliveries', 'Number of previous doses']
+recent      exact=Recent               cui=C0332185
+            competes-> ['Behavior present, not of recent onset', 'Presumptive recent Zika negative', 'Date of most recent screening for disease', 'Date of Most Recent Heart Failure', 'Date Time of Most Recent Angina Pectoris', 'Date most recent transplant']
+most recent exact=Most Recent          cui=C1513491
+            competes-> ['Date of most recent screening for disease', 'Date of Most Recent Heart Failure', 'Date Time of Most Recent Angina Pectoris', 'Date most recent transplant', 'Date of most recent treponemal test', 'During Most Recent Visit']
+onset       exact=None                 cui=None
+            competes-> ['8 weeks pre symptom onset or diagnosis', 'Behavior present, not of recent onset', 'pre symptom onset', 'Adult-onset citrullinemia type 2', 'Unknown Onset (if focal or generalized) - Other Motor', 'Type 2 diabetes (Adult onset)']
+initial     exact=None                 cui=None
+            competes-> ['Initially', 'Date of initial report', 'Date and time of initial encounter', 'Time of initial encounter', 'Number of Days from Date of Initial Pathologic Diagnosis to Date of Additional Surgery for New Tumor Event Metastasis', 'Number of Days from Date of Initial Pathologic Diagnosis to Date of Tumor Reoccurrence After Initial Treatment']
+first       exact=None                 cui=None
+            competes-> ['Months 1-3 (first trimester)', 'PhenX measure - substance - age of first use', 'First half', 'Labor Stage, First', 'Pregnancy Trimester, First', 'first known']
+new         exact=New                  cui=C0205314
+            competes-> ['Newly discovered', 'newborn screening comment-discussion', 'New', 'Current level of confidence I can travel to a new destination alone', 'Newborn hearing', 'Newborn hearing screen']
