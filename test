@@ -911,6 +911,8 @@ class ExtractionResult:
                                     or sig == NO_TEMPORAL_PLACEHOLDER or sig in m):
                                 continue
                             name = self._vocab.name_for_id(p.selected_id)
+                            if name is None:                       # id didn't resolve —
+                                name = self._vocab.name_from_text(p.selected_name)  # try the name echo
                             m[sig] = {
                                 "signal": sig,
                                 "matched_name": name,
@@ -1226,6 +1228,7 @@ class TemporalVocab:
         self._map = name_to_codes
         self._names = list(name_to_codes.keys())
         self._id_to_name = {f"id_{i+1}": n for i, n in enumerate(self._names)}
+        self._lower_to_name = {n.strip().lower(): n for n in self._names}
 
     @classmethod
     def from_file(cls, path: str) -> "TemporalVocab":
@@ -1245,6 +1248,16 @@ class TemporalVocab:
         if sel_id is None or str(sel_id).strip().lower() in ("none", "null", ""):
             return None
         return self._id_to_name.get(str(sel_id).strip())
+
+    def name_from_text(self, text: Any) -> Optional[str]:
+        """Resolve the model's echoed concept name to a real file name (exact,
+        else case-insensitive) — a fallback when selected_id doesn't resolve."""
+        if not isinstance(text, str) or not text.strip():
+            return None
+        t = text.strip()
+        if t in self._map:
+            return t
+        return self._lower_to_name.get(t.lower())
 
     def codes_for_name(self, name: Optional[str]) -> List[Dict[str, str]]:
         if not name:
@@ -1769,7 +1782,6 @@ if __name__ == "__main__":
         # "current medications and any planned procedures",
     ]
 
-    results = []
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {
             executor.submit(
@@ -1781,25 +1793,21 @@ if __name__ == "__main__":
             query = futures[future]
             idx = test_queries.index(query) + 1      # stable filename per query
             res = future.result()
-            results.append(res)
 
+            # Save the full result to JSON (no need to print the payload).
+            save_json(res, f"query{idx}_pipeline.json")
+
+            # Validation only — surface problems, not the output.
             valid, err = validate_schema(res, "minimal_pipeline")
-            filename = f"query{idx}_pipeline.json"
-            save_json(res, filename)
-
-            # Compact highlights — not the full payload.
-            print(f"Query     : {res.get('question', '')[:80]}")
-            print(f"Actions   : {', '.join(res.get('action_finder') or [])}")
-            if not res.get("is_processable", True):
-                print("Status    : Not processable")
-            else:
-                rep = res.get("representative_terms") or []
-                print(
-                    f"Status    : Processable | "
-                    f"clinical: {res.get('is_clinical')} | "
-                    f"intents: {res.get('total_intents_detected')}"
-                )
-                print(f"Rep terms : {', '.join(rep) if rep else '—'}")
             if not valid:
-                print(f"Schema    : FAILED — {err}")
-            print("-" * 60)
+                print(f"[query{idx}] SCHEMA FAILED: {err}")
+
+            # Temporal must not be blank: flag any signal that resolved to no codes.
+            blanks = [
+                t.get("signal")
+                for it in (res.get("intents") or [])
+                for t in ((it.get("retrieval_signals") or {}).get("temporal") or [])
+                if not t.get("codes")
+            ]
+            if blanks:
+                print(f"[query{idx}] BLANK temporal (no codes): {blanks}")
