@@ -16,7 +16,7 @@ from google.cloud import storage
 from google.genai import types
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from typing import Protocol, TypedDict, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 
 # --------------------------------------------------------------------------- #
@@ -29,23 +29,23 @@ from typing import Protocol, TypedDict, runtime_checkable
 # record types stay strings and temporal stays the raw phrase, both with empty
 # code slots — i.e. structurally code-ready, exactly as the dev notes require.
 # --------------------------------------------------------------------------- #
-class RecordType(TypedDict):
+class RecordType(BaseModel):
     name: str
-    code: Optional[str]
-    system: Optional[str]
+    code: Optional[str] = None
+    system: Optional[str] = None
 
 
-class CodeEntry(TypedDict):
+class CodeEntry(BaseModel):
     cui: str
     system: str            # "loinc" | "umls" | ...
 
 
-class TemporalMapping(TypedDict):
+class TemporalMapping(BaseModel):
     # The generated phrase, the normalized concept name it matched (or None),
     # and every {cui, system} for that name (a name can carry several).
     signal: Union[str, int]            # e.g. "last 3 years"
-    matched_name: Optional[str]        # concept name picked from the file; None if no match
-    codes: List[CodeEntry]             # [{cui, system}, ...]; [] if no match
+    matched_name: Optional[str] = None # concept name picked from the file; None if no match
+    codes: List[CodeEntry] = Field(default_factory=list)  # [] if no match
 
 
 @runtime_checkable
@@ -66,7 +66,7 @@ class NullTemporalResolver:
     match and no codes."""
 
     def resolve(self, signals: List[Union[str, int]]) -> List[TemporalMapping]:
-        return [{"signal": s, "matched_name": None, "codes": []} for s in signals]
+        return [TemporalMapping(signal=s, matched_name=None, codes=[]) for s in signals]
 
 
 class NullConceptCoder:
@@ -74,7 +74,7 @@ class NullConceptCoder:
     structurally code-ready (code/system present, set to None)."""
 
     def code_record_types(self, names: List[str]) -> List[RecordType]:
-        return [{"name": n, "code": None, "system": None} for n in names]
+        return [RecordType(name=n, code=None, system=None) for n in names]
 
 
 # Silence noisy SDK / HTTP client loggers.
@@ -698,28 +698,11 @@ class Format_FullPipeline(BaseModel):
     intents: List[IntentWithContext]
 
 
-class RecordTypeItem(BaseModel):
-    name: str
-    code: Optional[str] = None
-    system: Optional[str] = None
-
-
-class TemporalCodeItem(BaseModel):
-    cui: str
-    system: str
-
-
-class TemporalSignalItem(BaseModel):
-    signal: str
-    matched_name: Optional[str] = None
-    codes: List[TemporalCodeItem] = Field(default_factory=list)
-
-
 class StructuredRetrievalSignals(BaseModel):
     """The retrieval_signals shape AFTER _structured_signals (what
     minimal_pipeline actually emits): record types and temporal are objects."""
-    record_types: List[RecordTypeItem] = Field(default_factory=list)
-    temporal: List[TemporalSignalItem] = Field(default_factory=list)
+    record_types: List[RecordType] = Field(default_factory=list)
+    temporal: List[TemporalMapping] = Field(default_factory=list)
     authors: List[str] = Field(default_factory=list)
     longitudinal_scope: List[str] = Field(default_factory=list)
     content_signals: List[str] = Field(default_factory=list)
@@ -922,15 +905,17 @@ class ExtractionResult:
                             name = self._vocab.name_for_id(p.selected_id)
                             if name is None:                       # id didn't resolve —
                                 name = self._vocab.name_from_text(p.selected_name)  # try the name echo
-                            m[sig] = {
-                                "signal": sig,
-                                "matched_name": name,
-                                "codes": self._vocab.codes_for_name(name),
-                            }
+                            m[sig] = TemporalMapping(
+                                signal=sig,
+                                matched_name=name,
+                                codes=self._vocab.codes_for_name(name),
+                            )
         else:
             phrases = self._all_temporal_phrases()
             mappings = self._resolver.resolve(phrases) if phrases else []
-            m = {mm["signal"]: mm for mm in mappings}
+            for mm in mappings:
+                tm = mm if isinstance(mm, TemporalMapping) else TemporalMapping.model_validate(mm)
+                m[tm.signal] = tm
 
         self._temporal_map = m
         return self._temporal_map
@@ -945,7 +930,7 @@ class ExtractionResult:
             if s != NO_TEMPORAL_PLACEHOLDER
         ]
         temporal = [
-            tmap.get(s, {"signal": s, "matched_name": None, "codes": []})
+            tmap.get(s, TemporalMapping(signal=s, matched_name=None, codes=[]))
             for s in temporal_in
         ]
         # Never leave temporal empty: default to the present/current concept,
@@ -955,15 +940,18 @@ class ExtractionResult:
             for term in DEFAULT_TEMPORAL_TERMS:
                 name = self._vocab.name_from_text(term)
                 if name:
-                    temporal = [{
-                        "signal": term,
-                        "matched_name": name,
-                        "codes": self._vocab.codes_for_name(name),
-                    }]
+                    temporal = [TemporalMapping(
+                        signal=term,
+                        matched_name=name,
+                        codes=self._vocab.codes_for_name(name),
+                    )]
                     break
         return {
-            "record_types": self._coder.code_record_types(raw.get("record_types") or []),
-            "temporal": temporal,
+            "record_types": [
+                r.model_dump() for r in
+                self._coder.code_record_types(raw.get("record_types") or [])
+            ],
+            "temporal": [t.model_dump() for t in temporal],
             "authors": list(raw.get("author_roles") or []),
             "longitudinal_scope": list(raw.get("longitudinal_scope") or []),
             "content_signals": list(raw.get("content_signals") or []),
@@ -1281,13 +1269,14 @@ class TemporalVocab:
             return t
         return self._lower_to_name.get(t.lower())
 
-    def codes_for_name(self, name: Optional[str]) -> List[Dict[str, str]]:
+    def codes_for_name(self, name: Optional[str]) -> List["CodeEntry"]:
         if not name:
             return []
         entries = self._map.get(name, [])
         loinc = [e for e in entries
                  if str(e.get("system", "")).strip().lower() == "loinc"]
-        return list(loinc) if loinc else list(entries)   # LOINC-first
+        chosen = loinc if loinc else entries          # LOINC-first
+        return [CodeEntry.model_validate(e) for e in chosen]
 
 
 class ContextualIntentPipeline:
