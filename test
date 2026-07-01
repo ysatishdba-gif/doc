@@ -1,73 +1,47 @@
-"""
-run.py — end-to-end Intent Finder pipeline with the temporal matcher wired in.
-
-Place alongside intent.py, temporal_match.py, api.py, and your local
-temporal_name_to_cui.json (the {name: [{cui, system}, ...]} file).
-
-Prereqs:
-    pip install google-genai google-cloud-storage pydantic pandas
-    # ADC once:  gcloud auth application-default login
-
-Run:
-    python run.py
-"""
-
-import json
-
-from intent import ContextualIntentPipeline, minimal_pipeline
-from temporal_match import TemporalMatcher, make_gemini_call
-
-
-# ── config ───────────────────────────────────────────────────────────────
-PROJECT_ID = ""          # e.g. "my-gcp-project"
-LOCATION   = "us-central1"
-MODEL      = "gemini-2.5-flash"
-
-# Local slim temporal file: { name: [ {"cui", "system"}, ... ] }.
-# Use an absolute path if you launch python from a different directory.
-SLIM_TEMPORAL_FILE = "temporal_name_to_cui.json"
-
-# Where to write the result. Set to an absolute path if you want it elsewhere.
-OUTPUT_FILE = "intent_output.json"
-
-INCLUDE_RETRIEVAL_SIGNALS = True
-QUERY = "elevated psa in last 3 years"
-
-
-def build_pipeline() -> ContextualIntentPipeline:
-    # One Gemini caller for the matcher, same model settings as the pipeline.
-    gemini_call = make_gemini_call(PROJECT_ID, LOCATION, MODEL)
-
-    # Load the slim file ONCE from local disk and build the matcher.
-    # All concept names are used as match candidates, regardless of count.
-    temporal_matcher = TemporalMatcher.from_file(SLIM_TEMPORAL_FILE, gemini_call)
-    # from GCS instead:
-    #   temporal_matcher = TemporalMatcher.from_gcs(
-    #       PROJECT_ID, BUCKET, "path/to/temporal_name_to_cui.json", gemini_call)
-
-    return ContextualIntentPipeline(
-        project=PROJECT_ID, location=LOCATION, model=MODEL,
-        temporal_resolver=temporal_matcher,
-        # concept_coder=...,   # record-type coding, when available
-    )
-
-
-def main() -> None:
-    pipeline = build_pipeline()
-    out = minimal_pipeline(
-        pipeline, QUERY, include_retrieval_signals=INCLUDE_RETRIEVAL_SIGNALS
-    )
-
-    text = json.dumps(out, indent=2, ensure_ascii=False)
-
-    # write to a JSON file ...
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        f.write(text)
-
-    # ... and print it
-    print(text)
-    print(f"\n[written to {OUTPUT_FILE}]")
-
-
 if __name__ == "__main__":
-    main()
+
+    PROJECT_ID = PROJECT_ID
+    LOCATION = "us-central1"
+    MODEL_VERSION = "gemini-2.5-flash"
+
+    pipeline = ContextualIntentPipeline(
+        project=PROJECT_ID, location=LOCATION, model=MODEL_VERSION
+    )
+
+
+    #  Single query test 
+
+    test_queries = [
+"elevated psa in last 3 years"
+    ]
+    
+    results = []
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {
+            executor.submit(minimal_pipeline, pipeline, query): query
+            for query in test_queries
+        }
+        for idx, future in enumerate(as_completed(futures), 2):
+            res = future.result()
+            results.append(res)
+    
+            valid, err = validate_schema(res, "minimal_pipeline")
+            filename = f"query{idx}_pipeline.json"
+            save_json(res, filename)
+    
+            # Compact highlights — not the full payload.
+            print(f"Query     : {res.get('question', '')[:80]}")
+            print(f"Actions   : {', '.join(res.get('action_finder') or [])}")
+            if not res.get("is_processable"):
+                print("Status    : Not processable")
+            else:
+                rep = res.get("representative_terms") or []
+                print(
+                    f"Status    : Processable | "
+                    f"clinical: {res.get('is_clinical')} | "
+                    f"intents: {res.get('total_intents_detected')}"
+                )
+                print(f"Rep terms : {', '.join(rep) if rep else '—'}")
+            if not valid:
+                print(f"Schema    : FAILED — {err}")
+            print("-" * 60)
