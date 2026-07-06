@@ -34,9 +34,9 @@ class CodeEntry(BaseModel):
 
 
 class TemporalMapping(BaseModel):
-    # The generated phrase, the time-window concept it matched (or None), and
-    # that concept's cui + formula.
-    signal: Union[str, int]            # e.g. "last 3 years"
+    # The time-window concept a phrase matched (or None) and that concept's
+    # cui + formula. Keyed by the phrase in the match map, but the phrase
+    # itself is not emitted.
     time_window: Optional[str] = None  # concept name picked from the file, e.g. "3 Years"; None if no match
     codes: Optional[str] = None        # the cui, e.g. "C0003"; None if no match
     formula: Optional[str] = None      # e.g. "REF_POINT - 3Y"; None if none
@@ -54,8 +54,8 @@ class NullTemporalResolver:
     match and no codes."""
 
     def resolve(self, signals: List[Union[str, int]]) -> List[TemporalMapping]:
-        return [TemporalMapping(signal=s, time_window=None, codes=None, formula=None)
-                for s in signals]
+        return [TemporalMapping(time_window=None, codes=None, formula=None)
+                for _ in signals]
 
 
 # Silence noisy SDK / HTTP client loggers.
@@ -887,7 +887,6 @@ class ExtractionResult:
                                 name = self._vocab.name_from_text(p.selected_name)  # try the name echo
                             cui, formula = self._vocab.primary_for_name(name)
                             m[sig] = TemporalMapping(
-                                signal=sig,
                                 time_window=name,
                                 codes=cui,
                                 formula=formula,
@@ -895,9 +894,9 @@ class ExtractionResult:
         else:
             phrases = self._all_temporal_phrases()
             mappings = self._resolver.resolve(phrases) if phrases else []
-            for mm in mappings:
+            for phrase, mm in zip(phrases, mappings):
                 tm = mm if isinstance(mm, TemporalMapping) else TemporalMapping.model_validate(mm)
-                m[tm.signal] = tm
+                m[phrase] = tm
 
         self._temporal_map = m
         return self._temporal_map
@@ -912,7 +911,7 @@ class ExtractionResult:
             if s != NO_TEMPORAL_PLACEHOLDER
         ]
         temporal = [
-            tmap.get(s, TemporalMapping(signal=s, time_window=None, codes=None, formula=None))
+            tmap.get(s, TemporalMapping(time_window=None, codes=None, formula=None))
             for s in temporal_in
         ]
         # Never leave temporal empty: default to the present/current concept,
@@ -924,7 +923,7 @@ class ExtractionResult:
                 if name:
                     cui, formula = self._vocab.primary_for_name(name)
                     temporal = [TemporalMapping(
-                        signal=term, time_window=name, codes=cui, formula=formula,
+                        time_window=name, codes=cui, formula=formula,
                     )]
                     break
         return {
