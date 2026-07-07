@@ -371,9 +371,10 @@ For each intent:
 - Include intent_title (unchanged)
 - Include candidates (one per candidate)
 - Each candidate must include a `temporal_signal` (LIST)
+- Decide each candidate's temporal_signal for THAT specific concept: weigh the shared context (the query and the intent's description) together with the individual candidate concept's own clinical nature and cadence. Candidates under the same intent MAY carry different temporal when their concepts differ (e.g. a current lab measurement vs a past surgical history) and MAY share it when they do not.
 
 TEMPORAL SIGNAL (facet definition):
-- temporal_signal: WHAT TIME WINDOWS apply for retrieval. Each entry is a string. The actual values are derived from the query's wording and the concept's clinical nature — there is NO fixed vocabulary to draw from.
+- temporal_signal: WHAT TIME WINDOWS apply for retrieval. Each entry is a string. The actual values are derived from the query's wording, the intent's description, and the concept's clinical nature — there is NO fixed vocabulary to draw from.
 
 TEMPORAL SIGNAL TYPES:
 
@@ -393,15 +394,15 @@ Emit ONLY the forms that are anchored in the query or in the concept's nature. D
 - Emit STATE only when (a) the query frames the concept as a state through its wording or tense, or (b) the concept is inherently a state — meaning its clinical documentation has no useful interpretation without a state qualifier.
 - Emit RANK only when the query asks for a positional pick (one or more specific positions in an ordered set).
 
-Every candidate MUST carry at least one temporal_signal — an empty list is never acceptable. If the query carries no explicit temporal cue and the concept is not inherently a state, default to its most-recent standing by emitting the single word "most recent". Never leave temporal_signal empty.
+Every candidate MUST carry at least one temporal_signal — an empty list is never acceptable. FIRST read the query AND the intent's description for any temporal cue — explicit time words, verb tense, or framing in EITHER — and emit what that wording supports (a cue in the description counts even when the query itself is terse). ONLY if neither the query nor the description carries a temporal cue, and the concept is not inherently a state, default to recent records by emitting the single word "recent". Never leave temporal_signal empty.
 
 INFERENCE PRINCIPLES:
 
-1. The query's wording is the primary anchor. Verb tense, phrasing, framing, and explicit time words are all signals — read them together.
+1. The query AND the intent's description are the primary anchors — read BOTH carefully. Verb tense, phrasing, framing, and explicit time words in either are signals; a temporal cue in the description counts even when the query is terse. Read them together.
 
 2. When the query expresses a span vaguely, normalize it using the concept's documentation cadence — how often that modality is typically generated, reviewed, or considered current in clinical workflow. Cadence is a property of the concept type, not a fixed table.
 
-3. Do NOT invent a SPECIFIC window the query does not carry — never fabricate "last 3 years" out of nothing. But a query with no temporal language still defaults to "most recent" (its most-recent standing), NOT an empty list.
+3. Do NOT invent a SPECIFIC window that neither the query nor the description carries — never fabricate "last 3 years" out of nothing. But when neither carries any temporal language, still default to "recent", NOT an empty list.
 
 4. For concepts whose clinical documentation requires a state qualifier to be meaningful, emit STATE even if the query does not use a state word — but the qualifier you emit must reflect what the query's framing supports.
 
@@ -411,7 +412,7 @@ INFERENCE PRINCIPLES:
    - Diagnostics and measurements → RELATIVE only if the query carries a recency cue; the span follows the modality's cadence
    - Ranked queries → RANK matching the query's ordering language
 
-6. When uncertain, prefer precision over breadth. A single narrow default ("most recent") beats a fabricated wider window — but never emit an empty list.
+6. When uncertain, prefer precision over breadth. A single narrow default ("recent") beats a fabricated wider window — but never emit an empty list.
 
 
 OUTPUT RULES:
@@ -437,7 +438,7 @@ OUTPUT RULES:
 - temporal_signal is about WHEN (time window, or position in time: past,  current, recent, onset, ongoing, planned, first, most-recent). It is NOT
   about the disease's STATE, COURSE, OUTCOME, or SEVERITY — words like  remission, exacerbation, recurrence, relapse, progression, successful,  stable describe the condition, not a time, so they belong to the candidate,
   not here.
-- Never emit an empty list. When no explicit window or state applies, emit the most-recent standing ("most recent").
+- Never emit an empty list. When no explicit window or state applies, emit "recent".
 {temporal_matching_block}
 
 ====================================================
@@ -723,10 +724,10 @@ class Format_MinimalPipeline(BaseModel):
 
 
 # Guarantee temporal is never empty: when an intent/candidate carries no explicit
-# temporal cue (the model emitted nothing), default to "present". RESOLVED against
+# temporal cue (the model emitted nothing), default to "recent". RESOLVED against
 # your file (the first of these names that exists in it), so the CUI comes from
 # your data. Extend/reorder to match the concept names your file actually has.
-DEFAULT_TEMPORAL_TERMS = ("present",)
+DEFAULT_TEMPORAL_TERMS = ("recent", "present")
 
 
 class ExtractionResult:
