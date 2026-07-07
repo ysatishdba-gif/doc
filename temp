@@ -393,7 +393,7 @@ Emit ONLY the forms that are anchored in the query or in the concept's nature. D
 - Emit STATE only when (a) the query frames the concept as a state through its wording or tense, or (b) the concept is inherently a state — meaning its clinical documentation has no useful interpretation without a state qualifier.
 - Emit RANK only when the query asks for a positional pick (one or more specific positions in an ordered set).
 
-If the query carries no temporal cue and the concept is not inherently a state, return an empty list. An empty temporal_signal is a valid and often correct answer.
+Every candidate MUST carry at least one temporal_signal — an empty list is never acceptable. If the query carries no explicit temporal cue and the concept is not inherently a state, default to its most-recent standing by emitting the single word "most recent". Never leave temporal_signal empty.
 
 INFERENCE PRINCIPLES:
 
@@ -401,7 +401,7 @@ INFERENCE PRINCIPLES:
 
 2. When the query expresses a span vaguely, normalize it using the concept's documentation cadence — how often that modality is typically generated, reviewed, or considered current in clinical workflow. Cadence is a property of the concept type, not a fixed table.
 
-3. Do NOT invent a temporal cue the query does not carry. A query with no temporal language and a non-stateful concept yields an empty list — that is the correct answer, not a failure.
+3. Do NOT invent a SPECIFIC window the query does not carry — never fabricate "last 3 years" out of nothing. But a query with no temporal language still defaults to "most recent" (its most-recent standing), NOT an empty list.
 
 4. For concepts whose clinical documentation requires a state qualifier to be meaningful, emit STATE even if the query does not use a state word — but the qualifier you emit must reflect what the query's framing supports.
 
@@ -411,7 +411,7 @@ INFERENCE PRINCIPLES:
    - Diagnostics and measurements → RELATIVE only if the query carries a recency cue; the span follows the modality's cadence
    - Ranked queries → RANK matching the query's ordering language
 
-6. When uncertain, prefer precision over breadth. An empty or narrow list beats a fabricated wider one.
+6. When uncertain, prefer precision over breadth. A single narrow default ("most recent") beats a fabricated wider window — but never emit an empty list.
 
 
 OUTPUT RULES:
@@ -437,7 +437,7 @@ OUTPUT RULES:
 - temporal_signal is about WHEN (time window, or position in time: past,  current, recent, onset, ongoing, planned, first, most-recent). It is NOT
   about the disease's STATE, COURSE, OUTCOME, or SEVERITY — words like  remission, exacerbation, recurrence, relapse, progression, successful,  stable describe the condition, not a time, so they belong to the candidate,
   not here.
-- Empty list is valid when no meaningful temporal dimension applies.
+- Never emit an empty list. When no explicit window or state applies, emit the most-recent standing ("most recent").
 {temporal_matching_block}
 
 ====================================================
@@ -914,18 +914,23 @@ class ExtractionResult:
             tmap.get(s, TemporalMapping(time_window=None, codes=None, formula=None))
             for s in temporal_in
         ]
-        # Never leave temporal empty: default to the present/current concept,
-        # resolved against the file so the cui is real (skipped if no vocab or
-        # the file has none of the default concepts).
-        if not temporal and self._vocab is not None:
-            for term in DEFAULT_TEMPORAL_TERMS:
-                name = self._vocab.name_from_text(term)
-                if name:
-                    cui, formula = self._vocab.primary_for_name(name)
-                    temporal = [TemporalMapping(
-                        time_window=name, codes=cui, formula=formula,
-                    )]
-                    break
+        # Never leave temporal empty. Prefer a real default concept from the
+        # file (present/current/recent); if the file has none — e.g. a
+        # durations-only file — fall back to an explicit no-window entry so the
+        # list is NEVER blank, whatever the file contains.
+        if not temporal:
+            default_entry: Optional[TemporalMapping] = None
+            if self._vocab is not None:
+                for term in DEFAULT_TEMPORAL_TERMS:
+                    name = self._vocab.name_from_text(term)
+                    if name:
+                        cui, formula = self._vocab.primary_for_name(name)
+                        default_entry = TemporalMapping(
+                            time_window=name, codes=cui, formula=formula,
+                        )
+                        break
+            temporal = [default_entry or
+                        TemporalMapping(time_window=None, codes=None, formula=None)]
         return {
             "record_types": list(dict.fromkeys(raw.get("record_types") or [])),
             "temporal": [t.model_dump() for t in temporal],
