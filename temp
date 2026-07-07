@@ -370,75 +370,57 @@ Produce `temporal_by_intent`.
 For each intent:
 - Include intent_title (unchanged)
 - Include candidates (one per candidate)
-- Each candidate must include a `temporal_signal` (LIST)
+- Each candidate must include a `temporal_signal`: a non-empty LIST of entry OBJECTS (schema in OUTPUT FORM) — never omitted, null, or empty
 - Decide each candidate's temporal_signal for THAT specific concept: weigh the shared context (the query and the intent's description) together with the individual candidate concept's own clinical nature and cadence. Candidates under the same intent MAY carry different temporal when their concepts differ (e.g. a current lab measurement vs a past surgical history) and MAY share it when they do not.
 
 TEMPORAL SIGNAL (facet definition):
-- temporal_signal: WHAT TIME WINDOWS apply for retrieval. Each entry is a string. The actual values are derived from the query's wording, the intent's description, and the concept's clinical nature — there is NO fixed vocabulary to draw from.
+- temporal_signal answers WHEN, for retrieval: a time window, a lifecycle position, or an ordering. It is a LIST of entry OBJECTS (see OUTPUT FORM); only the `signal` field is inferred in this task. Values come from the query's wording, the intent's description, and the candidate concept's clinical nature — there is NO fixed vocabulary to draw from.
 
-TEMPORAL SIGNAL TYPES:
+DECISION ALGORITHM — apply to EACH candidate, in precedence order. Each "emit X" below means: ADD ONE entry object whose `signal` is X (selected_id and selected_name null).
 
-Three categories. The values you emit come from the query's own language; do not pull from a predefined list.
+SECTION A — EXPLICIT SIGNALS from the query or description. Emit EVERY one that applies (a candidate MAY carry more than one — e.g. a window AND a qualifier), keeping them in precedence order:
+  1. an explicit TIME WINDOW (duration or recency span) → emit it EXACTLY as worded ("last 3 months", "previous 2 years"); do not normalize or relabel.
+  2. an explicit LIFECYCLE QUALIFIER (present / ongoing / resolved / past, via wording or tense) → emit the canonical qualifier ("current", "past", "historical").
+  3. an explicit ORDERED occurrence (a positional pick in a set) → emit the ordering qualifier ("most recent", "first").
 
-- RELATIVE: a duration or recency window expressed in the query's words
-- STATE: a lifecycle qualifier — whether the concept is being asked about as present, ongoing, resolved, or past
-- RANK: an ordering cue — when the query asks for a positional pick rather than all instances
+SECTION B — DEFAULT. Section B is MANDATORY whenever Section A emitted no entries, and MUST produce EXACTLY ONE entry, chosen from the candidate's clinical TYPE:
+  • chronic / ongoing condition        → "current"
+  • completed surgery or past event    → "past"
+  • laboratory result                  → "recent"
+  • imaging / scan / report            → "recent"
+  • medication currently taken         → "current"
+  • planned or anticipated procedure   → "planned"
+  • otherwise                          → "recent"
+Section B can never fail: if no type matches, emit "recent". It does NOT run when Section A already produced entries.
 
-Use the query's wording verbatim when it is unambiguous. Normalize only when the query's wording is vague, and derive the normalization from the concept's documentation cadence — not from a fixed lookup.
-
-EMISSION RULES:
-
-Emit ONLY the forms that are anchored in the query or in the concept's nature. Do NOT fabricate a window to "cover all types."
-
-- Emit RELATIVE only when the query expresses a duration or recency window in its wording.
-- Emit STATE only when (a) the query frames the concept as a state through its wording or tense, or (b) the concept is inherently a state — meaning its clinical documentation has no useful interpretation without a state qualifier.
-- Emit RANK only when the query asks for a positional pick (one or more specific positions in an ordered set).
-
-Every candidate MUST carry at least one temporal_signal — an empty list is never acceptable. FIRST read the query AND the intent's description for any temporal cue — explicit time words, verb tense, or framing in EITHER — and emit what that wording supports (a cue in the description counts even when the query itself is terse). ONLY if neither the query nor the description carries a temporal cue, and the concept is not inherently a state, default to recent records by emitting the single word "recent". Never leave temporal_signal empty.
-
-INFERENCE PRINCIPLES:
-
-1. The query AND the intent's description are the primary anchors — read BOTH carefully. Verb tense, phrasing, framing, and explicit time words in either are signals; a temporal cue in the description counts even when the query is terse. Read them together.
-
-2. When the query expresses a span vaguely, normalize it using the concept's documentation cadence — how often that modality is typically generated, reviewed, or considered current in clinical workflow. Cadence is a property of the concept type, not a fixed table.
-
-3. Do NOT invent a SPECIFIC window that neither the query nor the description carries — never fabricate "last 3 years" out of nothing. But when neither carries any temporal language, still default to "recent", NOT an empty list.
-
-4. For concepts whose clinical documentation requires a state qualifier to be meaningful, emit STATE even if the query does not use a state word — but the qualifier you emit must reflect what the query's framing supports.
-
-5. Match concept type to signal type:
-   - Concepts that represent an ongoing condition → STATE matching query framing
-   - Concepts that represent past events → STATE or RELATIVE matching query framing
-   - Diagnostics and measurements → RELATIVE only if the query carries a recency cue; the span follows the modality's cadence
-   - Ranked queries → RANK matching the query's ordering language
-
-6. When uncertain, prefer precision over breadth. A single narrow default ("recent") beats a fabricated wider window — but never emit an empty list.
+Do NOT emit duplicate entries — if more than one rule yields the same `signal`, keep only one. Every candidate MUST contain the key `temporal_signal`; it may NEVER be omitted, null, or an empty list. Do NOT invent lifecycle qualifiers unsupported by the query, description, or concept type — when uncertain, prefer "recent". Candidates under one intent MAY differ (a current lab vs a past surgery) and MAY share when their concepts do not.
 
 
-OUTPUT RULES:
+OUTPUT FORM — each temporal_signal entry is an OBJECT:
+    {{ "signal": "<verbatim window OR canonical qualifier>", "selected_id": null, "selected_name": null }}
+Only `signal` is inferred in this task; selected_id / selected_name are set by the matching block below when present, otherwise left null. The `signal` value is ONE of:
+  (A) a TIME WINDOW — a duration/recency span, emitted VERBATIM from the query ("last 3 months"). Do not normalize or convert it into a concept word.
+  (B) a LIFECYCLE / ORDERING QUALIFIER — a SINGLE canonical clinical term that resolves to a UMLS concept (CUI-alignable): the bare qualifier ALONE, never a sentence, never wrapped in quantifiers or articles, never glued to the concept it modifies. Emit the canonical term a terminology lookup would resolve, NOT the surface wording:
+       * "all historical encounters" -> "historical" (or "past")
+       * "currently taking"          -> "current"
+       * "history of"                -> "past"
 
-- Each temporal_signal entry is ONE of exactly two forms:
+- The clinical noun the qualifier modifies NEVER appears in temporal_signal — that noun is the candidate, documented elsewhere.
+- Do NOT emit quantifiers ("all", "any", "every"), articles, or full sentences.
+- temporal_signal is about WHEN (position in time: past, current, recent, onset, ongoing, planned, first, most-recent). It is NOT about the disease's STATE, COURSE, OUTCOME, or SEVERITY — remission, exacerbation, recurrence, relapse, progression, stable describe the condition and belong to the candidate, not here.
 
-  (A) A TIME WINDOW — a duration or recency span ("last 3 months","previous 2 years").
-      Emit these EXACTLY as the query expresses them. Do NOT normalize,relabel, or convert a time window into a concept word. Durations stay verbatim.
+JSON CONTRACT — every candidate's temporal_signal MUST satisfy:
+  - the key is REQUIRED (never omitted)
+  - the value is an ARRAY of length >= 1 (never null, never [])
+  - every entry has a non-empty `signal` string
+  Each entry is an OBJECT: fill `signal` with the string above; selected_id / selected_name are set by the matching block below when it is present, otherwise left null.
 
-  (B) A LIFECYCLE QUALIFIER — when the signal is a state/lifecycle concept rather than a window, emit it as a SINGLE canonical clinical concept string that resolves to a UMLS concept (a CUI-alignable term). It must
-      be the bare qualifier alone — not a sentence, not a phrase, not wrapped in quantifiers or articles, and never glued to the concept it modifies.
-
-- Form (B) must be UMLS-alignable. Emit the canonical clinical term a terminology lookup would resolve, NOT the query's surface wording:
-    * "all historical encounters" -> "historical" (or "past")
-    * "currently taking"          -> "current"
-    * "current stage"             -> "current"
-    * "history of"                -> "past"
-  The clinical noun the qualifier modifies NEVER appears in temporal_signal — that noun is the candidate, documented elsewhere. temporal_signal carries
-  only the time window or the lifecycle qualifier.
-
-- Do not emit quantifiers ("all", "any", "every"), articles, or full sentences as temporal_signal entries.
-- Each temporal_signal entry's `signal` is a plain string (the time window or lifecycle qualifier) usable for concept matching.
-- temporal_signal is about WHEN (time window, or position in time: past,  current, recent, onset, ongoing, planned, first, most-recent). It is NOT
-  about the disease's STATE, COURSE, OUTCOME, or SEVERITY — words like  remission, exacerbation, recurrence, relapse, progression, successful,  stable describe the condition, not a time, so they belong to the candidate,
-  not here.
-- Never emit an empty list. When no explicit window or state applies, emit "recent".
+FINAL VALIDATION (MANDATORY) — before emitting JSON, for EVERY candidate. Let DEFAULT = {{ "signal": "recent", "selected_id": null, "selected_name": null }}.
+    if temporal_signal is missing or null:                 temporal_signal = [ DEFAULT ]
+    if temporal_signal == []:                              temporal_signal = [ DEFAULT ]
+    drop every entry that lacks a "signal" key, or whose "signal" is null or empty
+    if temporal_signal is now empty:                       temporal_signal = [ DEFAULT ]
+Only after these repairs may JSON be returned. An empty temporal_signal is INVALID output.
 {temporal_matching_block}
 
 ====================================================
