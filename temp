@@ -722,13 +722,11 @@ class Format_MinimalPipeline(BaseModel):
 
 
 
-NO_TEMPORAL_PLACEHOLDER = "current"
-
 # Guarantee temporal is never empty: when an intent/candidate carries no explicit
-# temporal cue, default to the present/current state. The default is RESOLVED
-# against your file (the first of these names that exists in it), so the CUI comes
-# from your data. Reorder/extend to match the concept your file actually has.
-DEFAULT_TEMPORAL_TERMS = ("current", "present", "recent")
+# temporal cue (the model emitted nothing), default to "present". RESOLVED against
+# your file (the first of these names that exists in it), so the CUI comes from
+# your data. Extend/reorder to match the concept names your file actually has.
+DEFAULT_TEMPORAL_TERMS = ("present",)
 
 
 class ExtractionResult:
@@ -829,7 +827,7 @@ class ExtractionResult:
     def _temporal_for_candidate(self, intent_title: str, candidate: str) -> List[str]:
 
         if not self.temporal or not self.temporal.intents:
-            return [NO_TEMPORAL_PLACEHOLDER]
+            return []
         ikey = intent_title.strip().lower()
         ckey = candidate.strip().lower()
         for it in self.temporal.intents:
@@ -847,20 +845,19 @@ class ExtractionResult:
                     if k and k not in seen:
                         intent_union.append(s)
                         seen.add(k)
-            result = own if own else intent_union
-            return result if result else [NO_TEMPORAL_PLACEHOLDER]
-        return [NO_TEMPORAL_PLACEHOLDER]
+            return own if own else intent_union
+        return []
 
     def _all_temporal_phrases(self) -> List[str]:
-        """Every distinct temporal phrase the pipeline generated (placeholder
-        excluded), across all intents/candidates."""
+        """Every distinct temporal phrase the pipeline generated, across all
+        intents/candidates."""
         phrases = set()
         if self.temporal and self.temporal.intents:
             for it in self.temporal.intents:
                 for c in (it.candidates or []):
                     for p in (c.temporal_signal or []):
                         s = p.signal
-                        if isinstance(s, str) and s != NO_TEMPORAL_PLACEHOLDER:
+                        if isinstance(s, str) and s:
                             phrases.add(s)
         return sorted(phrases)
 
@@ -880,7 +877,7 @@ class ExtractionResult:
                         for p in (c.temporal_signal or []):
                             sig = p.signal
                             if (not isinstance(sig, str) or not sig
-                                    or sig == NO_TEMPORAL_PLACEHOLDER or sig in m):
+                                    or sig in m):
                                 continue
                             name = self._vocab.name_for_id(p.selected_id)
                             if name is None:                       # id didn't resolve —
@@ -903,13 +900,9 @@ class ExtractionResult:
 
     def _structured_signals(self, raw: Dict[str, Any]) -> Dict[str, Any]:
         """Project a raw signals dict into the API's code-ready shape. Temporal
-        phrases are resolved from the per-request match map (no per-call LLM);
-        the 'current' placeholder is dropped."""
+        phrases are resolved from the per-request match map (no per-call LLM)."""
         tmap = self._get_temporal_map()
-        temporal_in = [
-            s for s in (raw.get("temporal_signal") or [])
-            if s != NO_TEMPORAL_PLACEHOLDER
-        ]
+        temporal_in = list(raw.get("temporal_signal") or [])
         temporal = [
             tmap.get(s, TemporalMapping(time_window=None, codes=None, formula=None))
             for s in temporal_in
@@ -1075,12 +1068,6 @@ class ExtractionResult:
             return list(seen_vals.values())
 
         temporal = _union(lambda s: s.temporal_signal)
-        real_temporal = [t for t in temporal if t != NO_TEMPORAL_PLACEHOLDER]
-        if real_temporal:
-            temporal = real_temporal
-        elif not temporal:
-            # Defensive: every candidate fell through with []; keep contract.
-            temporal = [NO_TEMPORAL_PLACEHOLDER]
 
         return FlatRetrievalSignals(
             record_types=_union(lambda s: s.record_types),
