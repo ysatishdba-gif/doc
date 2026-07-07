@@ -903,15 +903,24 @@ class ExtractionResult:
         phrases are resolved from the per-request match map (no per-call LLM)."""
         tmap = self._get_temporal_map()
         temporal_in = list(raw.get("temporal_signal") or [])
-        temporal = [
-            tmap.get(s, TemporalMapping(time_window=None, codes=None, formula=None))
-            for s in temporal_in
-        ]
-        # Never leave temporal empty. Prefer a real default concept from the
-        # file (present/current/recent); if the file has none — e.g. a
-        # durations-only file — fall back to an explicit no-window entry so the
-        # list is NEVER blank, whatever the file contains.
-        if not temporal:
+
+        # Keep only signals that actually resolved to a concept (a real cui).
+        # Unmatched phrases are dropped, not surfaced as null.
+        resolved: List[TemporalMapping] = []
+        seen_codes: set = set()
+        for s in temporal_in:
+            t = tmap.get(s)
+            if t and t.codes and t.codes not in seen_codes:
+                resolved.append(t)
+                seen_codes.add(t.codes)
+
+        # If nothing resolved (no cue at all, OR every emitted phrase was
+        # unmatched), fall back to the default concept from the file (present).
+        # Only if the file lacks even that do we emit an explicit no-window
+        # entry — so temporal is never blank AND never a stray null.
+        if resolved:
+            temporal = resolved
+        else:
             default_entry: Optional[TemporalMapping] = None
             if self._vocab is not None:
                 for term in DEFAULT_TEMPORAL_TERMS:
