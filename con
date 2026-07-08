@@ -20,9 +20,14 @@ class Settings(BaseSettings):
     gcp_location: str = "us-central1"                # INTENT_GCP_LOCATION
     model_name: str = "gemini-2.5-flash"             # INTENT_MODEL_NAME
 
-    # --- Pipeline ---
-    temporal_file: str = "temporal_name_to_cui.json"    # INTENT_TEMPORAL_FILE (local path)
-    default_include_retrieval_signals: bool = True      # INTENT_DEFAULT_INCLUDE_RETRIEVAL_SIGNALS
+    # --- Pipeline / temporal vocabulary ---
+    # Load the vocabulary from GCS when a bucket + path are set (recommended on
+    # GCP — update the file without rebuilding the image); otherwise from the
+    # local temporal_file.
+    temporal_file: str = "temporal_name_to_cui.json"    # INTENT_TEMPORAL_FILE (local fallback)
+    temporal_gcs_bucket: str = ""                        # INTENT_TEMPORAL_GCS_BUCKET
+    temporal_gcs_path: str = ""                          # INTENT_TEMPORAL_GCS_PATH
+    default_include_retrieval_signals: bool = True       # INTENT_DEFAULT_INCLUDE_RETRIEVAL_SIGNALS
 
     # --- Service ---
     api_key: str = ""                                # INTENT_API_KEY ("" disables auth — dev only)
