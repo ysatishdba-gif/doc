@@ -1,0 +1,216 @@
+"""
+intent_api.py — FastAPI service exposing the Contextual Intent / Temporal pipeline.
+
+  POST /v1/analyze   run the pipeline on one clinical query
+  GET  /healthz      liveness
+  GET  /readyz       readiness (pipeline + vocabulary loaded)
+
+The pipeline is built once at startup and reused. Each request calls Gemini, so
+the blocking call runs in a thread pool and is bounded by a timeout.
+
+Run:  uvicorn intent_api:app --host 0.0.0.0 --port 8080
+Docs: /docs   OpenAPI: /openapi.json
+"""
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import hmac
+import logging
+from contextlib import asynccontextmanager
+from typing import Any, Optional
+
+from fastapi import Depends, FastAPI, Header, Request
+from fastapi.concurrency import run_in_threadpool
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from config import settings
+from intent import (
+    ContextualIntentPipeline,
+    Format_MinimalPipeline,
+    TemporalVocab,
+    minimal_pipeline,
+)
+
+logger = logging.getLogger("intent_api")
+
+
+class AnalyzeRequest(BaseModel):
+    query: str = Field(
+        ...,
+        min_length=1,
+        max_length=settings.max_query_chars,
+        description="The clinical query to analyze (free text).",
+        examples=["colonoscopy images and report from the last 6 months"],
+    )
+    include_retrieval_signals: Optional[bool] = Field(
+        default=None,
+        description="Include record types + temporal. Omit to use the server default.",
+    )
+
+
+class ErrorDetail(BaseModel):
+    code: str = Field(..., description="Stable machine-readable error code.")
+    message: str = Field(..., description="Human-readable summary.")
+    details: Optional[Any] = Field(default=None, description="Optional structured context.")
+
+
+class ErrorResponse(BaseModel):
+    error: ErrorDetail
+
+
+class APIError(Exception):
+    def __init__(self, status_code: int, code: str, message: str, details: Any = None):
+        self.status_code = status_code
+        self.code = code
+        self.message = message
+        self.details = details
+
+
+def _error_body(code: str, message: str, details: Any = None) -> dict:
+    return {"error": {"code": code, "message": message, "details": details}}
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Build the pipeline once. On failure, report not-ready instead of crashing.
+    app.state.ready = False
+    app.state.pipeline = None
+    try:
+        if settings.temporal_gcs_bucket and settings.temporal_gcs_path:
+            vocab = TemporalVocab.from_gcs(
+                settings.gcp_project, settings.temporal_gcs_bucket, settings.temporal_gcs_path
+            )
+            src = f"gs://{settings.temporal_gcs_bucket}/{settings.temporal_gcs_path}"
+        else:
+            vocab = TemporalVocab.from_file(settings.temporal_file)
+            src = settings.temporal_file
+        app.state.pipeline = ContextualIntentPipeline(
+            project=settings.gcp_project,
+            location=settings.gcp_location,
+            model=settings.model_name,
+            temporal_vocab=vocab,
+        )
+        app.state.ready = True
+        logger.info("pipeline ready (model=%s, vocab=%s)", settings.model_name, src)
+    except Exception:
+        logger.exception("pipeline init failed — service will report NOT ready")
+
+    if not settings.api_key:
+        logger.warning("INTENT_API_KEY not set — authentication is DISABLED (dev only).")
+
+    yield
+
+
+app = FastAPI(
+    title="Contextual Intent & Temporal API",
+    version="1.0.0",
+    summary="Analyze a clinical query into intents, representative terms, and retrieval signals.",
+    lifespan=lifespan,
+)
+
+
+async def require_api_key(
+    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+) -> None:
+    if not settings.api_key:            # auth disabled (dev); warned at startup
+        return
+    if not x_api_key or not hmac.compare_digest(x_api_key, settings.api_key):
+        raise APIError(401, "unauthorized", "Missing or invalid API key.")
+
+
+def get_pipeline(request: Request) -> ContextualIntentPipeline:
+    if not getattr(request.app.state, "ready", False) or request.app.state.pipeline is None:
+        raise APIError(503, "not_ready", "Pipeline is not initialized. Retry shortly.")
+    return request.app.state.pipeline
+
+
+@app.exception_handler(APIError)
+async def _api_error_handler(_: Request, exc: APIError):
+    return JSONResponse(_error_body(exc.code, exc.message, exc.details), status_code=exc.status_code)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_handler(_: Request, exc: RequestValidationError):
+    return JSONResponse(
+        _error_body("validation_error", "Request validation failed.", exc.errors()),
+        status_code=422,
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_handler(_: Request, exc: StarletteHTTPException):
+    codes = {401: "unauthorized", 403: "forbidden", 404: "not_found", 405: "method_not_allowed"}
+    return JSONResponse(
+        _error_body(codes.get(exc.status_code, "http_error"), str(exc.detail)),
+        status_code=exc.status_code,
+    )
+
+
+@app.exception_handler(Exception)
+async def _unhandled_handler(_: Request, exc: Exception):
+    logger.exception("unhandled error")
+    return JSONResponse(_error_body("internal_error", "Internal server error."), status_code=500)
+
+
+@app.post(
+    "/v1/analyze",
+    response_model=Format_MinimalPipeline,
+    responses={
+        401: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+        502: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+        504: {"model": ErrorResponse},
+    },
+    summary="Analyze a clinical query.",
+    tags=["analysis"],
+)
+async def analyze(
+    req: AnalyzeRequest,
+    _: None = Depends(require_api_key),
+    pipeline: ContextualIntentPipeline = Depends(get_pipeline),
+):
+    query = req.query.strip()
+    if not query:
+        raise APIError(422, "validation_error", "query must not be blank.")
+
+    include = (
+        req.include_retrieval_signals
+        if req.include_retrieval_signals is not None
+        else settings.default_include_retrieval_signals
+    )
+
+    # PHI: log only a length + short hash, never the query text.
+    qhash = hashlib.sha256(query.encode("utf-8")).hexdigest()[:12]
+    logger.info("analyze q_len=%d q_hash=%s signals=%s", len(query), qhash, include)
+
+    try:
+        result = await asyncio.wait_for(
+            run_in_threadpool(minimal_pipeline, pipeline, query, include),
+            timeout=settings.request_timeout_seconds,
+        )
+    except asyncio.TimeoutError:
+        raise APIError(504, "upstream_timeout", "Analysis timed out. Try again.")
+    except APIError:
+        raise
+    except Exception:
+        logger.exception("pipeline execution failed (q_hash=%s)", qhash)
+        raise APIError(502, "upstream_error", "Upstream analysis failed.")
+
+    return result
+
+
+@app.get("/healthz", tags=["health"], summary="Liveness probe.")
+async def healthz():
+    return {"status": "ok"}
+
+
+@app.get("/readyz", tags=["health"], summary="Readiness probe.")
+async def readyz(request: Request):
+    if getattr(request.app.state, "ready", False):
+        return {"status": "ready"}
+    return JSONResponse(_error_body("not_ready", "Pipeline is not initialized."), status_code=503)
