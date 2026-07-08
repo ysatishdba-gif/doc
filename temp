@@ -1,55 +1,44 @@
 {
-    "query":[
+  "queries": [
+    {
+      "id": "q1",
+      "text": "chest x-ray reports from the last year",
+
+      "record_types": [
         {
-            "text": "......",                                #Query
-            "record_types": [                                # Document Types
-                {
-                    "Name" : "Clinical note"                 # Normalised Name
-                    "coding": [
-                                 {
-                                  "code": "C0332185",
-                                  "system": "NIH UMLS",        #LOINC, Snowmed etc..https://uts.nlm.nih.gov/uts/umls
-                                  }
-                                {
-                                  "code": "C0332567",
-                                  "system": "NIH UMLS",        #LOINC, Snowmed etc..https://uts.nlm.nih.gov/uts/umls
-                                  }
-                    ]                   
-                },
-                {.....},
-                {.....},
-                .....
-            ],
-            "Temporal_component": [                            #Time window
-               {
-                   "coding": [
-                       {
-                           "name": "Less Than One Year",            # Naomrlaised ANme
-                            "code": [ {.......}, {.......}, .....]  #cuis
-                           "formula":"REF_POINT - 1Y"               # Formula
-                           
-                       }
-                   ]
-                },
-               
-            ],
-            "Tags": [                                           # Representative terms
-                {
-                    "name" : "x-ray"
-                     "coding": [
-                         {
-                         "Code":[ {.......}, {.......}, .....]      #CUIs
-                        "Topics":[ {.......}, {.......}, .....]     #group of codes
-                         }
-                     ]
-                },
-                {.....},
-                {.....},
-                .....
-            ]
+          "name": "Clinical Note",
+          "coding": [
+            { "system": "UMLS", "code": "C0332185" },
+            { "system": "LOINC", "code": "11488-4" }
+          ]
         },
-        {.....}, # Question 2
-        {.....}, # Question 3
-        .....
-    ]
+        {
+          "name": "Radiology Report",
+          "coding": [
+            { "system": "UMLS", "code": "C0034571" }
+          ]
+        }
+      ],
+
+      "temporal": [
+        {
+          "name": "Less Than One Year",
+          "formula": "REF_POINT - 1Y",
+          "coding": [
+            { "system": "UMLS", "code": "C0332185" }
+          ]
+        }
+      ],
+
+      "tags": [
+        {
+          "name": "X-ray",
+          "coding": [
+            { "system": "UMLS", "code": "C0043299" }
+          ],
+          "topics": ["imaging", "radiology"]
+        }
+      ]
+    }
+  ]
 }
