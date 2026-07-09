@@ -1,110 +1,20 @@
-Contextual Intent & Temporal API
-================================
-
-FastAPI service that turns a clinical query into intents, representative
-terms, and retrieval signals (record types + temporal). It wraps intent.py.
-Runs on GCP (Cloud Run) and calls Gemini on Vertex AI.
-
-
-How it works (the prompts)
---------------------------
-One request runs 3 LLM calls, or 4 when retrieval signals are requested.
-Each call is a separate prompt with a fixed job.
-
-Step 1 - Expand the query          (QUERY_EXPANSION_PROMPT)
-  Raw query -> fuller clinical version. Spells out abbreviations
-  (DM -> Diabetes Mellitus) and expands broad terms into specifics
-  (vitals -> blood pressure, heart rate, temp...). Everything after this
-  step reads the expanded query.
-
-Steps 2 and 3 run in parallel, both off the expanded query:
-
-Step 2 - Extract intents           (INTENT_EXTRACTION_PROMPT)
-  The distinct clinical intents. Each has a title, description, nature,
-  sub-natures, and the atomic concepts to search for.
-
-Step 3 - Extract representative terms   (REPRESENTATIVE_TERMS_PROMPT)
-  The 1-3 canonical entities the query is really about (e.g. "EKG").
-
-Step 4 - Build context / retrieval signals   (CONTEXTUAL_ENVIRONMENT_PROMPT)
-  Only when include_retrieval_signals is true. Per concept:
-  Task 1 (facets): record types, authors, care-lifecycle, setting.
-  Task 2 (temporal): the time window. Reads the query + intent description;
-  if neither gives a cue it defaults from the concept type (labs/imaging ->
-  recent, chronic -> current, history -> past). Each temporal is matched
-  against the vocabulary file to attach a code and formula.
-
-
-Requirements
-------------
-- Python 3.11+
-- GCP project with Vertex AI (Gemini) enabled
-- The vocabulary file temporal_name_to_cui.json in GCS (or on disk locally)
-
-
-Run locally
------------
-pip install -r requirements.txt
-export INTENT_GCP_PROJECT=your-project
-export INTENT_API_KEY=some-key
-# local credentials for Vertex/GCS:
-gcloud auth application-default login
-uvicorn intent_api:app --host 0.0.0.0 --port 8080
-
-Docs: /docs   OpenAPI: /openapi.json
-
-
-Deploy on GCP (Cloud Run)
--------------------------
-1. Build and push the image to Artifact Registry:
-     gcloud builds submit --tag REGION-docker.pkg.dev/PROJECT/REPO/intent-api:latest
-
-2. Put the vocabulary file in GCS:
-     gsutil cp temporal_name_to_cui.json gs://YOUR_BUCKET/path/temporal_name_to_cui.json
-
-3. Store the API key in Secret Manager:
-     printf "your-key" | gcloud secrets create intent-api-key --data-file=-
-
-4. Give the service account these roles:
-     roles/aiplatform.user               (Gemini on Vertex)
-     roles/storage.objectViewer          (read the vocab from GCS)
-     roles/secretmanager.secretAccessor  (read the API key)
-
-5. Edit the placeholders in service.yaml and deploy:
-     gcloud run services replace service.yaml --region REGION
-
-The attached service account provides Vertex + GCS credentials, so no key
-file is needed in the container.
-
-
-Endpoints
----------
-POST /v1/analyze   analyze a query
-GET  /healthz      liveness
-GET  /readyz       readiness (503 until the pipeline + vocabulary are loaded)
-
-
-Example
--------
-curl -sX POST https://YOUR-SERVICE-URL/v1/analyze \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: some-key" \
-  -d '{"query":"colonoscopy images and report from the last 6 months","include_retrieval_signals":true}'
-
-
-Errors
-------
-{ "error": { "code": "...", "message": "...", "details": null } }
-
-200 ok   401 bad/missing key   422 bad query   502 Gemini failed   503 not ready   504 timeout
-
-
-Config (env vars; INTENT_GCP_PROJECT and INTENT_API_KEY are the important ones)
--------------------------------------------------------------------------------
-INTENT_GCP_PROJECT           GCP project id (required)
-INTENT_API_KEY               key clients must send; empty = auth off (dev only)
-INTENT_GCP_LOCATION          default us-central1
-INTENT_MODEL_NAME            default gemini-2.5-flash
-INTENT_TEMPORAL_GCS_BUCKET   GCS bucket holding the vocabulary file
-INTENT_TEMPORAL_GCS_PATH     object path of the vocabulary file in that bucket
-INTENT_TEMPORAL_FILE         local vocab path, used only if the GCS vars are empty
+Psychology Note
+ 
+├── Counseling Note (C1370109-0)
+│   ├── Mental Health Counseling Note (C1369730-1)
+│   ├── Psychology Counseling Note (C1369732-1)
+│   ├── Counseling Note (C1831142-1)
+├── Evaluation and Management Note (C1317348-0)
+│   ├── Evaluation Note (C2360545-0)
+│   │   ├── Mental Health Evaluation Note (C5426394-1)
+│   │   ├── Psychology Evaluation Note (C5426432-1)
+│   │   ├── Evaluation Note (C2360544-1)
+│   │   ├── Evaluation and Plan Note (C2360543-0)
+│   ├── Care Note (C3871191-0)
+│   ├── Evaluation and Management of a Specific Problem Document (C5212822-0)
+│   ├── Progress Document (C1280477-0)
+│   │   ├── Progress Note (C0747978-1)
+├── Notes (C1317574-0)
+│   ├── Notes (C1316572-1)
+│   ├── Mental Health Note (C1369652-1)
+│   ├── Psychology Note (C1369658-1)
