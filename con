@@ -1,28 +1,123 @@
-Summary of Job Duties and Current Projects
-Prepared for H-1B Extension Petition
-Employee Name: [Your Full Name]
-Job Title: Principal Data Scientist [confirm against LCA/petition title]
-Employer: [Company Name]
-Work Location: [City, State]
-Position Overview
-I serve as a Principal Data Scientist responsible for designing, developing, and deploying artificial intelligence and machine learning systems for clinical natural language processing (NLP). My work transforms free-text clinical queries into structured, standardized medical data that powers downstream healthcare information retrieval systems. This role requires advanced, specialized knowledge of machine learning, large language models (LLMs), biomedical ontologies (UMLS, SNOMED CT), statistical modeling, and cloud-based data engineering, consistent with a specialty occupation requiring at least a bachelor's degree in computer science, data science, or a related field.
-Current Projects and Responsibilities
-1. Nature Breakdown API — Standardized Output Schema (deployed)
-Designed and implemented a standardized, versioned output schema for the team's deployed Nature Breakdown model API, which classifies clinical text into nature categories and sub-natures with associated medical concept identifiers (CUIs) and confidence scores. Replaced prompt-dependent output formatting with Pydantic-based schema enforcement on Google Vertex AI (Gemini), including pre-response schema validation, backward compatibility and versioning, unit testing across varied inputs, and updated technical documentation. Deployed the standardized API to the enterprise AI platform for consumption by downstream engineering teams.
-2. Clinical Query Pipeline (end-to-end NLP retrieval pipeline)
-Architected and built a production-ready pipeline that converts free-text clinical queries into structured intents, UMLS/SNOMED CT concept identifiers, retrieval signals, and topic groupings. Components include clinical-relevance gating, query expansion, LLM-based intent extraction and contextual environment construction (Gemini on Vertex AI), integration with a CUI extraction service, BigQuery-based concept summarization, and topic formation using hierarchy-, embedding-, and graph-clustering methods. Engineered the system as a class-based service with production lifecycle management for handoff to the API engineering team, with complete documentation, dependency specifications, and IAM/deployment requirements.
-3. Medical Concept Enrichment and Clustering
-Built a BigQuery-driven cluster builder over UMLS relationship tables (MRCONSO, MRSTY, MRREL) that constructs semantic-type, relation, and cross-semantic concept clusters with deterministic identifiers, producing a per-concept lookup used for concept matching within the pipeline.
-4. Clinical Query Context Taxonomy
-Defined a versioned nine-context taxonomy classifying clinical queries by intended source of truth (e.g., patient chart data, aggregate/population health metrics), used for query routing and exclusion within the retrieval pipeline, and delivered in structured JSON for programmatic consumption.
-5. Batch Processing, Cost, and Performance Engineering
-Developed a parallel batch runner processing query datasets from Google Cloud Storage through the pipeline, with automated testing. Performed token-level cost modeling and latency profiling of LLM calls to support production capacity planning and budgeting.
-Breakdown of Job Duties (approximate)
+Job Description
+Role Details:
+Provide technical leadership for AI engineering across the full lifecycle. 
+•    Own architecture, standards, and delivery for multimodal and LLM systems with strong governance, safety, and reliability. 
+•    Own end-to-end AI system design from data and features through training, deployment, and monitoring. 
+•    Design and operate multimodal and LLM-based systems including RAG and knowledge operations. 
+•    Implement human-in-the-loop controls for safety, quality, and regulatory needs. 
+•    Govern data quality, lineage, and compliance across batch, streaming, and analytics platforms.
+•    Establish CI/ CD for ML including registries, automated retraining, rollback, and incident playbooks. 
+•    Apply SRE practices to AI systems using SLOs, error budgets, and release discipline. 
+•    Implement zero-trust controls for AI services with policy-aware outputs and full auditability. 
+•    Lead architecture reviews, define standards, publish reference implementations, and mentor senior engineers and data scientists. 
+•    Translate business intents into prompts, retrieval schemas, experiments, and measurable outcomes. 
+•    Drive adoption through documentation, demos, and reusable patterns.
+ 
 
-40% — Design and development of machine learning / NLP models and pipelines, including LLM-based intent extraction, schema enforcement, and concept summarization. [Adjust %]
-25% — Data engineering and cloud architecture on Google Cloud Platform (BigQuery, Vertex AI, Cloud Storage), including biomedical ontology processing at scale. [Adjust %]
-20% — Software engineering for production deployment: API schema design, validation, versioning, lifecycle management, unit testing, and documentation. [Adjust %]
-15% — Analysis, evaluation, and optimization: cost modeling, performance profiling, taxonomy design, and stakeholder communication. [Adjust %]
+Qualifications
+•   A master’s degree in engineering, computer science, mathematics, health science, or a related field with 7 years of relevant experience, or a bachelor’s degree with 9 years of relevant experience. 
+•   Extensive (7+ years) experience applying AI and machine learning in production healthcare environments or similar highly regulated or technology focused industries, showcasing an acute understanding of healthcare technology.
+•   Demonstrated leadership in managing complex projects, with a proven ability to navigate intricate project requirements and deliver successful outcomes.
+•   Proven success in fostering collaboration across diverse teams and effectively communicating complex technical concepts to non-technical stakeholders.
+•   Demonstrated expertise in cloud infrastructure environment and software development tools.
+•   Experience working with large, complex, and heterogeneous data sets, preferably in healthcare. 
+•   Strong skills in AI/ML techniques and frameworks.
+•   Expertise with best practices in data engineering, data science, AI Engineering, and the MLOps communities.
+•   In-depth knowledge of healthcare domain, including clinical workflows, electronic health records, medical terminologies, regulatory requirements, and industry standards.
+•   Demonstrated leadership in administration, education, software development, and technical reporting. 
+•   Experience mentoring and training less-experienced team members, coupled with strong interpersonal, communication, and time management skills.
 
-Technologies and Specialized Knowledge Applied
-Python, Pydantic, Google Cloud Platform (Vertex AI / Gemini LLMs, BigQuery, Cloud Storage), UMLS and SNOMED CT biomedical ontologies, NetworkX, SciPy, statistical clustering and graph algorithms, REST API design, and schema validation frameworks.
+
+Preferred Qualifications:
+•   A Ph.D. or other doctorate is preferred. 
+•   Strong expertise in AI/ML techniques and frameworks, such as deep learning, natural language processing, and Generative AI, with proficiency in tools like Python, TensorFlow, PyTorch, sci-kit-learn, Keras, etc.
+•   Experience with healthcare industry informatics standards, best practices, and common data models. Participation in national or international standards organizations or other domain-specific professional organizations, or extensive implementation experience with common data, development, and deployment standards.
+•   Excellent communication, collaboration, and stakeholder management skills, with the ability to effectively engage with diverse stakeholders and translate complex technical concepts and results to non-technical audiences.
+•   Demonstrated experience leading technical/quantitative teams in a regulated environment.
+•   Familiarity with systems or quality engineering best practices, regulatory standards, and compliance frameworks, with the ability to adapt these effectively to different project scenarios.
+•   Demonstrated experience creating risk management files and verification/validation strategies for digital health technology products within the healthcare industry.
+•   Demonstrated expertise in user-centered design, human factors engineering, usability testing methodologies, and evaluation across AI product development. Ability to lead expert reviews using established usability practices and methods. Presents findings in easy-to-understand terms for the business or clinical practice.
+•   Strong problem-solving abilities, critical thinking skills, and a passion for driving innovation and positive change in healthcare through AI technology.
+
+ 
+
+Preferred Technical Skills:
+•    Primary language Python. 
+•    SQL for analytics and ETL.
+•    Scala or Java for Spark and JVM pipelines. 
+•    TypeScript for AI-enabled user experiences. 
+•    Bash for operations and automation. 
+•    Strong software engineering practices including testing, modular design, typing, packaging, and reproducibility.
+
+ML and LLM Stack: 
+•    PyTorch, TensorFlow, JAX. scikit-learn, XGBoost, LightGBM. 
+•    Hugging Face Transformers and tokenizers. 
+•    Parameter-efficient tuning including LoRA and QLoRA. 
+•    Distillation and quantization using INT8 and FP16.
+•    Inference and serving with Triton, TorchServe, TF Serving, ONNX Runtime, and Ray Serve.
+
+Data Processing and Orchestration: 
+•    Spark, Flink, Beam for large-scale processing. 
+•    Pandas and Polars for feature preparation. 
+•    Airflow, Prefect, Dagster for orchestration. 
+•    dbt for analytics transformations. 
+•    Streaming and CDC with Kafka, Kinesis, Pub Sub, Debezium, and Fivetran.
+
+Storage and Data Management: 
+•    Data lakes on S3, GCS, or ADLS with Delta, Iceberg, or Hudi. 
+•    Warehouses including BigQuery, Snowflake, and Redshift. 
+•    Formats Parquet, ORC, and Avro with schema evolution and data contracts.
+
+RAG and Knowledge Operations: 
+•    Vector databases such as Faiss, Milvus, and Pinecone. 
+•    High-quality chunking and embedding strategies.
+•    Hybrid retrieval using dense and lexical methods. 
+•    Grounding, citation, freshness controls, and de-duplication. Policy-aware queries and audit-ready traces.
+
+Prompting and Orchestration: 
+•    Prompt orchestration libraries including LangChain, LlamaIndex, and Haystack. 
+•    Structured prompts, tool use, guardrails, and output validation. 
+•    Workflow orchestration with planning, memory, and function calling. 
+•    Human checkpoints for high-risk actions.
+
+Containers, Delivery, and Reliability: 
+•    Docker and Kubernetes with HPA and VPA. 
+•    Service mesh with Istio or Linkerd. 
+•    GitHub Actions, GitLab, or Jenkins for CI and CD. 
+•    GitOps with ArgoCD or Flux. 
+•    Progressive delivery with canary and blue green releases. 
+•    Global availability, autoscaling, and rollback strategies.
+
+Observability and Operations: 
+•    Prometheus, Grafana, Datadog. 
+•    OpenTelemetry for traces across retrieval and generation. 
+•    Model and feature drift detection, calibration, and bias monitoring. 
+•    User feedback loops and degradation policies.
+
+Security and Responsible AI: 
+•    OAuth2, OIDC, mTLS, and scoped IAM. 
+•    Encryption with KMS, tokenization, and masking. 
+•    Row and column level security.
+•    Safety filters, jailbreak defenses, and content moderation. 
+•    Model cards, audit trails, retention policies, and DPIA support. 
+•    Privacy-preserving techniques including synthetic data when appropriate.
+
+Platforms and Compute: 
+•    Managed ML platforms including SageMaker, Vertex AI, and Azure ML. 
+•    GPU and TPU scheduling, mixed precision, profiling, and throughput optimization. 
+•    Cost and performance controls including token budgeting and caching.
+
+Agentic AI Expertise: 
+•    Design assistive, semi-autonomous, and autonomous agent patterns with clear approval boundaries. 
+•    Implement planner, executor, retrieval, memory, policy, and evaluator agents. 
+•    Support analytics, research, coding, and workflow agents with strong audit trails. 
+•    Design multi-agent topologies including manager-worker, mediator, and reflective patterns.
+•    Enable secure agent-to-agent interoperability with clear schemas, access controls, and attestations.
+
+ 
+
+Preferred Experience and Capabilities:
+•    Proven delivery of multimodal and LLM systems with RAG and human-in-the-loop safety.
+•    Demonstrated ownership of evaluation, guardrails, and measurable business outcomes.
+•    Experience governing data usage, consent, and compliance at scale. 
+•    Track record establishing reference architecture and mentoring senior engineers and data scientists. 
