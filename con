@@ -1,39 +1,28 @@
-"""
-config.py — single source of configuration for the service and its tools.
+Summary of Job Duties and Current Projects
+Prepared for H-1B Extension Petition
+Employee Name: [Your Full Name]
+Job Title: Principal Data Scientist [confirm against LCA/petition title]
+Employer: [Company Name]
+Work Location: [City, State]
+Position Overview
+I serve as a Principal Data Scientist responsible for designing, developing, and deploying artificial intelligence and machine learning systems for clinical natural language processing (NLP). My work transforms free-text clinical queries into structured, standardized medical data that powers downstream healthcare information retrieval systems. This role requires advanced, specialized knowledge of machine learning, large language models (LLMs), biomedical ontologies (UMLS, SNOMED CT), statistical modeling, and cloud-based data engineering, consistent with a specialty occupation requiring at least a bachelor's degree in computer science, data science, or a related field.
+Current Projects and Responsibilities
+1. Nature Breakdown API — Standardized Output Schema (deployed)
+Designed and implemented a standardized, versioned output schema for the team's deployed Nature Breakdown model API, which classifies clinical text into nature categories and sub-natures with associated medical concept identifiers (CUIs) and confidence scores. Replaced prompt-dependent output formatting with Pydantic-based schema enforcement on Google Vertex AI (Gemini), including pre-response schema validation, backward compatibility and versioning, unit testing across varied inputs, and updated technical documentation. Deployed the standardized API to the enterprise AI platform for consumption by downstream engineering teams.
+2. Clinical Query Pipeline (end-to-end NLP retrieval pipeline)
+Architected and built a production-ready pipeline that converts free-text clinical queries into structured intents, UMLS/SNOMED CT concept identifiers, retrieval signals, and topic groupings. Components include clinical-relevance gating, query expansion, LLM-based intent extraction and contextual environment construction (Gemini on Vertex AI), integration with a CUI extraction service, BigQuery-based concept summarization, and topic formation using hierarchy-, embedding-, and graph-clustering methods. Engineered the system as a class-based service with production lifecycle management for handoff to the API engineering team, with complete documentation, dependency specifications, and IAM/deployment requirements.
+3. Medical Concept Enrichment and Clustering
+Built a BigQuery-driven cluster builder over UMLS relationship tables (MRCONSO, MRSTY, MRREL) that constructs semantic-type, relation, and cross-semantic concept clusters with deterministic identifiers, producing a per-concept lookup used for concept matching within the pipeline.
+4. Clinical Query Context Taxonomy
+Defined a versioned nine-context taxonomy classifying clinical queries by intended source of truth (e.g., patient chart data, aggregate/population health metrics), used for query routing and exclusion within the retrieval pipeline, and delivered in structured JSON for programmatic consumption.
+5. Batch Processing, Cost, and Performance Engineering
+Developed a parallel batch runner processing query datasets from Google Cloud Storage through the pipeline, with automated testing. Performed token-level cost modeling and latency profiling of LLM calls to support production capacity planning and budgeting.
+Breakdown of Job Duties (approximate)
 
-All values come from environment variables, prefixed INTENT_ (see .env.example).
-Import the shared instance:
+40% — Design and development of machine learning / NLP models and pipelines, including LLM-based intent extraction, schema enforcement, and concept summarization. [Adjust %]
+25% — Data engineering and cloud architecture on Google Cloud Platform (BigQuery, Vertex AI, Cloud Storage), including biomedical ontology processing at scale. [Adjust %]
+20% — Software engineering for production deployment: API schema design, validation, versioning, lifecycle management, unit testing, and documentation. [Adjust %]
+15% — Analysis, evaluation, and optimization: cost modeling, performance profiling, taxonomy design, and stakeholder communication. [Adjust %]
 
-    from config import settings
-
-Both the API (intent_api.py) and the local runner (run_local.py) read from here,
-so there is exactly one place that defines names, defaults, and types.
-"""
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="INTENT_", env_file=".env", extra="ignore")
-
-    # --- GCP / Vertex ---
-    gcp_project: str = ""                            # INTENT_GCP_PROJECT (required in prod)
-    gcp_location: str = "us-central1"                # INTENT_GCP_LOCATION
-    model_name: str = "gemini-2.5-flash"             # INTENT_MODEL_NAME
-
-    # --- Pipeline / temporal vocabulary ---
-    # Load the vocabulary from GCS when a bucket + path are set (recommended on
-    # GCP — update the file without rebuilding the image); otherwise from the
-    # local temporal_file.
-    temporal_file: str = "temporal_name_to_cui.json"    # INTENT_TEMPORAL_FILE (local fallback)
-    temporal_gcs_bucket: str = ""                        # INTENT_TEMPORAL_GCS_BUCKET
-    temporal_gcs_path: str = ""                          # INTENT_TEMPORAL_GCS_PATH
-    default_include_retrieval_signals: bool = True       # INTENT_DEFAULT_INCLUDE_RETRIEVAL_SIGNALS
-
-    # --- Service ---
-    api_key: str = ""                                # INTENT_API_KEY ("" disables auth — dev only)
-    request_timeout_seconds: float = 60.0            # INTENT_REQUEST_TIMEOUT_SECONDS
-    max_query_chars: int = 4000                      # INTENT_MAX_QUERY_CHARS
-
-
-# Import this everywhere; do not construct Settings() elsewhere.
-settings = Settings()
+Technologies and Specialized Knowledge Applied
+Python, Pydantic, Google Cloud Platform (Vertex AI / Gemini LLMs, BigQuery, Cloud Storage), UMLS and SNOMED CT biomedical ontologies, NetworkX, SciPy, statistical clustering and graph algorithms, REST API design, and schema validation frameworks.
