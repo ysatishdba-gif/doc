@@ -1,109 +1,13 @@
-Subject: Current Work Summary — H-1B Extension / Sponsorship
+Thank you for checking in on this. Please find attached a summary document for my H-1B extension.
 
-Hi [Manager],
+A quick note on what's in it, since the visa process can be a bit unfamiliar:
 
-Thank you for checking in. Please find below a summary of my current work, job duties, and qualifications for the H-1B extension. My job title, compensation, and role remain unchanged from the current petition. Please let me know if the legal team needs any additional information.
+1. The "Job Duties" section is taken directly from the official job description for my Principal AI/ML Engineer role — this is the main part the legal team needs, as the petition is based on the duties of the position.
 
-====================================================
-H-1B EXTENSION — EMPLOYEE SUMMARY: POSITION, DUTIES, AND QUALIFICATIONS
-====================================================
+2. I've also included a "Representative Current Work" section describing the specific projects I'm working on. This may not be strictly required, but immigration attorneys sometimes ask for it as supporting evidence, so I included it proactively to save a round trip.
 
-Employee Name: [Your Full Name]
-Job Title: Principal AI/ML Engineer
-Employer: [Company Name]
-Department/Team: [Team Name]
-Manager: [Manager Name]
-Work Location: [City, State]
-Employment Type: Full-time
-Current H-1B Validity: [Start Date] – [End Date]
-Change in Role/Title/Compensation Since Last Petition: None
+3. The document also has my education details and confirms that my title, compensation, and role are unchanged from the current petition — which typically means this is a standard extension.
 
-----------------------------------------------------
-EDUCATION AND QUALIFICATIONS
-----------------------------------------------------
-• Master of Computer Applications (MCA), [University Name], [Country], [Year]
-• Bachelor of [Degree], [University Name], [Country], [Year]
-• More than 14 years of professional experience applying artificial intelligence, machine learning, and software engineering in production environments, including healthcare
-• Credential evaluation establishing U.S. master's degree equivalency [available from prior petition / to be obtained]
+All you should need to do is forward the attached document to the legal team. If they need anything else (like specific dates or documents), I'm happy to provide it directly.
 
-----------------------------------------------------
-POSITION OVERVIEW
-----------------------------------------------------
-The Principal AI/ML Engineer provides technical leadership for AI engineering across the full development lifecycle. The role owns architecture, standards, and delivery for multimodal and large language model (LLM) based systems, ensuring strong governance, safety, and reliability within a production healthcare environment. The position involves advanced, specialized work in machine learning, natural language processing, generative AI, biomedical informatics standards, cloud infrastructure, and MLOps.
-
-----------------------------------------------------
-JOB DUTIES
-----------------------------------------------------
-1. Owns end-to-end AI system design, from data and feature engineering through model training, deployment, and monitoring.
-
-2. Owns architecture, standards, and delivery for multimodal and LLM-based systems, ensuring strong governance, safety, and reliability.
-
-3. Designs and operates multimodal and LLM-based systems, including retrieval-augmented generation (RAG) and knowledge operations, covering vector databases, chunking and embedding strategies, hybrid dense and lexical retrieval, grounding, citation and freshness controls, de-duplication, policy-aware queries, and audit-ready traces.
-
-4. Implements human-in-the-loop controls to meet safety, quality, and regulatory requirements, including structured prompts, guardrails, output validation, and human checkpoints for high-risk actions.
-
-5. Governs data quality, lineage, and compliance across batch, streaming, and analytics platforms, including oversight of data usage, consent, and compliance at scale.
-
-6. Establishes continuous integration and continuous delivery (CI/CD) practices for machine learning, including model registries, automated retraining, rollback strategies, and incident playbooks, and implements progressive delivery through canary and blue-green releases.
-
-7. Applies site reliability engineering (SRE) practices to AI systems through service-level objectives (SLOs), error budgets, and release discipline, including observability across retrieval and generation, model and feature drift detection, calibration, bias monitoring, user feedback loops, and degradation policies.
-
-8. Implements zero-trust security controls for AI services, delivering policy-aware outputs and full auditability through scoped IAM, encryption, tokenization, masking, safety filters, jailbreak defenses, content moderation, model cards, audit trails, and retention policies.
-
-9. Designs and implements agentic AI systems, including assistive, semi-autonomous, and autonomous agent patterns with clearly defined approval boundaries; planner, executor, retrieval, memory, policy, and evaluator agents; multi-agent topologies such as manager-worker, mediator, and reflective patterns; and secure agent-to-agent interoperability with defined schemas, access controls, and attestations.
-
-10. Optimizes inference and serving infrastructure, including parameter-efficient model tuning (LoRA and QLoRA), distillation and quantization, GPU and TPU scheduling, throughput optimization, and cost and performance controls such as token budgeting and caching.
-
-11. Engineers large-scale data processing and orchestration pipelines across data lakes, data warehouses, and streaming platforms, incorporating schema evolution and data contracts.
-
-12. Leads architecture reviews, defines engineering standards, publishes reference implementations, and mentors senior engineers and data scientists.
-
-13. Translates business objectives into prompts, retrieval schemas, experiments, and measurable outcomes, with ownership of evaluation, guardrails, and business impact.
-
-14. Drives adoption of AI solutions through documentation, demonstrations, and reusable patterns, and communicates complex technical concepts to non-technical and clinical stakeholders.
-
-----------------------------------------------------
-REPRESENTATIVE CURRENT WORK
-----------------------------------------------------
-• Clinical Query Pipeline: Architected and delivered a production end-to-end natural language processing pipeline that converts free-text clinical queries into structured intents, standardized medical concept identifiers (UMLS/SNOMED CT CUIs), retrieval signals, and topic groupings. The pipeline spans LLM-based intent extraction and query expansion (Gemini on Vertex AI), BigQuery-based concept summarization, hybrid retrieval using hierarchy-based, embedding-based, and graph-clustering methods, and a class-based service architecture with full production lifecycle management for enterprise deployment.
-
-• Nature Breakdown API — Standardized Output Schema: Defined and enforced a standardized, versioned API output schema, replacing prompt-dependent formatting with Pydantic-based structural enforcement, pre-response validation, backward compatibility, versioning governance, and unit testing. The API has been deployed to the enterprise AI platform.
-
-• Medical Knowledge Operations: Built BigQuery-driven concept clustering over UMLS relationship tables (MRCONSO, MRSTY, MRREL), producing deterministic cluster identifiers and per-concept knowledge lookups that support downstream retrieval and grounding.
-
-• Clinical Query Context Taxonomy: Designed a versioned nine-context taxonomy that classifies clinical queries by their intended source of truth for routing and exclusion decisions, delivered in both stakeholder-facing and machine-readable formats.
-
-• Evaluation, Cost, and Performance Engineering: Built parallelized batch evaluation tooling over Google Cloud Storage datasets with automated verification, and performed token-level LLM cost modeling across query complexity tiers, latency profiling, thread-safety analysis, and capacity planning for multi-worker deployment.
-
-• Documentation and Enablement: Produced layered technical documentation, including quick-start guides, API contracts, architecture internals, and dependency and IAM specifications, enabling downstream engineering teams to consume the systems without custom parsing logic.
-
-----------------------------------------------------
-TECHNICAL SKILLS APPLIED IN THE ROLE
-----------------------------------------------------
-• Languages: Python (primary), SQL for analytics and ETL, Scala and Java for Spark and JVM pipelines, TypeScript for AI-enabled user experiences, and Bash for operations, supported by strong software engineering practices including testing, modular design, typing, packaging, and reproducibility.
-
-• ML/LLM Stack: PyTorch, TensorFlow, JAX, scikit-learn, XGBoost, LightGBM, and Hugging Face Transformers; parameter-efficient tuning (LoRA, QLoRA); distillation and quantization (INT8, FP16); and inference serving with Triton, TorchServe, TF Serving, ONNX Runtime, and Ray Serve.
-
-• Data Processing and Orchestration: Spark, Flink, and Beam for large-scale processing; Pandas and Polars for feature preparation; Airflow, Prefect, and Dagster for orchestration; dbt for analytics transformations; and streaming and CDC with Kafka, Kinesis, Pub/Sub, Debezium, and Fivetran.
-
-• Storage and Data Management: Data lakes on S3, GCS, and ADLS with Delta, Iceberg, or Hudi; data warehouses including BigQuery, Snowflake, and Redshift; and Parquet, ORC, and Avro formats with schema evolution and data contracts.
-
-• RAG and Prompting: Vector databases (Faiss, Milvus, Pinecone); prompt orchestration libraries (LangChain, LlamaIndex, Haystack); structured prompts, tool use, guardrails, and output validation; and workflow orchestration with planning, memory, and function calling.
-
-• Delivery and Reliability: Docker and Kubernetes with HPA and VPA; service mesh with Istio or Linkerd; CI/CD with GitHub Actions, GitLab, or Jenkins; GitOps with ArgoCD or Flux; and observability with Prometheus, Grafana, Datadog, and OpenTelemetry.
-
-• Security and Responsible AI: OAuth2, OIDC, mTLS, and scoped IAM; encryption with KMS, tokenization, and masking; row- and column-level security; DPIA support; and privacy-preserving techniques including synthetic data.
-
-• Platforms and Compute: SageMaker, Vertex AI, and Azure ML; GPU and TPU scheduling, mixed precision, profiling, and throughput optimization.
-
-----------------------------------------------------
-DOMAIN EXPERTISE
-----------------------------------------------------
-Healthcare AI and natural language processing, including clinical workflows, electronic health records, medical terminologies and ontologies (UMLS, SNOMED CT), healthcare informatics standards, and regulatory and compliance considerations for AI in regulated environments.
-
-====================================================
-
-Thank you very much for your support.
-
-Best regards,
-[Your Name]
+Thank you so much for your support!
