@@ -1,20 +1,55 @@
-Psychology Note
+##########################################################################
+Search String pscyhology note -->  
+clusterset:lonic_document_class
  
-├── Counseling Note (C1370109-0)
-│   ├── Mental Health Counseling Note (C1369730-1)
-│   ├── Psychology Counseling Note (C1369732-1)
-│   ├── Counseling Note (C1831142-1)
-├── Evaluation and Management Note (C1317348-0)
-│   ├── Evaluation Note (C2360545-0)
-│   │   ├── Mental Health Evaluation Note (C5426394-1)
-│   │   ├── Psychology Evaluation Note (C5426432-1)
-│   │   ├── Evaluation Note (C2360544-1)
-│   │   ├── Evaluation and Plan Note (C2360543-0)
-│   ├── Care Note (C3871191-0)
-│   ├── Evaluation and Management of a Specific Problem Document (C5212822-0)
-│   ├── Progress Document (C1280477-0)
-│   │   ├── Progress Note (C0747978-1)
-├── Notes (C1317574-0)
-│   ├── Notes (C1316572-1)
-│   ├── Mental Health Note (C1369652-1)
-│   ├── Psychology Note (C1369658-1)
+document_class(2850)
+Evaluation and Management Note
+Notes
+Evaluation Note
+Progress Document
+Mental Health Note
+Psychology Note
+Care Note
+Evaluation and Management of a Specific Problem Document
+Evaluation and Plan Note
+Mental Health Evaluation Note
+Psychology Evaluation Note
+ 
+############################################################################
+Search String pscyhology note -->  
+clusterset:lonic_document_activity
+ 
+Note:Find:Pt:Custodial care facility:Doc:Psychology
+Note:Find:Pt:{Setting}:Doc:Neuropsychology
+Child and adolescent psychology&#x7C;ANYTypeOfService&#x7C;ANYKindOfNote&#x7C;ANYSetting
+Note:Find:Pt:Telehealth:Doc:Psychology
+Note:Find:Pt:Telephone encounter:Doc:Psychology
+Episode of care medical records:Find:Pt:^Patient:Doc:Psychology
+Note:Find:Pt:{Setting}:Doc:Psychology.team
+Progress note:Find:Pt:Outpatient:Doc:Psychology
+Diagnostic study note:Find:Pt:{Setting}:Doc:Psychology
+Progress note:Find:Pt:{Setting}:Doc:Psychology
+Group counseling note:Find:Pt:{Setting}:Doc:Psychology
+Progress note:Find:Pt:Hospital:Doc:Psychology
+Note:Find:Pt:Long term care facility:Doc:Psychology
+Deprecated Psychology visit note
+Note:Find:Pt:Patient's home:Doc:Psychology
+Note:Find:Pt:Hospital:Doc:Psychology
+Note:Find:Pt:{Setting}:Doc:Psychology.intern
+Initial evaluation note:Find:Pt:{Setting}:Doc:Psychology
+Note:Find:Pt:Outpatient:Doc:Psychology
+Note:Find:Pt:{Setting}:Doc:Psychology
+ 
+############################################################################
+Search String pscyhology note -->  
+clusterset:lonic_document_names
+ 
+Psychology Note
+Psychology Team Note
+Psychology Intern Note
+Neuropsychology Note
+Psychology Progress Note
+Psychology Group Counseling Note
+Psychology Initial Evaluation Note
+Psychology Diagnostic Study Note
+ 
